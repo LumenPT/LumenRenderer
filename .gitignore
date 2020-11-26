@@ -2,6 +2,16 @@
 # Created by https://www.toptal.com/developers/gitignore/api/visualstudio,c++,cuda
 # Edit at https://www.toptal.com/developers/gitignore?templates=visualstudio,c++,cuda
 
+
+Lumen_Engine/Lumen_Engine.sln
+Lumen_Engine/Sandbox/Sandbox.vcxproj
+Lumen_Engine/Lumen/Lumen.vcxproj
+Lumen_Engine/Lumen/Lumen.vcxproj.filters
+.vs/CMake Overview
+.vs/ProjectSettings.json
+.vs/slnx.sqlite
+.vs/VSWorkspaceState.json
+
 ### C++ ###
 # Prerequisites
 *.d
