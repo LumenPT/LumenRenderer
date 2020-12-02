@@ -12,6 +12,7 @@ Lumen_Engine/Lumen/Lumen.vcxproj.filters
 .vs/slnx.sqlite
 .vs/VSWorkspaceState.json
 Lumen_Engine/build
+Lumen_Engine/out
 
 ### C++ ###
 # Prerequisites

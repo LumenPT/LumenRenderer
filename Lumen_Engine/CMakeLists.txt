@@ -17,5 +17,7 @@ add_subdirectory ("Lumen/vendor/Glad")
 add_subdirectory ("Lumen/vendor/ImGui")
 	#Lumen
 add_subdirectory ("Lumen")
+	#LumenPT
+add_subdirectory ("LumenPT")
 	#Sandbox
 add_subdirectory ("Sandbox")
