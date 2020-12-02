@@ -11,6 +11,7 @@ Lumen_Engine/Lumen/Lumen.vcxproj.filters
 .vs/ProjectSettings.json
 .vs/slnx.sqlite
 .vs/VSWorkspaceState.json
+Lumen_Engine/build
 
 ### C++ ###
 # Prerequisites
