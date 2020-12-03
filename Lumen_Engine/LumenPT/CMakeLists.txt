@@ -22,17 +22,12 @@ file(GLOB_RECURSE SOURCE_FILES
 # Add header and source files to library
 add_library (${PROJECT_NAME} STATIC ${HEADER_FILES} ${SOURCE_FILES})
 
-link_directories(
-	${CMAKE_CURRENT_SOURCE_DIR}/vendor/Libs
-	${CMAKE_CURRENT_SOURCE_DIR}/vendor/Libs/Cuda
-	)
-
 # Put all libraries into a variable
 set(LIBS
-	cuda.lib
-	cudart.lib
-	cudadevrt.lib
-	glad.lib
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Libs/Cuda/cuda.lib"
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Libs/Cuda/cudart.lib"
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Libs/Cuda/cudadevrt.lib"
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Libs/glad.lib"
 )
 
 set(INCLUDES
@@ -48,6 +43,4 @@ target_include_directories(${PROJECT_NAME} PUBLIC
 # Define the link libraries
 target_link_libraries(${PROJECT_NAME} 
 	${LIBS}
-
-
 )
