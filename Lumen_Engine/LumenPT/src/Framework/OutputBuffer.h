@@ -11,7 +11,7 @@ public:
     OutputBuffer(uint32_t a_Width, uint32_t a_Height);
     ~OutputBuffer();
 
-    void* GetDevicePointer();
+    uchar4* GetDevicePointer();
 
     GLuint GetTexture();
 

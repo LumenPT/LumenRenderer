@@ -33,6 +33,7 @@ set(LIBS
 set(INCLUDES
 	"vendor/Include"
 	"vendor/Include/Cuda"
+	"${CMAKE_CURRENT_BINARY_DIR}/config"
 )
 
 # Define the include DIRs
@@ -43,4 +44,9 @@ target_include_directories(${PROJECT_NAME} PUBLIC
 # Define the link libraries
 target_link_libraries(${PROJECT_NAME} 
 	${LIBS}
+)
+
+configure_file(
+	${CMAKE_CURRENT_SOURCE_DIR}/cmake/LumenConfig.h.in 
+	${CMAKE_CURRENT_BINARY_DIR}/config/LumenConfig.h
 )

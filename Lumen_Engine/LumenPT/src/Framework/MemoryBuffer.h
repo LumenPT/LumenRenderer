@@ -25,5 +25,6 @@ public:
 
 private:
     unsigned long long m_CudaPtr;
+    void* m_DevPtr;
     size_t m_Size;
 };
