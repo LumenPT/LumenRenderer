@@ -5,6 +5,8 @@
 
 #include <glad/glad.h>
 
+#include <gltf.h>	//temp
+
 #include "Input.h"
 
 namespace Lumen

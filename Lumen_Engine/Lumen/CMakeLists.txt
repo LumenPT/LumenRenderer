@@ -42,6 +42,8 @@ set(INCLUDES
 	"vendor/imgui"
 	"vendor/glm"
 	"vendor/spdlog/include"
+	"vendor/nlohmann/include"
+	"vendor/fx"
 	"src"
 )
 
