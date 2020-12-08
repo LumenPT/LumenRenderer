@@ -41,7 +41,6 @@ Lumen_Engine/out
 *.lai
 *.la
 *.a
-*.lib
 
 # Executables
 *.exe
