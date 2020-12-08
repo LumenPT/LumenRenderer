@@ -51,7 +51,6 @@ Lumen_Engine/out
 *.i
 *.ii
 *.gpu
-*.ptx
 *.cubin
 *.fatbin
 

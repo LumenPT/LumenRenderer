@@ -48,7 +48,7 @@ __global__ void __raygen__draw_solid_color()
 
     unsigned int p0;
 
-    optixTrace(params.m_Handle, origin, dir, 0.0f, 1000.0f, 0.0f, OptixVisibilityMask(255), OPTIX_RAY_FLAG_NONE, 0, 1, 0, p0);
+    //optixTrace(params.m_Handle, origin, dir, 0.0f, 1000.0f, 0.0f, OptixVisibilityMask(255), OPTIX_RAY_FLAG_NONE, 0, 1, 0, p0);
 
     float3 col = make_float3(0.4f, 0.5f, 0.9f);
 
