@@ -435,3 +435,11 @@ _deps
 
 # End of https://www.toptal.com/developers/gitignore/api/cmake
 Lumen_Engine/LumenPT/config/LumenConfig.h
+Lumen_Engine\Lumen\Lumen.dir\
+.Lumen_Engine\Lumen\Lumen.dir\
+*.lib
+*.tlog
+Lumen_Engine\Lumen\vendor\Glad\Glad.dir
+Lumen_Engine\Lumen\vendor\imgui\ImGui.dir
+Lumen_Engine\LumenPT\LumenPT.dir
+Lumen_Engine\Sandbox\Sandbox.dir
