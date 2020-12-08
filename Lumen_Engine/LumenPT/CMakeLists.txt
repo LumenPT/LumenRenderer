@@ -13,23 +13,17 @@ file(GLOB_RECURSE CUDA_FILES
 )
 
 #generate .ptx files from .cu files
-#add_library(CudaPTX OBJECT ${CUDA_FILES})
-#set_target_properties(
-#	CudaPTX
-#	PROPERTIES
-#	CUDA_SEPARABLE_COMPILATION ON
-#)
+add_library(CudaPTX OBJECT ${CUDA_FILES})
+set_property(TARGET CudaPTX PROPERTY CUDA_PTX_COMPILATION ON)
 
-#set_property(TARGET CudaPTX PROPERTY CUDA_PTX_COMPILATION ON)
+target_include_directories(CudaPTX PUBLIC
+	"vendor/Include"
+	"vendor/Include/Cuda"
+)
 
-#target_include_directories(CudaPTX PUBLIC
-#	"vendor/Include"
-#	"vendor/Include/Cuda"
-#)
-
-#install(TARGETS CudaPTX
-#   OBJECTS DESTINATION bin/ptx 
-#)
+install(TARGETS CudaPTX
+   OBJECTS DESTINATION bin/ptx 
+)
 
 #Add header files
 file(GLOB_RECURSE HEADER_FILES 
