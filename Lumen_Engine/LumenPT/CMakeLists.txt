@@ -4,6 +4,8 @@ enable_language(CUDA)
 # specify the C++ standard
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
+set(CMAKE_CUDA_STANDARD 14)
+set(CMAKE_CUDA_STANDARD_REQUIRED True)
 
 #Add CUDA files
 file(GLOB_RECURSE CUDA_FILES 
