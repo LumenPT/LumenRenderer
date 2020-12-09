@@ -22,6 +22,10 @@ file(GLOB_RECURSE SOURCE_FILES
 # Add source to this project's executable
 add_executable (${PROJECT_NAME}  ${HEADER_FILES} ${SOURCE_FILES})
 
+include(${CMAKE_SOURCE_DIR}/cmake/functions.cmake)
+assign_source_group(${HEADER_FILES})
+assign_source_group(${SOURCE_FILES})
+
 set_property(TARGET ${PROJECT_NAME} PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT "Sandbox")
 

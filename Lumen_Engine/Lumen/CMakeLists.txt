@@ -22,6 +22,10 @@ file(GLOB_RECURSE SOURCE_FILES
 # Add header and source files to library
 add_library (${PROJECT_NAME} STATIC ${HEADER_FILES} ${SOURCE_FILES})
 
+include(${CMAKE_SOURCE_DIR}/cmake/functions.cmake)
+assign_source_group(${HEADER_FILES})
+assign_source_group(${SOURCE_FILES})
+
 #add precompiled header file
 target_precompile_headers(${PROJECT_NAME}
 	PRIVATE

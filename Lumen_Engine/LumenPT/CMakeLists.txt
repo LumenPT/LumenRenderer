@@ -43,6 +43,10 @@ file(GLOB_RECURSE SOURCE_FILES
 add_library (${PROJECT_NAME} STATIC ${HEADER_FILES} ${SOURCE_FILES})
 #add_dependencies(${PROJECT_NAME} CudaPTX)
 
+include(${CMAKE_SOURCE_DIR}/cmake/functions.cmake)
+assign_source_group(${HEADER_FILES})
+assign_source_group(${SOURCE_FILES})
+
 # Put all libraries into a variable
 set(LIBS
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Libs/Cuda/cuda.lib"
