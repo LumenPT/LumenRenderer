@@ -1,5 +1,7 @@
 #pragma once
 #include "MemoryBuffer.h"
+#include "ShaderBindingTableRecord.h"
+#include "../Shaders/CppCommon/LaunchParameters.h"
 
 #include <map>
 #include <string>
@@ -10,26 +12,8 @@
 
 using GLuint = unsigned;
 
-struct PipelineParameters
-{
-    void* m_OutputImage;
-    int m_ImageWidth;
-    int m_ImageHeight;
-};
-
-struct ProgramGroupHeader
-{
-    unsigned char m_Data[OPTIX_SBT_RECORD_HEADER_SIZE];
-};
-
-template<typename DataType>
-struct SBTRecord
-{
-    ProgramGroupHeader m_Header;
-    DataType m_Data;
-};
-
 class OutputBuffer;
+class ShaderBindingTableGenerator;
 
 class OptiXRenderer
 {
@@ -53,7 +37,7 @@ public:
 
     OptixProgramGroup CreateProgramGroup(OptixProgramGroupDesc a_ProgramGroupDesc, const std::string& a_Name);
 
-    OptixShaderBindingTable CreateShaderBindingTable();
+    void CreateShaderBindingTable();
 
     ProgramGroupHeader GetProgramGroupHeader(const std::string& a_GroupName) const;
 
@@ -90,6 +74,14 @@ private:
 
     OptixPipelineCompileOptions     m_PipelineCompileOptions;
     OptixPipeline                   m_Pipeline;
+
+    std::unique_ptr<ShaderBindingTableGenerator> m_ShaderBindingTableGenerator;
+
+
+    RecordHandle<RaygenData>    m_RayGenRecord;
+    RecordHandle<MissData>      m_MissRecord;
+    RecordHandle<HitData>       m_HitRecord;
+
 
     std::map<std::string, OptixProgramGroup> m_ProgramGroups;
 

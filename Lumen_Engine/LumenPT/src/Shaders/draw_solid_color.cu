@@ -41,6 +41,8 @@ __global__ void __raygen__draw_solid_color()
 {
     uint3 launch_index = optixGetLaunchIndex();
 
+    RaygenData* rgd = reinterpret_cast<RaygenData*>(optixGetSbtDataPointer());
+
     float3 origin = make_float3(static_cast<float>(launch_index.x) / params.m_ImageWidth, static_cast<float>(launch_index.y) / params.m_ImageHeight, 0.0f);
     origin.x = origin.x * 2.0f - 1.0f;
     origin.y = origin.y * 2.0f - 1.0f;
@@ -50,11 +52,15 @@ __global__ void __raygen__draw_solid_color()
 
     optixTrace(params.m_Handle, origin, dir, 0.0f, 1000.0f, 0.0f, OptixVisibilityMask(255), OPTIX_RAY_FLAG_NONE, 0, 1, 0, p0);
 
-    float3 col = make_float3(0.4f, 0.5f, 0.9f);
+    float3 col = rgd->m_Color;
 
-    if (p0 == 0)
+    if (p0 == 1)
     {
         col = make_float3(1.0f, 1.0f, 0.0f);
+    }
+    else if (p0 == 3)
+    {
+        col = make_float3(1.0f, 0.0f, 1.0f);
     }
 
     params.m_Image[launch_index.y * params.m_ImageWidth + launch_index.x] =
@@ -64,7 +70,8 @@ __global__ void __raygen__draw_solid_color()
 extern "C"
 __global__ void __miss__MissShader()
 {
-    optixSetPayload_0(0);
+    MissData* msd = reinterpret_cast<MissData*>(optixGetSbtDataPointer());;
+    optixSetPayload_0(msd->m_Num);
 }
 
 extern "C"

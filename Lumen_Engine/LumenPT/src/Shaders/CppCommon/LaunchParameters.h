@@ -1,6 +1,14 @@
 #pragma once
 
+#include <Optix/optix_types.h>
+
 #include "Cuda/cuda/helpers.h"
+
+
+struct ProgramGroupHeader
+{
+    unsigned char m_Data[OPTIX_SBT_RECORD_HEADER_SIZE];
+};
 
 struct LaunchParameters
 {
@@ -17,7 +25,7 @@ struct RaygenData
 
 struct MissData
 {
-    
+    unsigned int m_Num;
 };
 
 struct HitData

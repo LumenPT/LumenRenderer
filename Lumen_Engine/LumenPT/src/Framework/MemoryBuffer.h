@@ -4,7 +4,7 @@ class MemoryBuffer
 {
 public:
 
-    MemoryBuffer(size_t a_Size);
+    MemoryBuffer(size_t a_Size = 0);
     ~MemoryBuffer();
 
     unsigned long long& operator*();
@@ -21,10 +21,15 @@ public:
 
     void CopyFrom(MemoryBuffer a_MemoryBuffer, size_t a_Size, size_t a_DstOffset = 0, size_t a_SrcOffset = 0);
 
+    void Resize(size_t a_NewSize);
+
     size_t GetSize() const;
 
 private:
-    unsigned long long m_CudaPtr;
-    void* m_DevPtr;
+    union
+    {
+        unsigned long long m_CudaPtr;
+        void* m_DevPtr;        
+    };
     size_t m_Size;
 };

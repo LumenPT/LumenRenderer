@@ -4,6 +4,8 @@
 #include "MemoryBuffer.h"
 #include "OutputBuffer.h"
 
+#include "ShaderBindingTableGen.h"
+
 #include "../Shaders/CppCommon/LaunchParameters.h"
 
 #include "Optix/optix_stubs.h"
@@ -28,6 +30,10 @@ OptiXRenderer::OptiXRenderer(const InitializationData& /*a_InitializationData*/)
     InitializePipelineOptions();
     CreatePipeline();
     CreateOutputBuffer();
+
+    m_ShaderBindingTableGenerator = std::make_unique<ShaderBindingTableGenerator>();
+
+    CreateShaderBindingTable();
 
     cuStreamCreate(&m_CudaStream, CU_STREAM_DEFAULT);
 }
@@ -243,60 +249,29 @@ void OptiXRenderer::AccumulateStackSizes(OptixProgramGroup a_ProgramGroup, Optix
     a_StackSizes.dssDC = std::max(a_StackSizes.dssDC, localSizes.dssDC);
 }
 
-OptixShaderBindingTable OptiXRenderer::CreateShaderBindingTable()
+void OptiXRenderer::CreateShaderBindingTable()
 {
     // OptixShaderBindingTable is just a struct which describes where the different parts of the table are located in GPU memory
     // This means that the entire table could easily be split into multiple buffers if we so desire
 
+    m_RayGenRecord = m_ShaderBindingTableGenerator->SetRayGen<RaygenData>();
 
-    m_SBTBuffer = std::make_unique<MemoryBuffer>(256);
-
-    struct RayGenData
-    {
-        float3 m_ClearColor;
-    };
-
-    SBTRecord<RayGenData> rayGenRecord;
+    auto& rayGenRecord = m_RayGenRecord.GetRecord();
 
     rayGenRecord.m_Header = GetProgramGroupHeader("RayGen");
-    rayGenRecord.m_Data.m_ClearColor = { 0.4f, 0.5f, 0.9f };
+    rayGenRecord.m_Data.m_Color = { 0.4f, 0.5f, 0.2f };
 
-    m_SBTBuffer->Write(rayGenRecord, 0);
-
-    //struct MissData
-    //{
-    //    float3 m_Color;
-    //};
-
-
-    struct Empty{};
-    SBTRecord<Empty> missRecord;
-
+    m_MissRecord = m_ShaderBindingTableGenerator->AddMiss<MissData>();
+    
+    auto& missRecord = m_MissRecord.GetRecord();
     missRecord.m_Header = GetProgramGroupHeader("Miss");
+    missRecord.m_Data.m_Num = 2;
 
-    auto missOffset = (sizeof(rayGenRecord) / 32 + 1) * 32;
-    m_SBTBuffer->Write(missRecord, missOffset);
+    m_HitRecord = m_ShaderBindingTableGenerator->AddHitGroup<HitData>();
 
-    SBTRecord<Empty> hitRecord;
+    auto& hitRecord = m_HitRecord.GetRecord();
 
     hitRecord.m_Header = GetProgramGroupHeader("Hit");
-
-    auto hitOffset = missOffset + (sizeof(missRecord) / 32 + 1) * 32;
-
-    m_SBTBuffer->Write(hitRecord, hitOffset);
-
-    
-
-    OptixShaderBindingTable sbt = {};
-    sbt.raygenRecord = **m_SBTBuffer;
-    sbt.missRecordBase = **m_SBTBuffer + missOffset;
-    sbt.missRecordCount = 1;
-    sbt.missRecordStrideInBytes = (sizeof(missRecord) / OPTIX_SBT_RECORD_ALIGNMENT + 1) * OPTIX_SBT_RECORD_ALIGNMENT;
-    sbt.hitgroupRecordBase = **m_SBTBuffer + hitOffset;
-    sbt.hitgroupRecordCount = 1;
-    sbt.hitgroupRecordStrideInBytes = (sizeof(hitRecord) / OPTIX_SBT_RECORD_ALIGNMENT + 1) * OPTIX_SBT_RECORD_ALIGNMENT;
-
-    return sbt;
 }
 
 ProgramGroupHeader OptiXRenderer::GetProgramGroupHeader(const std::string& a_GroupName) const
@@ -329,7 +304,7 @@ GLuint OptiXRenderer::TraceFrame()
     MemoryBuffer devBuffer(sizeof(params));
     devBuffer.Write(params);
 
-    OptixShaderBindingTable sbt = CreateShaderBindingTable();
+    OptixShaderBindingTable sbt = m_ShaderBindingTableGenerator->GetTableDesc();
 
 
     optixLaunch(m_Pipeline, m_CudaStream, *devBuffer, devBuffer.GetSize(), &sbt, params.m_ImageWidth, params.m_ImageHeight, 1);

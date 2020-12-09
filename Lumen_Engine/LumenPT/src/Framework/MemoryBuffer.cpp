@@ -16,11 +16,10 @@ void CudaCheck(cudaError_t err)
 }
 
 MemoryBuffer::MemoryBuffer(size_t a_Size)
-: m_Size(a_Size)
+    : m_Size(a_Size)
+    , m_DevPtr(nullptr)
 {
-    CudaCheck(cudaMalloc(&m_DevPtr, m_Size));
-
-    //CudaCheck(cudaFree(m_DevPtr));
+    Resize(a_Size);
 
     m_CudaPtr = reinterpret_cast<CUdeviceptr>(m_DevPtr);
 };
@@ -51,6 +50,14 @@ void MemoryBuffer::CopyFrom(MemoryBuffer a_MemoryBuffer, size_t a_Size, size_t a
 
     CudaCheck(cudaMemcpy(reinterpret_cast<void*>(reinterpret_cast<CUdeviceptr>(m_DevPtr) + a_DstOffset), reinterpret_cast<void*>(*a_MemoryBuffer + a_SrcOffset),
         a_Size, cudaMemcpyDeviceToDevice));
+}
+
+void MemoryBuffer::Resize(size_t a_NewSize)
+{
+    if (m_DevPtr)
+        cudaFree(m_DevPtr);
+    cudaMalloc(&m_DevPtr, a_NewSize);
+    m_Size = a_NewSize;
 };
 
 size_t MemoryBuffer::GetSize() const
