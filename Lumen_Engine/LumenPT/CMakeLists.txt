@@ -1,5 +1,4 @@
 cmake_minimum_required (VERSION 3.16)
-project(LumenPT)
 enable_language(CUDA)
 
 # specify the C++ standard
@@ -40,8 +39,8 @@ file(GLOB_RECURSE SOURCE_FILES
 )
 
 # Add header and source files to library
-add_library (${PROJECT_NAME} STATIC ${HEADER_FILES} ${SOURCE_FILES})
-#add_dependencies(${PROJECT_NAME} CudaPTX)
+add_library (LumenPT STATIC ${HEADER_FILES} ${SOURCE_FILES})
+add_dependencies(LumenPT CudaPTX)
 
 include(${CMAKE_SOURCE_DIR}/cmake/functions.cmake)
 assign_source_group(${HEADER_FILES})
@@ -62,12 +61,12 @@ set(INCLUDES
 )
 
 # Define the include DIRs
-target_include_directories(${PROJECT_NAME} PUBLIC
+target_include_directories(LumenPT PUBLIC
 	${INCLUDES}
 )
 
 # Define the link libraries
-target_link_libraries(${PROJECT_NAME} 
+target_link_libraries(LumenPT 
 	${LIBS}
 )
 

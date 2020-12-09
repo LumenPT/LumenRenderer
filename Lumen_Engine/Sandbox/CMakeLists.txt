@@ -1,5 +1,4 @@
 cmake_minimum_required (VERSION 3.16)
-project(Sandbox)
 
 # specify the C++ standard
 set(CMAKE_CXX_STANDARD 17)
@@ -20,17 +19,17 @@ file(GLOB_RECURSE SOURCE_FILES
 )
 
 # Add source to this project's executable
-add_executable (${PROJECT_NAME}  ${HEADER_FILES} ${SOURCE_FILES})
+add_executable (Sandbox  ${HEADER_FILES} ${SOURCE_FILES})
 
 include(${CMAKE_SOURCE_DIR}/cmake/functions.cmake)
 assign_source_group(${HEADER_FILES})
 assign_source_group(${SOURCE_FILES})
 
-set_property(TARGET ${PROJECT_NAME} PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
+set_property(TARGET Sandbox PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT "Sandbox")
 
 #Add header directory includes
-target_include_directories(${PROJECT_NAME} PUBLIC
+target_include_directories(Sandbox PUBLIC
 	"${CMAKE_CURRENT_SOURCE_DIR}/../Lumen/src"
 	"${CMAKE_CURRENT_SOURCE_DIR}/../Lumen/vendor"
 	"${CMAKE_CURRENT_SOURCE_DIR}/../Lumen/vendor/glm"
@@ -41,7 +40,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC
 	"${CMAKE_CURRENT_SOURCE_DIR}/../LumenPT/src"
 )
 
-target_link_libraries(${PROJECT_NAME} 
+target_link_libraries(Sandbox
 	Lumen
 	LumenPT
 )

@@ -1,5 +1,4 @@
 cmake_minimum_required (VERSION 3.16)
-project(Lumen)
 
 # specify the C++ standard
 set(CMAKE_CXX_STANDARD 17)
@@ -20,14 +19,14 @@ file(GLOB_RECURSE SOURCE_FILES
 )
 
 # Add header and source files to library
-add_library (${PROJECT_NAME} STATIC ${HEADER_FILES} ${SOURCE_FILES})
+add_library (Lumen STATIC ${HEADER_FILES} ${SOURCE_FILES})
 
 include(${CMAKE_SOURCE_DIR}/cmake/functions.cmake)
 assign_source_group(${HEADER_FILES})
 assign_source_group(${SOURCE_FILES})
 
 #add precompiled header file
-target_precompile_headers(${PROJECT_NAME}
+target_precompile_headers(Lumen
 	PRIVATE
 		"src/lmnpch.h"
 )
@@ -54,13 +53,13 @@ set(INCLUDES
 add_compile_definitions(GLFW_INCLUDE_NONE)
 
 # Define the include DIRs
-target_include_directories(${PROJECT_NAME} PUBLIC
+target_include_directories(Lumen PUBLIC
 
 	${INCLUDES}
 )
 
 # Define the link libraries
-target_link_libraries(${PROJECT_NAME} 
+target_link_libraries(Lumen 
 
 	${LIBS}
 )
