@@ -7,6 +7,27 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_CUDA_STANDARD 14)
 set(CMAKE_CUDA_STANDARD_REQUIRED True)
 
+
+#function to transform input paths to output paths.
+function(changePath REGEX_MATCH REGEX_REPLACE RESULT_VAR_NAME)
+
+	set(RESULT "")
+
+	foreach(ARG IN LISTS ARGN)
+
+		string(REGEX REPLACE ${REGEX_MATCH} ${REGEX_REPLACE} OUTPUTPATH ${ARG})
+		list(APPEND RESULT ${OUTPUTPATH})
+
+		#message("\n Replaced: ${ARG} \n with: ${OUTPUTPATH}")
+
+	endforeach()
+
+	set(${RESULT_VAR_NAME} ${RESULT} PARENT_SCOPE)
+	
+endfunction()
+
+
+
 #Add CUDA files
 file(GLOB_RECURSE CUDA_FILES 
 
@@ -22,9 +43,23 @@ target_include_directories(CudaPTX PUBLIC
 	"vendor/Include/Cuda"
 )
 
-install(TARGETS CudaPTX
-   OBJECTS DESTINATION bin/ptx 
-)
+set(CUDA_FILES_OUTPUT "")
+set(CUDA_FILES_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/Assets/CompiledShaders)
+
+#replace input file paths with output path and extension. Capture first part because otherwise first path will not be replaced.
+changePath("(.*\\/)([A-Za-z0-9_\\.]+\\.)cu\\;?$" "${CUDA_FILES_OUTPUT_DIR}/\\2ptx" CUDA_FILES_OUTPUT "${CUDA_FILES}")
+
+message("CUDA_FILES_OUTPUT: ${CUDA_FILES_OUTPUT}")
+add_custom_command(
+	OUTPUT ${CUDA_FILES_OUTPUT}
+	COMMAND ${CMAKE_COMMAND} -E make_directory ${CUDA_FILES_OUTPUT_DIR}
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_OBJECTS:CudaPTX> ${CUDA_FILES_OUTPUT_DIR}
+	#COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_OBJECTS:CudaPTX> ${CUDA_FILES_OUTPUT_DIR}
+	DEPENDS CudaPTX
+	VERBATIM
+	COMMAND_EXPAND_LISTS)
+
+add_custom_target(copyCUDAOutput ALL DEPENDS ${CUDA_FILES_OUTPUT})
 
 #Add header files
 file(GLOB_RECURSE HEADER_FILES 
