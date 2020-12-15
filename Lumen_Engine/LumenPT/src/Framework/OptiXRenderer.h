@@ -82,6 +82,7 @@ private:
     RecordHandle<MissData>      m_MissRecord;
     RecordHandle<HitData>       m_HitRecord;
 
+    std::unique_ptr<class Texture> m_Texture;
 
     std::map<std::string, OptixProgramGroup> m_ProgramGroups;
 

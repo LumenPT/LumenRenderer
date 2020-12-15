@@ -47,6 +47,7 @@ set(INCLUDES
 	"vendor/spdlog/include"
 	"vendor/nlohmann/include"
 	"vendor/fx"
+	"vendor/stb"
 	"src"
 )
 

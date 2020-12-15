@@ -9,10 +9,15 @@
 
 void CudaCheck(cudaError_t err)
 {
+#ifdef _DEBUG
     if (err != 0)
     {
         printf("Cuda error %u", err);
+        abort();
     }
+#else
+    err;
+#endif
 }
 
 MemoryBuffer::MemoryBuffer(size_t a_Size)

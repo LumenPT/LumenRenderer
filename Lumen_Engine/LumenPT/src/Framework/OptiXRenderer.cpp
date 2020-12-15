@@ -7,12 +7,14 @@
 #include "ShaderBindingTableGen.h"
 
 #include "../Shaders/CppCommon/LaunchParameters.h"
+#include "Texture.h"
 
 #include "Optix/optix_stubs.h"
 
 #include "Cuda/cuda.h"
 #include "Cuda/cuda_gl_interop.h"
 #include "Cuda/cuda_runtime.h"
+
 
 #include <cstdio>
 #include <fstream>
@@ -23,6 +25,8 @@
 #include <bitset>
 #include <iostream>
 
+const uint32_t gs_ImageWidth = 800;
+const uint32_t gs_ImageHeight = 600;
 
 OptiXRenderer::OptiXRenderer(const InitializationData& /*a_InitializationData*/)
 {
@@ -33,7 +37,19 @@ OptiXRenderer::OptiXRenderer(const InitializationData& /*a_InitializationData*/)
 
     m_ShaderBindingTableGenerator = std::make_unique<ShaderBindingTableGenerator>();
 
+
+    uchar4 px[] = {
+        {255, 0, 0, 255 },
+        {255, 255, 0, 255 },
+        {255, 0, 0, 255 },
+        {255, 255, 0, 255 }
+    };
+    //m_Texture = std::make_unique<Texture>(px, cudaCreateChannelDesc<uchar4>(), 2, 2);
+
+    m_Texture = std::make_unique<Texture>(LumenPTConsts::gs_AssetDirectory + "debugTex.jpg");
+
     CreateShaderBindingTable();
+
 
     cuStreamCreate(&m_CudaStream, CU_STREAM_DEFAULT);
 }
@@ -228,7 +244,7 @@ OptixTraversableHandle OptiXRenderer::BuildInstanceAccelerationStructure(std::ve
 
 void OptiXRenderer::CreateOutputBuffer()
 {
-    m_OutputBuffer = std::make_unique<OutputBuffer>(128, 128);
+    m_OutputBuffer = std::make_unique<OutputBuffer>(gs_ImageWidth, gs_ImageHeight);
 }
 
 void OptiXRenderer::DebugCallback(unsigned int a_Level, const char* a_Tag, const char* a_Message, void*)
@@ -260,18 +276,22 @@ void OptiXRenderer::CreateShaderBindingTable()
 
     rayGenRecord.m_Header = GetProgramGroupHeader("RayGen");
     rayGenRecord.m_Data.m_Color = { 0.4f, 0.5f, 0.2f };
+    
 
     m_MissRecord = m_ShaderBindingTableGenerator->AddMiss<MissData>();
     
     auto& missRecord = m_MissRecord.GetRecord();
     missRecord.m_Header = GetProgramGroupHeader("Miss");
     missRecord.m_Data.m_Num = 2;
+    missRecord.m_Data.m_Color = { 0.0f, 0.0f, 1.0f };
+
 
     m_HitRecord = m_ShaderBindingTableGenerator->AddHitGroup<HitData>();
 
     auto& hitRecord = m_HitRecord.GetRecord();
 
     hitRecord.m_Header = GetProgramGroupHeader("Hit");
+    hitRecord.m_Data.m_TextureObject = **m_Texture;
 }
 
 ProgramGroupHeader OptiXRenderer::GetProgramGroupHeader(const std::string& a_GroupName) const
@@ -289,20 +309,28 @@ GLuint OptiXRenderer::TraceFrame()
 {
     std::vector<float3> vert = {
         {0.5f, 0.5f, 0.5f},
-        {-0.5f, 0.5f, 0.5f},
-        {0.0f, 0.0f, 0.5f}
+        {0.5f, -0.5f, 0.5f},
+        {-0.5f, 0.5f, 0.5f}
     };
 
     LaunchParameters params = {};
 
     params.m_Image = m_OutputBuffer->GetDevicePointer();
     params.m_Handle = BuildGeometryAccelerationStructure(vert);
-    params.m_ImageWidth = 128;
-    params.m_ImageHeight = 128;
+    params.m_ImageWidth = gs_ImageWidth;
+    params.m_ImageHeight = gs_ImageHeight;
     // Fill out struct here with whatev
 
     MemoryBuffer devBuffer(sizeof(params));
     devBuffer.Write(params);
+
+    auto c = m_MissRecord.GetRecord().m_Data.m_Color;
+
+    static float f = 0.0f;
+
+    f += 1.0f / 60.0f;
+
+    m_MissRecord.GetRecord().m_Data.m_Color = { 0.0f, sinf(f), 0.0f };
 
     OptixShaderBindingTable sbt = m_ShaderBindingTableGenerator->GetTableDesc();
 
@@ -310,6 +338,7 @@ GLuint OptiXRenderer::TraceFrame()
     optixLaunch(m_Pipeline, m_CudaStream, *devBuffer, devBuffer.GetSize(), &sbt, params.m_ImageWidth, params.m_ImageHeight, 1);
     cuStreamSynchronize(m_CudaStream);
 
+    auto err = cudaGetLastError();
 
     return m_OutputBuffer->GetTexture();
 }

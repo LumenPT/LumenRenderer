@@ -26,9 +26,10 @@ struct RaygenData
 struct MissData
 {
     unsigned int m_Num;
+    float3 m_Color;
 };
 
 struct HitData
 {
-    
+    cudaTextureObject_t m_TextureObject;
 };

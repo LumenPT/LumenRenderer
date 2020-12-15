@@ -3,8 +3,6 @@
 #include "../Shaders/CppCommon/LaunchParameters.h"
 
 #include <unordered_map>
-static int counter = 9;
-
 
 template<typename T>
 struct Record
@@ -25,24 +23,13 @@ public:
     RecordHandleBase(RecordHandleBase&) = delete;
     RecordHandleBase& operator=(RecordHandleBase&) = delete;
 
-    //RecordHandleBase(RecordHandleBase&& a_Other);
-    //RecordHandleBase& operator=(RecordHandleBase&& a_Other);
-
-    void debug()
-    {
-        if (count == 18)
-        {
-            printf("asd");
-        }
-    }
-
     uint32_t m_TableIndex;
 
 protected:
     void UpdateGeneratorReference();
 
-    void* m_RawData;
-    uint32_t m_Size;
+    void* m_RawData; // Pointer to the record in the child object
+    uint32_t m_Size; // Size of the record owned by the child object
 
     std::unordered_map<uint64_t, RecordHandleBase*>* m_RecordListRef;
     RecordHandleBase** m_RecordHandleRef;
@@ -60,8 +47,6 @@ public:
     RecordHandle()
         : RecordHandleBase()
     {
-        debug();
-        count = counter++;
         m_Size = sizeof(Record<T>);
         m_RawData = &m_Record;
     }
@@ -90,8 +75,6 @@ private:
 template <typename T>
 RecordHandle<T>::~RecordHandle()
 {
-    printf("Destr\n");
-
     if (m_RecordListRef)
         m_RecordListRef->erase(m_Key);
     else if (m_RecordHandleRef)
@@ -101,32 +84,21 @@ RecordHandle<T>::~RecordHandle()
 template <typename T>
 RecordHandle<T>::RecordHandle(RecordHandle<T>&& a_Other)
 {
-    count = counter++;
     memcpy(this, &a_Other, sizeof(a_Other));
-
-    debug();
-    a_Other.debug();
 
     UpdateGeneratorReference();
 
     a_Other.m_RecordHandleRef = nullptr;
     a_Other.m_RecordListRef = nullptr;
-    printf("M C D\n");
 
     m_RawData = &m_Record;
-    count = counter++;
-    debug();
 }
 
 template <typename T>
 RecordHandle<T>& RecordHandle<T>::operator=(RecordHandle<T>&& a_Other)
 {
-    count = counter++;
     //RecordHandle<T> newHandle;
     memcpy(this, &a_Other, sizeof(a_Other));
-
-    debug();
-    a_Other.debug();
 
     UpdateGeneratorReference();
 
@@ -134,8 +106,6 @@ RecordHandle<T>& RecordHandle<T>::operator=(RecordHandle<T>&& a_Other)
 
     a_Other.m_RecordHandleRef = nullptr;
     a_Other.m_RecordListRef = nullptr;
-
-    printf("M A D\n");
 
     return *this;
 }
