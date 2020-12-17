@@ -2,6 +2,7 @@
 #include "MemoryBuffer.h"
 #include "ShaderBindingTableRecord.h"
 #include "../Shaders/CppCommon/LaunchParameters.h"
+#include "Camera.h"
 
 #include <map>
 #include <string>
@@ -91,6 +92,8 @@ private:
     std::unique_ptr<MemoryBuffer> m_SBTBuffer;
 
     CUstream_st* m_CudaStream;
+
+    Camera m_Camera;
 };
 
 template <typename VertexType, typename IndexType>

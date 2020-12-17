@@ -47,7 +47,7 @@ private:
 	float m_AspectRatio = 1.0f;
 
 	glm::vec2 m_ImagePlaneHalfSize = glm::vec2(1.0f, 1.0f);
-	float m_FovY = 35.f;
+	float m_FovY = 90.f;
 
 	bool m_DirtyFlag = true;
 };
