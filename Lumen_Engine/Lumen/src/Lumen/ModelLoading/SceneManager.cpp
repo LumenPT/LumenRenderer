@@ -2,6 +2,7 @@
 #include "SceneManager.h"
 #include "Node.h"
 #include "Transform.h"
+#include "../Renderer/ILumenMesh.h"
 
 //#include <string>
 #include <memory>
@@ -9,7 +10,6 @@
 
 Lumen::SceneManager::Scene* Lumen::SceneManager::LoadGLTF(std::string a_Path, glm::mat4& a_TransformMat)
 {
-
 	auto findIter = m_LoadedScenes.find(a_Path);
 
 	if(findIter != m_LoadedScenes.end())
@@ -20,16 +20,11 @@ Lumen::SceneManager::Scene* Lumen::SceneManager::LoadGLTF(std::string a_Path, gl
 	auto& res = m_LoadedScenes[a_Path];		// create new scene at path key
 	auto doc = fx::gltf::LoadFromText(a_Path);
 
+	LoadMeshes(doc, res);
 	LoadNodes(doc, res, a_TransformMat);
-
+	
 	return& res;
 }
-
-//std::vector<std::shared_ptr<Lumen::SceneManager::Scene>> Lumen::SceneManager::LoadScenes(fx::gltf::Document& a_Doc,
-//	std::string a_Filepath)
-//{
-//	
-//}
 
 void Lumen::SceneManager::LoadNodes(fx::gltf::Document& a_Doc, Scene& a_Scene, glm::mat4& a_TransformMat)
 {
@@ -48,9 +43,7 @@ void Lumen::SceneManager::LoadNodes(fx::gltf::Document& a_Doc, Scene& a_Scene, g
 	{
 		const fx::gltf::Node& fxNode = a_Doc.nodes.at(fxNodeIdx);
 		
-		// Create Lumen Node based on fx-gltf node
 		std::shared_ptr<Node> newNode = std::make_shared<Node>();
-		//Assuming undefined fields in fx-gltf end up as -1
 		newNode->m_MeshID = -1 ? -1 : (fxNode.mesh + meshOffset);
 		newNode->m_Name = fxNode.name;
 		newNode->m_NodeID = static_cast<int>(nodes.size());
@@ -90,6 +83,24 @@ void Lumen::SceneManager::LoadNodes(fx::gltf::Document& a_Doc, Scene& a_Scene, g
 		
 		a_Scene.m_NodePool.push_back(newNode);
 	}
+}
+
+void Lumen::SceneManager::LoadMeshes(fx::gltf::Document& a_Doc, Scene& a_Scene, glm::mat4& a_TransformMat)
+{
+	const int meshOffset = static_cast<int>(a_Scene.m_MeshPool.size());
+
+	std::vector<std::shared_ptr<ILumenMesh>> meshes;
+
+	// pass binary data into mesh
+
+
+	/*for (auto& fxMesh : a_Doc)
+	{
+
+	}*/
+	
+	//a_Scene.m_MeshPool = 
+	
 }
 
 

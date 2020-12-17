@@ -5,6 +5,7 @@
 #include "imgui/imgui.h"
 
 #include "GLFW/include/GLFW/glfw3.h"
+#include "Lumen/ModelLoading/SceneManager.h"
 
 
 //#include "imgui/imgui.h"
@@ -64,8 +65,8 @@ public:
 
 		//PushOverlay(new Lumen::ImGuiLayer());
 		
-		//Lumen::SceneManager Manager;
-		//Manager.LoadGLTF("Yes lets load");
+		Lumen::SceneManager Manager = Lumen::SceneManager();
+		Manager.LoadGLTF("Yes lets load");
 	}
 
 	~Sandbox()

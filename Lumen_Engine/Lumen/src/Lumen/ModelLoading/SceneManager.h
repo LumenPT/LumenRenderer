@@ -11,7 +11,7 @@
 namespace Lumen
 {
 	class Transform;
-	class Mesh;
+	class ILumenMesh;
 	class Scene;
 	class Node;
 }
@@ -28,7 +28,7 @@ namespace Lumen
 		{
 			std::vector<int>						m_RootNodeIndices;
 			std::vector<std::shared_ptr<Node>>		m_NodePool;
-			std::vector<std::shared_ptr<Mesh>>		m_MeshPool;
+			std::vector<std::shared_ptr<ILumenMesh>>		m_MeshPool;
 			// Also contain materials
 			// Also contain textures
 			// Also contain lights
@@ -38,8 +38,8 @@ namespace Lumen
 			// Generic resource. Perhaps contains volumes, too?
 		};
 		
-		SceneManager();
-		~SceneManager();
+		SceneManager(){};
+		~SceneManager(){};
 
 		SceneManager(SceneManager&) = delete;
 		SceneManager(SceneManager&&) = delete;
@@ -60,6 +60,7 @@ namespace Lumen
 		//std::vector<std::shared_ptr<Scene>> LoadScenes(fx::gltf::Document& a_Doc, std::string a_Filepath);
 
 		void LoadNodes(fx::gltf::Document& a_Doc, Scene& a_Scene, glm::mat4& a_TransformMat = glm::mat4(0));
+		void LoadMeshes(fx::gltf::Document& a_Doc, Scene& a_Scene, glm::mat4& a_TransformMat = glm::mat4(0));
 		
 	};
 
