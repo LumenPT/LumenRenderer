@@ -5,37 +5,52 @@
 
 #include "Lumen.h"
 
-class Camera
+namespace Lumen
 {
-public:
-	Camera();
-	Camera(glm::vec3 a_position, glm::vec3 a_up, float yaw, float pitch);
-	~Camera();
+	class Camera
+	{
+	public:
+		Camera();
+		Camera(glm::vec3 a_Position, glm::vec3 a_Up, float a_Yaw, float a_Pitch);
+		~Camera();
 
-	void GetVectorData(glm::vec3& eye, glm::vec3& U, glm::vec3& V, glm::vec3& W);
-	void HandleInput();
+		//TODO: set lookat
+		
+		void SetPosition(glm::vec3 a_Position) { m_Position = a_Position; m_DirtyFlag = true; }
+		glm::vec3 GetPosition() const { return m_Position; }
 
-private:
-	void UpdateImagePlane();
-	void UpdateCameraVectors();
+		void SetYaw(float a_Yaw) { m_Yaw = a_Yaw; m_DirtyFlag = true; }
+		float GetYaw() const { return m_Yaw; }
 
-	glm::vec3 m_position = glm::vec3(0.f, 0.f, 0.f);
-	glm::vec3 m_worldUp = glm::vec3(0.f, 1.f, 0.f);
+		void SetPitch(float a_Pitch) { m_Pitch = a_Pitch; m_DirtyFlag = true; }
+		float GetPitch() const { return m_Pitch; }
+		
+		void GetVectorData(glm::vec3& a_Eye, glm::vec3& a_U, glm::vec3& a_V, glm::vec3& a_W);
+		void HandleInput();
 
-	glm::vec3 m_forward = glm::vec3(0.f, 0.f, 1.0f);
-	glm::vec3 m_right = glm::vec3(-1.f, 0.f, 0.f);
-	glm::vec3 m_up = glm::vec3(0.f, 1.f, 0.f);
+	private:
+		void UpdateImagePlane();
+		void UpdateCameraVectors();
 
-	float m_yaw = 0.f;
-	float m_pitch = 0.f;
+		glm::vec3 m_Position = glm::vec3(0.f, 0.f, 0.f);
+		glm::vec3 m_WorldUp = glm::vec3(0.f, 1.f, 0.f);
 
-	float m_movementSpeed = 50.f;
+		glm::vec3 m_Forward = glm::vec3(0.f, 0.f, 1.0f);
+		glm::vec3 m_Right = glm::vec3(-1.f, 0.f, 0.f);
+		glm::vec3 m_Up = glm::vec3(0.f, 1.f, 0.f);
 
-	float m_focalLength = 1.0f;
-	float m_aspectRatio = 1.0f;
-	float m_fovY = 35.f;
-	
-	glm::vec2 m_imagePlaneHalfSize = glm::vec2(1.0f, 1.0f);
+		float m_Yaw = 0.f;
+		float m_Pitch = 0.f;
 
-	bool m_dirtyFlag = true;
-};
+		float m_MovementSpeed = 1.f;
+		float m_RotationSpeed = 1.f;
+
+		float m_FocalLength = 1.0f;
+		float m_AspectRatio = 1.0f;
+
+		glm::vec2 m_ImagePlaneHalfSize = glm::vec2(1.0f, 1.0f);
+		float m_FovY = 35.f;
+
+		bool m_DirtyFlag = true;
+	};
+}
