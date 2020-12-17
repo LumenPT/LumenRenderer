@@ -334,6 +334,14 @@ GLuint OptiXRenderer::TraceFrame()
     params.m_VertexBuffer = vertexBuffer.GetDevicePtr<Vertex>();
     // Fill out struct here with whatev
 
+    m_Camera.SetAspectRatio(static_cast<float>(gs_ImageWidth) / static_cast<float>(params.m_ImageHeight));
+    glm::vec3 eye, U, V, W;
+    m_Camera.GetVectorData(eye, U, V, W);
+    params.eye = make_float3(eye.x, eye.y, eye.z);
+    params.U = make_float3(U.x, U.y, U.z);
+    params.V = make_float3(V.x, V.y, V.z);
+    params.W = make_float3(W.x, W.y, W.z);
+	
     LaunchParameters lparam;
 
     MemoryBuffer devBuffer(sizeof(params));
