@@ -1,5 +1,9 @@
 #include "Camera.h"
 
+#include <assert.h>
+
+#include <glm/gtx/rotate_vector.hpp>
+
 Camera::Camera() :
 	m_DirtyFlag(true)
 {
@@ -23,6 +27,30 @@ Camera::~Camera()
 
 }
 
+void Camera::SetRotation(glm::quat a_Rotation)
+{
+	glm::vec3 viewDirection = glm::vec3(0.f, 0.f, 1.0f) * a_Rotation;
+	SetRotation(viewDirection);
+}
+
+void Camera::SetRotation(glm::vec3& direction)
+{
+	//https://gamedev.stackexchange.com/questions/112565/finding-pitch-yaw-values-from-lookat-vector
+	m_Pitch = glm::degrees(glm::asin(direction.y));
+	m_Yaw = glm::degrees(glm::atan(direction.x, direction.z));
+}
+
+void Camera::SetLookAt(glm::vec3 a_Position, glm::vec3 a_LookAtPos, glm::vec3 a_WorldUp)
+{
+	glm::vec3 viewDirection = a_LookAtPos - a_Position;
+	SetRotation(viewDirection);
+	
+	m_Position = a_Position;
+	m_WorldUp = a_WorldUp;
+
+	m_DirtyFlag = true;
+}
+
 void Camera::GetVectorData(glm::vec3& a_Eye, glm::vec3& a_U, glm::vec3& a_V, glm::vec3& a_W)
 {
 	if(m_DirtyFlag)
@@ -44,31 +72,6 @@ void Camera::UpdateValues()
 	UpdateImagePlane();
 	UpdateCameraVectors();
 }
-
-/*void Camera::HandleInput()
-{
-	float movementSpeed = 5.f;
-	glm::vec3 movementDirection = glm::vec3(0.f, 0.f, 0.f);
-
-	if (Lumen::Input::IsKeyPressed(LMN_KEY_UP))
-	{
-		movementDirection += glm::normalize(m_Forward) * movementSpeed;
-	}
-	if (Lumen::Input::IsKeyPressed(LMN_KEY_DOWN))
-	{
-		movementDirection -= glm::normalize(m_Forward) * movementSpeed;
-	}
-	if (Lumen::Input::IsKeyPressed(LMN_KEY_LEFT))
-	{
-		movementDirection -= glm::normalize(m_Right) * movementSpeed;
-	}
-	if (Lumen::Input::IsKeyPressed(LMN_KEY_DOWN))
-	{
-		movementDirection += glm::normalize(m_Right) * movementSpeed;
-	}
-
-	m_Position += glm::normalize(movementDirection) * movementSpeed;
-}*/
 
 void Camera::UpdateImagePlane()
 {

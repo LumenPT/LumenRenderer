@@ -89,6 +89,7 @@ __device__ __forceinline__ float3 MicrofacetBRDF(const float3 WIN, const float3 
 
     //const float3 ks = F;
     const float3 kd = (1.0f - F) * (1.0f - metallic);
+    const float3 diffuse = albedo / M_PIf;
 
-    return kd * (albedo / M_PIf) + specular;
+    return kd * diffuse + specular;
 }
