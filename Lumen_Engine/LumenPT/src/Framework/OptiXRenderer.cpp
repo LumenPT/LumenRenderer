@@ -7,6 +7,7 @@
 #include "ShaderBindingTableGen.h"
 
 #include "../Shaders/CppCommon/LaunchParameters.h"
+#include "../Shaders/CppCommon/ModelStructs.h"
 #include "Texture.h"
 
 #include "Optix/optix_stubs.h"
@@ -313,13 +314,27 @@ GLuint OptiXRenderer::TraceFrame()
         {-0.5f, 0.5f, 0.5f}
     };
 
+    std::vector<Vertex> verti = std::vector<Vertex>(3);
+    verti[0].m_Position = vert[0];
+    verti[0].m_Normal = { 1.0f, 0.0f, 0.0f };
+    verti[1].m_Position = vert[1];
+    verti[1].m_Normal = { 0.0f, 1.0f, 0.0f };
+    verti[2].m_Position = vert[2];
+    verti[2].m_Normal = { 0.0f, 0.0f, 1.0f };
+
+    MemoryBuffer vertexBuffer(verti.size() * sizeof(Vertex));
+    vertexBuffer.Write(verti.data(), verti.size() * sizeof(Vertex), 0);
+
     LaunchParameters params = {};
 
     params.m_Image = m_OutputBuffer->GetDevicePointer();
-    params.m_Handle = BuildGeometryAccelerationStructure(vert);
+    params.m_Handle = BuildGeometryAccelerationStructure(verti);
     params.m_ImageWidth = gs_ImageWidth;
     params.m_ImageHeight = gs_ImageHeight;
+    params.m_VertexBuffer = vertexBuffer.GetDevicePtr<Vertex>();
     // Fill out struct here with whatev
+
+    LaunchParameters lparam;
 
     MemoryBuffer devBuffer(sizeof(params));
     devBuffer.Write(params);

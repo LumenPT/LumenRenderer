@@ -54,16 +54,22 @@ __global__ void __raygen__draw_solid_color()
 
     float3 col = rgd->m_Color;
 
+    float U = int_as_float(p1);
+    float V = int_as_float(p2);
+
+    Vertex* A = &params.m_VertexBuffer[p0 + 0];
+    Vertex* B = &params.m_VertexBuffer[p0 + 1];
+    Vertex* C = &params.m_VertexBuffer[p0 + 2];
+
+    float W = 1.0f - (U + V);
+
+    col = A->m_Normal * U + B->m_Normal * V + C->m_Normal * W;
+    //col = make_float3(int_as_float(p0), int_as_float(p1), int_as_float(p2));
+
     if (p0 == 1)
     {
-        col = make_float3(1.0f, 1.0f, 0.0f);
+        col = make_float3(0.4f, 0.5f, 0.9f);
     }
-    else if (p0 == 3)
-    {
-        col = make_float3(1.0f, 0.0f, 1.0f);
-    }
-
-    col = make_float3(int_as_float(p0), int_as_float(p1), int_as_float(p2));
 
     params.m_Image[launch_index.y * params.m_ImageWidth + launch_index.x] =
         make_color( col );
@@ -74,7 +80,8 @@ __global__ void __miss__MissShader()
 {
     MissData* msd = reinterpret_cast<MissData*>(optixGetSbtDataPointer());
 
-    optixSetPayload_0(float_as_int(msd->m_Color.z * 0.25f));
+
+    optixSetPayload_0(1);
     optixSetPayload_1(float_as_int(msd->m_Color.y));
     optixSetPayload_2(float_as_int(msd->m_Color.z));
 }
@@ -88,7 +95,7 @@ __global__ void __closesthit__HitShader()
     auto col1 = tex2D<float4>(msd->m_TextureObject, barycentrics.x, 1 - barycentrics.y);
 
 
-    optixSetPayload_0(float_as_int(col1.x));
-    optixSetPayload_1(float_as_int(col1.y));
-    optixSetPayload_2(float_as_int(col1.z));
+    optixSetPayload_0(optixGetPrimitiveIndex());
+    optixSetPayload_1(float_as_int(barycentrics.x));
+    optixSetPayload_2(float_as_int(barycentrics.y));
 }

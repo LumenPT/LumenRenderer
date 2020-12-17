@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ModelStructs.h"
+
 #include <Optix/optix_types.h>
 
 #include "Cuda/cuda/helpers.h"
@@ -13,6 +15,7 @@ struct ProgramGroupHeader
 struct LaunchParameters
 {
     uchar4* m_Image;
+    Vertex* m_VertexBuffer;
     OptixTraversableHandle m_Handle;
     unsigned int m_ImageHeight;
     unsigned int m_ImageWidth;
