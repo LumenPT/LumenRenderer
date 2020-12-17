@@ -75,10 +75,10 @@ void Camera::UpdateCameraVectors()
 	m_Forward = glm::vec3(0, 0, 1);
 	m_Forward = glm::rotate(m_Forward, glm::radians(m_Yaw), m_WorldUp);
 
-	m_Right = glm::normalize(glm::cross(m_Forward, m_WorldUp));
+	m_Right = glm::normalize(glm::cross(m_WorldUp, m_Forward));
 	m_Forward = glm::rotate(m_Forward, glm::radians(m_Pitch), m_Right);
 
-	m_Up = glm::normalize(glm::cross(m_Right, m_Forward));
+	m_Up = glm::normalize(glm::cross(m_Forward, m_Right));
 
 	m_DirtyFlag = false;
 }
