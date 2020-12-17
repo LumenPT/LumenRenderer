@@ -6,6 +6,7 @@
 #include <cstdint>
 
 class OptiXRenderer;
+class Camera;
 
 using LumenPT = OptiXRenderer;
 
@@ -19,6 +20,8 @@ public:
 
 private:
 
+    void HandleCameraInput(Camera& a_Camera);
+	
     std::unique_ptr<LumenPT> m_LumenPT;
 
     uint32_t m_Program;

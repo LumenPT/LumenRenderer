@@ -29,6 +29,8 @@
 
 #include <cuda/helpers.h>
 
+
+#include "../../vendor/Include/sutil/vec_math.h"
 #include "Optix/optix.h"
 #include "CppCommon/LaunchParameters.h"
 
@@ -44,10 +46,12 @@ __global__ void __raygen__draw_solid_color()
     RaygenData* rgd = reinterpret_cast<RaygenData*>(optixGetSbtDataPointer());
 
     float3 origin = make_float3(static_cast<float>(launch_index.x) / params.m_ImageWidth, static_cast<float>(launch_index.y) / params.m_ImageHeight, 0.0f);
-    origin.x = origin.x * 2.0f - 1.0f;
-    origin.y = origin.y * 2.0f - 1.0f;
-    float3 dir = make_float3(0.0f, 0.0f, 1.0f);
-
+    origin.x = -(origin.x * 2.0f - 1.0f); //we inverse the result, because U image coordinate points left while X vector points right
+    origin.y = -(origin.y * 2.0f - 1.0f); //we inverse the result, because V image coordinate points down while Y vector points up
+    origin = origin.x * params.U + origin.y * params.V;
+    origin += params.eye;
+    float3 dir = params.W;
+	
     unsigned int p0, p1, p2;
 
     optixTrace(params.m_Handle, origin, dir, 0.0f, 1000.0f, 0.0f, OptixVisibilityMask(255), OPTIX_RAY_FLAG_NONE, 0, 1, 0, p0, p1, p2);

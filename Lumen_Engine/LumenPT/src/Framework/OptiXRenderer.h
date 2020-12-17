@@ -2,6 +2,7 @@
 #include "MemoryBuffer.h"
 #include "ShaderBindingTableRecord.h"
 #include "../Shaders/CppCommon/LaunchParameters.h"
+#include "Camera.h"
 
 #include <map>
 #include <string>
@@ -56,6 +57,8 @@ public:
 
     GLuint TraceFrame();
 
+    Camera m_Camera;
+	
 private:
     static void DebugCallback(unsigned int a_Level, const char* a_Tag, const char* a_Message, void* /*extra data provided during context initialization*/);
 

@@ -19,6 +19,11 @@ struct LaunchParameters
     OptixTraversableHandle m_Handle;
     unsigned int m_ImageHeight;
     unsigned int m_ImageWidth;
+
+    float3       eye;
+    float3       U;
+    float3       V;
+    float3       W;
 };
 
 struct RaygenData

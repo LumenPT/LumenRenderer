@@ -63,7 +63,9 @@ public:
 		PushLayer(new OutputLayer());
 
 		//PushOverlay(new Lumen::ImGuiLayer());
-
+		
+		//Lumen::SceneManager Manager;
+		//Manager.LoadGLTF("Yes lets load");
 	}
 
 	~Sandbox()
