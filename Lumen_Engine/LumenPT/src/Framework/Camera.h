@@ -1,7 +1,7 @@
 #pragma once
 
 #include <glm/glm.hpp>
-#include <glm/gtx/rotate_vector.hpp>
+#include <glm/gtx/quaternion.hpp>
 
 //#include "Lumen.h"
 
@@ -17,6 +17,11 @@ public:
 	void SetPosition(glm::vec3 a_Position) { m_Position = a_Position; m_DirtyFlag = true; }
 	glm::vec3 GetPosition() const { return m_Position; }
 
+	void SetRotation(glm::quat a_Rotation);
+	void SetRotation(glm::vec3& direction);
+	
+	void SetLookAt(glm::vec3 a_Position, glm::vec3 a_LookAt, glm::vec3 a_WorldUp);
+	
 	void SetYaw(float a_Yaw) { m_Yaw = a_Yaw; m_DirtyFlag = true; }
 	float GetYaw() const { return m_Yaw; }
 
