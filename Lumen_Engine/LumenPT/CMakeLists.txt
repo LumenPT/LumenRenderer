@@ -37,6 +37,7 @@ file(GLOB_RECURSE CUDA_FILES
 #generate .ptx files from .cu files
 add_library(CudaPTX OBJECT ${CUDA_FILES})
 set_property(TARGET CudaPTX PROPERTY CUDA_PTX_COMPILATION ON)
+set_property(TARGET CudaPTX PROPERTY CUDA_ARCHITECTURES 52)
 
 target_include_directories(CudaPTX PUBLIC
 	"vendor/Include"
@@ -44,7 +45,7 @@ target_include_directories(CudaPTX PUBLIC
 )
 
 set(CUDA_FILES_OUTPUT "")
-set(CUDA_FILES_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/Assets/CompiledShaders)
+set(CUDA_FILES_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/Assets/PrecompiledShaders)
 
 #replace input file paths with output path and extension. Capture first part because otherwise first path will not be replaced.
 changePath("(.*\\/)([A-Za-z0-9_\\.]+\\.)cu\\;?$" "${CUDA_FILES_OUTPUT_DIR}/\\2ptx" CUDA_FILES_OUTPUT "${CUDA_FILES}")
@@ -52,8 +53,8 @@ changePath("(.*\\/)([A-Za-z0-9_\\.]+\\.)cu\\;?$" "${CUDA_FILES_OUTPUT_DIR}/\\2pt
 message("CUDA_FILES_OUTPUT: ${CUDA_FILES_OUTPUT}")
 add_custom_command(
 	OUTPUT ${CUDA_FILES_OUTPUT}
-	COMMAND ${CMAKE_COMMAND} -E make_directory ${CUDA_FILES_OUTPUT_DIR}
-	COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_OBJECTS:CudaPTX> ${CUDA_FILES_OUTPUT_DIR}
+	COMMAND ${CMAKE_COMMAND} -E make_directory ${CUDA_FILES_OUTPUT_DIR}/$<CONFIG>
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_OBJECTS:CudaPTX> ${CUDA_FILES_OUTPUT_DIR}/$<CONFIG>
 	#COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_OBJECTS:CudaPTX> ${CUDA_FILES_OUTPUT_DIR}
 	DEPENDS CudaPTX
 	VERBATIM
@@ -111,6 +112,6 @@ target_link_libraries(LumenPT
 
 # Config file where CMake will specify the location of the project directory
 configure_file(
-	${CMAKE_CURRENT_SOURCE_DIR}/cmake/LumenConfig.h.in 
-	${CMAKE_CURRENT_BINARY_DIR}/config/LumenConfig.h
+	${CMAKE_CURRENT_SOURCE_DIR}/cmake/LumenPTConfig.h.in 
+	${CMAKE_CURRENT_BINARY_DIR}/config/LumenPTConfig.h
 )

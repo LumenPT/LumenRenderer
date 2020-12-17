@@ -17,6 +17,7 @@
 *.tlog
 **/build/**
 **/out/**
+**/LumenPT/config/**
 **/Lumen/Lumen.dir/**
 **/LumenPT/LumenPT.dir/**
 **/LumenPT/CudaPTX.dir/**
