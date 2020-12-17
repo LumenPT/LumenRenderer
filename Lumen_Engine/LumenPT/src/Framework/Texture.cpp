@@ -29,6 +29,11 @@ Texture::Texture(void* a_PixelData, cudaChannelFormatDesc a_FormatDesc, uint32_t
     CreateTextureObject(a_PixelData, a_FormatDesc, a_Width, a_Height);
 }
 
+Texture::~Texture()
+{
+    cudaFreeArray(m_MemoryArray);
+}
+
 void Texture::CreateTextureObject(void* a_PixelData, cudaChannelFormatDesc a_FormatDesc, uint32_t a_Width, uint32_t a_Height)
 {
     m_Width = a_Width;

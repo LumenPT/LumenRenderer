@@ -13,6 +13,8 @@ public:
 
     Texture(void* a_PixelData, cudaChannelFormatDesc a_FormatDesc, uint32_t a_Width, uint32_t a_Height);
 
+    ~Texture();
+	
     cudaTextureObject_t& operator*() { return m_TextureObject; }
 
 private:
