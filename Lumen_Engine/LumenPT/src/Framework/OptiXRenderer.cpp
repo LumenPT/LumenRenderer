@@ -319,9 +319,6 @@ GLuint OptiXRenderer::TraceFrame()
     params.m_Handle = BuildGeometryAccelerationStructure(vert);
     params.m_ImageWidth = gs_ImageWidth;
     params.m_ImageHeight = gs_ImageHeight;
-
-    m_Camera.SetPosition(glm::vec3(0.f, 0.f, 0.f));
-    m_Camera.SetYaw(0.f);
 	
     glm::vec3 eye, U, V, W;
     m_Camera.GetVectorData(eye, U, V, W);

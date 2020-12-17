@@ -1,10 +1,14 @@
 #include "OutputLayer.h"
 
 #include "LumenPT.h"
+#include "Framework/Camera.h"
+#include "Lumen/Input.h"
 
 #include "Glad/glad.h"
 
 #include <iostream>
+
+#include "Lumen/KeyCodes.h"
 
 OutputLayer::OutputLayer()
 {
@@ -66,9 +70,55 @@ OutputLayer::~OutputLayer()
 
 void OutputLayer::OnUpdate(){
 
+	HandleCameraInput(m_LumenPT->m_Camera);
 	auto texture = m_LumenPT->TraceFrame(); // TRACE SUM
 
+
+	
 	glBindTexture(GL_TEXTURE_2D, texture);
 	glUseProgram(m_Program);
 	glDrawArrays(GL_TRIANGLES, 0, 3);
+}
+
+void OutputLayer::HandleCameraInput(Camera& a_Camera)
+{
+	constexpr float movementSpeed = 1.0f / 60.f;
+	glm::vec3 movementDirection = glm::vec3(0.f, 0.f, 0.f);
+	glm::vec3 eye, U, V, W;
+	a_Camera.GetVectorData(eye, U, V, W);
+	
+	if (Lumen::Input::IsKeyPressed(LMN_KEY_UP) || Lumen::Input::IsKeyPressed(LMN_KEY_W))
+	{
+		movementDirection += glm::normalize(V) * movementSpeed;
+	}
+	if (Lumen::Input::IsKeyPressed(LMN_KEY_DOWN) || Lumen::Input::IsKeyPressed(LMN_KEY_S))
+	{
+		movementDirection -= glm::normalize(V) * movementSpeed;
+	}
+	if (Lumen::Input::IsKeyPressed(LMN_KEY_LEFT) || Lumen::Input::IsKeyPressed(LMN_KEY_A))
+	{
+		movementDirection += glm::normalize(U) * movementSpeed;
+	}
+	if (Lumen::Input::IsKeyPressed(LMN_KEY_RIGHT) || Lumen::Input::IsKeyPressed(LMN_KEY_D))
+	{
+		movementDirection -= glm::normalize(U) * movementSpeed;
+	}
+
+	if(glm::length(movementDirection))
+	{
+		a_Camera.SetPosition(eye + glm::normalize(movementDirection) * movementSpeed);
+	}
+
+	constexpr float rotationSpeed = 30.f * (1.0f / 60.f);
+	float yawRotation = 0.f;
+	if (Lumen::Input::IsKeyPressed(LMN_KEY_Q))
+	{
+		yawRotation += rotationSpeed;
+	}
+	if(Lumen::Input::IsKeyPressed(LMN_KEY_E))
+	{
+		yawRotation -= rotationSpeed;
+	}
+
+	a_Camera.SetYaw(a_Camera.GetYaw() + yawRotation);
 }

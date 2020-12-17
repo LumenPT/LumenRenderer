@@ -57,6 +57,8 @@ public:
 
     GLuint TraceFrame();
 
+    Camera m_Camera;
+	
 private:
     static void DebugCallback(unsigned int a_Level, const char* a_Tag, const char* a_Message, void* /*extra data provided during context initialization*/);
 
@@ -92,8 +94,6 @@ private:
     std::unique_ptr<MemoryBuffer> m_SBTBuffer;
 
     CUstream_st* m_CudaStream;
-
-    Camera m_Camera;
 };
 
 template <typename VertexType, typename IndexType>
