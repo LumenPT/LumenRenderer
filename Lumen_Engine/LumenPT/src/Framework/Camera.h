@@ -22,11 +22,15 @@ public:
 
 	void SetPitch(float a_Pitch) { m_Pitch = a_Pitch; m_DirtyFlag = true; }
 	float GetPitch() const { return m_Pitch; }
+
+	void SetAspectRatio(float a_AspectRatio) { m_AspectRatio = a_AspectRatio; m_DirtyFlag = true; }
+	float GetAspectRatio() { return m_AspectRatio; }
 	
 	void GetVectorData(glm::vec3& a_Eye, glm::vec3& a_U, glm::vec3& a_V, glm::vec3& a_W);
 	/*void HandleInput();*/
 
 private:
+	void UpdateValues();
 	void UpdateImagePlane();
 	void UpdateCameraVectors();
 

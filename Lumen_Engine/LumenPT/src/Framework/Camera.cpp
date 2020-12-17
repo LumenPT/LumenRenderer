@@ -27,7 +27,7 @@ void Camera::GetVectorData(glm::vec3& a_Eye, glm::vec3& a_U, glm::vec3& a_V, glm
 {
 	if(m_DirtyFlag)
 	{
-		UpdateCameraVectors();
+		UpdateValues();
 	}
 
 	a_Eye = m_Position;
@@ -37,6 +37,12 @@ void Camera::GetVectorData(glm::vec3& a_Eye, glm::vec3& a_U, glm::vec3& a_V, glm
 	a_V = m_Up * m_ImagePlaneHalfSize.y;
 
 	a_W = m_Forward * m_FocalLength;
+}
+
+void Camera::UpdateValues()
+{
+	UpdateImagePlane();
+	UpdateCameraVectors();
 }
 
 /*void Camera::HandleInput()
@@ -66,8 +72,8 @@ void Camera::GetVectorData(glm::vec3& a_Eye, glm::vec3& a_U, glm::vec3& a_V, glm
 
 void Camera::UpdateImagePlane()
 {
-	m_ImagePlaneHalfSize.x = m_FocalLength * glm::tan(glm::radians(m_FovY) * 0.5f);
-	m_ImagePlaneHalfSize.y = m_ImagePlaneHalfSize.x * m_AspectRatio;
+	m_ImagePlaneHalfSize.y = m_FocalLength * glm::tan(glm::radians(m_FovY) * 0.5f);
+	m_ImagePlaneHalfSize.x = m_ImagePlaneHalfSize.y * m_AspectRatio;
 }
 
 void Camera::UpdateCameraVectors()
