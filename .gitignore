@@ -10,6 +10,7 @@
 # **/Lumen/IgnoreMePls.txt instead of **/Lumen_Engine/Lumen/IgnoreMePls.txt
 # ** = any file path so  **/Lumen/** means any filepath before and after /Lumen/
 #* = any directory or file that does not contain a filepath separator( = / or \) so */Lumen/* means any directory before /Lumen/ and any file or directory after.
+#-----
 
 #Ignore project specific directories
 *.lib
