@@ -66,7 +66,7 @@ public:
 		//PushOverlay(new Lumen::ImGuiLayer());
 		
 		Lumen::SceneManager Manager = Lumen::SceneManager();
-		//Manager.LoadGLTF("Yes lets load");
+		//Manager.LoadGLTF("D:/Breda_University/Year3/LumenRenderer/Lumen_Engine/Sandbox/assets/models/cube/cube.gltf");
 	}
 
 	~Sandbox()
