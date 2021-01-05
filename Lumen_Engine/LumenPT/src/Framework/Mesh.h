@@ -1,15 +1,15 @@
 #pragma once
-#include "Lumen/Renderer/ILumenMesh.h"
-#include "../../vendor/Include/Optix/optix_types.h"
+#include "Renderer/ILumenMesh.h"
+#include "Optix/optix_types.h"
 
 #include <memory>
 
-
-class VertexBuffer;
-
 class Mesh : public ILumenMesh
 {
-	std::unique_ptr<VertexBuffer> m_VertBuffer;
-	std::unique_ptr<VertexBuffer> m_IndexBuffer;
+	Mesh(std::unique_ptr<MemoryBuffer> a_VertexBuffer,
+		std::unique_ptr<MemoryBuffer> a_IndexBuffer, OptixTraversableHandle a_TraversableHandle);
+
+	std::unique_ptr<MemoryBuffer> m_VertBuffer;
+	std::unique_ptr<MemoryBuffer> m_IndexBuffer;
 	OptixTraversableHandle m_TraversableHandle;
 };

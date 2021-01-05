@@ -16,6 +16,12 @@ using GLuint = unsigned;
 class OutputBuffer;
 class ShaderBindingTableGenerator;
 
+namespace Lumen
+{
+    class ILumenTexture;
+    class ILumenMesh;
+}
+
 class OptiXRenderer
 {
 public:
@@ -52,6 +58,11 @@ public:
         const OptixBuildInput& a_BuildInput);
 
     OptixTraversableHandle BuildInstanceAccelerationStructure(std::vector<OptixInstance> a_Instances);
+
+    // Creates a cuda texture from the provided raw data and sizes. Only works if the pixel format is uchar4.
+    Lumen::ILumenTexture* CreateTexture(void* a_RawData, uint32_t a_Width, uint32_t a_Height);
+
+    Lumen::ILumenMesh* CreateMesh(std::vector<Vertex> a_Vertices, std::vector<uint32_t> a_Indices);
 
     void CreateOutputBuffer();
 

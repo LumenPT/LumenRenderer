@@ -77,7 +77,7 @@ __global__ void __raygen__draw_solid_color()
         params.V,
         params.W
     );*/
-	
+
     unsigned int p0, p1, p2;
 
     optixTrace(params.m_Handle, origin, dir, 0.0f, 1000.0f, 0.0f, OptixVisibilityMask(255), OPTIX_RAY_FLAG_NONE, 0, 1, 0, p0, p1, p2);
@@ -122,7 +122,7 @@ __global__ void __closesthit__HitShader()
     const float2 barycentrics = optixGetTriangleBarycentrics();
     HitData* msd = reinterpret_cast<HitData*>(optixGetSbtDataPointer());;
     auto col = make_float4(0.0f, 1.0f, 0.0f, 1.0f);
-    auto col1 = tex2D<float4>(msd->m_TextureObject, barycentrics.x, 1 - barycentrics.y);
+    auto col1 = tex2D<float4>(msd->m_TextureObject, barycentrics.y, 1 - barycentrics.y);
 
 
     optixSetPayload_0(optixGetPrimitiveIndex());
