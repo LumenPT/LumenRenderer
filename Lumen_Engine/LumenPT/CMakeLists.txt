@@ -47,15 +47,39 @@ target_include_directories(CudaPTX PUBLIC
 set(CUDA_FILES_OUTPUT "")
 set(CUDA_FILES_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/Assets/PrecompiledShaders)
 
+if(	${CMAKE_GENERATOR} STREQUAL "Visual Studio 8 2005" OR
+	${CMAKE_GENERATOR} STREQUAL "Visual Studio 9 2008")
+
+	set(CUDA_FILES_OUTPUT_DIR ${CUDA_FILES_OUTPUT_DIR}/$(ConfigurationName))
+
+elseif(
+	${CMAKE_GENERATOR} STREQUAL "Visual Studio 10 2010" OR
+	${CMAKE_GENERATOR} STREQUAL "Visual Studio 11 2012" OR
+	${CMAKE_GENERATOR} STREQUAL "Visual Studio 12 2013" OR
+	${CMAKE_GENERATOR} STREQUAL "Visual Studio 14 2015" OR
+	${CMAKE_GENERATOR} STREQUAL "Visual Studio 15 2017" OR
+	${CMAKE_GENERATOR} STREQUAL "Visual Studio 16 2019")
+
+	set(CUDA_FILES_OUTPUT_DIR ${CUDA_FILES_OUTPUT_DIR}/$(Configuration))
+
+elseif(
+	${CMAKE_GENERATOR} STREQUAL "Xcode" OR
+	${CMAKE_GENERATOR} STREQUAL "Ninja Multi-Config")
+	set(CUDA_FILES_OUTPUT_DIR ${CUDA_FILES_OUTPUT_DIR}/$(CONFIGURATION))
+endif()
+
+#set(CUDA_FILES_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/Assets/PrecompiledShaders/${CMAKE_CFG_INTDIR})
+#https://cmake.org/cmake/help/v3.19/variable/CMAKE_CFG_INTDIR.html#variable:CMAKE_CFG_INTDIR
+
 #replace input file paths with output path and extension. Capture first part because otherwise first path will not be replaced.
 changePath("(.*\\/)([A-Za-z0-9_\\.]+\\.)cu\\;?$" "${CUDA_FILES_OUTPUT_DIR}/\\2ptx" CUDA_FILES_OUTPUT "${CUDA_FILES}")
 
 message("CUDA_FILES_OUTPUT: ${CUDA_FILES_OUTPUT}")
 add_custom_command(
 	OUTPUT ${CUDA_FILES_OUTPUT}
-	COMMAND ${CMAKE_COMMAND} -E make_directory ${CUDA_FILES_OUTPUT_DIR}/$<CONFIG>
-	COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_OBJECTS:CudaPTX> ${CUDA_FILES_OUTPUT_DIR}/$<CONFIG>
-	#COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_OBJECTS:CudaPTX> ${CUDA_FILES_OUTPUT_DIR}
+	COMMAND ${CMAKE_COMMAND} -E make_directory ${CUDA_FILES_OUTPUT_DIR}
+	COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_OBJECTS:CudaPTX> ${CUDA_FILES_OUTPUT_DIR}
+	#COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_OBJECTS:CudaPTX> ${CUDA_FILES_OUTPUT_DIR}/$<CONFIG>
 	DEPENDS CudaPTX
 	VERBATIM
 	COMMAND_EXPAND_LISTS)
@@ -96,6 +120,7 @@ set(INCLUDES
 	"vendor/Include"
 	"vendor/Include/Cuda"
 	"../Lumen/src/AssetLoading"
+	"../Lumen/src/Lumen"
 	"${CMAKE_CURRENT_SOURCE_DIR}/../Lumen/vendor/glm"
 	"${CMAKE_CURRENT_BINARY_DIR}/config"
 )

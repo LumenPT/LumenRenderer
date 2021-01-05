@@ -120,5 +120,6 @@ void OutputLayer::HandleCameraInput(Camera& a_Camera)
 		yawRotation -= rotationSpeed;
 	}
 
-	a_Camera.SetYaw(a_Camera.GetYaw() + yawRotation);
+	a_Camera.IncrementYaw(glm::radians(yawRotation));
+	//a_Camera.SetYaw(a_Camera.GetYaw() + yawRotation);
 }

@@ -9,6 +9,7 @@
 
 #include "Input.h"
 
+
 namespace Lumen
 {
 #define BIND_EVENT_FN(x) std::bind(&LumenApp::x, this, std::placeholders::_1)

@@ -8,13 +8,16 @@
 
 #include "../Shaders/CppCommon/LaunchParameters.h"
 #include "../Shaders/CppCommon/ModelStructs.h"
+
+#include "Mesh.h"
 #include "Texture.h"
 
 #include "Optix/optix_stubs.h"
 
 #include "Cuda/cuda.h"
-#include "Cuda/cuda_gl_interop.h"
 #include "Cuda/cuda_runtime.h"
+
+#include "glm/glm.hpp"
 
 
 #include <cstdio>
@@ -83,7 +86,6 @@ void OptiXRenderer::InitializePipelineOptions()
     m_PipelineCompileOptions.usesMotionBlur = false;
     // Name by which the launch parameters will be accessible in the shaders. This must match with the shaders.
     m_PipelineCompileOptions.pipelineLaunchParamsVariableName = "params";
-
 }
 
 void OptiXRenderer::CreatePipeline()
@@ -243,6 +245,18 @@ OptixTraversableHandle OptiXRenderer::BuildInstanceAccelerationStructure(std::ve
     return handle;
 }
 
+Lumen::ILumenTexture* OptiXRenderer::CreateTexture(void* a_RawData, uint32_t a_Width, uint32_t a_Height)
+{
+    static cudaChannelFormatDesc formatDesc = cudaCreateChannelDesc<uchar4>();
+    return new Texture(a_RawData, formatDesc, a_Width, a_Height);
+}
+
+Lumen::ILumenMesh* OptiXRenderer::CreateMesh(std::vector<Vertex> a_Vertices, std::vector<uint32_t> a_Indices)
+{
+    return nullptr;
+}
+
+
 void OptiXRenderer::CreateOutputBuffer()
 {
     m_OutputBuffer = std::make_unique<OutputBuffer>(gs_ImageWidth, gs_ImageHeight);
@@ -306,6 +320,8 @@ ProgramGroupHeader OptiXRenderer::GetProgramGroupHeader(const std::string& a_Gro
     return header;
 }
 
+#include "glm/gtx/compatibility.hpp"
+
 GLuint OptiXRenderer::TraceFrame()
 {
     std::vector<float3> vert = {
@@ -313,7 +329,7 @@ GLuint OptiXRenderer::TraceFrame()
         {0.5f, -0.5f, 0.5f},
         {-0.5f, 0.5f, 0.5f}
     };
-
+    glm::float3;
     std::vector<Vertex> verti = std::vector<Vertex>(3);
     verti[0].m_Position = vert[0];
     verti[0].m_Normal = { 1.0f, 0.0f, 0.0f };

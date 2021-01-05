@@ -28,7 +28,7 @@ namespace Lumen
 		{
 			std::vector<int>						m_RootNodeIndices;
 			std::vector<std::shared_ptr<Node>>		m_NodePool;
-			std::vector<std::shared_ptr<ILumenMesh>>		m_MeshPool;
+			std::vector<std::shared_ptr<Lumen::ILumenMesh>>		m_MeshPool;
 			// Also contain materials
 			// Also contain textures
 			// Also contain lights
@@ -61,6 +61,9 @@ namespace Lumen
 
 		void LoadNodes(fx::gltf::Document& a_Doc, Scene& a_Scene, glm::mat4& a_TransformMat = glm::mat4(0));
 		void LoadMeshes(fx::gltf::Document& a_Doc, Scene& a_Scene, glm::mat4& a_TransformMat = glm::mat4(0));
+		std::vector<uint8_t> LoadBinary(fx::gltf::Document& a_Doc, uint32_t a_AccessorIndx);
+		uint32_t GetComponentCount(fx::gltf::Accessor& a_Accessor);
+		uint32_t GetComponentSize(fx::gltf::Accessor& a_Accessor);
 		
 	};
 
