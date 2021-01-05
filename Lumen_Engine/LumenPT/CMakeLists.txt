@@ -37,7 +37,7 @@ file(GLOB_RECURSE CUDA_FILES
 #generate .ptx files from .cu files
 add_library(CudaPTX OBJECT ${CUDA_FILES})
 set_property(TARGET CudaPTX PROPERTY CUDA_PTX_COMPILATION ON)
-set_property(TARGET CudaPTX PROPERTY CUDA_ARCHITECTURES 52)
+#set_property(TARGET CudaPTX PROPERTY CUDA_ARCHITECTURES 52)
 
 target_include_directories(CudaPTX PUBLIC
 	"vendor/Include"
