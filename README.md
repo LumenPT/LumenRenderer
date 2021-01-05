@@ -7,5 +7,3 @@ Build Instructions using Premake5. You will need Visual Studio 2019 for this.
 - Create a new folder path inside the Lumen_Engine directory called "vendor" > "bin" > "premake".
 - Put the Premake5 executable in the the premake folder.
 - Run "GenerateProject.bat" and open the solution in generates. 
- 
- Test change
