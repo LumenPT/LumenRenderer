@@ -31,6 +31,8 @@ void Camera::SetRotation(glm::quat a_Rotation)
 {
 	glm::vec3 viewDirection = glm::vec3(0.f, 0.f, 1.0f) * a_Rotation;
 	SetRotation(viewDirection);
+
+	m_Rotation = a_Rotation;
 }
 
 void Camera::SetRotation(glm::vec3& direction)
@@ -59,7 +61,7 @@ void Camera::GetVectorData(glm::vec3& a_Eye, glm::vec3& a_U, glm::vec3& a_V, glm
 	}
 
 	a_Eye = m_Position;
-
+	
 	a_U = m_Right * m_ImagePlaneHalfSize.x;
 
 	a_V = m_Up * m_ImagePlaneHalfSize.y;
@@ -89,5 +91,11 @@ void Camera::UpdateCameraVectors()
 
 	m_Up = glm::normalize(glm::cross(m_Forward, m_Right));
 
+	/*glm::mat4 rotationMatrix = glm::toMat4(m_Rotation);
+
+	m_Right = rotationMatrix[0];
+	m_Up = rotationMatrix[1];
+	m_Forward = rotationMatrix[2];*/
+	
 	m_DirtyFlag = false;
 }

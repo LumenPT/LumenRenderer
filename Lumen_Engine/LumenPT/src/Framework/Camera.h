@@ -48,6 +48,7 @@ private:
 
 	float m_Yaw = 0.f;
 	float m_Pitch = 0.f;
+	glm::quat m_Rotation = glm::quat(1.f, 0.f, 0.f, 0.f);
 
 	float m_MovementSpeed = 1.f;
 	float m_RotationSpeed = 1.f;
