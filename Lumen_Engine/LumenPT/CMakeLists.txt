@@ -7,6 +7,30 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_CUDA_STANDARD 14)
 set(CMAKE_CUDA_STANDARD_REQUIRED True)
 
+set(CONFIG_NAME "")
+
+if(	${CMAKE_GENERATOR} STREQUAL "Visual Studio 8 2005" OR
+	${CMAKE_GENERATOR} STREQUAL "Visual Studio 9 2008")
+
+	set(CONFIG_NAME $(ConfigurationName))
+
+elseif(
+	${CMAKE_GENERATOR} STREQUAL "Visual Studio 10 2010" OR
+	${CMAKE_GENERATOR} STREQUAL "Visual Studio 11 2012" OR
+	${CMAKE_GENERATOR} STREQUAL "Visual Studio 12 2013" OR
+	${CMAKE_GENERATOR} STREQUAL "Visual Studio 14 2015" OR
+	${CMAKE_GENERATOR} STREQUAL "Visual Studio 15 2017" OR
+	${CMAKE_GENERATOR} STREQUAL "Visual Studio 16 2019")
+
+	set(CONFIG_NAME $(Configuration))
+
+elseif(
+	${CMAKE_GENERATOR} STREQUAL "Xcode" OR
+	${CMAKE_GENERATOR} STREQUAL "Ninja Multi-Config")
+
+	set(CONFIG_NAME $(CONFIGURATION))
+	
+endif()
 
 #function to transform input paths to output paths.
 function(changePath REGEX_MATCH REGEX_REPLACE RESULT_VAR_NAME)
@@ -51,27 +75,11 @@ target_include_directories(CudaPTX PUBLIC
 
 set(CUDA_FILES_OUTPUT "")
 set(CUDA_FILES_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/Assets/PrecompiledShaders)
+#if(${CONFIG_NAME})
+	message("ConfigName: ${CONFIG_NAME}")
+	set(CUDA_FILES_OUTPUT_DIR ${CUDA_FILES_OUTPUT_DIR}/${CONFIG_NAME})
+#endif()
 
-if(	${CMAKE_GENERATOR} STREQUAL "Visual Studio 8 2005" OR
-	${CMAKE_GENERATOR} STREQUAL "Visual Studio 9 2008")
-
-	set(CUDA_FILES_OUTPUT_DIR ${CUDA_FILES_OUTPUT_DIR}/$(ConfigurationName))
-
-elseif(
-	${CMAKE_GENERATOR} STREQUAL "Visual Studio 10 2010" OR
-	${CMAKE_GENERATOR} STREQUAL "Visual Studio 11 2012" OR
-	${CMAKE_GENERATOR} STREQUAL "Visual Studio 12 2013" OR
-	${CMAKE_GENERATOR} STREQUAL "Visual Studio 14 2015" OR
-	${CMAKE_GENERATOR} STREQUAL "Visual Studio 15 2017" OR
-	${CMAKE_GENERATOR} STREQUAL "Visual Studio 16 2019")
-
-	set(CUDA_FILES_OUTPUT_DIR ${CUDA_FILES_OUTPUT_DIR}/$(Configuration))
-
-elseif(
-	${CMAKE_GENERATOR} STREQUAL "Xcode" OR
-	${CMAKE_GENERATOR} STREQUAL "Ninja Multi-Config")
-	set(CUDA_FILES_OUTPUT_DIR ${CUDA_FILES_OUTPUT_DIR}/$(CONFIGURATION))
-endif()
 
 #set(CUDA_FILES_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/Assets/PrecompiledShaders/${CMAKE_CFG_INTDIR})
 #https://cmake.org/cmake/help/v3.19/variable/CMAKE_CFG_INTDIR.html#variable:CMAKE_CFG_INTDIR
@@ -108,6 +116,7 @@ file(GLOB_RECURSE CPP_SOURCE_FILES
 # Add header and source files to library
 add_library (LumenPT STATIC ${CPP_HEADER_FILES} ${CPP_SOURCE_FILES})
 add_dependencies(LumenPT CudaPTX)
+set_property(TARGET LumenPT APPEND_STRING PROPERTY COMPILE_DEFINITIONS CONFIG_NAME=\"${CONFIG_NAME}\")
 set_property(TARGET LumenPT APPEND PROPERTY COMPILE_DEFINITIONS LUMEN_PT)
 
 include(${CMAKE_SOURCE_DIR}/cmake/functions.cmake)
