@@ -8,6 +8,7 @@
 #include "Cuda/vector_functions.h"
 
 Material::Material()
+    : m_DeviceMaterialDirty(true)
 {
     m_DeviceMemoryBuffer = std::make_unique<MemoryBuffer>(sizeof(DeviceMaterial));
 }
