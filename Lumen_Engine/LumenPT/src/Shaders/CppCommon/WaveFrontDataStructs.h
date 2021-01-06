@@ -1,7 +1,5 @@
 #pragma once
 
-#include <Cuda/cuda/helpers.h>
-
 /*TODO: check if usage of textures can benefit performance
  *for buffers like intersectionBuffer or OutputBuffer.
 */
