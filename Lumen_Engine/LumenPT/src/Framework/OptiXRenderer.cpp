@@ -29,6 +29,8 @@
 #include <bitset>
 #include <iostream>
 
+#include "Material.h"
+
 const uint32_t gs_ImageWidth = 800;
 const uint32_t gs_ImageHeight = 600;
 
@@ -245,18 +247,6 @@ OptixTraversableHandle OptiXRenderer::BuildInstanceAccelerationStructure(std::ve
     return handle;
 }
 
-Lumen::ILumenTexture* OptiXRenderer::CreateTexture(void* a_RawData, uint32_t a_Width, uint32_t a_Height)
-{
-    static cudaChannelFormatDesc formatDesc = cudaCreateChannelDesc<uchar4>();
-    return new Texture(a_RawData, formatDesc, a_Width, a_Height);
-}
-
-Lumen::ILumenMesh* OptiXRenderer::CreateMesh(std::vector<Vertex> a_Vertices, std::vector<uint32_t> a_Indices)
-{
-    return nullptr;
-}
-
-
 void OptiXRenderer::CreateOutputBuffer()
 {
     m_OutputBuffer = std::make_unique<OutputBuffer>(gs_ImageWidth, gs_ImageHeight);
@@ -403,3 +393,75 @@ OptiXRenderer::ComputedStackSizes OptiXRenderer::ComputeStackSizes(OptixStackSiz
     return sizes;
 }
 
+std::shared_ptr<Lumen::ILumenMesh> OptiXRenderer::CreateMesh(const MeshData& a_MeshData)
+{
+    auto vertexBuffer = InterleaveVertexData(a_MeshData);
+
+    std::vector<uint32_t> correctedIndices;
+
+    if (a_MeshData.m_IndexSize == 4)
+    {
+        VectorView<uint16_t, uint8_t> indexView(a_MeshData.m_IndexBinary);
+
+        for (size_t i = 0; i < indexView.Size(); i++)
+        {
+            correctedIndices.push_back(indexView[i]);
+        }
+    }
+
+    std::unique_ptr<MemoryBuffer> indexBuffer = std::make_unique<MemoryBuffer>(correctedIndices);
+
+    unsigned int geomFlags = OPTIX_GEOMETRY_FLAG_NONE;
+
+    OptixAccelBuildOptions buildOptions = {};
+    buildOptions.buildFlags = OPTIX_BUILD_FLAG_PREFER_FAST_TRACE;
+    buildOptions.operation = OPTIX_BUILD_OPERATION_BUILD;
+    buildOptions.motionOptions = {};
+
+    OptixBuildInput buildInput = {};
+    buildInput.type = OPTIX_BUILD_INPUT_TYPE_TRIANGLES;
+    buildInput.triangleArray.indexBuffer = **indexBuffer;
+    buildInput.triangleArray.indexFormat = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
+    buildInput.triangleArray.indexStrideInBytes = 0;
+    buildInput.triangleArray.numIndexTriplets = correctedIndices.size() / 3;
+    buildInput.triangleArray.vertexBuffers = &**vertexBuffer;
+    buildInput.triangleArray.vertexFormat = OPTIX_VERTEX_FORMAT_FLOAT3;
+    buildInput.triangleArray.vertexStrideInBytes = sizeof(Vertex);
+    buildInput.triangleArray.numVertices = a_MeshData.m_Positions.Size();
+    buildInput.triangleArray.numSbtRecords = 1;
+    buildInput.triangleArray.flags = &geomFlags;
+        
+    auto gAccel = BuildGeometryAccelerationStructure(buildOptions, buildInput);
+
+    return std::make_shared<Mesh>(std::move(vertexBuffer), std::move(indexBuffer), gAccel);
+}
+
+std::unique_ptr<MemoryBuffer> OptiXRenderer::InterleaveVertexData(const MeshData& a_MeshData)
+{
+    std::vector<Vertex> vertices;
+
+    for (size_t i = 0; i < a_MeshData.m_Positions.Size(); i++)
+    {
+        auto& v = vertices.emplace_back();
+        v.m_Position = make_float3(a_MeshData.m_Positions[i].x, a_MeshData.m_Positions[i].y, a_MeshData.m_Positions[i].z);
+        v.m_UVCoord = make_float2(a_MeshData.m_TexCoords[i].x, a_MeshData.m_TexCoords[i].y);
+        v.m_Normal = make_float3(a_MeshData.m_Normals[i].x, a_MeshData.m_Normals[i].y, a_MeshData.m_Normals[i].z);
+    }    
+
+    return std::make_unique<MemoryBuffer>(vertices);
+}
+
+std::shared_ptr<Lumen::ILumenTexture> OptiXRenderer::CreateTexture(void* a_RawData, uint32_t a_Width, uint32_t a_Height)
+{
+    static cudaChannelFormatDesc formatDesc = cudaCreateChannelDesc<uchar4>();
+    return std::make_shared<Texture>(a_RawData, formatDesc, a_Width, a_Height);
+}
+
+std::shared_ptr<Lumen::ILumenMaterial> OptiXRenderer::CreateMaterial(const MaterialData& a_MaterialData)
+{
+    auto mat = std::make_shared<Material>();
+    mat->SetDiffuseColor(a_MaterialData.m_DiffuseColor);
+    mat->SetDiffuseTexture(a_MaterialData.m_DiffuseTexture);
+
+    return mat;
+}

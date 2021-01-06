@@ -121,6 +121,7 @@ set(INCLUDES
 	"vendor/Include/Cuda"
 	"../Lumen/src/AssetLoading"
 	"../Lumen/src/Lumen"
+	"../Lumen/src"
 	"${CMAKE_CURRENT_SOURCE_DIR}/../Lumen/vendor/glm"
 	"${CMAKE_CURRENT_BINARY_DIR}/config"
 )

@@ -4,6 +4,8 @@
 #include "../Shaders/CppCommon/LaunchParameters.h"
 #include "Camera.h"
 
+#include "Renderer/LumenRenderer.h"
+
 #include <map>
 #include <string>
 #include <vector>
@@ -22,7 +24,7 @@ namespace Lumen
     class ILumenMesh;
 }
 
-class OptiXRenderer
+class OptiXRenderer : public LumenRenderer
 {
 public:
 
@@ -60,9 +62,12 @@ public:
     OptixTraversableHandle BuildInstanceAccelerationStructure(std::vector<OptixInstance> a_Instances);
 
     // Creates a cuda texture from the provided raw data and sizes. Only works if the pixel format is uchar4.
-    Lumen::ILumenTexture* CreateTexture(void* a_RawData, uint32_t a_Width, uint32_t a_Height);
+    std::shared_ptr<Lumen::ILumenTexture> CreateTexture(void* a_PixelData, uint32_t a_Width, uint32_t a_Height) override;
 
-    Lumen::ILumenMesh* CreateMesh(std::vector<Vertex> a_Vertices, std::vector<uint32_t> a_Indices);
+    std::shared_ptr<Lumen::ILumenMesh> CreateMesh(const MeshData& a_MeshData) override;
+    std::unique_ptr<MemoryBuffer> InterleaveVertexData(const MeshData& a_MeshData);
+
+    std::shared_ptr<Lumen::ILumenMaterial> CreateMaterial(const MaterialData& a_MaterialData) override;
 
     void CreateOutputBuffer();
 

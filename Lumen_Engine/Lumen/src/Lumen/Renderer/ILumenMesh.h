@@ -1,7 +1,11 @@
 #pragma once
 
-class ILumenMesh
-{
-public:
-	virtual ~ILumenMesh() = 0;
-};
+namespace Lumen
+{    
+    class ILumenMesh
+    {
+    public:
+    	virtual ~ILumenMesh(){};
+    };
+
+}

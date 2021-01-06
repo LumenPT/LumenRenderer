@@ -20,7 +20,7 @@ struct Vertex
 };
 
 // Common material struct meant as a way to access a model's material on the GPU
-struct Material
+struct DeviceMaterial
 {
     NONAMESPACE::float4 m_DiffuseColor;
     cudaTextureObject_t m_DiffuseTexture;
