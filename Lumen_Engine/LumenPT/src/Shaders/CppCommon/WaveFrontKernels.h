@@ -1,31 +1,35 @@
 #pragma once
 
 #include <cuda_runtime.h>
+#include <cinttypes>
+
 
 //Some defines to make the functions less scary and more readable
 #define GPU __device__ __forceinline__ 
 #define CPU __global__ __forceinline__
 #define CPU_ONLY __host__ __forceinline__
 
+
+
 /*
  * Set up buffers and other resources required by the pipeline.
  * Called once at program start, or when buffers need to be resized.
  */
-CPU void Initialize();
+CPU void Initialize(const std::uint32_t a_ScreenWidth, const std::uint32_t a_ScreenHeight, const std::uint32_t a_Depth);
 
 /*
  * Called once before every frame.
  * Generates primary rays from the camera etc.
  * Rays are stored in the ray batch.
  */
-CPU void PreRenderSetup();
+CPU void PreRenderSetup(const DeviceCamera& a_Camera);
 
 /*
  * Call Optix to intersect all rays in the ray batch.
  * Stores intersection data in the intersection data buffer.
  */
 CPU_ONLY void IntersectRays();
-
+ 
 /*
  * Shade the intersection points.
  * This does direct, indirect and specular shading.
@@ -45,31 +49,41 @@ CPU void ResolveShadowRays();
 CPU void PostProcess();
 
 
-
 //The below functions are only called internally from the GPU within the above defined functions.
 
+//Called in setup.
+GPU void GenerateRays();
+GPU void GenerateMotionVectors();
+
+//Called during shading
+GPU void ShadeDirect();
+GPU void ShadeSpecular();
+GPU void ShadeIndirect();
+
+//Called during post-processing.
 GPU void Denoise();
 GPU void MergeLightChannels();
 GPU void DLSS();
 GPU void PostProcessingEffects();
-GPU void GenerateRays();
-GPU void GenerateMotionVectors();
-GPU void ShadeDirect();
-GPU void ShadeSpecular();
-GPU void ShadeIndirect();
+
 
 /*
  * Example calling order of functions.
  */
 inline void Example()
 {
-    Initialize(); //Set up memory buffers.
+    constexpr int w = 720;
+    constexpr int h = 540;
+    constexpr int depth = 3;
+    DeviceCamera camera;
+
+    Initialize(w, h, depth); //Set up memory buffers.
 
     while(true)
     {
-        PreRenderSetup(); //Generate primary rays.
+        PreRenderSetup(camera); //Generate primary rays.
 
-        for(int depth = 0; depth < 3; ++depth)
+        for(int d = 0; d < depth; ++d)
         {
             IntersectRays(); //Gets intersection points for primary and secondary rays.
             Shade(); //Creates shadow rays with their potential contribution. Creates new secondary rays.
@@ -82,7 +96,7 @@ inline void Example()
 
 
 
-CPU void Initialize()
+CPU void Initialize(const std::uint32_t a_ScreenWidth, const std::uint32_t a_ScreenHeight, const std::uint32_t a_Depth)
 {
     //TODO:
     /*
@@ -97,7 +111,7 @@ CPU void Initialize()
      */
 }
 
-CPU void PreRenderSetup()
+CPU void PreRenderSetup(const DeviceCamera& a_Camera)
 {
     //TODO
     /*
@@ -152,4 +166,8 @@ CPU void PostProcess()
      * Not needed now. Can be implemented later.
      * For now just merge the final light contributions to get the final pixel color.
      */
+    Denoise();
+    MergeLightChannels();
+    DLSS();
+    PostProcessingEffects();
 }
