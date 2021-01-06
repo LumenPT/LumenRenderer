@@ -4,6 +4,7 @@
 #include "Lumen/LayerStack.h"
 #include "Lumen/Events/Event.h"
 #include "Lumen/Events/ApplicationEvent.h"
+#include "Lumen/Renderer/LumenRenderer.h"
 
 #include "Lumen/ImGui/ImGuiLayer.h"
 

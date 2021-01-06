@@ -18,6 +18,8 @@ public:
 
     void OnUpdate() override;
 
+    OptiXRenderer* GetPipeline() { return m_LumenPT.get(); };
+
 private:
 
     void HandleCameraInput(Camera& a_Camera);

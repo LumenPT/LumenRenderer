@@ -1,4 +1,7 @@
 #include <Lumen.h>
+#include <string>
+#include <filesystem>
+#include <algorithm>
 
 #include "OutputLayer.h"
 
@@ -6,6 +9,7 @@
 
 #include "GLFW/include/GLFW/glfw3.h"
 #include "Lumen/ModelLoading/SceneManager.h"
+#include "../../LumenPT/src/Framework/OptiXRenderer.h"
 
 
 //#include "imgui/imgui.h"
@@ -60,13 +64,22 @@ public:
 	{
 		glfwMakeContextCurrent(reinterpret_cast<GLFWwindow*>(GetWindow().GetNativeWindow()));
 
+		OutputLayer* m_ContextLayer = new OutputLayer;
 		PushLayer(new ExampleLayer());
-		PushLayer(new OutputLayer());
+		PushLayer(m_ContextLayer);
 
 		//PushOverlay(new Lumen::ImGuiLayer());
+
+		//temporary stuff to avoid absolute paths to gltf cube
+		std::filesystem::path p = std::filesystem::current_path();
+		std::string p_string{ p.string() };
+		std::replace(p_string.begin(), p_string.end(), '\\', '/');
+		p_string.append("/Sandbox/assets/models/cube/cube.gltf");
+		LMN_TRACE(p_string);
 		
-		Lumen::SceneManager Manager = Lumen::SceneManager();
-		//Manager.LoadGLTF("D:/Breda_University/Year3/LumenRenderer/Lumen_Engine/Sandbox/assets/models/cube/cube.gltf");
+		Lumen::SceneManager manager = Lumen::SceneManager();
+		manager.SetPipeline(*m_ContextLayer->GetPipeline());
+		manager.LoadGLTF(p_string);
 	}
 
 	~Sandbox()

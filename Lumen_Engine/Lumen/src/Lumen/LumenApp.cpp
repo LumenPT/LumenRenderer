@@ -52,6 +52,7 @@ namespace Lumen
 			m_ImGuiLayer->Begin();
 			for (Layer* layer : m_LayerStack)
 			{
+				layer->OnDraw();
 				layer->OnImGuiRender();
 			}
 			m_ImGuiLayer->End();

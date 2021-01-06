@@ -14,6 +14,7 @@ namespace Lumen
 		virtual void OnAttach() {}
 		virtual void OnDetach() {}
 		virtual void OnUpdate() {}
+		virtual void OnDraw() {}
 		virtual void OnImGuiRender() {}
 		virtual void OnEvent(Event& event) {}
 
