@@ -29,19 +29,24 @@ endfunction()
 
 
 #Add CUDA files
-file(GLOB_RECURSE CUDA_FILES 
+file(GLOB_RECURSE CUDA_HEADER_FILES
+	${CMAKE_CURRENT_SOURCE_DIR}/src/*.cuh
+)
 
+file(GLOB_RECURSE CUDA_SOURCE_FILES 
 	${CMAKE_CURRENT_SOURCE_DIR}/src/*.cu
 )
 
 #generate .ptx files from .cu files
-add_library(CudaPTX OBJECT ${CUDA_FILES})
+add_library(CudaPTX OBJECT ${CUDA_HEADER_FILES} ${CUDA_SOURCE_FILES})
 set_property(TARGET CudaPTX PROPERTY CUDA_PTX_COMPILATION ON)
 #set_property(TARGET CudaPTX PROPERTY CUDA_ARCHITECTURES 52)
 
 target_include_directories(CudaPTX PUBLIC
 	"vendor/Include"
 	"vendor/Include/Cuda"
+	"src/Shaders"
+	"src/Shaders/CppCommon"
 )
 
 set(CUDA_FILES_OUTPUT "")
@@ -72,14 +77,14 @@ endif()
 #https://cmake.org/cmake/help/v3.19/variable/CMAKE_CFG_INTDIR.html#variable:CMAKE_CFG_INTDIR
 
 #replace input file paths with output path and extension. Capture first part because otherwise first path will not be replaced.
-changePath("(.*\\/)([A-Za-z0-9_\\.]+\\.)cu\\;?$" "${CUDA_FILES_OUTPUT_DIR}/\\2ptx" CUDA_FILES_OUTPUT "${CUDA_FILES}")
+changePath("(.*\\/)([A-Za-z0-9_\\.]+\\.)cu\\;?$" "${CUDA_FILES_OUTPUT_DIR}/\\2ptx" CUDA_FILES_OUTPUT "${CUDA_SOURCE_FILES}")
 
 message("CUDA_FILES_OUTPUT: ${CUDA_FILES_OUTPUT}")
 add_custom_command(
 	OUTPUT ${CUDA_FILES_OUTPUT}
 	COMMAND ${CMAKE_COMMAND} -E make_directory ${CUDA_FILES_OUTPUT_DIR}
 	COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_OBJECTS:CudaPTX> ${CUDA_FILES_OUTPUT_DIR}
-	#COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_OBJECTS:CudaPTX> ${CUDA_FILES_OUTPUT_DIR}/$<CONFIG>
+	#COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_OBJECTS:CudaPTX> ${CUDA_FILES_OUTPUT_DIR}
 	DEPENDS CudaPTX
 	VERBATIM
 	COMMAND_EXPAND_LISTS)
@@ -87,26 +92,27 @@ add_custom_command(
 add_custom_target(copyCUDAOutput ALL DEPENDS ${CUDA_FILES_OUTPUT})
 
 #Add header files
-file(GLOB_RECURSE HEADER_FILES 
+file(GLOB_RECURSE CPP_HEADER_FILES 
 
 	${CMAKE_CURRENT_SOURCE_DIR}/src/*.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/*.hpp
 )
 
 #Add source files
-file(GLOB_RECURSE SOURCE_FILES 
+file(GLOB_RECURSE CPP_SOURCE_FILES 
 
 	${CMAKE_CURRENT_SOURCE_DIR}/src/*.c
 	${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp
 )
 
 # Add header and source files to library
-add_library (LumenPT STATIC ${HEADER_FILES} ${SOURCE_FILES})
+add_library (LumenPT STATIC ${CPP_HEADER_FILES} ${CPP_SOURCE_FILES})
 add_dependencies(LumenPT CudaPTX)
+set_property(TARGET LumenPT APPEND PROPERTY COMPILE_DEFINITIONS LUMEN_PT)
 
 include(${CMAKE_SOURCE_DIR}/cmake/functions.cmake)
-assign_source_group(${HEADER_FILES})
-assign_source_group(${SOURCE_FILES})
+assign_source_group(${CPP_HEADER_FILES})
+assign_source_group(${CPP_SOURCE_FILES})
 
 # Put all libraries into a variable
 set(LIBS

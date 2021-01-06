@@ -20,6 +20,7 @@ file(GLOB_RECURSE SOURCE_FILES
 
 # Add header and source files to library
 add_library (Lumen STATIC ${HEADER_FILES} ${SOURCE_FILES})
+set_property(TARGET Lumen APPEND PROPERTY COMPILE_DEFINITIONS LUMEN)
 
 include(${CMAKE_SOURCE_DIR}/cmake/functions.cmake)
 assign_source_group(${HEADER_FILES})
