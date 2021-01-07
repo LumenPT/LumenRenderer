@@ -9,7 +9,7 @@
 #define CPU __global__ __forceinline__
 #define CPU_ONLY __host__ __forceinline__
 
-
+using namespace WaveFront;
 
 /*
  * Set up buffers and other resources required by the pipeline.
