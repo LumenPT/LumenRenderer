@@ -4,104 +4,109 @@
  *for buffers like intersectionBuffer or OutputBuffer.
 */
 
-struct RayData
-{
-    
-    const float3 m_Origin;
-    const float3 m_Direction;
-    const float3 m_Contribution;
-
-};
-
-struct RayBatch
+namespace WaveFront
 {
 
-    const unsigned int m_Size;
-    RayData m_Rays[];
+    struct RayData
+    {
 
-};
+        const float3 m_Origin;
+        const float3 m_Direction;
+        const float3 m_Contribution;
 
-struct ShadowRayData
-{
+    };
 
-    const float3 m_Origin;
-    const float3 m_Direction;
-    const float m_MaxDistance;
-    const float3 m_PotentialRadiance;
-    unsigned int m_OutputChannelIndex;
+    struct RayBatch
+    {
 
-};
+        const unsigned int m_Size;
+        RayData m_Rays[];
 
-struct ShadowRayBatch
-{
+    };
 
-    const unsigned int m_Size;
-    ShadowRayData m_ShadowRays[];
+    struct ShadowRayData
+    {
 
-};
+        const float3 m_Origin;
+        const float3 m_Direction;
+        const float m_MaxDistance;
+        const float3 m_PotentialRadiance;
+        unsigned int m_OutputChannelIndex;
 
-struct IntersectionData
-{
+    };
 
-    unsigned int m_RayId;
-    float m_IntersectionT;
-    unsigned int m_TriangleId;
-    unsigned int m_MeshId;
+    struct ShadowRayBatch
+    {
 
-};
+        const unsigned int m_Size;
+        ShadowRayData m_ShadowRays[];
 
-struct IntersectionBuffer
-{
+    };
 
-    const unsigned int m_Size;
-    IntersectionData m_Intersections[];
+    struct IntersectionData
+    {
 
-};
+        unsigned int m_RayId;
+        float m_IntersectionT;
+        unsigned int m_TriangleId;
+        unsigned int m_MeshId;
 
-struct OutputBuffer
-{
+    };
 
-    const static unsigned int m_NumOutputChannels = 3;
-    const unsigned int m_Size;
-    float3 m_Pixels[][m_NumOutputChannels];
+    struct IntersectionBuffer
+    {
 
-};
+        const unsigned int m_Size;
+        IntersectionData m_Intersections[];
 
-struct PixelBuffer
-{
+    };
 
-    RayBatch* m_PrimaryRays;
-    IntersectionBuffer* m_PrimaryIntersections;
-    OutputBuffer* m_PixelOutput;
+    struct OutputBuffer
+    {
 
-};
+        const static unsigned int m_NumOutputChannels = 3;
+        const unsigned int m_Size;
+        float3 m_Pixels[][m_NumOutputChannels];
 
-struct ShadingLaunchParameters
-{
+    };
 
-    PixelBuffer* m_Output;
-    PixelBuffer* m_PrevOutput;
-    RayBatch* m_SecondaryRays;
-    IntersectionBuffer* m_Intersections;
-    const float2 m_OutputSize;
-    ShadowRayBatch* m_ShadowRaysBatches[];
+    struct PixelBuffer
+    {
 
-};
+        RayBatch* m_PrimaryRays;
+        IntersectionBuffer* m_PrimaryIntersections;
+        OutputBuffer* m_PixelOutput;
 
-struct DeviceCameraData
-{
+    };
 
-    float3 m_Position;
-    float3 m_Up;
-    float3 m_Right;
-    float3 m_Forward;
+    struct ShadingLaunchParameters
+    {
 
-};
+        PixelBuffer* m_Output;
+        PixelBuffer* m_PrevOutput;
+        RayBatch* m_SecondaryRays;
+        IntersectionBuffer* m_Intersections;
+        const float2 m_OutputSize;
+        ShadowRayBatch* m_ShadowRaysBatches[];
 
-struct PrimRayGenLaunchParameters
-{
+    };
 
-    DeviceCameraData m_Camera;
-    float2 m_OutputSize;
+    struct DeviceCameraData
+    {
 
-};
+        float3 m_Position;
+        float3 m_Up;
+        float3 m_Right;
+        float3 m_Forward;
+
+    };
+
+    struct PrimRayGenLaunchParameters
+    {
+
+        DeviceCameraData m_Camera;
+        float2 m_OutputSize;
+
+    };
+
+}

@@ -1,5 +1,6 @@
 #include "./CppCommon/WaveFrontKernels.cuh"
 
+using namespace WaveFront;
 /*
  * Example calling order of functions.
  */
