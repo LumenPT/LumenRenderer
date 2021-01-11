@@ -10,6 +10,7 @@ namespace WaveFront
     struct RayData
     {
 
+        //Read only
         const float3 m_Origin;
         const float3 m_Direction;
         const float3 m_Contribution;
@@ -19,7 +20,10 @@ namespace WaveFront
     struct RayBatch
     {
 
+        //Read only
         const unsigned int m_Size;
+
+        //Read/Write
         RayData m_Rays[];
 
     };
@@ -27,18 +31,22 @@ namespace WaveFront
     struct ShadowRayData
     {
 
+        //Read only
         const float3 m_Origin;
         const float3 m_Direction;
         const float m_MaxDistance;
         const float3 m_PotentialRadiance;
-        unsigned int m_OutputChannelIndex;
+        const unsigned int m_OutputChannelIndex;
 
     };
 
     struct ShadowRayBatch
     {
 
+        //Read only
         const unsigned int m_Size;
+
+        //Read/Write
         ShadowRayData m_ShadowRays[];
 
     };
@@ -46,53 +54,66 @@ namespace WaveFront
     struct IntersectionData
     {
 
-        unsigned int m_RayId;
-        float m_IntersectionT;
-        unsigned int m_TriangleId;
-        unsigned int m_MeshId;
+        //Read only
+        const unsigned int m_RayId;
+        const float m_IntersectionT;
+        const unsigned int m_TriangleId;
+        const unsigned int m_MeshId;
 
     };
 
     struct IntersectionBuffer
     {
 
+        //Read only
         const unsigned int m_Size;
+
+        //Read/Write
         IntersectionData m_Intersections[];
-
-    };
-
-    struct OutputBuffer
-    {
-
-        const static unsigned int m_NumOutputChannels = 3;
-        const unsigned int m_Size;
-        float3 m_Pixels[][m_NumOutputChannels];
 
     };
 
     struct PixelBuffer
     {
 
-        RayBatch* m_PrimaryRays;
-        IntersectionBuffer* m_PrimaryIntersections;
-        OutputBuffer* m_PixelOutput;
+        enum class OutputChannel : unsigned int
+        {
+            DIRECT,
+            INDIRECT,
+            SPECULAR,
+            NUM_CHANNELS
+        };
+
+        //Ready only
+        constexpr static unsigned int m_NumOutputChannels = static_cast<unsigned>(OutputChannel::NUM_CHANNELS);
+        const unsigned int m_Size;
+
+        //Read/Write
+        float3 m_Pixels[][m_NumOutputChannels];
 
     };
 
-    struct ShadingLaunchParameters
+    struct OutputBuffer
     {
 
-        PixelBuffer* m_Output;
-        PixelBuffer* m_PrevOutput;
-        RayBatch* m_SecondaryRays;
-        IntersectionBuffer* m_Intersections;
-        const float2 m_OutputSize;
-        ShadowRayBatch* m_ShadowRaysBatches[];
+        //Read only
+        const RayBatch* m_PrimaryRays;
+        const IntersectionBuffer* m_PrimaryIntersections;
+
+        //Read/Write
+        PixelBuffer* m_PixelOutput;
 
     };
 
     struct DeviceCameraData
     {
+
+        DeviceCameraData(
+            const float3& a_Position, 
+            const float3& a_Up, 
+            const float3& a_Right, 
+            const float3& a_Forward);
+        ~DeviceCameraData();
 
         float3 m_Position;
         float3 m_Up;
@@ -101,11 +122,57 @@ namespace WaveFront
 
     };
 
-    struct PrimRayGenLaunchParameters
+    struct SetupLaunchParameters
     {
 
-        DeviceCameraData m_Camera;
-        float2 m_OutputSize;
+        SetupLaunchParameters();
+        ~SetupLaunchParameters();
+
+        const uint2 m_Resolution;
+        const DeviceCameraData m_Camera;
+
+    };
+
+    struct ShadingLaunchParameters
+    {
+
+        ShadingLaunchParameters(
+            const uint2& a_Resolution,
+            const OutputBuffer* a_PrevOutput,
+            const IntersectionBuffer* a_Intersections,
+            RayBatch* a_SecondaryRays,
+            ShadowRayBatch* a_ShadowRayBatches[]);
+
+        ~ShadingLaunchParameters();
+
+        //Read only
+        const uint2 m_Resolution;
+        const OutputBuffer* m_PrevOutput;
+        const IntersectionBuffer* m_Intersections;
+        //TODO: Geometry buffer
+        //TODO: Light buffer
+
+        //Write
+        RayBatch* m_SecondaryRays;
+        ShadowRayBatch* m_ShadowRaysBatches[];
+
+    };
+
+    struct PostProcessLaunchParameters
+    {
+
+        PostProcessLaunchParameters(
+            const uint2& a_Resolution, 
+            const OutputBuffer* a_WavefrontOutput, 
+            char4* a_ImageOutput);
+        ~PostProcessLaunchParameters();
+
+        //Read only
+        const uint2 m_Resolution;
+        const OutputBuffer* m_WavefrontOutputBuffer;
+
+        //Read/Write
+        char4* m_ImageOutputBuffer;
 
     };
 
