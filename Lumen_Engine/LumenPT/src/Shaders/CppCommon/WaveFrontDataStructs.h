@@ -20,7 +20,7 @@ namespace WaveFront
             NUM_CHANNELS
         };
 
-        __global__ PixelBuffer(unsigned int a_Size);
+        PixelBuffer(unsigned int a_Size);
 
         //Ready only
         constexpr static unsigned int m_NumOutputChannels = static_cast<unsigned>(OutputChannel::NUM_CHANNELS);
