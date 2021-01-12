@@ -9,7 +9,12 @@
 
 #include "GLFW/include/GLFW/glfw3.h"
 #include "Lumen/ModelLoading/SceneManager.h"
+
+#ifdef WAVEFRONT
+#include "../../LumenPT/src/Framework/WaveFrontRenderer.h"
+#else
 #include "../../LumenPT/src/Framework/OptiXRenderer.h"
+#endif
 
 
 //#include "imgui/imgui.h"

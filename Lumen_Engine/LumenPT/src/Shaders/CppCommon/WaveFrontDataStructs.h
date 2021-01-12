@@ -93,7 +93,7 @@ namespace WaveFront
 
     };
 
-    struct OutputBuffer
+    struct ResultBuffer
     {
 
         //Read only
@@ -138,7 +138,7 @@ namespace WaveFront
 
         ShadingLaunchParameters(
             const uint2& a_Resolution,
-            const OutputBuffer* a_PrevOutput,
+            const ResultBuffer* a_PrevOutput,
             const IntersectionBuffer* a_Intersections,
             RayBatch* a_SecondaryRays,
             ShadowRayBatch* a_ShadowRayBatches[]);
@@ -147,7 +147,7 @@ namespace WaveFront
 
         //Read only
         const uint2 m_Resolution;
-        const OutputBuffer* m_PrevOutput;
+        const ResultBuffer* m_PrevOutput;
         const IntersectionBuffer* m_Intersections;
         //TODO: Geometry buffer
         //TODO: Light buffer
@@ -163,13 +163,13 @@ namespace WaveFront
 
         PostProcessLaunchParameters(
             const uint2& a_Resolution, 
-            const OutputBuffer* a_WavefrontOutput, 
+            const ResultBuffer* a_WavefrontOutput, 
             char4* a_ImageOutput);
         ~PostProcessLaunchParameters();
 
         //Read only
         const uint2 m_Resolution;
-        const OutputBuffer* m_WavefrontOutputBuffer;
+        const ResultBuffer* m_WavefrontOutputBuffer;
 
         //Read/Write
         char4* m_ImageOutputBuffer;

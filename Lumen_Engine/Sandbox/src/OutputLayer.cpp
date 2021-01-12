@@ -55,7 +55,12 @@ OutputLayer::OutputLayer()
 
 	m_Program = program;
 
-	LumenPT::InitializationData init;
+	LumenPT::InitializationData init{};
+
+#ifdef WAVEFRONT
+	init.m_Resolution = { 800, 600 };
+#else
+#endif
 
 	m_LumenPT = std::make_unique<LumenPT>(init);
 
