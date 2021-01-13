@@ -158,7 +158,7 @@ bool WaveFrontRenderer::CreatePipeline()
     OptixProgramGroup hitProgram = CreateProgramGroup(htGroupDesc, "Hit");
 
     OptixPipelineLinkOptions pipelineLinkOptions = {};
-    pipelineLinkOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_LINEINFO;
+    pipelineLinkOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_FULL;
     pipelineLinkOptions.maxTraceDepth = 3; //TODO: potentially add this as a init param.
 
     OptixProgramGroup programGroups[] = { rayGenProgram, missProgram, hitProgram };

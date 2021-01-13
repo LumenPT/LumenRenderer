@@ -13,30 +13,11 @@
 using namespace WaveFront;
 
 /*
- * Called once before every frame.
- * Generates primary rays from the camera etc.
- * Rays are stored in the ray batch.
- */
-CPU_ONLY void PreRenderSetup(const SetupLaunchParameters& a_SetupParams);
-
-/*
- * Call Optix to intersect all rays in the ray batch.
- * Stores intersection data in the intersection data buffer.
- */
-CPU_ONLY void IntersectRays();
-
-/*
  * Shade the intersection points.
  * This does direct, indirect and specular shading.
  * This fills the shadow ray buffer with potential contributions per pixel.
  */
 CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams);
-
-/*
- * This resolves all shadow rays in parallel, and adds the light contribution
- * of each light channel to the output pixel buffer for each un-occluded ray.
- */
-CPU_ONLY void ResolveShadowRays();
 
 /*
  * Apply de-noising, up scaling and post-processing effects.
@@ -51,16 +32,16 @@ CPU_ONLY void GenerateRays(const SetupLaunchParameters& a_SetupParams);
 CPU_ONLY void GenerateMotionVectors();
 
 //Called during shading
-GPU void ShadeDirect();
-GPU void ShadeSpecular();
-GPU void ShadeIndirect();
+CPU void ShadeDirect();
+CPU void ShadeSpecular();
+CPU void ShadeIndirect();
 
 //Called during post-processing.
 GPU void Denoise();
-GPU void MergeLightChannels();
+CPU void MergeLightChannels();
 GPU void DLSS();
 GPU void PostProcessingEffects();
 
 
 //Generate some rays based on the thread index.
-GPU void GenerateRay(int a_NumRays, RayData* a_Buffer, const float3& a_U, const float3& a_V, const float3& a_W, const float3& a_Eye, const int2& a_Dimensions);
+CPU void GenerateRay(int a_NumRays, RayData* a_Buffer, const float3& a_U, const float3& a_V, const float3& a_W, const float3& a_Eye, const int2& a_Dimensions);
