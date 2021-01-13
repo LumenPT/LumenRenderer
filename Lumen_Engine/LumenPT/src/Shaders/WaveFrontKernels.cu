@@ -43,9 +43,22 @@ CPU_ONLY void PostProcess(const PostProcessLaunchParameters& a_PostProcessParams
      * Not needed now. Can be implemented later.
      * For now just merge the final light contributions to get the final pixel color.
      */
+
+     //The amount of pixels and threads/blocks needed to apply effects.
+    const int numPixels = a_PostProcessParams.m_Resolution.x * a_PostProcessParams.m_Resolution.y;
+    const int blockSize = 256;
+    const int numBlocks = (numPixels + blockSize - 1) / blockSize;
+
+    //TODO before merging.
     Denoise();
-    MergeLightChannels<<<1,1>>>();
+
+    //TODO pass in output buffer and input buffer.
+    MergeLightChannels << <numBlocks, blockSize >> > (numPixels, a_PostProcessParams.m_Resolution, nullptr, nullptr);
+
+    //TODO steal hidden Nvidia technology by breaking into their buildings
     DLSS();
+
+    //TODO
     PostProcessingEffects();
 }
 
@@ -71,8 +84,21 @@ GPU void Denoise()
 {
 }
 
-CPU void MergeLightChannels()
+CPU void MergeLightChannels(int a_NumPixels, const uint2& a_Dimensions, PixelBuffer* a_Input, float3* a_Output)
 {
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    int stride = blockDim.x * gridDim.x;
+
+    for (int i = index; i < a_NumPixels; i += stride)
+    {
+        //Convert the index into the screen dimensions.
+        const int screenY = i / a_Dimensions.x;
+        const int screenX = i - (screenY * a_Dimensions.x);
+
+        //Mix the results.
+        auto& data = a_Input->m_Pixels[i];
+        a_Output[i] = data[0] + data[1] + data[2];
+    }
 }
 
 GPU void DLSS()
