@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Renderer/ILumenTexture.h"
+#include "Renderer/ILumenResources.h"
 
 #include "glm/vec4.hpp"
 
@@ -15,7 +15,7 @@ class Material : public Lumen::ILumenMaterial
 public:
     Material();
 
-    const DeviceMaterial* GetDeviceMaterial() const;
+    DeviceMaterial* GetDeviceMaterial() const;
 
     void SetDiffuseColor(const glm::vec4& a_NewDiffuseColor) override;
     void SetDiffuseTexture(std::shared_ptr<Lumen::ILumenTexture> a_NewDiffuseTexture) override;

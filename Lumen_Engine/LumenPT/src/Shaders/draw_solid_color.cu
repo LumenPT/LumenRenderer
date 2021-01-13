@@ -67,7 +67,7 @@ __global__ void __raygen__draw_solid_color()
         params.W
     );
 
-    /*perspectiveProjection(
+    perspectiveProjection(
         origin,
         dir,
         make_int2(launch_index.x, launch_index.y),
@@ -76,7 +76,7 @@ __global__ void __raygen__draw_solid_color()
         params.U,
         params.V,
         params.W
-    );*/
+    );
 
     unsigned int p0, p1, p2;
 
@@ -96,9 +96,13 @@ __global__ void __raygen__draw_solid_color()
     col = A->m_Normal * U + B->m_Normal * V + C->m_Normal * W;
     //col = make_float3(int_as_float(p0), int_as_float(p1), int_as_float(p2));
 
-    if (p0 == 1)
+    if (p0 == 42)
     {
         col = make_float3(0.4f, 0.5f, 0.9f);
+    }
+    else
+    {
+        col = make_float3(0.0f, 1.0f, 0.0f);
     }
 
     params.m_Image[launch_index.y * params.m_ImageWidth + launch_index.x] =
@@ -111,7 +115,7 @@ __global__ void __miss__MissShader()
     MissData* msd = reinterpret_cast<MissData*>(optixGetSbtDataPointer());
 
 
-    optixSetPayload_0(1);
+    optixSetPayload_0(42);
     optixSetPayload_1(float_as_int(msd->m_Color.y));
     optixSetPayload_2(float_as_int(msd->m_Color.z));
 }

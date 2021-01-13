@@ -68,12 +68,12 @@ public:
 	Sandbox()
 	{
 		glfwMakeContextCurrent(reinterpret_cast<GLFWwindow*>(GetWindow().GetNativeWindow()));
+		//PushOverlay(new Lumen::ImGuiLayer());
 
 		OutputLayer* m_ContextLayer = new OutputLayer;
 		PushLayer(new ExampleLayer());
 		PushLayer(m_ContextLayer);
 
-		//PushOverlay(new Lumen::ImGuiLayer());
 
 		//temporary stuff to avoid absolute paths to gltf cube
 		std::filesystem::path p = std::filesystem::current_path();
@@ -84,7 +84,24 @@ public:
 		
 		Lumen::SceneManager manager = Lumen::SceneManager();
 		manager.SetPipeline(*m_ContextLayer->GetPipeline());
-		manager.LoadGLTF(p_string);
+		auto res = manager.LoadGLTF(p_string);
+
+
+		auto lumenPT = m_ContextLayer->GetPipeline();
+
+		LumenRenderer::SceneData scData = {};
+
+
+		lumenPT->m_Scene = lumenPT->CreateScene(scData);
+
+		auto mesh = lumenPT->m_Scene->AddMesh();
+		mesh->SetMesh(res->m_MeshPool[0]);
+
+		mesh->m_Transform.SetPosition(glm::vec3(0.f, 0.f, 50.0f));
+		mesh->m_Transform.SetScale(glm::vec3(1.0f));
+
+		auto someMatidk = mesh->m_Transform.GetTransformationMatrix();
+
 	}
 
 	~Sandbox()

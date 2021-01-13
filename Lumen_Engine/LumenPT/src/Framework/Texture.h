@@ -3,7 +3,7 @@
 #include "Cuda/cuda_runtime_api.h"
 
 
-#include "Renderer/ILumenTexture.h"
+#include "Renderer/ILumenResources.h"
 
 #include <cstdint>
 #include <string>

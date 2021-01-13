@@ -13,7 +13,7 @@ Material::Material()
     m_DeviceMemoryBuffer = std::make_unique<MemoryBuffer>(sizeof(DeviceMaterial));
 }
 
-const DeviceMaterial* Material::GetDeviceMaterial() const
+DeviceMaterial* Material::GetDeviceMaterial() const
 {
     if (m_DeviceMaterialDirty)
     {
@@ -53,7 +53,10 @@ DeviceMaterial Material::CreateDeviceMaterial() const
 {
     DeviceMaterial m;
     m.m_DiffuseColor = m_DiffuseColor;
-    m.m_DiffuseTexture = **m_DiffuseTexture;
+    if (m_DiffuseTexture)
+    {
+        m.m_DiffuseTexture = **m_DiffuseTexture;        
+    }
 
     return m;
 }

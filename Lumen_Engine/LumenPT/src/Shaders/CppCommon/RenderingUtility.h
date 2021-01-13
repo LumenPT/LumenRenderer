@@ -2,7 +2,6 @@
 
 #include <cuda_runtime.h>
 #include <cuda/helpers.h>
-
 __device__ __forceinline__ void orthgraphicProjection(float3& origin, float3& direction, int2 launchIndices, int2 screenResolution, const float3 eye, const float3 U, const float3 V, const float3 W)
 {
     origin = make_float3(static_cast<float>(launchIndices.x) / screenResolution.x, static_cast<float>(launchIndices.y) / screenResolution.y, 0.0f);
