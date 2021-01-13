@@ -62,7 +62,7 @@ option(NANOVDB_USE_CUDA "Build with CUDA support" ON)
 option(NANOVDB_USE_TBB "Build with TBB support" OFF)
 option(NANOVDB_USE_BLOSC "Build with BLOSC support" OFF)
 option(NANOVDB_USE_ZLIB "Build with ZLIB support" OFF)
-option(NANOVDB_USE_OPTIX "Build with OptiX support" ON)
+option(NANOVDB_USE_OPTIX "Build with OptiX support" OFF)
 option(NANOVDB_USE_MAGICAVOXEL "Build with MagicaVoxel support" OFF)
 
 option(NANOVDB_ALLOW_FETCHCONTENT
