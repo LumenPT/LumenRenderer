@@ -116,7 +116,7 @@ void WaveFrontRenderer::InitializePipelineOptions()
     m_PipelineCompileOptions = {};
     m_PipelineCompileOptions.traversableGraphFlags = OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_ANY;
     m_PipelineCompileOptions.numAttributeValues = 2;
-    m_PipelineCompileOptions.numPayloadValues = 3;
+    m_PipelineCompileOptions.numPayloadValues = 4;
     m_PipelineCompileOptions.exceptionFlags = OPTIX_EXCEPTION_FLAG_DEBUG;
     m_PipelineCompileOptions.usesPrimitiveTypeFlags = 0;
     m_PipelineCompileOptions.usesMotionBlur = false;
@@ -439,6 +439,7 @@ GLuint WaveFrontRenderer::TraceFrame()
     vertexBuffer.Write(verti.data(), verti.size() * sizeof(Vertex), 0);
 
     LaunchParameters params = {};
+    OptixShaderBindingTable sbt = m_ShaderBindingTableGenerator->GetTableDesc();
 
     params.m_Image = m_OutputBuffer->GetDevicePointer();
     params.m_Handle = static_cast<PTScene&>(*m_Scene).GetSceneAccelerationStructure();
@@ -462,7 +463,9 @@ GLuint WaveFrontRenderer::TraceFrame()
 
     m_MissRecord.GetRecord().m_Data.m_Color = { 0.f, sinf(f), 0.f };
 
-    OptixShaderBindingTable sbt = m_ShaderBindingTableGenerator->GetTableDesc();
+
+    cudaDeviceSynchronize();
+    auto error = cudaGetLastError();
 
     optixLaunch(
         m_Pipeline, 
@@ -473,8 +476,6 @@ GLuint WaveFrontRenderer::TraceFrame()
         m_Resolution.x, 
         m_Resolution.y, 
         1);
-
-    auto error = cudaGetLastError();
 
     return m_OutputBuffer->GetTexture();
 
@@ -578,7 +579,7 @@ std::unique_ptr<Lumen::ILumenPrimitive> WaveFrontRenderer::CreatePrimitive(Primi
     auto& rec = prim->m_RecordHandle.GetRecord();
     rec.m_Header = GetProgramGroupHeader("Hit");
     rec.m_Data.m_VertexBuffer = prim->m_VertBuffer->GetDevicePtr<Vertex>();
-    rec.m_Data.m_IndexBuffer = prim->m_IndexBuffer->GetDevicePtr<int>();
+    rec.m_Data.m_IndexBuffer = prim->m_IndexBuffer->GetDevicePtr<unsigned int>();
     rec.m_Data.m_Material = static_cast<Material*>(prim->m_Material.get())->GetDeviceMaterial();
 
     return prim;

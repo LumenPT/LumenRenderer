@@ -10,6 +10,11 @@ PTMesh::PTMesh(std::vector<std::unique_ptr<Lumen::ILumenPrimitive>>& a_Primitive
     : ILumenMesh(a_Primitives)
     , m_Services(a_ServiceLocator)
 {
+    
+}
+
+void PTMesh::UpdateAccelerationStructure()
+{
     std::vector<OptixInstance> instances;
     uint32_t idCounter = 0;
     for (auto& primitive : m_Primitives)
@@ -24,7 +29,29 @@ PTMesh::PTMesh(std::vector<std::unique_ptr<Lumen::ILumenPrimitive>>& a_Primitive
 
         auto transform = glm::mat4(1.0f);
         memcpy(&inst.transform[0], &transform, sizeof(inst.transform));
+        m_LastUsedSBTOffsets[ptPrim] = ptPrim->m_RecordHandle.m_TableIndex;
     }
 
     m_AccelerationStructure = m_Services.m_Renderer->BuildInstanceAccelerationStructure(instances);
+}
+
+bool PTMesh::VerifyStructCorrectness()
+{
+    bool structCorrect = true;
+    for (auto& lumenPrimitive : m_Primitives)
+    {
+        auto ptPrimitive = static_cast<PTPrimitive*>(lumenPrimitive.get());
+        if (ptPrimitive->m_RecordHandle.m_TableIndex != m_LastUsedSBTOffsets[ptPrimitive])
+        {
+            structCorrect = false;
+        }
+    }
+
+    if (!structCorrect)
+    {
+        UpdateAccelerationStructure();
+    }
+
+    // True if the struct was correct to begin with, false if it had to be updated
+    return structCorrect;
 }

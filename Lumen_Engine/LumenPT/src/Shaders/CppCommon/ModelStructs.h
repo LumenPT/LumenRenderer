@@ -30,7 +30,7 @@ struct DeviceMaterial
 struct DevicePrimitive
 {
     Vertex*     m_VertexBuffer;
-    int*        m_IndexBuffer;
+    unsigned int*  m_IndexBuffer;
     DeviceMaterial* m_Material;
 };
 

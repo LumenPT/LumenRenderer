@@ -40,7 +40,15 @@ OptixTraversableHandle PTScene::GetSceneAccelerationStructure()
 
 void PTScene::UpdateSceneAccelerationStructure()
 {
-    if (!m_TransformedAccelerationStructures.empty())
+    bool sbtMatchStructs = true;
+    for (auto& meshInstance : m_MeshInstances)
+    {
+        sbtMatchStructs &= static_cast<PTMesh*>(meshInstance->GetMesh().get())->VerifyStructCorrectness();
+    }
+
+    // If there has been a mismatch between the SBT and the acceleration structs, some of the structs have been rebuilt and thus have new handles
+    // which invalidates them in the scene struct
+    if (!m_TransformedAccelerationStructures.empty() || sbtMatchStructs)
     {
         uint32_t instanceID = 0;
         std::vector<OptixInstance> instances;

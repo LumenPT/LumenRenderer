@@ -493,7 +493,7 @@ std::unique_ptr<Lumen::ILumenPrimitive> OptiXRenderer::CreatePrimitive(Primitive
     auto& rec = prim->m_RecordHandle.GetRecord();
     rec.m_Header = GetProgramGroupHeader("Hit");
     rec.m_Data.m_VertexBuffer = prim->m_VertBuffer->GetDevicePtr<Vertex>();
-    rec.m_Data.m_IndexBuffer = prim->m_IndexBuffer->GetDevicePtr<int>();
+    rec.m_Data.m_IndexBuffer = prim->m_IndexBuffer->GetDevicePtr<unsigned int>();
     rec.m_Data.m_Material = static_cast<Material*>(prim->m_Material.get())->GetDeviceMaterial();
 
     return prim;

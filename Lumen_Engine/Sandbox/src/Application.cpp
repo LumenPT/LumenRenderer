@@ -79,7 +79,7 @@ public:
 		std::filesystem::path p = std::filesystem::current_path();
 		std::string p_string{ p.string() };
 		std::replace(p_string.begin(), p_string.end(), '\\', '/');
-		p_string.append("/Sandbox/assets/models/cube/cube.gltf");
+		p_string.append("/Sandbox/assets/models/Lantern.gltf");
 		LMN_TRACE(p_string);
 		
 		Lumen::SceneManager manager = Lumen::SceneManager();
@@ -97,7 +97,7 @@ public:
 		auto mesh = lumenPT->m_Scene->AddMesh();
 		mesh->SetMesh(res->m_MeshPool[0]);
 
-		mesh->m_Transform.SetPosition(glm::vec3(0.f, 0.f, 50.0f));
+		mesh->m_Transform.SetPosition(glm::vec3(0.f, 0.f, 15.0f));
 		mesh->m_Transform.SetScale(glm::vec3(1.0f));
 
 		auto someMatidk = mesh->m_Transform.GetTransformationMatrix();
