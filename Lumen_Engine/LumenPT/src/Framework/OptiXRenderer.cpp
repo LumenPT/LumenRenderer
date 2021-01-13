@@ -46,7 +46,7 @@ OptiXRenderer::OptiXRenderer(const InitializationData& /*a_InitializationData*/)
 
     m_ShaderBindingTableGenerator = std::make_unique<ShaderBindingTableGenerator>();
 
-    m_ServiceLocator.m_Renderer = this;
+    //m_ServiceLocator.m_Renderer = this;
     m_ServiceLocator.m_SBTGenerator = m_ShaderBindingTableGenerator.get();
 
     uchar4 px[] = {

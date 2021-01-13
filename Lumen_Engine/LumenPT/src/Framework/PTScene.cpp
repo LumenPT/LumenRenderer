@@ -5,7 +5,7 @@
 
 #include "PTMeshInstance.h"
 
-#include "OptiXRenderer.h"
+#include "WaveFrontRenderer.h"
 
 PTScene::PTScene(LumenRenderer::SceneData& a_SceneData, PTServiceLocator& a_ServiceLocator)
     : m_Services(a_ServiceLocator)

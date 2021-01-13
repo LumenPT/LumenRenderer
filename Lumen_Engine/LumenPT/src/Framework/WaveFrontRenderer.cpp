@@ -1,5 +1,7 @@
 #include "WaveFrontRenderer.h"
-#include "Mesh.h"
+#include "PTMesh.h"
+#include "PTScene.h"
+#include "AccelerationStructure.h"
 #include "Material.h"
 #include "Texture.h"
 #include "MemoryBuffer.h"
@@ -15,6 +17,10 @@
 #include "Cuda/cuda_runtime.h"
 #include "Optix/optix_stubs.h"
 #include <glm/gtx/compatibility.hpp>
+
+
+#include "PTMesh.h"
+#include "PTPrimitive.h"
 
 void CheckOptixRes(const OptixResult& a_res)
 {
@@ -50,10 +56,10 @@ m_Texture(nullptr),
 m_ProgramGroups({}),
 m_OutputBuffer(nullptr),
 m_SBTBuffer(nullptr),
-m_CudaStream(nullptr),
 m_Resolution({}),
 m_Initialized(false)
 {
+
     m_Initialized = Initialize(a_InitializationData);
     if(!m_Initialized)
     {
@@ -65,9 +71,11 @@ m_Initialized(false)
 
     m_Texture = std::make_unique<Texture>(LumenPTConsts::gs_AssetDirectory + "debugTex.jpg");
 
+    m_ServiceLocator.m_SBTGenerator = m_ShaderBindingTableGenerator.get();
+    m_ServiceLocator.m_Renderer = this;
+
     CreateShaderBindingTable();
 
-    cuStreamCreate(&m_CudaStream, CU_STREAM_DEFAULT);
 
 }
 
@@ -76,17 +84,16 @@ WaveFrontRenderer::~WaveFrontRenderer()
 
 bool WaveFrontRenderer::Initialize(const InitializationData& a_InitializationData)
 {
-
-    bool succes = true;
+    bool success = true;
 
     m_Resolution = a_InitializationData.m_Resolution;
 
     InitializeContext();
     InitializePipelineOptions();
-    succes &= CreatePipeline();
-    CreateOutputBuffer(a_InitializationData);
+    success &= CreatePipeline();
+    CreateOutputBuffer();
 
-    return succes;
+    return success;
 
 }
 
@@ -193,7 +200,7 @@ bool WaveFrontRenderer::CreatePipeline()
         finalSizes.DirectSizeTrace, 
         finalSizes.DirectSizeState, 
         finalSizes.ContinuationSize, 
-        2));
+        3));
 
     if (error) { return false; }
 
@@ -264,52 +271,38 @@ OptixProgramGroup WaveFrontRenderer::CreateProgramGroup(OptixProgramGroupDesc a_
 
 }
 
-OptixTraversableHandle WaveFrontRenderer::BuildGeometryAccelerationStructure(
+std::unique_ptr<AccelerationStructure> WaveFrontRenderer::BuildGeometryAccelerationStructure(
     const OptixAccelBuildOptions& a_BuildOptions, 
     const OptixBuildInput& a_BuildInput)
 {
 
+    // Let Optix compute how much memory the output buffer and the temporary buffer need to have, then create these buffers
     OptixAccelBufferSizes sizes;
-    CHECKOPTIXRESULT(optixAccelComputeMemoryUsage(
-        m_DeviceContext, 
-        &a_BuildOptions, 
-        &a_BuildInput, 
-        1, 
-        &sizes));
-
+    CHECKOPTIXRESULT(optixAccelComputeMemoryUsage(m_DeviceContext, &a_BuildOptions, &a_BuildInput, 1, &sizes));
     MemoryBuffer tempBuffer(sizes.tempSizeInBytes);
-    MemoryBuffer resultBuffer(sizes.outputSizeInBytes);
+    std::unique_ptr<MemoryBuffer> resultBuffer = std::make_unique<MemoryBuffer>(sizes.outputSizeInBytes);
 
     OptixTraversableHandle handle;
+    // It is possible to have functionality similar to DX12 Command lists with cuda streams, though it is not required.
+    // Just worth mentioning if we want that functionality.
+    CheckOptixRes(optixAccelBuild(m_DeviceContext, 0, &a_BuildOptions, &a_BuildInput, 1, *tempBuffer, sizes.tempSizeInBytes,
+        **resultBuffer, sizes.outputSizeInBytes, &handle, nullptr, 0));
 
-    CHECKOPTIXRESULT(optixAccelBuild(
-        m_DeviceContext, 
-        0, 
-        &a_BuildOptions, 
-        &a_BuildInput, 
-        1, 
-        *tempBuffer, 
-        sizes.tempSizeInBytes, 
-        *resultBuffer, 
-        sizes.outputSizeInBytes, 
-        &handle, 
-        nullptr, 
-        0));
-
-    return handle;
+    // Needs to return the resulting memory buffer and the traversable handle
+    return std::make_unique<AccelerationStructure>(handle, std::move(resultBuffer));
 
 }
 
-OptixTraversableHandle WaveFrontRenderer::BuildInstanceAccelerationStructure(std::vector<OptixInstance> a_Instances)
+std::unique_ptr<AccelerationStructure> WaveFrontRenderer::BuildInstanceAccelerationStructure(std::vector<OptixInstance> a_Instances)
 {
 
-    MemoryBuffer instanceBuffer(a_Instances.size() * sizeof(OptixInstance));
-    instanceBuffer.Write(
-        a_Instances.data(), 
-        a_Instances.size() * sizeof(OptixInstance), 
-        0);
 
+    auto instanceBuffer = MemoryBuffer(a_Instances.size() * sizeof(OptixInstance));
+    instanceBuffer.Write(a_Instances.data(), a_Instances.size() * sizeof(OptixInstance), 0);
     OptixBuildInput buildInput = {};
+
+    assert(*instanceBuffer % OPTIX_INSTANCE_BYTE_ALIGNMENT == 0);
+
     buildInput.type = OPTIX_BUILD_INPUT_TYPE_INSTANCES;
     buildInput.instanceArray.instances = *instanceBuffer;
     buildInput.instanceArray.numInstances = static_cast<uint32_t>(a_Instances.size());
@@ -317,10 +310,13 @@ OptixTraversableHandle WaveFrontRenderer::BuildInstanceAccelerationStructure(std
     buildInput.instanceArray.numAabbs = 0;
 
     OptixAccelBuildOptions buildOptions = {};
-
+    // Based on research, it is more efficient to continuously be rebuilding most instance acceleration structures rather than to update them
+    // This is because updating an acceleration structure reduces its quality, thus lowering the ray traversal speed through it
+    // while rebuilding will preserve this quality. Since instance acceleration structures are cheap to build, it is faster to rebuild them than deal
+    // with the lower traversal speed
     buildOptions.buildFlags = OPTIX_BUILD_FLAG_PREFER_FAST_TRACE;
     buildOptions.operation = OPTIX_BUILD_OPERATION_BUILD;
-    buildOptions.motionOptions.numKeys = 0;
+    buildOptions.motionOptions.numKeys = 0; // No motion
 
     OptixAccelBufferSizes sizes;
     CHECKOPTIXRESULT(optixAccelComputeMemoryUsage(
@@ -330,8 +326,8 @@ OptixTraversableHandle WaveFrontRenderer::BuildInstanceAccelerationStructure(std
         1,
         &sizes));
 
-    MemoryBuffer tempBuffer(sizes.tempSizeInBytes);
-    MemoryBuffer resultBuffer(sizes.outputSizeInBytes);
+    auto tempBuffer = MemoryBuffer(sizes.tempSizeInBytes);
+    auto resultBuffer = std::make_unique<MemoryBuffer>(sizes.outputSizeInBytes);
 
     OptixTraversableHandle handle;
     CHECKOPTIXRESULT(optixAccelBuild(
@@ -342,22 +338,22 @@ OptixTraversableHandle WaveFrontRenderer::BuildInstanceAccelerationStructure(std
         1,
         *tempBuffer,
         sizes.tempSizeInBytes,
-        *resultBuffer,
+        **resultBuffer,
         sizes.outputSizeInBytes,
         &handle,
         nullptr,
         0));
 
-    return handle;
-
+    return std::make_unique<AccelerationStructure>(handle, std::move(resultBuffer));;
+    
 }
 
 //TODO: adjust output buffer to the necessary output buffer received
 //from CUDA.
-void WaveFrontRenderer::CreateOutputBuffer(const InitializationData& a_InitializationData)
+void WaveFrontRenderer::CreateOutputBuffer()
 {
 
-    m_OutputBuffer = std::make_unique<::OutputBuffer>(a_InitializationData.m_Resolution.x, a_InitializationData.m_Resolution.y);
+    m_OutputBuffer = std::make_unique<::OutputBuffer>(m_Resolution.x, m_Resolution.y);
 
 }
 
@@ -445,8 +441,7 @@ GLuint WaveFrontRenderer::TraceFrame()
     LaunchParameters params = {};
 
     params.m_Image = m_OutputBuffer->GetDevicePointer();
-
-    params.m_Handle = BuildGeometryAccelerationStructure(verti);
+    params.m_Handle = static_cast<PTScene&>(*m_Scene).GetSceneAccelerationStructure();
     params.m_ImageWidth = m_Resolution.x;
     params.m_ImageHeight = m_Resolution.y;
     params.m_VertexBuffer = vertexBuffer.GetDevicePtr<Vertex>();
@@ -471,15 +466,13 @@ GLuint WaveFrontRenderer::TraceFrame()
 
     optixLaunch(
         m_Pipeline, 
-        m_CudaStream, 
+        0, 
         *devBuffer, 
         devBuffer.GetSize(), 
         &sbt, 
         m_Resolution.x, 
         m_Resolution.y, 
         1);
-
-    cuStreamSynchronize(m_CudaStream);
 
     auto error = cudaGetLastError();
 
@@ -511,16 +504,41 @@ WaveFrontRenderer::ComputedStackSizes WaveFrontRenderer::ComputeStackSizes(
 
 }
 
-std::shared_ptr<Lumen::ILumenMesh> WaveFrontRenderer::CreateMesh(const MeshData& a_MeshData)
+std::unique_ptr<MemoryBuffer> WaveFrontRenderer::InterleaveVertexData(const PrimitiveData& a_MeshData)
+{
+    std::vector<Vertex> vertices;
+
+    for (size_t i = 0; i < a_MeshData.m_Positions.Size(); i++)
+    {
+        auto& v = vertices.emplace_back();
+        v.m_Position = make_float3(a_MeshData.m_Positions[i].x, a_MeshData.m_Positions[i].y, a_MeshData.m_Positions[i].z);
+        if (!a_MeshData.m_TexCoords.Empty())
+            v.m_UVCoord = make_float2(a_MeshData.m_TexCoords[i].x, a_MeshData.m_TexCoords[i].y);
+        if (!a_MeshData.m_Normals.Empty())
+            v.m_Normal = make_float3(a_MeshData.m_Normals[i].x, a_MeshData.m_Normals[i].y, a_MeshData.m_Normals[i].z);
+    }
+    return std::make_unique<MemoryBuffer>(vertices);
+}
+
+std::shared_ptr<Lumen::ILumenTexture> WaveFrontRenderer::CreateTexture(void* a_PixelData, uint32_t a_Width, uint32_t a_Height)
 {
 
-    auto vertexBuffer = InterleaveVertexData(a_MeshData);
+    static cudaChannelFormatDesc formatDesc = cudaCreateChannelDesc<uchar4>();
+    return std::make_shared<Texture>(a_PixelData, formatDesc, a_Width, a_Height);
+
+}
+
+std::unique_ptr<Lumen::ILumenPrimitive> WaveFrontRenderer::CreatePrimitive(PrimitiveData& a_PrimitiveData)
+{
+    auto vertexBuffer = InterleaveVertexData(a_PrimitiveData);
+    cudaDeviceSynchronize();
+    auto err = cudaGetLastError();
 
     std::vector<uint32_t> correctedIndices;
 
-    if (a_MeshData.m_IndexSize == 4)
+    if (a_PrimitiveData.m_IndexSize != 4)
     {
-        VectorView<uint16_t, uint8_t> indexView(a_MeshData.m_IndexBinary);
+        VectorView<uint16_t, uint8_t> indexView(a_PrimitiveData.m_IndexBinary);
 
         for (size_t i = 0; i < indexView.Size(); i++)
         {
@@ -546,39 +564,31 @@ std::shared_ptr<Lumen::ILumenMesh> WaveFrontRenderer::CreateMesh(const MeshData&
     buildInput.triangleArray.vertexBuffers = &**vertexBuffer;
     buildInput.triangleArray.vertexFormat = OPTIX_VERTEX_FORMAT_FLOAT3;
     buildInput.triangleArray.vertexStrideInBytes = sizeof(Vertex);
-    buildInput.triangleArray.numVertices = a_MeshData.m_Positions.Size();
+    buildInput.triangleArray.numVertices = a_PrimitiveData.m_Positions.Size();
     buildInput.triangleArray.numSbtRecords = 1;
     buildInput.triangleArray.flags = &geomFlags;
 
     auto gAccel = BuildGeometryAccelerationStructure(buildOptions, buildInput);
 
-    return std::make_shared<Mesh>(std::move(vertexBuffer), std::move(indexBuffer), gAccel);
+    auto prim = std::make_unique<PTPrimitive>(std::move(vertexBuffer), std::move(indexBuffer), std::move(gAccel));
 
+    prim->m_Material = a_PrimitiveData.m_Material;
+
+    prim->m_RecordHandle = m_ShaderBindingTableGenerator->AddHitGroup<DevicePrimitive>();
+    auto& rec = prim->m_RecordHandle.GetRecord();
+    rec.m_Header = GetProgramGroupHeader("Hit");
+    rec.m_Data.m_VertexBuffer = prim->m_VertBuffer->GetDevicePtr<Vertex>();
+    rec.m_Data.m_IndexBuffer = prim->m_IndexBuffer->GetDevicePtr<int>();
+    rec.m_Data.m_Material = static_cast<Material*>(prim->m_Material.get())->GetDeviceMaterial();
+
+    return prim;
 }
 
-std::unique_ptr<MemoryBuffer> WaveFrontRenderer::InterleaveVertexData(const MeshData& a_MeshData)
+std::shared_ptr<Lumen::ILumenMesh> WaveFrontRenderer::CreateMesh(
+    std::vector<std::unique_ptr<Lumen::ILumenPrimitive>>& a_Primitives)
 {
-
-    std::vector<Vertex> vertices;
-
-    for (size_t i = 0; i < a_MeshData.m_Positions.Size(); i++)
-    {
-        auto& v = vertices.emplace_back();
-        v.m_Position = make_float3(a_MeshData.m_Positions[i].x, a_MeshData.m_Positions[i].y, a_MeshData.m_Positions[i].z);
-        v.m_UVCoord = make_float2(a_MeshData.m_TexCoords[i].x, a_MeshData.m_TexCoords[i].y);
-        v.m_Normal = make_float3(a_MeshData.m_Normals[i].x, a_MeshData.m_Normals[i].y, a_MeshData.m_Normals[i].z);
-    }
-
-    return std::make_unique<MemoryBuffer>(vertices);
-
-}
-
-std::shared_ptr<Lumen::ILumenTexture> WaveFrontRenderer::CreateTexture(void* a_PixelData, uint32_t a_Width, uint32_t a_Height)
-{
-
-    static cudaChannelFormatDesc formatDesc = cudaCreateChannelDesc<uchar4>();
-    return std::make_shared<Texture>(a_PixelData, formatDesc, a_Width, a_Height);
-
+    auto mesh = std::make_shared<PTMesh>(a_Primitives, m_ServiceLocator);
+    return mesh;
 }
 
 std::shared_ptr<Lumen::ILumenMaterial> WaveFrontRenderer::CreateMaterial(const MaterialData& a_MaterialData)
@@ -590,4 +600,9 @@ std::shared_ptr<Lumen::ILumenMaterial> WaveFrontRenderer::CreateMaterial(const M
 
     return mat;
 
+}
+
+std::shared_ptr<Lumen::ILumenScene> WaveFrontRenderer::CreateScene(SceneData a_SceneData)
+{
+    return std::make_shared<PTScene>(a_SceneData, m_ServiceLocator);
 }
