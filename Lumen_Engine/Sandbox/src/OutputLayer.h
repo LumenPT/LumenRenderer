@@ -18,6 +18,8 @@ public:
 
     void OnUpdate() override;
 
+    void OnImGuiRender() override;
+
     OptiXRenderer* GetPipeline() { return m_LumenPT.get(); };
 
 private:

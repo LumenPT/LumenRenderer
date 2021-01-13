@@ -2,15 +2,14 @@
 #include "SceneManager.h"
 #include "Node.h"
 #include "Transform.h"
-#include "../Renderer/ILumenMesh.h"
-#include "../Renderer/ILumenTexture.h"
+#include "../Renderer/ILumenResources.h"
 #include "stb_image.h"
 //#include "../../LumenPT/src/Framework/OptiXRenderer.h"
 
 //#include <string>
 #include <memory>
 
-Lumen::SceneManager::Scene* Lumen::SceneManager::LoadGLTF(std::string a_Path, glm::mat4& a_TransformMat)
+Lumen::SceneManager::GLTFResource* Lumen::SceneManager::LoadGLTF(std::string a_Path, glm::mat4& a_TransformMat)
 {
 	auto findIter = m_LoadedScenes.find(a_Path);
 
@@ -24,11 +23,13 @@ Lumen::SceneManager::Scene* Lumen::SceneManager::LoadGLTF(std::string a_Path, gl
 
 	res.m_Path = a_Path;
 
-	LoadMeshes(doc, res);
-	LoadNodes(doc, res, a_TransformMat);
+
 	LoadMaterials(doc, res);
 
-	return&res;
+	LoadMeshes(doc, res);
+	LoadNodes(doc, res, a_TransformMat);
+
+	return &res;
 }
 
 void Lumen::SceneManager::SetPipeline(LumenRenderer& a_Renderer)
@@ -36,11 +37,11 @@ void Lumen::SceneManager::SetPipeline(LumenRenderer& a_Renderer)
 	m_RenderPipeline = &a_Renderer;
 }
 
-void Lumen::SceneManager::LoadNodes(fx::gltf::Document& a_Doc, Scene& a_Scene, glm::mat4& a_TransformMat)
+void Lumen::SceneManager::LoadNodes(fx::gltf::Document& a_Doc, GLTFResource& a_Res, glm::mat4& a_TransformMat)
 {
 	//store offsets in the case there is somehow already data loaded in the scene object
-	const int nodeOffset = static_cast<int>(a_Scene.m_NodePool.size()) + 1;
-	const int meshOffset = static_cast<int>(a_Scene.m_MeshPool.size());
+	const int nodeOffset = static_cast<int>(a_Res.m_NodePool.size()) + 1;
+	const int meshOffset = static_cast<int>(a_Res.m_MeshPool.size());
 
 	std::vector<std::shared_ptr<Node>> nodes;	//only supporting one scene per file. Seems to work fine 99% of the time
 
@@ -92,38 +93,37 @@ void Lumen::SceneManager::LoadNodes(fx::gltf::Document& a_Doc, Scene& a_Scene, g
 			));
 		}
 
-		a_Scene.m_NodePool.push_back(newNode);
+		a_Res.m_NodePool.push_back(newNode);
 	}
 }
 
-void Lumen::SceneManager::LoadMeshes(fx::gltf::Document& a_Doc, Scene& a_Scene, glm::mat4& a_TransformMat)
+void Lumen::SceneManager::LoadMeshes(fx::gltf::Document& a_Doc, GLTFResource& a_Res, glm::mat4& a_TransformMat)
 {
-	const int meshOffset = static_cast<int>(a_Scene.m_MeshPool.size());
+	const int meshOffset = static_cast<int>(a_Res.m_MeshPool.size());
 
 	std::vector<std::shared_ptr<ILumenMesh>> meshes;
-
 	// pass binary data into mesh
 
 	for (auto& fxMesh : a_Doc.meshes)
 	{
+		std::vector<std::unique_ptr<Lumen::ILumenPrimitive>> primitives;
 		for (auto& fxPrim : fxMesh.primitives)
 		{
+			std::vector<uint8_t> posBinary, texBinary;
 			for (auto& fxAttribute : fxPrim.attributes)
 			{
-				std::vector<uint8_t> binary;
-
 				if (fxAttribute.first == "POSITION")
 				{
 					// store position accessor
 					//fxAttribute.second
 
-					binary = LoadBinary(a_Doc, fxAttribute.second);
+					posBinary = LoadBinary(a_Doc, fxAttribute.second);
 					//make vertex buffer of this, make function
 
 				}
 				else if (fxAttribute.first == "TEXCOORD_0")
 				{
-					//binary = 
+					texBinary = LoadBinary(a_Doc, fxAttribute.second);
 				}
 				else if (fxAttribute.first == "COLOR_0")
 				{
@@ -133,26 +133,39 @@ void Lumen::SceneManager::LoadMeshes(fx::gltf::Document& a_Doc, Scene& a_Scene, 
 				{
 
 				}
-
-
 			}
-
-			//index to accessor
 			auto& acc = fxPrim.attributes["POSITION"];
 			auto& accessprYe = a_Doc.accessors[acc];
 			auto& bufferView = a_Doc.bufferViews[accessprYe.bufferView];
 
 			auto binary = a_Doc.buffers[bufferView.buffer];
 
+			//index to accessor
 
 
+			auto indexBufferAcc = a_Doc.accessors[fxPrim.indices];
+		    auto indexBin = LoadBinary(a_Doc, fxPrim.indices);
+			auto indexSize = GetComponentSize(indexBufferAcc); // indices are are always a single component
+			assert(indexSize <= 4);
 
+			LumenRenderer::PrimitiveData primitiveData;
+			primitiveData.m_Positions = posBinary;
+			primitiveData.m_TexCoords = texBinary;
 
+			primitiveData.m_IndexBinary = indexBin;
+			primitiveData.m_IndexSize = indexSize;
+
+			primitiveData.m_Material = a_Res.m_MaterialPool[fxPrim.material];
+
+			auto newPrim = m_RenderPipeline->CreatePrimitive(primitiveData);
+
+			//newPrim->m_Material = a_Res.m_MaterialPool[fxPrim.material];
+			primitives.push_back(std::move(newPrim));
 		}
-		//meshes.push_back(static_cast<ILumenMesh>(fxMesh));
+		meshes.push_back(m_RenderPipeline->CreateMesh(primitives));
 	}
 
-	//a_Scene.m_MeshPool = 
+	a_Res.m_MeshPool = meshes;
 
 }
 
@@ -184,7 +197,7 @@ std::vector<uint8_t> Lumen::SceneManager::LoadBinary(fx::gltf::Document& a_Doc, 
 	return data;
 }
 
-void Lumen::SceneManager::LoadMaterials(fx::gltf::Document& a_Doc, Scene& a_Scene)
+void Lumen::SceneManager::LoadMaterials(fx::gltf::Document& a_Doc, GLTFResource& a_Res)
 {
 	std::vector<std::shared_ptr<ILumenMaterial>> materials;	// Get these iLumenMats from OptiXRenderer
 	//needs to be a more specific material implementation
@@ -209,7 +222,7 @@ void Lumen::SceneManager::LoadMaterials(fx::gltf::Document& a_Doc, Scene& a_Scen
 		{
 			auto& fxTex = a_Doc.images.at(fxMat.pbrMetallicRoughness.baseColorTexture.index);
 			int x, y, c;
-			auto stbTex = stbi_load((a_Scene.m_Path + "/../" + fxTex.uri).c_str(), &x, &y, &c, 4);
+			auto stbTex = stbi_load((a_Res.m_Path + "/../" + fxTex.uri).c_str(), &x, &y, &c, 4);
 			auto& tex = m_RenderPipeline->CreateTexture(stbTex, x, y);
 
 			mat->SetDiffuseTexture(tex);
@@ -218,7 +231,7 @@ void Lumen::SceneManager::LoadMaterials(fx::gltf::Document& a_Doc, Scene& a_Scen
 		materials.push_back(mat);
 	}
 
-	a_Scene.m_MaterialPool = materials;
+	a_Res.m_MaterialPool = materials;
 }
 
 uint32_t Lumen::SceneManager::GetComponentSize(fx::gltf::Accessor& a_Accessor)
