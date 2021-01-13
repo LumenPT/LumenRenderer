@@ -1,13 +1,21 @@
 #pragma once
 
-#include "device_launch_parameters.h"
 #include <cuda_runtime.h>
-#include <cinttypes>
-#include "./WaveFrontDataStructs.h"
+#include "WaveFrontDataStructs.h"
 
 //Some defines to make the functions less scary and more readable
-#define GPU __device__ __forceinline__ //Runs on GPU only, available on GPU only.
-#define CPU __global__ __forceinline__ //Runs on GPU, available on GPU and CPU.
+#ifdef GPU_ONLY
+#undef GPU_ONLY
+#endif
+#ifdef CPU_GPU
+#undef CPU_GPU
+#endif
+#ifdef CPU_ONLY
+#undef CPU_ONLY
+#endif
+
+#define GPU_ONLY __device__ __forceinline__ //Runs on GPU only, available on GPU only.
+#define CPU_GPU __global__ __forceinline__ //Runs on GPU, available on GPU and CPU.
 #define CPU_ONLY __host__ __forceinline__
 
 using namespace WaveFront;
@@ -25,23 +33,23 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams);
 CPU_ONLY void PostProcess(const PostProcessLaunchParameters& a_PostProcessParams);
 
 
-//The below functions are only called internally from the GPU within the above defined functions.
+//The below functions are only called internally from the GPU_ONLY within the above defined functions.
 
 //Called in setup.
 CPU_ONLY void GenerateRays(const SetupLaunchParameters& a_SetupParams);
 CPU_ONLY void GenerateMotionVectors();
 
 //Called during shading
-CPU void ShadeDirect(ShadingLaunchParameters& a_ShadingParams);
-CPU void ShadeSpecular();
-CPU void ShadeIndirect();
+CPU_GPU void ShadeDirect(const ShadingLaunchParameters& a_ShadingParams);
+CPU_GPU void ShadeSpecular();
+CPU_GPU void ShadeIndirect();
 
 //Called during post-processing.
-GPU void Denoise();
-CPU void MergeLightChannels(int a_NumPixels, const uint2& a_Dimensions, PixelBuffer* a_Input, float3* a_Output);
-GPU void DLSS();
-GPU void PostProcessingEffects();
+GPU_ONLY void Denoise();
+CPU_GPU void MergeLightChannels(int a_NumPixels, const uint2& a_Dimensions, const PixelBuffer* const a_Input[ResultBuffer::s_NumOutputChannels], PixelBuffer* const a_Output);
+GPU_ONLY void DLSS();
+GPU_ONLY void PostProcessingEffects();
 
 
 //Generate some rays based on the thread index.
-CPU void GenerateRay(int a_NumRays, RayData* a_Buffer, const float3& a_U, const float3& a_V, const float3& a_W, const float3& a_Eye, const int2& a_Dimensions);
+CPU_GPU void GenerateRay(int a_NumRays, RayData* a_Buffer, const float3& a_U, const float3& a_V, const float3& a_W, const float3& a_Eye, const int2& a_Dimensions);

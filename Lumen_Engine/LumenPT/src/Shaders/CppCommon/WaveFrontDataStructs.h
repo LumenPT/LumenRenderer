@@ -1,6 +1,7 @@
 #pragma once
 
-#include "Cuda/cuda.h"
+#include <Optix/optix.h>
+#include <Cuda/cuda/helpers.h>
 
 /*TODO: check if usage of textures can benefit performance
  *for buffers like intersectionBuffer or OutputBuffer.
@@ -13,37 +14,45 @@
 namespace WaveFront
 {
 
-    struct PixelBuffer
+    //Scene data
+
+    struct LightData    //placeholder contents
+    {
+        LightData(float a_Intensity, float3 a_Color);
+
+        // material or something?
+        float m_Intensity;
+        float3 m_Color;
+        float3 m_Position;
+    };
+
+    struct LightBuffer  //placeholder contents
+    {
+        LightBuffer(unsigned int a_Size);
+
+        const unsigned int m_Size;
+        LightData m_Lights[];
+    };
+
+    struct MeshData
     {
 
-        enum class OutputChannel : unsigned int
-        {
-            DIRECT,
-            INDIRECT,
-            SPECULAR,
-            NUM_CHANNELS
-        };
-
-        CPU_ONLY PixelBuffer(unsigned int a_Size)
-            :
-        m_Size(a_Size)
-        {
-            cudaMalloc(reinterpret_cast<void**>(&m_Pixels), m_Size * sizeof(float3) * m_NumOutputChannels);
-        }
-
-        CPU_ONLY ~PixelBuffer()
-        {
-            cudaFree(m_Pixels);
-        }
-
-        //Ready only
-        constexpr static unsigned int m_NumOutputChannels = static_cast<unsigned>(OutputChannel::NUM_CHANNELS);
-        const unsigned int m_Size;
-
-        //Read/Write
-        float3 m_Pixels[][m_NumOutputChannels];
+        //Buffer handles
+        //Buffer vertex layouts
 
     };
+
+    struct MeshBuffer
+    {
+
+        const unsigned int m_Size;
+        MeshData m_Meshes[];
+
+    };
+
+
+
+    //Ray & Intersection data and buffers
 
     struct RayData
     {
@@ -75,109 +84,38 @@ namespace WaveFront
     struct RayBatch
     {
 
-        CPU_ONLY RayBatch(unsigned int a_Size)
+        RayBatch()
             :
-        m_Size(a_Size)
-        {
-            cudaMalloc(reinterpret_cast<void**>(&m_Rays), m_Size * sizeof(RayData));
-        }
-
-        CPU_ONLY ~RayBatch()
-        {
-            cudaFree(m_Rays);
-        }
+        m_NumPixels(0u),
+        m_RaysPerPixel(0u),
+        m_Rays()
+        {}
 
         //Read only
-        const unsigned int m_Size;
+        const unsigned int m_NumPixels;
+        const unsigned int m_RaysPerPixel;
 
         //Read/Write
         RayData m_Rays[];
 
-        GPU_ONLY void AddRay(const RayData& a_data, unsigned int a_index)
+        CPU_GPU unsigned int GetSize() const
         {
-            if (a_index < m_Size)
+            return m_NumPixels * m_RaysPerPixel;
+        }
+
+        GPU_ONLY void SetRay(
+            const RayData& a_Data, 
+            unsigned int a_PixelIndex,
+            unsigned int a_RayIndex)
+        {
+            if( a_PixelIndex < m_NumPixels && 
+                a_RayIndex < m_RaysPerPixel)
             {
-                m_Rays[a_index] = a_data;
+                m_Rays[a_PixelIndex * m_RaysPerPixel + a_RayIndex] = a_Data;
             }
         }
 
     };
-
-    struct ShadowRayData
-    {
-
-        CPU_GPU ShadowRayData()
-            :
-        m_Origin(make_float3(0.f, 0.f, 0.f)),
-        m_Direction(make_float3(0.f, 0.f, 0.f)),
-        m_MaxDistance(0.f),
-        m_PotentialRadiance(make_float3(0.f, 0.f, 0.f)),
-        m_OutputChannelIndex(PixelBuffer::OutputChannel::DIRECT)
-        {}
-
-        CPU_GPU ShadowRayData(
-            const float3& a_Origin,
-            const float3& a_Direction,
-            const float& a_MaxDistance,
-            const float3& a_PotentialRadiance,
-            PixelBuffer::OutputChannel a_OutputChannelIndex)
-            :
-        m_Origin(a_Origin),
-        m_Direction(a_Direction),
-        m_MaxDistance(a_MaxDistance),
-        m_PotentialRadiance(a_PotentialRadiance),
-        m_OutputChannelIndex(a_OutputChannelIndex)
-        {}
-
-        //Read only
-        float3 m_Origin;
-        float3 m_Direction;
-        float m_MaxDistance;
-        float3 m_PotentialRadiance;
-        PixelBuffer::OutputChannel m_OutputChannelIndex;
-
-    };
-
-    struct ShadowRayBatch
-    {
-
-        CPU_ONLY ShadowRayBatch(unsigned int a_Size)
-            :
-        m_Size(a_Size)
-        {
-            cudaMalloc(reinterpret_cast<void**>(&m_ShadowRays), m_Size * sizeof(ShadowRayData));
-        }
-
-        CPU_ONLY ~ShadowRayBatch()
-        {
-            cudaFree(m_ShadowRays);
-        }
-
-        //Read only
-        const unsigned int m_Size;
-
-        //Read/Write
-        ShadowRayData m_ShadowRays[];
-
-    };
-
-	struct LightData    //placeholder contents
-	{
-        LightData(float a_Intensity, float3 a_Color);
-
-		// material or something?
-        float m_Intensity;
-        float3 m_Color;
-        float3 m_Position;
-	};
-
-	struct LightBuffer  //placeholder contents
-	{
-        LightBuffer(unsigned int a_Size);
-
-        const unsigned int m_Size;
-        LightData m_Lights[];
-	};
 
     struct IntersectionData
     {
@@ -219,54 +157,166 @@ namespace WaveFront
     struct IntersectionBuffer
     {
 
-        CPU_ONLY IntersectionBuffer(unsigned int a_Size)
+        IntersectionBuffer()
             :
-        m_Size(a_Size)
-        {
-            cudaMalloc(reinterpret_cast<void**>(&m_Intersections), m_Size * sizeof(IntersectionData));
-        }
-
-        CPU_ONLY ~IntersectionBuffer()
-        {
-            cudaFree(m_Intersections);
-        }
+        m_NumPixels(0u),
+        m_IntersectionsPerPixel(0u),
+        m_Intersections()
+        {}
 
         //Read only
-        const unsigned int m_Size;
+        const unsigned int m_NumPixels;
+        const unsigned int m_IntersectionsPerPixel;
 
         //Read/Write
         IntersectionData m_Intersections[];
+
+        CPU_GPU unsigned int GetSize() const
+        {
+            return m_NumPixels * m_IntersectionsPerPixel;
+        }
+
+        CPU_GPU void SetIntersection(
+            const IntersectionData& a_Data, 
+            unsigned int a_PixelIndex, 
+            unsigned int a_IntersectionIndex)
+        {
+
+            if( a_PixelIndex < m_NumPixels && 
+                a_IntersectionIndex < m_IntersectionsPerPixel)
+            {
+                m_Intersections[a_PixelIndex * m_IntersectionsPerPixel + a_IntersectionIndex] = a_Data;
+            }
+
+        }
+
+    };
+
+    struct PixelBuffer
+    {
+
+        PixelBuffer()
+            :
+        m_NumPixels(0u),
+        m_Pixels()
+        {}
+
+        //Ready only
+        const unsigned int m_NumPixels;
+
+        //Read/Write
+        float3 m_Pixels[];
+
+        CPU_GPU void SetPixel(const float3& a_value, unsigned int a_PixelIndex)
+        {
+            if(a_PixelIndex < m_NumPixels)
+            {
+                m_Pixels[a_PixelIndex] = a_value;
+            }
+        }
 
     };
 
     struct ResultBuffer
     {
 
-        CPU_ONLY ResultBuffer(
-            const RayBatch* a_PrimaryRays,
-            const IntersectionBuffer* a_PrimaryIntersections,
-            PixelBuffer* a_PixelOutput)
+        enum class OutputChannel : unsigned int
+        {
+            DIRECT,
+            INDIRECT,
+            SPECULAR,
+            NUM_CHANNELS
+        };
+
+        ResultBuffer()
             :
-        m_PrimaryRays(a_PrimaryRays),
-        m_PrimaryIntersections(a_PrimaryIntersections),
-        m_PixelOutput(a_PixelOutput)
+        m_PrimaryRays(nullptr),
+        m_PrimaryIntersections(nullptr),
+        m_PixelOutput()
         {}
 
-        CPU_ONLY ~ResultBuffer()
-        {
-            m_PrimaryRays = nullptr;
-            m_PrimaryIntersections = nullptr;
-            m_PixelOutput = nullptr;
-        }
-
         //Read only
-        const RayBatch* m_PrimaryRays;
-        const IntersectionBuffer* m_PrimaryIntersections;
+        const RayBatch* const m_PrimaryRays;
+        const IntersectionBuffer* const m_PrimaryIntersections;
+        constexpr static unsigned int s_NumOutputChannels = static_cast<unsigned>(OutputChannel::NUM_CHANNELS);
 
         //Read/Write
-        PixelBuffer* m_PixelOutput;
+        PixelBuffer* const m_PixelOutput[s_NumOutputChannels];
 
     };
+
+    struct ShadowRayData
+    {
+
+        CPU_GPU ShadowRayData()
+            :
+            m_Origin(make_float3(0.f, 0.f, 0.f)),
+            m_Direction(make_float3(0.f, 0.f, 0.f)),
+            m_MaxDistance(0.f),
+            m_PotentialRadiance(make_float3(0.f, 0.f, 0.f)),
+            m_OutputChannelIndex(ResultBuffer::OutputChannel::DIRECT)
+        {}
+
+        CPU_GPU ShadowRayData(
+            const float3& a_Origin,
+            const float3& a_Direction,
+            const float& a_MaxDistance,
+            const float3& a_PotentialRadiance,
+            ResultBuffer::OutputChannel a_OutputChannelIndex)
+            :
+            m_Origin(a_Origin),
+            m_Direction(a_Direction),
+            m_MaxDistance(a_MaxDistance),
+            m_PotentialRadiance(a_PotentialRadiance),
+            m_OutputChannelIndex(a_OutputChannelIndex)
+        {}
+
+        //Read only
+        float3 m_Origin;
+        float3 m_Direction;
+        float m_MaxDistance;
+        float3 m_PotentialRadiance;
+        ResultBuffer::OutputChannel m_OutputChannelIndex;
+
+    };
+
+    struct ShadowRayBatch
+    {
+
+        ShadowRayBatch()
+            :
+        m_NumPixels(0u),
+        m_RaysPerPixel(0u),
+        m_ShadowRays()
+        {}
+
+        //Read only
+        const unsigned int m_NumPixels;
+        const unsigned int m_RaysPerPixel;
+
+        //Read/Write
+        ShadowRayData m_ShadowRays[];
+
+        CPU_GPU unsigned int GetSize() const
+        {
+            return m_NumPixels * m_RaysPerPixel;
+        }
+
+        CPU_GPU void SetShadowRay(const ShadowRayData& a_Data, unsigned int a_PixelIndex, unsigned int a_RayIndex)
+        {
+            if(
+                a_PixelIndex < m_NumPixels && 
+                a_RayIndex < m_RaysPerPixel)
+            {
+                m_ShadowRays[a_PixelIndex * m_RaysPerPixel + a_RayIndex] = a_Data;
+            }
+        }
+
+    };
+
+
+
+    //Camera data
 
     struct DeviceCameraData
     {
@@ -291,6 +341,10 @@ namespace WaveFront
         float3 m_Forward;
 
     };
+
+
+
+    //Kernel Launch parameters
 
     struct SetupLaunchParameters
     {
@@ -352,6 +406,37 @@ namespace WaveFront
 
         //Read/Write
         char4* m_ImageOutputBuffer;
+
+    };
+
+
+
+    // Shader Launch parameters
+
+    struct CommonOptixLaunchParameters
+    {
+
+        OptixTraversableHandle m_Solids;
+        OptixTraversableHandle m_Volumes;
+
+    };
+
+    struct ResolveRaysLaunchParameters
+    {
+
+        uint3 m_ResolutionAndDepth;
+        RayBatch* m_Rays;
+        IntersectionBuffer* m_Intersections;
+
+    };
+
+    struct ResolveShadowRaysLaunchParameters
+    {
+
+
+        uint3 m_ResolutionAndDepth;
+        ShadowRayBatch* m_ShadowRays;
+        ResultBuffer* m_Results;
 
     };
 

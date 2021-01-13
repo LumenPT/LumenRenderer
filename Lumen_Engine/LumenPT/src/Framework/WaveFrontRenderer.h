@@ -1,7 +1,7 @@
 #pragma once
-#include "MemoryBuffer.h"
 #include "ShaderBindingTableRecord.h"
 #include "../Shaders/CppCommon/LaunchParameters.h"
+#include "MemoryBuffer.h"
 #include "Camera.h"
 #include "PTServiceLocator.h"
 
@@ -40,21 +40,7 @@ public:
     WaveFrontRenderer(const InitializationData& a_InitializationData);
     ~WaveFrontRenderer();
 
-    bool Initialize(const InitializationData& a_InitializationData);
 
-    void InitializeContext();
-
-    void InitializePipelineOptions();
-
-    bool CreatePipeline();
-
-    OptixModule CreateModule(const std::string& a_PtxPath);
-
-    OptixProgramGroup CreateProgramGroup(OptixProgramGroupDesc a_ProgramGroupDesc, const std::string& a_Name);
-
-    void CreateShaderBindingTable();
-
-    ProgramGroupHeader GetProgramGroupHeader(const std::string& a_GroupName) const;
 
     //template<typename VertexType>
     //OptixTraversableHandle BuildGeometryAccelerationStructure(std::vector<VertexType> a_Vertices, size_t a_Offset)
@@ -81,7 +67,7 @@ public:
 
     std::shared_ptr<Lumen::ILumenScene> CreateScene(SceneData a_SceneData) override;
 
-    void CreateOutputBuffer();
+   
 
     GLuint TraceFrame();
 
@@ -90,9 +76,6 @@ public:
     Lumen::Transform m_TestTransform;
 
 private:
-    static void DebugCallback(unsigned int a_Level, const char* a_Tag, const char* a_Message, void* /*extra data provided during context initialization*/);
-
-    static void AccumulateStackSizes(OptixProgramGroup a_ProgramGroup, OptixStackSizes& a_StackSizes);
 
     struct ComputedStackSizes
     {
@@ -101,7 +84,33 @@ private:
         int ContinuationSize;
     };
 
+
+
+    bool Initialize(const InitializationData& a_InitializationData);
+
+    void InitializeContext();
+
+    void InitializePipelineOptions();
+
+    bool CreatePipeline();
+
+    void CreateOutputBuffer();
+
+    OptixModule CreateModule(const std::string& a_PtxPath);
+
+    OptixProgramGroup CreateProgramGroup(OptixProgramGroupDesc a_ProgramGroupDesc, const std::string& a_Name);
+
+    void CreateShaderBindingTable();
+
+    ProgramGroupHeader GetProgramGroupHeader(const std::string& a_GroupName) const;
+
+    static void DebugCallback(unsigned int a_Level, const char* a_Tag, const char* a_Message, void* /*extra data provided during context initialization*/);
+
+    static void AccumulateStackSizes(OptixProgramGroup a_ProgramGroup, OptixStackSizes& a_StackSizes);
+
     static ComputedStackSizes ComputeStackSizes(OptixStackSizes a_StackSizes, int a_TraceDepth, int a_DirectDepth, int a_ContinuationDepth);
+
+
 
     PTServiceLocator m_ServiceLocator;
 
@@ -117,15 +126,16 @@ private:
     RecordHandle<MissData>      m_MissRecord;
     RecordHandle<HitData>       m_HitRecord;
 
-    std::unique_ptr<class Texture> m_Texture;
-
     std::map<std::string, OptixProgramGroup> m_ProgramGroups;
 
     std::unique_ptr<OutputBuffer> m_OutputBuffer;
-
     std::unique_ptr<MemoryBuffer> m_SBTBuffer;
 
     std::vector<std::unique_ptr<MemoryBuffer>> m_TempBuffers;
+
+    std::unique_ptr<MemoryBuffer> m_SecondaryIntersections;
+
+    std::unique_ptr<class Texture> m_Texture;
 
     uint2 m_Resolution;
     bool m_Initialized;

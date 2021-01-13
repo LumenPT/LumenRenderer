@@ -1,6 +1,8 @@
-#include "./CppCommon/WaveFrontKernels.cuh"
-
+#include "CppCommon/WaveFrontKernels.cuh"
 #include "CppCommon/RenderingUtility.h"
+
+#include "device_launch_parameters.h"
+#include "../../vendor/Include/sutil/vec_math.h"
 
 using namespace WaveFront;
 
@@ -32,7 +34,7 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
 
     ShadeIndirect<<<1,1>>>(); //Generate secondary rays.
     ShadeSpecular<<<1,1>>>(); //Generate shadow rays for specular highlights.
-    ShadeDirect<<<1,1>>>();   //Generate shadow rays for direct lights.
+    ShadeDirect<<<1,1>>>(a_ShadingParams);   //Generate shadow rays for direct lights.
 }
 
 
@@ -68,7 +70,7 @@ CPU_ONLY void GenerateMotionVectors()
 {
 }
 
-GPU void ShadeDirect(ShadingLaunchParameters& a_ShadingParams)
+CPU_GPU void ShadeDirect(const ShadingLaunchParameters& a_ShadingParams)
 {
     // need access to light & mesh
         // I get triangleID and meshID, so need to use that to look up actual data based on those IDs
@@ -104,7 +106,7 @@ GPU void ShadeDirect(ShadingLaunchParameters& a_ShadingParams)
             direction,
             1000.f,
             potRadiance,    //not sure what this represents
-            PixelBuffer::OutputChannel::DIRECT
+            ResultBuffer::OutputChannel::DIRECT
         );
     }
 
@@ -123,19 +125,24 @@ GPU void ShadeDirect(ShadingLaunchParameters& a_ShadingParams)
 
 }
 
-CPU void ShadeSpecular()
+CPU_GPU void ShadeSpecular()
 {
 }
 
-CPU void ShadeIndirect()
+CPU_GPU void ShadeIndirect()
 {
 }
 
-GPU void Denoise()
+GPU_ONLY void Denoise()
 {
 }
 
-CPU void MergeLightChannels(int a_NumPixels, const uint2& a_Dimensions, PixelBuffer* a_Input, float3* a_Output)
+CPU_GPU void MergeLightChannels(
+    int a_NumPixels, 
+    const uint2& a_Dimensions, 
+    const PixelBuffer* 
+    const a_Input[ResultBuffer::s_NumOutputChannels], 
+    PixelBuffer* const a_Output)
 {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     int stride = blockDim.x * gridDim.x;
@@ -147,20 +154,24 @@ CPU void MergeLightChannels(int a_NumPixels, const uint2& a_Dimensions, PixelBuf
         const int screenX = i - (screenY * a_Dimensions.x);
 
         //Mix the results.
-        auto& data = a_Input->m_Pixels[i];
-        a_Output[i] = data[0] + data[1] + data[2];
+        const float3& direct = a_Input[static_cast<unsigned>(ResultBuffer::OutputChannel::DIRECT)]->m_Pixels[i];
+        const float3& indirect = a_Input[static_cast<unsigned>(ResultBuffer::OutputChannel::INDIRECT)]->m_Pixels[i];
+        const float3& specular = a_Input[static_cast<unsigned>(ResultBuffer::OutputChannel::SPECULAR)]->m_Pixels[i];
+        //a_Output[i] = data[0] + data[1] + data[2]; this isnt correct ? take a float 3 and add each of its members to each other ?
+
+        a_Output->m_Pixels[i] = direct + indirect + specular;
     }
 }
 
-GPU void DLSS()
+GPU_ONLY void DLSS()
 {
 }
 
-GPU void PostProcessingEffects()
+GPU_ONLY void PostProcessingEffects()
 {
 }
 
-CPU void GenerateRay(int a_NumRays, RayData* a_Buffer, const float3& a_U, const float3& a_V, const float3& a_W,
+CPU_GPU void GenerateRay(int a_NumRays, RayData* a_Buffer, const float3& a_U, const float3& a_V, const float3& a_W,
                      const float3& a_Eye, const int2& a_Dimensions)
 {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
