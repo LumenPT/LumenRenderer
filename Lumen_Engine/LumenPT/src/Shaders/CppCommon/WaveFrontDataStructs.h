@@ -161,6 +161,24 @@ namespace WaveFront
 
     };
 
+	struct LightData    //placeholder contents
+	{
+        LightData(float a_Intensity, float3 a_Color);
+
+		// material or something?
+        float m_Intensity;
+        float3 m_Color;
+        float3 m_Position;
+	};
+
+	struct LightBuffer  //placeholder contents
+	{
+        LightBuffer(unsigned int a_Size);
+
+        const unsigned int m_Size;
+        LightData m_Lights[];
+	};
+
     struct IntersectionData
     {
 
@@ -300,7 +318,8 @@ namespace WaveFront
             const ResultBuffer* a_PrevOutput,
             const IntersectionBuffer* a_Intersections,
             RayBatch* a_SecondaryRays,
-            ShadowRayBatch* a_ShadowRayBatches[]);
+            ShadowRayBatch* a_ShadowRayBatches[],
+            LightBuffer* a_Lights);
 
         ~ShadingLaunchParameters();
 
@@ -310,6 +329,7 @@ namespace WaveFront
         const IntersectionBuffer* m_Intersections;
         //TODO: Geometry buffer
         //TODO: Light buffer
+        const LightBuffer* m_LightBuffer;
 
         //Write
         RayBatch* m_SecondaryRays;
