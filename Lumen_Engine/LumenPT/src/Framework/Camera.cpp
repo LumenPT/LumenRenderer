@@ -27,8 +27,8 @@ Camera::~Camera()
 
 void Camera::SetRotation(glm::quat a_Rotation)
 {
-	glm::vec3 viewDirection = glm::vec3(0.f, 0.f, 1.0f) * a_Rotation;
-	SetRotation(viewDirection);
+	//glm::vec3 viewDirection = glm::vec3(0.f, 0.f, 1.0f) * a_Rotation;
+	//SetRotation(viewDirection);
 
 	m_Rotation = a_Rotation;
 }

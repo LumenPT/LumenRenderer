@@ -38,6 +38,7 @@ set(LIBS
 	GLFW
 	Glad
 	ImGui
+	libnanovdb
 )
 
 set(INCLUDES
@@ -50,6 +51,7 @@ set(INCLUDES
 	"vendor/fx"
 	"vendor/stb"
 	"src"
+	${NANOVDB_HEADERS}
 )
 
 add_compile_definitions(GLFW_INCLUDE_NONE)
