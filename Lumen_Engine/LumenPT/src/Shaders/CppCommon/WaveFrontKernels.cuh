@@ -38,7 +38,7 @@ CPU void ShadeIndirect();
 
 //Called during post-processing.
 GPU void Denoise();
-CPU void MergeLightChannels();
+CPU void MergeLightChannels(int a_NumPixels, const uint2& a_Dimensions, PixelBuffer* a_Input, float3* a_Output);
 GPU void DLSS();
 GPU void PostProcessingEffects();
 
