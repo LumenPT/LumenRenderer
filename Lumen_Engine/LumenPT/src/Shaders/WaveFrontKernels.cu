@@ -74,7 +74,7 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
 
     ShadeIndirect(); //Generate secondary rays.
     ShadeSpecular(); //Generate shadow rays for specular highlights.
-    ShadeDirect();   //Generate shadow rays for direct lights.
+    ShadeDirect(a_ShadingParams);   //Generate shadow rays for direct lights.
 }
 
 CPU_ONLY void ResolveShadowRays()
@@ -124,8 +124,59 @@ CPU_ONLY void GenerateMotionVectors()
 {
 }
 
-GPU void ShadeDirect()
+GPU void ShadeDirect(ShadingLaunchParameters& a_ShadingParams)
 {
+    // need access to light & mesh
+		// I get triangleID and meshID, so need to use that to look up actual data based on those IDs
+		// 
+	
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    int stride = blockDim.x * gridDim.x;
+
+    const int numRays = a_ShadingParams.m_Resolution.x * a_ShadingParams.m_Resolution.y;
+
+    float3 origin = { 0.0f,0.0f,0.0f };
+
+	/*
+	 * a_ShadingParams->m_Intersections.m_Intersections[i]  //      intersection data
+	 *              find intersecting triangle properties through MeshID & TriangleID 
+	 */
+	
+    float3 direction = { 0.0f,0.0f,0.0f };
+    float3 potRadiance = { 0.0f,0.0f,0.0f };
+	
+    for (unsigned int i = index; i < numRays; i += stride)
+    {
+        //temp and probably shit, looping through all lights in buffer (rather than those nearby)
+        for (unsigned int j = 0; i < a_ShadingParams.m_LightBuffer->m_Size; j++)
+        {
+            direction = normalize(a_ShadingParams.m_LightBuffer->m_Lights[j].m_Position);// - intersectionPosition;
+        	
+        }
+    	
+	    //write shadow ray direction etc. to shadow ray batch   // TEMP
+        a_ShadingParams.m_ShadowRaysBatches[0]->m_ShadowRays[i] = ShadowRayData(
+            origin,
+            direction,
+            1000.f,
+            potRadiance,    //not sure what this represents
+            PixelBuffer::OutputChannel::DIRECT
+        );
+    }
+	
+	// look at generaterays function
+
+	// just need a pointer to start of buffer to start processing data
+
+	// need to get material and properties from intersection
+
+	// call BRDF functions
+
+	// buffers may require regular device pointers(?)
+
+    // hold array of buffer handles, so you can look up the buffers that belong to a certain mesh
+		// then inside those buffers you look up the triangleID to get the properties of the actual triangle
+	
 }
 
 GPU void ShadeSpecular()

@@ -51,7 +51,7 @@ CPU_ONLY void GenerateRays(const SetupLaunchParameters& a_SetupParams);
 CPU_ONLY void GenerateMotionVectors();
 
 //Called during shading
-GPU void ShadeDirect();
+GPU void ShadeDirect(ShadingLaunchParameters& a_ShadingParams);
 GPU void ShadeSpecular();
 GPU void ShadeIndirect();
 
