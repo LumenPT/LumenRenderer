@@ -122,23 +122,23 @@ namespace WaveFront
 
         CPU_GPU IntersectionData()
             :
-        m_RayId(0),
+        m_RayIndex(0),
         m_IntersectionT(-1.f),
         m_TriangleId(0),
-        m_MeshId(0)
+        m_MeshAndInstanceId(0)
         {}
         
 
         CPU_GPU IntersectionData(
-            unsigned int a_RayId,
+            unsigned int a_RayIndex,
             float a_IntersectionT,
             unsigned int a_TriangleId,
-            unsigned int a_MeshId)
+            unsigned int a_MeshAndInstanceId)
             :
-        m_RayId(a_RayId),
+        m_RayIndex(a_RayIndex),
         m_IntersectionT(a_IntersectionT),
         m_TriangleId(a_TriangleId),
-        m_MeshId(a_MeshId)
+        m_MeshAndInstanceId(a_MeshAndInstanceId)
         {}
 
         CPU_GPU bool IsIntersection() const
