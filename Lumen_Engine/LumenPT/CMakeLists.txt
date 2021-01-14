@@ -130,6 +130,7 @@ set(LIBS
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Libs/Cuda/cudart.lib"
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Libs/Cuda/cudadevrt.lib"
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Libs/glad.lib"
+	libnanovdb
 )
 
 set(INCLUDES
@@ -140,6 +141,7 @@ set(INCLUDES
 	"../Lumen/src"
 	"${CMAKE_CURRENT_SOURCE_DIR}/../Lumen/vendor/glm"
 	"${CMAKE_CURRENT_BINARY_DIR}/config"
+	${NANOVDB_HEADERS}
 )
 
 # Define the include DIRs

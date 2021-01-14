@@ -116,11 +116,11 @@ void OutputLayer::HandleCameraInput(Camera& a_Camera)
 	
 	if (Lumen::Input::IsKeyPressed(LMN_KEY_UP) || Lumen::Input::IsKeyPressed(LMN_KEY_W))
 	{
-		movementDirection -= glm::normalize(W) * movementSpeed;
+		movementDirection += glm::normalize(W) * movementSpeed;
 	}
 	if (Lumen::Input::IsKeyPressed(LMN_KEY_DOWN) || Lumen::Input::IsKeyPressed(LMN_KEY_S))
 	{
-		movementDirection += glm::normalize(W) * movementSpeed;
+		movementDirection -= glm::normalize(W) * movementSpeed;
 	}
 	if (Lumen::Input::IsKeyPressed(LMN_KEY_LEFT) || Lumen::Input::IsKeyPressed(LMN_KEY_A))
 	{
