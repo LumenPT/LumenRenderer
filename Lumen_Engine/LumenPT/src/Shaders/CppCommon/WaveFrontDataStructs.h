@@ -230,14 +230,14 @@ namespace WaveFront
 
         ResultBuffer()
             :
-        m_PrimaryRays(nullptr),
-        m_PrimaryIntersections(nullptr),
+        //m_PrimaryRays(nullptr),
+        //m_PrimaryIntersections(nullptr),
         m_PixelOutput()
         {}
 
-        //Read only
-        const RayBatch* const m_PrimaryRays;
-        const IntersectionBuffer* const m_PrimaryIntersections;
+        //Read only (Might not be necessary to store the primary rays and intersections here)
+        //const RayBatch* const m_PrimaryRays;
+        //const IntersectionBuffer* const m_PrimaryIntersections;
         constexpr static unsigned int s_NumOutputChannels = static_cast<unsigned>(OutputChannel::NUM_CHANNELS);
 
         //Read/Write
@@ -285,12 +285,14 @@ namespace WaveFront
 
         ShadowRayBatch()
             :
+        m_MaxDepth(0u),
         m_NumPixels(0u),
         m_RaysPerPixel(0u),
         m_ShadowRays()
         {}
 
         //Read only
+        const unsigned int m_MaxDepth;
         const unsigned int m_NumPixels;
         const unsigned int m_RaysPerPixel;
 
@@ -299,16 +301,20 @@ namespace WaveFront
 
         CPU_GPU unsigned int GetSize() const
         {
-            return m_NumPixels * m_RaysPerPixel;
+            return m_MaxDepth * m_NumPixels * m_RaysPerPixel;
         }
 
-        CPU_GPU void SetShadowRay(const ShadowRayData& a_Data, unsigned int a_PixelIndex, unsigned int a_RayIndex)
+        CPU_GPU void SetShadowRay(
+            const ShadowRayData& a_Data, 
+            unsigned int a_DepthIndex, 
+            unsigned int a_PixelIndex, 
+            unsigned int a_RayIndex)
         {
-            if(
+            if( a_DepthIndex < m_MaxDepth &&
                 a_PixelIndex < m_NumPixels && 
                 a_RayIndex < m_RaysPerPixel)
             {
-                m_ShadowRays[a_PixelIndex * m_RaysPerPixel + a_RayIndex] = a_Data;
+                m_ShadowRays[a_DepthIndex * m_NumPixels * m_RaysPerPixel + a_PixelIndex * m_RaysPerPixel + a_RayIndex] = a_Data;
             }
         }
 
@@ -351,16 +357,19 @@ namespace WaveFront
 
         CPU_ONLY SetupLaunchParameters(
             const uint2& a_Resolution, 
-            const DeviceCameraData& a_Camera)
+            const DeviceCameraData& a_Camera,
+            RayBatch* const a_PrimaryRays)
             :
         m_Resolution(a_Resolution),
-        m_Camera(a_Camera)
+        m_Camera(a_Camera),
+        m_PrimaryRays(a_PrimaryRays)
         {}
 
         CPU_ONLY ~SetupLaunchParameters() = default;
 
         const uint2 m_Resolution;
         const DeviceCameraData m_Camera;
+        RayBatch* const m_PrimaryRays;
 
     };
 
@@ -368,44 +377,67 @@ namespace WaveFront
     {
 
         CPU_ONLY ShadingLaunchParameters(
-            const uint2& a_Resolution,
-            const ResultBuffer* a_PrevOutput,
+            const uint3& a_ResolutionAndDepth,
+            const RayBatch* const a_PrimaryRays,
+            const IntersectionBuffer* a_PrimaryIntersections,
+            const RayBatch* const a_PrevRays,
             const IntersectionBuffer* a_Intersections,
             RayBatch* a_SecondaryRays,
-            ShadowRayBatch* a_ShadowRayBatches[],
-            LightBuffer* a_Lights);
+            ShadowRayBatch* a_ShadowRayBatch,
+            const LightBuffer* a_Lights)
+            :
+        m_ResolutionAndDepth(a_ResolutionAndDepth),
+        m_PrimaryRays(a_PrimaryRays),
+        m_PrimaryIntersections(a_PrimaryIntersections),
+        m_PrevRays(a_PrevRays),
+        m_Intersections(a_Intersections),
+        m_LightBuffer(a_Lights),
+        m_SecondaryRays(a_SecondaryRays),
+        m_ShadowRaysBatch(a_ShadowRayBatch)
+        {}
 
-        ~ShadingLaunchParameters();
+        CPU_ONLY ~ShadingLaunchParameters() = default;
 
         //Read only
-        const uint2 m_Resolution;
-        const ResultBuffer* m_PrevOutput;
-        const IntersectionBuffer* m_Intersections;
+        const uint3 m_ResolutionAndDepth;
+        const RayBatch* const m_PrimaryRays;
+        const IntersectionBuffer* const m_PrimaryIntersections;
+        const RayBatch* const m_PrevRays;
+        const IntersectionBuffer* const m_Intersections;
         //TODO: Geometry buffer
         //TODO: Light buffer
-        const LightBuffer* m_LightBuffer;
+        const LightBuffer* const m_LightBuffer;
 
         //Write
-        RayBatch* m_SecondaryRays;
-        ShadowRayBatch* m_ShadowRaysBatches[];
+        RayBatch* const m_SecondaryRays;
+        ShadowRayBatch* const m_ShadowRaysBatch;
 
     };
 
     struct PostProcessLaunchParameters
     {
 
-        PostProcessLaunchParameters(
+        CPU_ONLY PostProcessLaunchParameters(
             const uint2& a_Resolution, 
-            const ResultBuffer* a_WavefrontOutput, 
-            char4* a_ImageOutput);
-        ~PostProcessLaunchParameters();
+            const ResultBuffer* const a_WavefrontOutput,
+            PixelBuffer* const a_MergedResults,
+            char4* const a_ImageOutput)
+            :
+        m_Resolution(a_Resolution),
+        m_WavefrontOutput(a_WavefrontOutput),
+        m_MergedResults(a_MergedResults),
+        m_ImageOutput(a_ImageOutput)
+        {}
+
+        CPU_ONLY ~PostProcessLaunchParameters() = default;
 
         //Read only
         const uint2 m_Resolution;
-        const ResultBuffer* m_WavefrontOutputBuffer;
+        const ResultBuffer* const m_WavefrontOutput;
 
         //Read/Write
-        char4* m_ImageOutputBuffer;
+        PixelBuffer* const m_MergedResults; //Used to merge results from multiple channels into one channel.
+        char4* const m_ImageOutput; //Used to display image after DLSS algorithm has run on merged results.
 
     };
 

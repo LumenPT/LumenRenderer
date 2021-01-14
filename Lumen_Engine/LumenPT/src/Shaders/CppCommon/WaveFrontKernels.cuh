@@ -40,7 +40,7 @@ CPU_ONLY void GenerateRays(const SetupLaunchParameters& a_SetupParams);
 CPU_ONLY void GenerateMotionVectors();
 
 //Called during shading
-CPU_GPU void ShadeDirect(const ShadingLaunchParameters& a_ShadingParams);
+CPU_GPU void ShadeDirect(const uint3& a_ResolutionAndDepth, const IntersectionBuffer* const a_Intersections, ShadowRayBatch* const a_ShadowRays, const LightBuffer* const a_Lights);
 CPU_GPU void ShadeSpecular();
 CPU_GPU void ShadeIndirect();
 
@@ -52,4 +52,4 @@ GPU_ONLY void PostProcessingEffects();
 
 
 //Generate some rays based on the thread index.
-CPU_GPU void GenerateRay(int a_NumRays, RayData* a_Buffer, const float3& a_U, const float3& a_V, const float3& a_W, const float3& a_Eye, const int2& a_Dimensions);
+CPU_GPU void GenerateRay(int a_NumRays, RayBatch* const a_Buffer, const float3& a_U, const float3& a_V, const float3& a_W, const float3& a_Eye, const int2& a_Dimensions);
