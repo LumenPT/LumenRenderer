@@ -1,47 +1,90 @@
 #pragma once
-#include "Camera.h"
 #include "ShaderBindingTableRecord.h"
-#include "Renderer/LumenRenderer.h"
 #include "../Shaders/CppCommon/LaunchParameters.h"
+#include "MemoryBuffer.h"
+#include "Camera.h"
+#include "PTServiceLocator.h"
 
-#include <string>
+#include "Renderer/LumenRenderer.h"
+
 #include <map>
+#include <string>
 #include <vector>
 #include <memory>
 #include <Optix/optix_types.h>
-#include <Cuda/builtin_types.h>
+#include "Cuda/builtin_types.h"
 
 using GLuint = unsigned;
 
+class OutputBuffer;
+class ShaderBindingTableGenerator;
+
+class AccelerationStructure;
+
+namespace Lumen
+{
+    class ILumenTexture;
+    class ILumenPrimitive;
+}
+
 class WaveFrontRenderer : public LumenRenderer
 {
-
 public:
 
     struct InitializationData
     {
-
         uint2 m_Resolution;
-
 
     };
 
     WaveFrontRenderer(const InitializationData& a_InitializationData);
     ~WaveFrontRenderer();
 
-    GLuint TraceFrame();
 
+
+    //template<typename VertexType>
+    //OptixTraversableHandle BuildGeometryAccelerationStructure(std::vector<VertexType> a_Vertices, size_t a_Offset)
+
+    template<typename VertexType, typename IndexType = uint32_t>
+    std::unique_ptr<AccelerationStructure> BuildGeometryAccelerationStructure(
+        std::vector<VertexType> a_Vertices, size_t a_VertexOffset = 0,
+        std::vector<IndexType> a_Indices = std::vector<IndexType>(), size_t a_IndexOffset = 0);
+    std::unique_ptr<AccelerationStructure> BuildGeometryAccelerationStructure(
+        const OptixAccelBuildOptions& a_BuildOptions,
+        const OptixBuildInput& a_BuildInput);
+
+    std::unique_ptr<AccelerationStructure> BuildInstanceAccelerationStructure(std::vector<OptixInstance> a_Instances);
+
+    // Creates a cuda texture from the provided raw data and sizes. Only works if the pixel format is uchar4.
     std::shared_ptr<Lumen::ILumenTexture> CreateTexture(void* a_PixelData, uint32_t a_Width, uint32_t a_Height) override;
 
-    std::shared_ptr<Lumen::ILumenMesh> CreateMesh(const MeshData& a_MeshData) override;
+    std::unique_ptr<Lumen::ILumenPrimitive> CreatePrimitive(PrimitiveData& a_PrimitiveData) override;
+    std::unique_ptr<MemoryBuffer> InterleaveVertexData(const PrimitiveData& a_MeshData);
+
+    std::shared_ptr<Lumen::ILumenMesh> CreateMesh(std::vector<std::unique_ptr<Lumen::ILumenPrimitive>>& a_Primitives) override;
 
     std::shared_ptr<Lumen::ILumenMaterial> CreateMaterial(const MaterialData& a_MaterialData) override;
 
+    std::shared_ptr<Lumen::ILumenScene> CreateScene(SceneData a_SceneData) override;
 
+   
+
+    GLuint TraceFrame();
 
     Camera m_Camera;
 
+    Lumen::Transform m_TestTransform;
+
 private:
+
+    struct ComputedStackSizes
+    {
+        int DirectSizeTrace;
+        int DirectSizeState;
+        int ContinuationSize;
+    };
+
+
 
     bool Initialize(const InitializationData& a_InitializationData);
 
@@ -51,6 +94,8 @@ private:
 
     bool CreatePipeline();
 
+    void CreateOutputBuffer();
+
     OptixModule CreateModule(const std::string& a_PtxPath);
 
     OptixProgramGroup CreateProgramGroup(OptixProgramGroupDesc a_ProgramGroupDesc, const std::string& a_Name);
@@ -59,72 +104,47 @@ private:
 
     ProgramGroupHeader GetProgramGroupHeader(const std::string& a_GroupName) const;
 
-    template<typename VertexType, typename IndexType = uint32_t>
-    OptixTraversableHandle BuildGeometryAccelerationStructure(
-        std::vector<VertexType> a_Vertices, 
-        size_t a_VertexOffset = 0,
-        std::vector<IndexType> a_Indices = std::vector<IndexType>(), 
-        size_t a_IndexOffset = 0);
-
-    OptixTraversableHandle BuildGeometryAccelerationStructure(
-        const OptixAccelBuildOptions& a_BuildOptions,
-        const OptixBuildInput& a_BuildInput);
-
-    OptixTraversableHandle BuildInstanceAccelerationStructure(std::vector<OptixInstance> a_Instances);
-
-    void CreateOutputBuffer(const InitializationData& a_InitializationData);
-
-    std::unique_ptr<class MemoryBuffer> InterleaveVertexData(const MeshData& a_MeshData);
-
-    static void DebugCallback(unsigned int a_Level, const char* a_Tag, const char* a_Message, void*);
+    static void DebugCallback(unsigned int a_Level, const char* a_Tag, const char* a_Message, void* /*extra data provided during context initialization*/);
 
     static void AccumulateStackSizes(OptixProgramGroup a_ProgramGroup, OptixStackSizes& a_StackSizes);
 
-    struct ComputedStackSizes
-    {
-        int DirectSizeTrace;
-        int DirectSizeState;
-        int ContinuationSize;
-    };
-
-    static ComputedStackSizes ComputeStackSizes(
-        OptixStackSizes a_StackSizes, 
-        int a_TraceDepth, 
-        int a_DirectDepth, 
-        int a_ContinuationDepth);
+    static ComputedStackSizes ComputeStackSizes(OptixStackSizes a_StackSizes, int a_TraceDepth, int a_DirectDepth, int a_ContinuationDepth);
 
 
 
-    OptixDeviceContext m_DeviceContext;
+    PTServiceLocator m_ServiceLocator;
 
-    OptixPipelineCompileOptions m_PipelineCompileOptions;
-    OptixPipeline m_Pipeline;
+    OptixDeviceContext              m_DeviceContext;
+
+    OptixPipelineCompileOptions     m_PipelineCompileOptions;
+    OptixPipeline                   m_Pipeline;
 
     std::unique_ptr<ShaderBindingTableGenerator> m_ShaderBindingTableGenerator;
 
-    RecordHandle<RaygenData> m_RayGenRecord;
-    RecordHandle<MissData> m_MissRecord;
-    RecordHandle<HitData> m_HitRecord;
 
-    std::unique_ptr<class Texture> m_Texture;
+    RecordHandle<RaygenData>    m_RayGenRecord;
+    RecordHandle<MissData>      m_MissRecord;
+    RecordHandle<HitData>       m_HitRecord;
 
     std::map<std::string, OptixProgramGroup> m_ProgramGroups;
 
-    std::unique_ptr<class OutputBuffer> m_OutputBuffer;
+    std::unique_ptr<OutputBuffer> m_OutputBuffer;
+    std::unique_ptr<MemoryBuffer> m_SBTBuffer;
 
-    std::unique_ptr<class MemoryBuffer> m_SBTBuffer;
+    std::vector<std::unique_ptr<MemoryBuffer>> m_TempBuffers;
 
-    CUstream_st* m_CudaStream;
+    std::unique_ptr<MemoryBuffer> m_SecondaryIntersections;
+
+    std::unique_ptr<class Texture> m_Texture;
 
     uint2 m_Resolution;
     bool m_Initialized;
 
 };
 
-
-
 template <typename VertexType, typename IndexType>
-OptixTraversableHandle WaveFrontRenderer::BuildGeometryAccelerationStructure(std::vector<VertexType> a_Vertices,
+std::unique_ptr<AccelerationStructure> WaveFrontRenderer::BuildGeometryAccelerationStructure(
+    std::vector<VertexType> a_Vertices,
     size_t a_VertexOffset, std::vector<IndexType> a_Indices, size_t a_IndexOffset)
 {
     // Double check if the IndexType is uint32_t or uint16_t as those are the only supported index formats
@@ -171,3 +191,4 @@ OptixTraversableHandle WaveFrontRenderer::BuildGeometryAccelerationStructure(std
     return BuildGeometryAccelerationStructure(buildOptions, buildInput);
 
 }
+

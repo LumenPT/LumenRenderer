@@ -67,7 +67,7 @@ __global__ void __raygen__draw_solid_color()
         params.W
     );
 
-    /*perspectiveProjection(
+    perspectiveProjection(
         origin,
         dir,
         make_int2(launch_index.x, launch_index.y),
@@ -76,29 +76,19 @@ __global__ void __raygen__draw_solid_color()
         params.U,
         params.V,
         params.W
-    );*/
+    );
 
-    unsigned int p0, p1, p2;
+    unsigned int p0, p1, p2, p3;
 
-    optixTrace(params.m_Handle, origin, dir, 0.0f, 1000.0f, 0.0f, OptixVisibilityMask(255), OPTIX_RAY_FLAG_NONE, 0, 1, 0, p0, p1, p2);
+    optixTrace(params.m_Handle, origin, dir, 0.0f, 1000.0f, 0.0f, OptixVisibilityMask(255), OPTIX_RAY_FLAG_NONE, 0, 1, 0, p0, p1, p2, p3);
 
-    float3 col = rgd->m_Color;
+    float3 col = make_float3(0.4f, 0.5f, 0.9f);
 
-    float U = int_as_float(p1);
-    float V = int_as_float(p2);
-
-    Vertex* A = &params.m_VertexBuffer[p0 + 0];
-    Vertex* B = &params.m_VertexBuffer[p0 + 1];
-    Vertex* C = &params.m_VertexBuffer[p0 + 2];
-
-    float W = 1.0f - (U + V);
-
-    col = A->m_Normal * U + B->m_Normal * V + C->m_Normal * W;
-    //col = make_float3(int_as_float(p0), int_as_float(p1), int_as_float(p2));
-
-    if (p0 == 1)
+    if (p3 == 1)
     {
-        col = make_float3(0.4f, 0.5f, 0.9f);
+        col.x = int_as_float(p0);
+        col.y = int_as_float(p1);
+        col.z = int_as_float(p2);
     }
 
     params.m_Image[launch_index.y * params.m_ImageWidth + launch_index.x] =
@@ -111,21 +101,57 @@ __global__ void __miss__MissShader()
     MissData* msd = reinterpret_cast<MissData*>(optixGetSbtDataPointer());
 
 
-    optixSetPayload_0(1);
+    optixSetPayload_0(42);
     optixSetPayload_1(float_as_int(msd->m_Color.y));
     optixSetPayload_2(float_as_int(msd->m_Color.z));
+    optixSetPayload_3(0);
 }
 
 extern "C"
 __global__ void __closesthit__HitShader()
 {
+    DevicePrimitive* prim = reinterpret_cast<DevicePrimitive*>(optixGetSbtDataPointer());;
+
     const float2 barycentrics = optixGetTriangleBarycentrics();
-    HitData* msd = reinterpret_cast<HitData*>(optixGetSbtDataPointer());;
-    auto col = make_float4(0.0f, 1.0f, 0.0f, 1.0f);
-    auto col1 = tex2D<float4>(msd->m_TextureObject, barycentrics.y, 1 - barycentrics.y);
+    float U = barycentrics.x;
+    float V = barycentrics.y;
+    float W = 1.0f - (U + V);
+    unsigned int vertIndex = 3 * optixGetPrimitiveIndex();
 
+    Vertex* A = &prim->m_VertexBuffer[prim->m_IndexBuffer[vertIndex + 0]];
+    Vertex* B = &prim->m_VertexBuffer[prim->m_IndexBuffer[vertIndex + 1]];
+    Vertex* C = &prim->m_VertexBuffer[prim->m_IndexBuffer[vertIndex + 2]];
 
-    optixSetPayload_0(optixGetPrimitiveIndex());
-    optixSetPayload_1(float_as_int(barycentrics.x));
-    optixSetPayload_2(float_as_int(barycentrics.y));
+    if (U + V + W != 1.0f)
+    {
+        optixSetPayload_0(float_as_int(0.0f));
+        optixSetPayload_1(float_as_int(0.0f));
+        optixSetPayload_2(float_as_int(1.0f));
+        optixSetPayload_3(0);
+    }
+
+    float2 texCoords = A->m_UVCoord * W + B->m_UVCoord * U + C->m_UVCoord * V;
+
+    //texCoords.x = 1.0f - texCoords.x;
+
+    if (texCoords.x > 1.0f || texCoords.y > 1.0f)
+    {
+        optixSetPayload_0(float_as_int(0.0f));
+        optixSetPayload_1(float_as_int(0.0f));
+        optixSetPayload_2(float_as_int(1.0f));
+        optixSetPayload_3(0);
+    }
+
+    float4 smpCol = tex2D<float4>(prim->m_Material->m_DiffuseTexture, texCoords.x, texCoords.y);
+    float4 finalCol = smpCol * prim->m_Material->m_DiffuseColor;
+
+    optixSetPayload_0(float_as_int(finalCol.x));
+    optixSetPayload_1(float_as_int(finalCol.y));
+    optixSetPayload_2(float_as_int(finalCol.z));
+
+    //optixSetPayload_0(float_as_int(texCoords.x));
+    //optixSetPayload_1(float_as_int(texCoords.y));
+    //optixSetPayload_2(float_as_int(0.0f));
+
+    optixSetPayload_3(1);
 }

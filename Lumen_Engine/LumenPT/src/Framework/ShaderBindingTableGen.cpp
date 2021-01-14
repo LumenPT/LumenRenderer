@@ -109,7 +109,7 @@ void ShaderBindingTableGenerator::FullRebuild(MemoryBuffer& a_TargetBuffer,
 
         auto offset = indexCounter * a_RecordStride;
 
-        cudaMemcpy(reinterpret_cast<void*>(*a_TargetBuffer + offset), rec->m_RawData, rec->m_Size, cudaMemcpyHostToDevice);
+        auto err = cudaMemcpy(reinterpret_cast<void*>(*a_TargetBuffer + offset), rec->m_RawData, rec->m_Size, cudaMemcpyHostToDevice);
         rec->m_TableIndex = indexCounter++;
     }
 };

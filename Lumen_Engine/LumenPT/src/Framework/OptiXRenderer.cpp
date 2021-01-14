@@ -3,13 +3,16 @@
 
 #include "MemoryBuffer.h"
 #include "OutputBuffer.h"
+#include "AccelerationStructure.h"
 
 #include "ShaderBindingTableGen.h"
 
 #include "../Shaders/CppCommon/LaunchParameters.h"
 #include "../Shaders/CppCommon/ModelStructs.h"
 
-#include "Mesh.h"
+#include "PTMesh.h"
+
+#include "PTPrimitive.h"
 #include "Texture.h"
 
 #include "Optix/optix_stubs.h"
@@ -18,7 +21,6 @@
 #include "Cuda/cuda_runtime.h"
 
 #include "glm/glm.hpp"
-
 
 #include <cstdio>
 #include <fstream>
@@ -30,6 +32,7 @@
 #include <iostream>
 
 #include "Material.h"
+#include "PTScene.h"
 
 const uint32_t gs_ImageWidth = 800;
 const uint32_t gs_ImageHeight = 600;
@@ -43,6 +46,8 @@ OptiXRenderer::OptiXRenderer(const InitializationData& /*a_InitializationData*/)
 
     m_ShaderBindingTableGenerator = std::make_unique<ShaderBindingTableGenerator>();
 
+    //m_ServiceLocator.m_Renderer = this;
+    m_ServiceLocator.m_SBTGenerator = m_ShaderBindingTableGenerator.get();
 
     uchar4 px[] = {
         {255, 0, 0, 255 },
@@ -55,9 +60,6 @@ OptiXRenderer::OptiXRenderer(const InitializationData& /*a_InitializationData*/)
     m_Texture = std::make_unique<Texture>(LumenPTConsts::gs_AssetDirectory + "debugTex.jpg");
 
     CreateShaderBindingTable();
-
-
-    cuStreamCreate(&m_CudaStream, CU_STREAM_DEFAULT);
 }
 
 OptiXRenderer::~OptiXRenderer()
@@ -76,6 +78,9 @@ void OptiXRenderer::InitializeContext()
     options.logCallbackFunction = &OptiXRenderer::DebugCallback;
     options.logCallbackLevel = 4; // Determine what messages are sent out via the callback function. 4 is the most verbose, 0 is silent.
     optixDeviceContextCreate(cu_ctx, &options, &m_DeviceContext);
+
+    
+
 }
 
 void OptiXRenderer::InitializePipelineOptions()
@@ -83,7 +88,7 @@ void OptiXRenderer::InitializePipelineOptions()
     m_PipelineCompileOptions.traversableGraphFlags = OptixTraversableGraphFlags::OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_ANY;
     m_PipelineCompileOptions.numAttributeValues = 2; // Defaults to 2, maximum is 8. Defines how many 32-bit values can be output from an intersection shader
     m_PipelineCompileOptions.numPayloadValues = 3; // Defines how many 32-bit values can be output by a hit shader
-    m_PipelineCompileOptions.exceptionFlags = OptixExceptionFlags::OPTIX_EXCEPTION_FLAG_DEBUG;
+    m_PipelineCompileOptions.exceptionFlags = OptixExceptionFlags::OPTIX_EXCEPTION_FLAG_DEBUG | OPTIX_EXCEPTION_FLAG_TRACE_DEPTH | OPTIX_EXCEPTION_FLAG_STACK_OVERFLOW;
     m_PipelineCompileOptions.usesPrimitiveTypeFlags = 0; // 0 corresponds to enabling custom primitives and triangles, but nothing else 
     m_PipelineCompileOptions.usesMotionBlur = false;
     // Name by which the launch parameters will be accessible in the shaders. This must match with the shaders.
@@ -124,7 +129,7 @@ void OptiXRenderer::CreatePipeline()
 
     OptixPipelineLinkOptions pipelineLinkOptions = {};
     pipelineLinkOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_LINEINFO;
-    pipelineLinkOptions.maxTraceDepth = 3; // 2 or 3, needs some profiling
+    pipelineLinkOptions.maxTraceDepth = 1;
 
     // The program groups to include in the pipeline, can be replaced with an std::vector
     OptixProgramGroup programGroups[] = { raygen, miss, hit};
@@ -137,14 +142,14 @@ void OptiXRenderer::CreatePipeline()
 
     OptixStackSizes stackSizes = {};
 
-    AccumulateStackSizes(raygen, stackSizes);/*
+    AccumulateStackSizes(raygen, stackSizes);
     AccumulateStackSizes(miss, stackSizes);
-    AccumulateStackSizes(hit, stackSizes);*/
+    AccumulateStackSizes(hit, stackSizes);
 
     auto finalSizes = ComputeStackSizes(stackSizes, 1, 0, 0);
 
     optixPipelineSetStackSize(m_Pipeline, finalSizes.DirectSizeTrace,
-        finalSizes.DirectSizeState, finalSizes.ContinuationSize, 2);
+        finalSizes.DirectSizeState, 2048, 3);
 
 }
 
@@ -188,7 +193,8 @@ OptixProgramGroup OptiXRenderer::CreateProgramGroup(OptixProgramGroupDesc a_Prog
     return programGroup;
 }
 
-OptixTraversableHandle OptiXRenderer::BuildGeometryAccelerationStructure(const OptixAccelBuildOptions& a_BuildOptions,
+std::unique_ptr<AccelerationStructure> OptiXRenderer::BuildGeometryAccelerationStructure(
+    const OptixAccelBuildOptions& a_BuildOptions,
     const OptixBuildInput& a_BuildInput)
 {
     
@@ -196,28 +202,30 @@ OptixTraversableHandle OptiXRenderer::BuildGeometryAccelerationStructure(const O
     OptixAccelBufferSizes sizes;
     optixAccelComputeMemoryUsage(m_DeviceContext, &a_BuildOptions, &a_BuildInput, 1, &sizes);
     MemoryBuffer tempBuffer(sizes.tempSizeInBytes);
-    MemoryBuffer resultBuffer(sizes.outputSizeInBytes);
+    std::unique_ptr<MemoryBuffer> resultBuffer = std::make_unique<MemoryBuffer>(sizes.outputSizeInBytes);
 
     OptixTraversableHandle handle;
     // It is possible to have functionality similar to DX12 Command lists with cuda streams, though it is not required.
     // Just worth mentioning if we want that functionality.
     optixAccelBuild(m_DeviceContext, 0, &a_BuildOptions, &a_BuildInput, 1, *tempBuffer, sizes.tempSizeInBytes,
-        *resultBuffer, sizes.outputSizeInBytes, &handle, nullptr, 0);
+        **resultBuffer, sizes.outputSizeInBytes, &handle, nullptr, 0);
 
     // Needs to return the resulting memory buffer and the traversable handle
-    return handle;
+    return std::make_unique<AccelerationStructure>(handle, std::move(resultBuffer));
 }
 
-OptixTraversableHandle OptiXRenderer::BuildInstanceAccelerationStructure(std::vector<OptixInstance> a_Instances)
+std::unique_ptr<AccelerationStructure> OptiXRenderer::BuildInstanceAccelerationStructure(
+    std::vector<OptixInstance> a_Instances)
 {
     // The fucky part here is figuring out how the build the a_Instances vector outside this function
     // since it will contain SBT indices, transforms and whatnot. Those will probably come from the static mesh instances we have in the scene
 
-
-    MemoryBuffer instanceBuffer(a_Instances.size() * sizeof(OptixInstance));
+    auto instanceBuffer = MemoryBuffer(a_Instances.size() * sizeof(OptixInstance));
     instanceBuffer.Write(a_Instances.data(), a_Instances.size() * sizeof(OptixInstance), 0);
-
     OptixBuildInput buildInput = {};
+
+    assert(*instanceBuffer % OPTIX_INSTANCE_BYTE_ALIGNMENT == 0);
+
     buildInput.type = OPTIX_BUILD_INPUT_TYPE_INSTANCES;
     buildInput.instanceArray.instances = *instanceBuffer;
     buildInput.instanceArray.numInstances = static_cast<uint32_t>(a_Instances.size());
@@ -236,15 +244,17 @@ OptixTraversableHandle OptiXRenderer::BuildInstanceAccelerationStructure(std::ve
     OptixAccelBufferSizes sizes;
     optixAccelComputeMemoryUsage(m_DeviceContext, &buildOptions, &buildInput, 1, &sizes);
 
-    MemoryBuffer tempBuffer(sizes.tempSizeInBytes);
-    MemoryBuffer resultBuffer(sizes.outputSizeInBytes);
+    auto tempBuffer = MemoryBuffer(sizes.tempSizeInBytes);
+    auto resultBuffer = std::make_unique<MemoryBuffer>(sizes.outputSizeInBytes);
 
-    OptixTraversableHandle handle;
-    optixAccelBuild(m_DeviceContext, 0, &buildOptions, &buildInput, 1, *tempBuffer, sizes.tempSizeInBytes,
-        *resultBuffer, sizes.outputSizeInBytes, &handle, nullptr, 0);
+    OptixTraversableHandle handle = 0;
+    optixAccelBuild(m_DeviceContext, 0, &buildOptions, &buildInput, 1, *tempBuffer, tempBuffer.GetSize(),
+        **resultBuffer, resultBuffer->GetSize(), &handle, nullptr, 0);
 
-    // Needs to return the handle and the result buffer
-    return handle;
+    auto res = std::make_unique<AccelerationStructure>(handle, std::move(resultBuffer));
+
+    // Needs to return the resulting memory buffer and the traversable handle
+    return res;
 }
 
 void OptiXRenderer::CreateOutputBuffer()
@@ -254,6 +264,10 @@ void OptiXRenderer::CreateOutputBuffer()
 
 void OptiXRenderer::DebugCallback(unsigned int a_Level, const char* a_Tag, const char* a_Message, void*)
 {
+    if (a_Level == 2)
+    {
+        __debugbreak();
+    }
     std::printf("%u::%s:: %s\n\n", a_Level, a_Tag, a_Message); // This can be changed to better suite our preferred debug output format
 }
 
@@ -310,16 +324,19 @@ ProgramGroupHeader OptiXRenderer::GetProgramGroupHeader(const std::string& a_Gro
     return header;
 }
 
-#include "glm/gtx/compatibility.hpp"
 
 GLuint OptiXRenderer::TraceFrame()
 {
+    cudaDeviceSynchronize();
+    auto err = cudaGetLastError();
+    m_TempBuffers.clear();
+
+
     std::vector<float3> vert = {
         {0.5f, 0.5f, 0.5f},
         {0.5f, -0.5f, 0.5f},
         {-0.5f, 0.5f, 0.5f}
     };
-    glm::float3;
     std::vector<Vertex> verti = std::vector<Vertex>(3);
     verti[0].m_Position = vert[0];
     verti[0].m_Normal = { 1.0f, 0.0f, 0.0f };
@@ -330,29 +347,63 @@ GLuint OptiXRenderer::TraceFrame()
 
     MemoryBuffer vertexBuffer(verti.size() * sizeof(Vertex));
     vertexBuffer.Write(verti.data(), verti.size() * sizeof(Vertex), 0);
-
+    cudaDeviceSynchronize();
+    err = cudaGetLastError();
     LaunchParameters params = {};
+    m_Camera.SetPosition(glm::vec3(0.0f, 0.0f, -50.0f));
+    auto trv = BuildGeometryAccelerationStructure(verti);
+
+
+    auto& gtrv = static_cast<PTPrimitive*>(m_Scene->m_MeshInstances[0]->GetMesh().get()->m_Primitives[0].get())->m_GeometryAccelerationStructure;
+    std::vector<OptixInstance> instances;
+    {
+        auto& inst = instances.emplace_back();
+        inst.visibilityMask = 255;
+        inst.sbtOffset = 0;
+        inst.traversableHandle = gtrv->m_TraversableHandle;
+        inst.flags = OPTIX_INSTANCE_FLAG_NONE;
+        inst.instanceId = 1;
+
+        glm::mat4 identity = glm::mat4(1.0f);  
+        memcpy(&inst.transform, &identity, sizeof(inst.transform));
+    }
+
+    auto itrv = BuildInstanceAccelerationStructure(instances);
+
+    glm::mat4 identity = glm::transpose(m_TestTransform.GetTransformationMatrix());
+
+    instances[0].traversableHandle = itrv->m_TraversableHandle;
+    memcpy(&instances[0].transform, &identity, sizeof(instances[0].transform));
+    auto iitrv = BuildInstanceAccelerationStructure(instances);
+
 
     params.m_Image = m_OutputBuffer->GetDevicePointer();
-    params.m_Handle = BuildGeometryAccelerationStructure(verti);
+    params.m_Handle = static_cast<PTScene&>(*m_Scene).GetSceneAccelerationStructure();
     params.m_ImageWidth = gs_ImageWidth;
     params.m_ImageHeight = gs_ImageHeight;
     params.m_VertexBuffer = vertexBuffer.GetDevicePtr<Vertex>();
     // Fill out struct here with whatev
 
+    cudaDeviceSynchronize();
+    err = cudaGetLastError();
     m_Camera.SetAspectRatio(static_cast<float>(gs_ImageWidth) / static_cast<float>(params.m_ImageHeight));
     glm::vec3 eye, U, V, W;
     m_Camera.GetVectorData(eye, U, V, W);
+
+    cudaDeviceSynchronize();
+    err = cudaGetLastError();
     params.eye = make_float3(eye.x, eye.y, eye.z);
-    params.U = make_float3(U.x, U.y, U.z);
-    params.V = make_float3(V.x, V.y, V.z);
-    params.W = make_float3(W.x, W.y, W.z);
-	
-    LaunchParameters lparam;
+    params.U   = make_float3(U.x, U.y, U.z);
+    params.V   = make_float3(V.x, V.y, V.z);
+    params.W   = make_float3(W.x, W.y, W.z);
+
+
+    err = cudaGetLastError();
 
     MemoryBuffer devBuffer(sizeof(params));
     devBuffer.Write(params);
 
+    err = cudaGetLastError();
     auto c = m_MissRecord.GetRecord().m_Data.m_Color;
 
     static float f = 0.0f;
@@ -362,12 +413,11 @@ GLuint OptiXRenderer::TraceFrame()
     m_MissRecord.GetRecord().m_Data.m_Color = { 0.0f, sinf(f), 0.0f };
 
     OptixShaderBindingTable sbt = m_ShaderBindingTableGenerator->GetTableDesc();
+    err = cudaGetLastError();
 
+    optixLaunch(m_Pipeline, 0, *devBuffer, devBuffer.GetSize(), &sbt, params.m_ImageWidth, params.m_ImageHeight, 3);
 
-    optixLaunch(m_Pipeline, m_CudaStream, *devBuffer, devBuffer.GetSize(), &sbt, params.m_ImageWidth, params.m_ImageHeight, 1);
-    cuStreamSynchronize(m_CudaStream);
-
-    auto err = cudaGetLastError();
+    err = cudaGetLastError();
 
     return m_OutputBuffer->GetTexture();
 }
@@ -393,15 +443,17 @@ OptiXRenderer::ComputedStackSizes OptiXRenderer::ComputeStackSizes(OptixStackSiz
     return sizes;
 }
 
-std::shared_ptr<Lumen::ILumenMesh> OptiXRenderer::CreateMesh(const MeshData& a_MeshData)
+std::unique_ptr<Lumen::ILumenPrimitive> OptiXRenderer::CreatePrimitive(PrimitiveData& a_PrimitiveData)
 {
-    auto vertexBuffer = InterleaveVertexData(a_MeshData);
+    auto vertexBuffer = InterleaveVertexData(a_PrimitiveData);
+    cudaDeviceSynchronize();
+    auto err = cudaGetLastError();
 
     std::vector<uint32_t> correctedIndices;
 
-    if (a_MeshData.m_IndexSize == 4)
+    if (a_PrimitiveData.m_IndexSize != 4)
     {
-        VectorView<uint16_t, uint8_t> indexView(a_MeshData.m_IndexBinary);
+        VectorView<uint16_t, uint8_t> indexView(a_PrimitiveData.m_IndexBinary);
 
         for (size_t i = 0; i < indexView.Size(); i++)
         {
@@ -427,16 +479,27 @@ std::shared_ptr<Lumen::ILumenMesh> OptiXRenderer::CreateMesh(const MeshData& a_M
     buildInput.triangleArray.vertexBuffers = &**vertexBuffer;
     buildInput.triangleArray.vertexFormat = OPTIX_VERTEX_FORMAT_FLOAT3;
     buildInput.triangleArray.vertexStrideInBytes = sizeof(Vertex);
-    buildInput.triangleArray.numVertices = a_MeshData.m_Positions.Size();
+    buildInput.triangleArray.numVertices = a_PrimitiveData.m_Positions.Size();
     buildInput.triangleArray.numSbtRecords = 1;
     buildInput.triangleArray.flags = &geomFlags;
         
     auto gAccel = BuildGeometryAccelerationStructure(buildOptions, buildInput);
 
-    return std::make_shared<Mesh>(std::move(vertexBuffer), std::move(indexBuffer), gAccel);
+    auto prim = std::make_unique<PTPrimitive>(std::move(vertexBuffer), std::move(indexBuffer), std::move(gAccel));
+
+    prim->m_Material = a_PrimitiveData.m_Material;
+
+    prim->m_RecordHandle = m_ShaderBindingTableGenerator->AddHitGroup<DevicePrimitive>();
+    auto& rec = prim->m_RecordHandle.GetRecord();
+    rec.m_Header = GetProgramGroupHeader("Hit");
+    rec.m_Data.m_VertexBuffer = prim->m_VertBuffer->GetDevicePtr<Vertex>();
+    rec.m_Data.m_IndexBuffer = prim->m_IndexBuffer->GetDevicePtr<unsigned int>();
+    rec.m_Data.m_Material = static_cast<Material*>(prim->m_Material.get())->GetDeviceMaterial();
+
+    return prim;
 }
 
-std::unique_ptr<MemoryBuffer> OptiXRenderer::InterleaveVertexData(const MeshData& a_MeshData)
+std::unique_ptr<MemoryBuffer> OptiXRenderer::InterleaveVertexData(const PrimitiveData& a_MeshData)
 {
     std::vector<Vertex> vertices;
 
@@ -444,11 +507,22 @@ std::unique_ptr<MemoryBuffer> OptiXRenderer::InterleaveVertexData(const MeshData
     {
         auto& v = vertices.emplace_back();
         v.m_Position = make_float3(a_MeshData.m_Positions[i].x, a_MeshData.m_Positions[i].y, a_MeshData.m_Positions[i].z);
-        v.m_UVCoord = make_float2(a_MeshData.m_TexCoords[i].x, a_MeshData.m_TexCoords[i].y);
-        v.m_Normal = make_float3(a_MeshData.m_Normals[i].x, a_MeshData.m_Normals[i].y, a_MeshData.m_Normals[i].z);
+        if (!a_MeshData.m_TexCoords.Empty())
+            v.m_UVCoord = make_float2(a_MeshData.m_TexCoords[i].x, a_MeshData.m_TexCoords[i].y);
+        if (!a_MeshData.m_Normals.Empty())
+            v.m_Normal = make_float3(a_MeshData.m_Normals[i].x, a_MeshData.m_Normals[i].y, a_MeshData.m_Normals[i].z);
     }    
 
+    cudaDeviceSynchronize();
+    auto err = cudaGetLastError();
+
     return std::make_unique<MemoryBuffer>(vertices);
+}
+
+std::shared_ptr<Lumen::ILumenMesh> OptiXRenderer::CreateMesh(std::vector<std::unique_ptr<Lumen::ILumenPrimitive>>& a_Primitives)
+{
+    auto mesh = std::make_shared<PTMesh>(a_Primitives, m_ServiceLocator);
+    return mesh;
 }
 
 std::shared_ptr<Lumen::ILumenTexture> OptiXRenderer::CreateTexture(void* a_RawData, uint32_t a_Width, uint32_t a_Height)
@@ -464,4 +538,9 @@ std::shared_ptr<Lumen::ILumenMaterial> OptiXRenderer::CreateMaterial(const Mater
     mat->SetDiffuseTexture(a_MaterialData.m_DiffuseTexture);
 
     return mat;
+}
+
+std::shared_ptr<Lumen::ILumenScene> OptiXRenderer::CreateScene(SceneData a_SceneData)
+{
+    return std::make_shared<PTScene>(a_SceneData, m_ServiceLocator);
 }

@@ -4,20 +4,45 @@
 #include "glm/vec3.hpp"
 #include "glm/gtx/quaternion.hpp"
 
+#include <vector>
+#include <memory>
+
 namespace Lumen // BYOUTIFUL KARTOSHKA
 {
+    class DependentBase
+    {
+    public:
+        virtual void UpdateDependent() = 0;
+    };
+
+    template<typename Type>
+    class Dependent : public DependentBase
+    {
+    public:
+        Dependent(Type& a_Instance)
+            : m_Instance(a_Instance){};
+        void UpdateDependent() override
+        {
+            m_Instance.DependencyCallback();
+        };
+
+    private:
+        Type& m_Instance;
+    };
+
+
     class Transform
     {
     public:
         Transform();
         ~Transform();
 
-        Transform(Transform& a_Other);
-        Transform& operator=(Transform& a_Other);
+        Transform(const Transform& a_Other);
+        Transform& operator=(const Transform& a_Other);
 
         // Constructor and assignment operator from glm::mat4
-        Transform(glm::mat4& a_TransformationMatrix);
-        Transform& operator=(glm::mat4& a_TransformationMatrix);
+        Transform(const glm::mat4& a_TransformationMatrix);
+        Transform& operator=(const glm::mat4& a_TransformationMatrix);
 
         void SetPosition(const glm::vec3& a_NewPosition);
         void SetRotation(const glm::quat& a_Quaternion);
@@ -45,11 +70,19 @@ namespace Lumen // BYOUTIFUL KARTOSHKA
 
         Transform& operator*=(const Lumen::Transform& a_Other);
 
+        template<typename Type>
+        void AddDependent(Type& a_Dependent)
+        {
+            m_Dependents.push_back(std::make_unique<Dependent<Type>>(a_Dependent));
+        };
+
     private:
         void MakeDirty();
         void UpdateMatrix() const;
 
         void Decompose();
+
+        void UpdateDependents();
 
         glm::vec3 m_Position;
         glm::quat m_Rotation;
@@ -58,9 +91,12 @@ namespace Lumen // BYOUTIFUL KARTOSHKA
         mutable glm::mat4 m_TransformationMatrix;
         mutable bool m_MatrixDirty;
 
-
+        std::vector<std::unique_ptr<DependentBase>> m_Dependents;
     };
 
     Transform operator*(const Lumen::Transform& a_Left, const Lumen::Transform& a_Right);
 }
+
+
+
 

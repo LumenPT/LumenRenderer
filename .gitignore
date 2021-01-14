@@ -466,3 +466,6 @@ _deps
 *-prefix/
 
 # End of https://www.toptal.com/developers/gitignore/api/cmake
+*.ptx
+*.ptx
+Lumen_Engine/LumenPT/Assets/PrecompiledShaders/Debug/draw_solid_color.ptx

@@ -28,6 +28,8 @@ public:
 
     void OnUpdate() override;
 
+    void OnImGuiRender() override;
+
     LumenPT* GetPipeline() { return m_LumenPT.get(); };
 
 private:

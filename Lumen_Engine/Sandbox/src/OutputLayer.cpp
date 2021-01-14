@@ -6,6 +6,8 @@
 
 #include "Glad/glad.h"
 
+#include "imgui/imgui.h"
+
 #include <iostream>
 
 #include "Lumen/KeyCodes.h"
@@ -79,10 +81,30 @@ void OutputLayer::OnUpdate(){
 	auto texture = m_LumenPT->TraceFrame(); // TRACE SUM
 
 
-	
 	glBindTexture(GL_TEXTURE_2D, texture);
 	glUseProgram(m_Program);
 	glDrawArrays(GL_TRIANGLES, 0, 3);
+}
+
+void OutputLayer::OnImGuiRender()
+{
+
+
+	auto& tarTransform = m_LumenPT->m_Scene->m_MeshInstances[0]->m_Transform;
+
+	glm::vec3 pos, scale;
+	pos = tarTransform.GetPosition();
+	scale = tarTransform.GetScale();
+	auto rot = tarTransform.GetRotationEuler();
+
+	ImGui::Begin("ModelBoi 3000");
+	ImGui::DragFloat3("Position", &pos[0]);
+	ImGui::DragFloat3("Scale", &scale[0]);
+	ImGui::DragFloat3("Rotation", &rot[0]);
+	ImGui::End();
+	tarTransform.SetPosition(pos);
+	tarTransform.SetScale(scale);
+	tarTransform.SetRotation(rot);
 }
 
 void OutputLayer::HandleCameraInput(Camera& a_Camera)

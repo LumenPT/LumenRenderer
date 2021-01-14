@@ -12,6 +12,8 @@ public:
     MemoryBuffer(std::vector<ElementType>& a_VectorData);
     ~MemoryBuffer();
 
+    MemoryBuffer(MemoryBuffer&& a_Other);
+
     unsigned long long& operator*();
 
     template<typename DataType, typename Enabler = std::enable_if_t<!std::is_pointer<DataType>::value>>
@@ -44,6 +46,7 @@ private:
 
 template <typename ElementType>
 MemoryBuffer::MemoryBuffer(std::vector<ElementType>& a_VectorData)
+    : m_DevPtr(0)
 {
     Resize(a_VectorData.size() * sizeof(ElementType));
 

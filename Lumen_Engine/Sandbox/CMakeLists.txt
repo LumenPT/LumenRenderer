@@ -26,7 +26,7 @@ assign_source_group(${HEADER_FILES})
 assign_source_group(${SOURCE_FILES})
 
 set_property(TARGET Sandbox PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
-
+set_property(TARGET Sandbox PROPERTY COMPILE_DEFINITIONS WAVEFRONT)
 #Add header directory includes
 target_include_directories(Sandbox PUBLIC
 	"${CMAKE_CURRENT_SOURCE_DIR}/../Lumen/src"

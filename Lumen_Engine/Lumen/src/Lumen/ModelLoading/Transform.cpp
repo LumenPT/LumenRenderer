@@ -13,7 +13,7 @@ Lumen::Transform::Transform()
 
 }
 
-Lumen::Transform::Transform(glm::mat4& a_TransformationMatrix)
+Lumen::Transform::Transform(const glm::mat4& a_TransformationMatrix)
     : m_TransformationMatrix(a_TransformationMatrix)
     , m_MatrixDirty(false)
 {
@@ -24,7 +24,7 @@ Lumen::Transform::~Transform()
 {
 }
 
-Lumen::Transform::Transform(Transform& a_Other)
+Lumen::Transform::Transform(const Transform& a_Other)
 {
     a_Other.UpdateMatrix();
     m_Position = a_Other.m_Position;
@@ -33,7 +33,7 @@ Lumen::Transform::Transform(Transform& a_Other)
     m_TransformationMatrix = a_Other.m_TransformationMatrix;
 }
 
-Lumen::Transform& Lumen::Transform::operator=(Transform& a_Other)
+Lumen::Transform& Lumen::Transform::operator=(const Transform& a_Other)
 {
     a_Other.UpdateMatrix();
     m_Position = a_Other.m_Position;
@@ -44,7 +44,7 @@ Lumen::Transform& Lumen::Transform::operator=(Transform& a_Other)
     return *this;
 }
 
-Lumen::Transform& Lumen::Transform::operator=(glm::mat4& a_TransformationMatrix)
+Lumen::Transform& Lumen::Transform::operator=(const glm::mat4& a_TransformationMatrix)
 {
     m_TransformationMatrix = a_TransformationMatrix;
     Decompose();
@@ -159,6 +159,7 @@ Lumen::Transform& Lumen::Transform::operator*=(const Lumen::Transform& a_Other)
 
 void Lumen::Transform::MakeDirty()
 {
+    UpdateDependents();
     m_MatrixDirty = true;
 }
 
@@ -184,8 +185,14 @@ void Lumen::Transform::Decompose()
     // Needed for glm::decompose
     glm::vec3 skew;
     glm::vec4 perspective;
+}
 
-    glm::decompose(m_TransformationMatrix, m_Scale, m_Rotation, m_Position, skew, perspective);
+void Lumen::Transform::UpdateDependents()
+{
+    for (auto& dependent : m_Dependents)
+    {
+        dependent->UpdateDependent();
+    }
 }
 
 Lumen::Transform Lumen::operator*(const Lumen::Transform& a_Left, const Lumen::Transform& a_Right)
