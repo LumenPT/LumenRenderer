@@ -438,12 +438,14 @@ namespace WaveFront
     {
 
         CPU_ONLY PostProcessLaunchParameters(
-            const uint2& a_Resolution, 
+            const uint2& a_Resolution,
+            const uint2& a_UpscaledResolution,
             const ResultBuffer* const a_WavefrontOutput,
             PixelBuffer* const a_MergedResults,
-            char4* const a_ImageOutput)
+            uchar4* const a_ImageOutput)
             :
         m_Resolution(a_Resolution),
+        m_UpscaledResolution(a_UpscaledResolution),
         m_WavefrontOutput(a_WavefrontOutput),
         m_MergedResults(a_MergedResults),
         m_ImageOutput(a_ImageOutput)
@@ -453,11 +455,12 @@ namespace WaveFront
 
         //Read only
         const uint2 m_Resolution;
+        const uint2 m_UpscaledResolution;
         const ResultBuffer* const m_WavefrontOutput;
 
         //Read/Write
         PixelBuffer* const m_MergedResults; //Used to merge results from multiple channels into one channel.
-        char4* const m_ImageOutput; //Used to display image after DLSS algorithm has run on merged results.
+        uchar4* const m_ImageOutput; //Used to display image after DLSS algorithm has run on merged results.
 
     };
 

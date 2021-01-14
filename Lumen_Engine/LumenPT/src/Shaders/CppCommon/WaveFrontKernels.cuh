@@ -50,6 +50,9 @@ CPU_GPU void MergeLightChannels(int a_NumPixels, const uint2& a_Dimensions, cons
 GPU_ONLY void DLSS();
 GPU_ONLY void PostProcessingEffects();
 
+//Temporary step till post-processing is in place.
+CPU_GPU void WriteToOutput(int a_NumPixels, const uint2& a_Dimensions, PixelBuffer* const a_Input, uchar4* a_Output);
+
 
 //Generate some rays based on the thread index.
 CPU_GPU void GenerateRay(int a_NumRays, RayBatch* const a_Buffer, const float3& a_U, const float3& a_V, const float3& a_W, const float3& a_Eye, const int2& a_Dimensions);

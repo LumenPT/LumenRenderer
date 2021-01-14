@@ -1,4 +1,6 @@
 #include "CppCommon/WaveFrontKernels.cuh"
+
+#include "../../vendor/Include/Cuda/cuda/helpers.h"
 #include "CppCommon/RenderingUtility.h"
 
 #include "device_launch_parameters.h"
@@ -18,7 +20,6 @@ CPU_ONLY void GenerateRays(const SetupLaunchParameters& a_SetupParams)
     const int blockSize = 256;
     const int numBlocks = (numRays + blockSize - 1) / blockSize;
 
-    //TODO pass buffer
     GenerateRay <<<numBlocks, blockSize >>> (numRays, a_SetupParams.m_PrimaryRays, u, v, w, eye, dimensions);
 }
 
@@ -57,7 +58,6 @@ CPU_ONLY void PostProcess(const PostProcessLaunchParameters& a_PostProcessParams
     //TODO before merging.
     Denoise();
 
-    //TODO pass in output buffer and input buffer.
     MergeLightChannels <<<numBlocks, blockSize >>> (
         numPixels, 
         a_PostProcessParams.m_Resolution, 
@@ -70,6 +70,11 @@ CPU_ONLY void PostProcess(const PostProcessLaunchParameters& a_PostProcessParams
 
     //TODO
     PostProcessingEffects();
+
+
+
+    //TODO This is temporary till the post-processing is  in place. Let the last stage copy it directly to the output buffer.
+    WriteToOutput<<<numBlocks, blockSize>>>(numPixels, a_PostProcessParams.m_Resolution, a_PostProcessParams.m_MergedResults, a_PostProcessParams.m_ImageOutput);
 }
 
 
@@ -185,8 +190,21 @@ GPU_ONLY void PostProcessingEffects()
 {
 }
 
-CPU_GPU void GenerateRay(int a_NumRays, RayBatch* const a_Buffer, const float3& a_U, const float3& a_V, const float3& a_W,
-                     const float3& a_Eye, const int2& a_Dimensions)
+CPU_GPU void WriteToOutput(int a_NumPixels, const uint2& a_Dimensions, PixelBuffer* const a_Input, uchar4* a_Output)
+{
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    int stride = blockDim.x * gridDim.x;
+
+    for (int i = index; i < a_NumPixels; i += stride)
+    {
+        auto color = make_color(a_Input->m_Pixels[i]);
+        a_Output[i] = color;
+    }
+}
+
+CPU_GPU void GenerateRay(int a_NumRays, RayBatch* const a_Buffer, const float3& a_U, const float3& a_V,
+                         const float3& a_W,
+                         const float3& a_Eye, const int2& a_Dimensions)
 {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     int stride = blockDim.x * gridDim.x;
