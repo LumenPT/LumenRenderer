@@ -96,6 +96,8 @@ private:
 
     void CreateOutputBuffer();
 
+    void CreateDataBuffers();
+
     OptixModule CreateModule(const std::string& a_PtxPath);
 
     OptixProgramGroup CreateProgramGroup(OptixProgramGroupDesc a_ProgramGroupDesc, const std::string& a_Name);
@@ -133,7 +135,18 @@ private:
 
     std::vector<std::unique_ptr<MemoryBuffer>> m_TempBuffers;
 
-    std::unique_ptr<MemoryBuffer> m_SecondaryIntersections;
+    //Data buffers for the wavefront algorithm.
+
+    //ResultBuffer storing the different PixelBuffers as different light channels;
+    std::unique_ptr<MemoryBuffer> m_ResultBuffer;
+    //3 PixelBuffers for the different channels in the ResultBuffer and 1 PixelBuffer for the merged results.
+    std::unique_ptr<MemoryBuffer> m_PixelBuffers[4];
+    //2 ray batches, 1 for storing primary rays, other for overwriting secondary rays.
+    std::unique_ptr<MemoryBuffer> m_RayBatches[3];
+    //2 intersection buffers, 1 for storing primary intersections, other for overwriting secondary intersections.
+    std::unique_ptr<MemoryBuffer> m_IntersectionBuffers[2];
+    //1 shadow ray batch to overwrite with shadow rays.
+    std::unique_ptr<MemoryBuffer> m_ShadowRayBatch;
 
     std::unique_ptr<class Texture> m_Texture;
 

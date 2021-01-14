@@ -357,6 +357,62 @@ void WaveFrontRenderer::CreateOutputBuffer()
 
 }
 
+void WaveFrontRenderer::CreateDataBuffers()
+{
+
+    const unsigned numPixels = static_cast<unsigned>(m_Resolution.x) * static_cast<unsigned>(m_Resolution.y);
+
+    const unsigned raysPerPixel = 1;
+    const unsigned shadowRaysPerPixel = 1;
+    const unsigned maxDepth = 3;
+
+    //Allocate pixel buffers.
+    for(auto& pixelBuffer : m_PixelBuffers)
+    {
+        pixelBuffer = std::make_unique<MemoryBuffer>(sizeof(PixelBuffer) + numPixels * sizeof(float3));
+        pixelBuffer->Write(numPixels, 0);
+    }
+
+    //Allocate result buffer.
+    m_ResultBuffer = std::make_unique<MemoryBuffer>(sizeof(ResultBuffer));
+
+    const unsigned int numOutputChannels = ResultBuffer::s_NumOutputChannels;
+    PixelBuffer* pixelBufferHandles[numOutputChannels];
+
+    for(unsigned i = 0; i < numOutputChannels; ++i)
+    {
+        if(i < _countof(m_PixelBuffers))
+        {
+            pixelBufferHandles[i] = m_PixelBuffers[i]->GetDevicePtr<PixelBuffer>();
+        }
+    }
+
+    //Initialize result buffer with pixel buffer handles.
+    m_ResultBuffer->Write(pixelBufferHandles, 0);
+
+    //Allocate and initialize ray batches.
+    for(auto& rayBatch : m_RayBatches)
+    {
+        rayBatch = std::make_unique<MemoryBuffer>(sizeof(RayBatch) + numPixels * raysPerPixel * sizeof(RayData));
+        rayBatch->Write(numPixels, 0);
+        rayBatch->Write(raysPerPixel, sizeof(RayBatch::m_NumPixels));
+    }
+
+    for(auto& intersectionBuffer : m_IntersectionBuffers)
+    {
+        intersectionBuffer = std::make_unique<MemoryBuffer>(sizeof(IntersectionBuffer) + numPixels * raysPerPixel * sizeof(IntersectionData));
+        intersectionBuffer->Write(numPixels, 0);
+        intersectionBuffer->Write(raysPerPixel, sizeof(IntersectionBuffer::m_NumPixels));
+    }
+
+    m_ShadowRayBatch = std::make_unique<MemoryBuffer>(sizeof(ShadowRayBatch) + maxDepth * numPixels * shadowRaysPerPixel * sizeof(ShadowRayData));
+    m_ShadowRayBatch->Write(maxDepth, 0);
+    m_ShadowRayBatch->Write(numPixels, sizeof(ShadowRayBatch::m_MaxDepth));
+    m_ShadowRayBatch->Write(shadowRaysPerPixel, sizeof(ShadowRayBatch::m_MaxDepth) + sizeof(ShadowRayBatch::m_NumPixels));
+
+}
+
+
 void WaveFrontRenderer::DebugCallback(unsigned a_Level, const char* a_Tag, const char* a_Message, void*)
 {
 

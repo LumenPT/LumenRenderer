@@ -19,7 +19,7 @@ CPU_ONLY void GenerateRays(const SetupLaunchParameters& a_SetupParams)
     const int numBlocks = (numRays + blockSize - 1) / blockSize;
 
     //TODO pass buffer
-    GenerateRay <<<numBlocks, blockSize >>> (numRays, nullptr, u, v, w, eye, dimensions);
+    GenerateRay <<<numBlocks, blockSize >>> (numRays, a_SetupParams.m_PrimaryRays, u, v, w, eye, dimensions);
 }
 
 
@@ -32,9 +32,12 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
      * - Access to intersection data, as well as the ray resulting in this shading for chained BRDF scaling.
      */
 
-    ShadeIndirect<<<1,1>>>(); //Generate secondary rays.
-    ShadeSpecular<<<1,1>>>(); //Generate shadow rays for specular highlights.
-    ShadeDirect<<<1,1>>>(a_ShadingParams);   //Generate shadow rays for direct lights.
+     //Generate secondary rays.
+    ShadeIndirect<<<1,1>>>(); 
+     //Generate shadow rays for specular highlights.
+    ShadeSpecular<<<1,1>>>();
+    //Generate shadow rays for direct lights.
+    ShadeDirect<<<1,1>>>(a_ShadingParams.m_ResolutionAndDepth, a_ShadingParams.m_Intersections, a_ShadingParams.m_ShadowRaysBatch, a_ShadingParams.m_LightBuffer);   
 }
 
 
@@ -55,9 +58,14 @@ CPU_ONLY void PostProcess(const PostProcessLaunchParameters& a_PostProcessParams
     Denoise();
 
     //TODO pass in output buffer and input buffer.
-    MergeLightChannels << <numBlocks, blockSize >> > (numPixels, a_PostProcessParams.m_Resolution, nullptr, nullptr);
+    MergeLightChannels <<<numBlocks, blockSize >>> (
+        numPixels, 
+        a_PostProcessParams.m_Resolution, 
+        a_PostProcessParams.m_WavefrontOutput->m_PixelOutput,
+        a_PostProcessParams.m_MergedResults);
 
     //TODO steal hidden Nvidia technology by breaking into their buildings
+    //TODO copy merged results into image output after having run DLSS.
     DLSS();
 
     //TODO
@@ -70,7 +78,11 @@ CPU_ONLY void GenerateMotionVectors()
 {
 }
 
-CPU_GPU void ShadeDirect(const ShadingLaunchParameters& a_ShadingParams)
+CPU_GPU void ShadeDirect(
+    const uint3& a_ResolutionAndDepth, 
+    const IntersectionBuffer* const a_Intersections, 
+    ShadowRayBatch* const a_ShadowRays,
+    const LightBuffer* const a_Lights)
 {
     // need access to light & mesh
         // I get triangleID and meshID, so need to use that to look up actual data based on those IDs
@@ -79,7 +91,7 @@ CPU_GPU void ShadeDirect(const ShadingLaunchParameters& a_ShadingParams)
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     int stride = blockDim.x * gridDim.x;
 
-    const int numRays = a_ShadingParams.m_Resolution.x * a_ShadingParams.m_Resolution.y;
+    const int numRays =a_ResolutionAndDepth.x * a_ResolutionAndDepth.y;
 
     float3 origin = { 0.0f,0.0f,0.0f };
 
@@ -94,20 +106,22 @@ CPU_GPU void ShadeDirect(const ShadingLaunchParameters& a_ShadingParams)
     for (unsigned int i = index; i < numRays; i += stride)
     {
         //temp and probably shit, looping through all lights in buffer (rather than those nearby)
-        for (unsigned int j = 0; i < a_ShadingParams.m_LightBuffer->m_Size; j++)
+        for (unsigned int j = 0; i < a_Lights->m_Size; j++)
         {
-            direction = normalize(a_ShadingParams.m_LightBuffer->m_Lights[j].m_Position);// - intersectionPosition;
+            direction = normalize(a_Lights->m_Lights[j].m_Position);// - intersectionPosition;
 
         }
 
         //write shadow ray direction etc. to shadow ray batch   // TEMP
-        a_ShadingParams.m_ShadowRaysBatches[0]->m_ShadowRays[i] = ShadowRayData(
+        ShadowRayData shadowRay(
             origin,
             direction,
             1000.f,
             potRadiance,    //not sure what this represents
             ResultBuffer::OutputChannel::DIRECT
         );
+
+        a_ShadowRays->SetShadowRay(shadowRay, a_ResolutionAndDepth.z, i, 0);
     }
 
     // look at generaterays function
@@ -140,8 +154,7 @@ GPU_ONLY void Denoise()
 CPU_GPU void MergeLightChannels(
     int a_NumPixels, 
     const uint2& a_Dimensions, 
-    const PixelBuffer* 
-    const a_Input[ResultBuffer::s_NumOutputChannels], 
+    const PixelBuffer* const a_Input[ResultBuffer::s_NumOutputChannels], 
     PixelBuffer* const a_Output)
 {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
@@ -171,7 +184,7 @@ GPU_ONLY void PostProcessingEffects()
 {
 }
 
-CPU_GPU void GenerateRay(int a_NumRays, RayData* a_Buffer, const float3& a_U, const float3& a_V, const float3& a_W,
+CPU_GPU void GenerateRay(int a_NumRays, RayBatch* const a_Buffer, const float3& a_U, const float3& a_V, const float3& a_W,
                      const float3& a_Eye, const int2& a_Dimensions)
 {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
@@ -192,6 +205,6 @@ CPU_GPU void GenerateRay(int a_NumRays, RayData* a_Buffer, const float3& a_U, co
         direction = normalize(direction.x * a_U + direction.y * a_V + a_W);
 
         RayData ray { origin, direction, make_float3(1.f, 1.f, 1.f) };
-        a_Buffer[i] = ray;
+        a_Buffer->SetRay(ray, i, 0);
     }
 }
