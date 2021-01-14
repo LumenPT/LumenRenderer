@@ -147,10 +147,10 @@ namespace WaveFront
         }
 
         //Read only
-        unsigned int m_RayId;
+        unsigned int m_RayIndex;
         float m_IntersectionT;
         unsigned int m_TriangleId;
-        unsigned int m_MeshId;
+        unsigned int m_MeshAndInstanceId;
 
     };
 
@@ -190,6 +190,14 @@ namespace WaveFront
 
         }
 
+        CPU_GPU const IntersectionData& GetIntersection(unsigned int a_RayIndex) const
+        {
+            assert(a_RayIndex < GetSize());
+
+            return m_Intersections[a_RayIndex];
+                
+        }
+
     };
 
     struct PixelBuffer
@@ -198,21 +206,33 @@ namespace WaveFront
         PixelBuffer()
             :
         m_NumPixels(0u),
+        m_ChannelsPerPixel(0u),
         m_Pixels()
         {}
 
         //Ready only
         const unsigned int m_NumPixels;
+        const unsigned int m_ChannelsPerPixel;
 
         //Read/Write
         float3 m_Pixels[];
 
-        CPU_GPU void SetPixel(const float3& a_value, unsigned int a_PixelIndex)
+        CPU_GPU void SetPixel(const float3& a_value, unsigned int a_PixelIndex, unsigned int a_ChannelIndex)
         {
-            if(a_PixelIndex < m_NumPixels)
+            if( a_PixelIndex < m_NumPixels &&
+                a_ChannelIndex < m_ChannelsPerPixel) //Better to assert ?
             {
-                m_Pixels[a_PixelIndex] = a_value;
+                m_Pixels[a_PixelIndex * m_ChannelsPerPixel + a_ChannelIndex] = a_value;
             }
+        }
+
+        CPU_GPU const float3& GetPixel(unsigned int a_PixelIndex, unsigned int a_ChannelIndex) const
+        {
+            assert((a_PixelIndex < m_NumPixels&&
+                    a_ChannelIndex < m_ChannelsPerPixel));
+
+            return m_Pixels[a_PixelIndex * m_ChannelsPerPixel + a_ChannelIndex];
+
         }
 
     };
@@ -232,7 +252,7 @@ namespace WaveFront
             :
         //m_PrimaryRays(nullptr),
         //m_PrimaryIntersections(nullptr),
-        m_PixelOutput()
+        m_PixelOutput(nullptr)
         {}
 
         //Read only (Might not be necessary to store the primary rays and intersections here)
@@ -241,7 +261,7 @@ namespace WaveFront
         constexpr static unsigned int s_NumOutputChannels = static_cast<unsigned>(OutputChannel::NUM_CHANNELS);
 
         //Read/Write
-        PixelBuffer* const m_PixelOutput[s_NumOutputChannels];
+        PixelBuffer* const m_PixelOutput;
 
     };
 

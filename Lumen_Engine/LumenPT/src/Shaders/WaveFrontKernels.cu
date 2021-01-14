@@ -154,7 +154,7 @@ GPU_ONLY void Denoise()
 CPU_GPU void MergeLightChannels(
     int a_NumPixels, 
     const uint2& a_Dimensions, 
-    const PixelBuffer* const a_Input[ResultBuffer::s_NumOutputChannels], 
+    const PixelBuffer* const a_Input, 
     PixelBuffer* const a_Output)
 {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
@@ -167,12 +167,13 @@ CPU_GPU void MergeLightChannels(
         const int screenX = i - (screenY * a_Dimensions.x);
 
         //Mix the results.
-        const float3& direct = a_Input[static_cast<unsigned>(ResultBuffer::OutputChannel::DIRECT)]->m_Pixels[i];
-        const float3& indirect = a_Input[static_cast<unsigned>(ResultBuffer::OutputChannel::INDIRECT)]->m_Pixels[i];
-        const float3& specular = a_Input[static_cast<unsigned>(ResultBuffer::OutputChannel::SPECULAR)]->m_Pixels[i];
+        const float3& direct = a_Input->GetPixel(i, static_cast<unsigned>(ResultBuffer::OutputChannel::DIRECT));
+        const float3& indirect = a_Input->GetPixel(i, static_cast<unsigned>(ResultBuffer::OutputChannel::INDIRECT));
+        const float3& specular = a_Input->GetPixel(i, static_cast<unsigned>(ResultBuffer::OutputChannel::SPECULAR));
         //a_Output[i] = data[0] + data[1] + data[2]; this isnt correct ? take a float 3 and add each of its members to each other ?
 
-        a_Output->m_Pixels[i] = direct + indirect + specular;
+        float3 mergedColor = direct + indirect + specular;
+        a_Output->SetPixel(mergedColor, i, 0);
     }
 }
 
