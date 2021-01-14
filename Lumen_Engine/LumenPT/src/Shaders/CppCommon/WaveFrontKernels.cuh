@@ -42,7 +42,7 @@ CPU_ONLY void GenerateMotionVectors();
 //Called during shading
 CPU_GPU void ShadeDirect(const uint3& a_ResolutionAndDepth, const IntersectionBuffer* const a_Intersections, ShadowRayBatch* const a_ShadowRays, const LightBuffer* const a_Lights);
 CPU_GPU void ShadeSpecular();
-CPU_GPU void ShadeIndirect();
+CPU_GPU void ShadeIndirect(const uint3& a_ResolutionAndDepth, const IntersectionBuffer* const a_Intersections, RayBatch* a_Output);
 
 //Called during post-processing.
 GPU_ONLY void Denoise();

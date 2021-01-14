@@ -34,7 +34,7 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
      */
 
      //Generate secondary rays.
-    ShadeIndirect<<<1,1>>>(); 
+    ShadeIndirect<<<1,1>>>(a_ShadingParams.m_ResolutionAndDepth, a_ShadingParams.m_Intersections, a_ShadingParams.m_SecondaryRays); 
      //Generate shadow rays for specular highlights.
     ShadeSpecular<<<1,1>>>();
     //Generate shadow rays for direct lights.
@@ -148,8 +148,39 @@ CPU_GPU void ShadeSpecular()
 {
 }
 
-CPU_GPU void ShadeIndirect()
+CPU_GPU void ShadeIndirect(const uint3& a_ResolutionAndDepth, const IntersectionBuffer* const a_Intersections, const RayBatch* const a_PrimaryRays, RayBatch* a_Output)
 {
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    int stride = blockDim.x * gridDim.x;
+    const int numPixels = a_ResolutionAndDepth.x * a_ResolutionAndDepth.y;
+
+    for (int i = index; i < numPixels; i += stride)
+    {
+        //Convert the index into the screen dimensions.
+        const int screenY = i / a_ResolutionAndDepth.x;
+        const int screenX = i - (screenY * a_ResolutionAndDepth.x);
+
+        auto& intersection = a_Intersections[i];
+
+        //TODO russian roulette to terminate path (multiply weight with russian roulette outcome
+        float russianRouletteWeight = 1.f;
+
+        //TODO extract surface normal from intersection data.
+        float3 normal = make_float3(1.f, 0.f, 0.f);
+
+        //TODO generate random direction
+        float3 dir = make_float3(1.f, 0.f, 0.f);
+
+        //TODO get position from intersection data.
+        float3 pos = make_float3(0.f, 0.f, 0.f);
+
+        //TODO calculate BRDF to see how much light is transported.
+        float3 brdf = make_float3(1.f, 1.f, 1.f); //Do this after direct shading because the material is already looked up there. Use the BRDF.
+        float3 totalLightTransport = russianRouletteWeight * a_PrimaryRays->m_Rays[i].m_Contribution * brdf;  //Total amount of light that will end up in the camera through this path.
+
+        //Add to the output buffer.
+        a_Output->m_Rays[i] = RayData{ pos, dir, totalLightTransport };
+    }
 }
 
 GPU_ONLY void Denoise()
