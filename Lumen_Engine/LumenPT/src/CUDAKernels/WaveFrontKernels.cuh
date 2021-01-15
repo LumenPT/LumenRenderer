@@ -1,7 +1,7 @@
 #pragma once
 
 #include <cuda_runtime.h>
-#include "WaveFrontDataStructs.h"
+#include "../Shaders/CppCommon/WaveFrontDataStructs.h"
 
 //Some defines to make the functions less scary and more readable
 #ifdef GPU_ONLY
@@ -42,13 +42,13 @@ CPU_ONLY void GenerateMotionVectors();
 //Called during shading
 CPU_GPU void ShadeDirect(const uint3& a_ResolutionAndDepth, const IntersectionBuffer* const a_Intersections, ShadowRayBatch* const a_ShadowRays, const LightBuffer* const a_Lights);
 CPU_GPU void ShadeSpecular();
-CPU_GPU void ShadeIndirect(const uint3& a_ResolutionAndDepth, const IntersectionBuffer* const a_Intersections, RayBatch* a_Output);
+CPU_GPU void ShadeIndirect(const uint3& a_ResolutionAndDepth, const IntersectionBuffer* const a_Intersections, const RayBatch* const a_PrimaryRays, RayBatch* a_Output);
 
 //Called during post-processing.
-GPU_ONLY void Denoise();
+CPU_GPU void Denoise();
 CPU_GPU void MergeLightChannels(int a_NumPixels, const uint2& a_Dimensions, const PixelBuffer* const a_Input, PixelBuffer* const a_Output);
-GPU_ONLY void DLSS();
-GPU_ONLY void PostProcessingEffects();
+CPU_GPU void DLSS();
+CPU_GPU void PostProcessingEffects();
 
 //Temporary step till post-processing is in place.
 CPU_GPU void WriteToOutput(int a_NumPixels, const uint2& a_Dimensions, PixelBuffer* const a_Input, uchar4* a_Output);

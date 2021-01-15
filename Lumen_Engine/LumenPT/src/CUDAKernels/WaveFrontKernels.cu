@@ -1,7 +1,7 @@
-#include "CppCommon/WaveFrontKernels.cuh"
+#include "WaveFrontKernels.cuh"
 
 #include "../../vendor/Include/Cuda/cuda/helpers.h"
-#include "CppCommon/RenderingUtility.h"
+#include "../Shaders/CppCommon/RenderingUtility.h"
 
 #include "device_launch_parameters.h"
 #include "../../vendor/Include/sutil/vec_math.h"
@@ -34,7 +34,7 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
      */
 
      //Generate secondary rays.
-    ShadeIndirect<<<1,1>>>(a_ShadingParams.m_ResolutionAndDepth, a_ShadingParams.m_Intersections, a_ShadingParams.m_SecondaryRays); 
+    ShadeIndirect<<<1,1>>>(a_ShadingParams.m_ResolutionAndDepth, a_ShadingParams.m_Intersections, a_ShadingParams.m_CurrentRays, a_ShadingParams.m_SecondaryRays); 
      //Generate shadow rays for specular highlights.
     ShadeSpecular<<<1,1>>>();
     //Generate shadow rays for direct lights.
@@ -56,7 +56,7 @@ CPU_ONLY void PostProcess(const PostProcessLaunchParameters& a_PostProcessParams
     const int numBlocks = (numPixels + blockSize - 1) / blockSize;
 
     //TODO before merging.
-    Denoise();
+    Denoise<<<1,1>>>();
 
     MergeLightChannels <<<numBlocks, blockSize >>> (
         numPixels, 
@@ -66,10 +66,10 @@ CPU_ONLY void PostProcess(const PostProcessLaunchParameters& a_PostProcessParams
 
     //TODO steal hidden Nvidia technology by breaking into their buildings
     //TODO copy merged results into image output after having run DLSS.
-    DLSS();
+    DLSS<<<1,1>>>();
 
     //TODO
-    PostProcessingEffects();
+    PostProcessingEffects<<<1,1>>>();
 
 
 
@@ -183,7 +183,7 @@ CPU_GPU void ShadeIndirect(const uint3& a_ResolutionAndDepth, const Intersection
     }
 }
 
-GPU_ONLY void Denoise()
+CPU_GPU void Denoise()
 {
 }
 
@@ -213,11 +213,11 @@ CPU_GPU void MergeLightChannels(
     }
 }
 
-GPU_ONLY void DLSS()
+CPU_GPU void DLSS()
 {
 }
 
-GPU_ONLY void PostProcessingEffects()
+CPU_GPU void PostProcessingEffects()
 {
 }
 

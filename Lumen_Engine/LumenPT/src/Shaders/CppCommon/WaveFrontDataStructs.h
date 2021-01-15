@@ -2,6 +2,7 @@
 
 #include <Optix/optix.h>
 #include <Cuda/cuda/helpers.h>
+#include <assert.h>
 
 /*TODO: check if usage of textures can benefit performance
  *for buffers like intersectionBuffer or OutputBuffer.
@@ -79,6 +80,15 @@ namespace WaveFront
         float3 m_Direction;
         float3 m_Contribution;
 
+        GPU_ONLY bool IsValidRay() const
+        {
+
+            return !(m_Direction.x == 0.f &&
+                    m_Direction.y == 0.f &&
+                    m_Direction.z == 0.f);
+
+        }
+
     };
 
     struct RayBatch
@@ -108,11 +118,32 @@ namespace WaveFront
             unsigned int a_PixelIndex,
             unsigned int a_RayIndex)
         {
-            if( a_PixelIndex < m_NumPixels && 
-                a_RayIndex < m_RaysPerPixel)
-            {
-                m_Rays[a_PixelIndex * m_RaysPerPixel + a_RayIndex] = a_Data;
-            }
+            m_Rays[GetRayIndex(a_PixelIndex, a_RayIndex)] = a_Data;
+        }
+
+        GPU_ONLY const RayData& GetRay(unsigned int a_PixelIndex, const unsigned int a_RayIndex) const
+        {
+
+            return m_Rays[GetRayIndex(a_PixelIndex, a_RayIndex)];
+
+        }
+
+        GPU_ONLY const RayData& GetRay(unsigned int a_RayIndex) const
+        {
+            assert(a_RayIndex < GetSize());
+
+            return m_Rays[a_RayIndex];
+
+        }
+
+        //Gets an index to a Ray in the m_Rays array, taking into account the number of pixels and the number of rays per pixel.
+        GPU_ONLY unsigned int GetRayIndex(unsigned int a_PixelIndex, const unsigned int a_RayIndex) const
+        {
+
+            assert(a_PixelIndex < m_NumPixels&& a_RayIndex < m_RaysPerPixel);
+
+            return a_PixelIndex * m_RaysPerPixel + a_RayIndex;
+
         }
 
     };
@@ -150,7 +181,7 @@ namespace WaveFront
         unsigned int m_RayIndex;
         float m_IntersectionT;
         unsigned int m_TriangleId;
-        unsigned int m_MeshAndInstanceId;
+        unsigned int m_MeshAndInstanceId; //Might need to change to pointer to a DeviceMesh.
 
     };
 
@@ -176,26 +207,39 @@ namespace WaveFront
             return m_NumPixels * m_IntersectionsPerPixel;
         }
 
-        CPU_GPU void SetIntersection(
+        GPU_ONLY void SetIntersection(
             const IntersectionData& a_Data, 
             unsigned int a_PixelIndex, 
             unsigned int a_IntersectionIndex)
         {
 
-            if( a_PixelIndex < m_NumPixels && 
-                a_IntersectionIndex < m_IntersectionsPerPixel)
-            {
-                m_Intersections[a_PixelIndex * m_IntersectionsPerPixel + a_IntersectionIndex] = a_Data;
-            }
+            m_Intersections[GetRayIndex(a_PixelIndex, a_IntersectionIndex)] = a_Data;
 
         }
 
-        CPU_GPU const IntersectionData& GetIntersection(unsigned int a_RayIndex) const
+        GPU_ONLY  const IntersectionData& GetIntersection(unsigned int a_PixelIndex, unsigned int a_IntersectionIndex)
+        {
+
+            return m_Intersections[GetRayIndex(a_PixelIndex, a_IntersectionIndex)];
+
+        }
+
+        GPU_ONLY const IntersectionData& GetIntersection(unsigned int a_RayIndex) const
         {
             assert(a_RayIndex < GetSize());
 
             return m_Intersections[a_RayIndex];
                 
+        }
+
+        //Gets a index to IntersectionData in the m_Intersections array, taking into account the number of pixels and the number of rays per pixel.
+        GPU_ONLY unsigned int GetRayIndex(unsigned int a_PixelIndex, unsigned int a_IntersectionIndex) const
+        {
+
+            assert(a_PixelIndex < m_NumPixels && a_IntersectionIndex < m_IntersectionsPerPixel);
+
+            return a_PixelIndex * m_IntersectionsPerPixel + a_IntersectionIndex;
+
         }
 
     };
@@ -217,21 +261,27 @@ namespace WaveFront
         //Read/Write
         float3 m_Pixels[];
 
-        CPU_GPU void SetPixel(const float3& a_value, unsigned int a_PixelIndex, unsigned int a_ChannelIndex)
+        GPU_ONLY void SetPixel(const float3& a_value, unsigned int a_PixelIndex, unsigned int a_ChannelIndex)
         {
-            if( a_PixelIndex < m_NumPixels &&
-                a_ChannelIndex < m_ChannelsPerPixel) //Better to assert ?
-            {
-                m_Pixels[a_PixelIndex * m_ChannelsPerPixel + a_ChannelIndex] = a_value;
-            }
+
+            m_Pixels[GetPixelIndex(a_PixelIndex, a_ChannelIndex)] = a_value;
+
         }
 
-        CPU_GPU const float3& GetPixel(unsigned int a_PixelIndex, unsigned int a_ChannelIndex) const
+        GPU_ONLY const float3& GetPixel(unsigned int a_PixelIndex, unsigned int a_ChannelIndex) const
         {
-            assert((a_PixelIndex < m_NumPixels&&
-                    a_ChannelIndex < m_ChannelsPerPixel));
 
-            return m_Pixels[a_PixelIndex * m_ChannelsPerPixel + a_ChannelIndex];
+            return m_Pixels[GetPixelIndex(a_PixelIndex, a_ChannelIndex)];
+
+        }
+
+        //Gets an index to a pixel in the m_Pixels array, taking into account number of channels per pixel.
+        GPU_ONLY unsigned int GetPixelIndex(unsigned int a_PixelIndex, unsigned int a_ChannelIndex) const
+        {
+
+            assert(a_PixelIndex < m_NumPixels&& a_ChannelIndex < m_ChannelsPerPixel);
+
+            return a_PixelIndex * m_ChannelsPerPixel + a_ChannelIndex;
 
         }
 
@@ -324,18 +374,30 @@ namespace WaveFront
             return m_MaxDepth * m_NumPixels * m_RaysPerPixel;
         }
 
-        CPU_GPU void SetShadowRay(
+        GPU_ONLY void SetShadowRay(
             const ShadowRayData& a_Data, 
             unsigned int a_DepthIndex, 
             unsigned int a_PixelIndex, 
             unsigned int a_RayIndex)
         {
-            if( a_DepthIndex < m_MaxDepth &&
-                a_PixelIndex < m_NumPixels && 
-                a_RayIndex < m_RaysPerPixel)
-            {
-                m_ShadowRays[a_DepthIndex * m_NumPixels * m_RaysPerPixel + a_PixelIndex * m_RaysPerPixel + a_RayIndex] = a_Data;
-            }
+            m_ShadowRays[GetShadowRayIndex(a_DepthIndex, a_PixelIndex, a_RayIndex)] = a_Data;
+        }
+
+        GPU_ONLY const ShadowRayData& GetShadowRayData(unsigned int a_DepthIndex, unsigned int a_PixelIndex, unsigned int a_RayIndex) const
+        {
+
+            return m_ShadowRays[GetShadowRayIndex(a_DepthIndex, a_PixelIndex, a_RayIndex)];
+
+        }
+
+        //Gets a index to a ShadowRay in the m_ShadowRays array, taking into account the max dept, number of pixels and number of rays per pixel.
+        GPU_ONLY unsigned int GetShadowRayIndex(unsigned int a_DepthIndex, unsigned int a_PixelIndex, unsigned int a_RayIndex) const
+        {
+
+            assert(a_DepthIndex < m_MaxDepth&& a_PixelIndex < m_NumPixels&& a_RayIndex < m_RaysPerPixel);
+
+            return a_DepthIndex * m_NumPixels * m_RaysPerPixel + a_PixelIndex * m_RaysPerPixel + a_RayIndex;
+
         }
 
     };
@@ -361,6 +423,7 @@ namespace WaveFront
 
         CPU_ONLY ~DeviceCameraData() = default;
 
+        unsigned int m_PixelIndex;
         float3 m_Position;
         float3 m_Up;
         float3 m_Right;
@@ -398,18 +461,18 @@ namespace WaveFront
 
         CPU_ONLY ShadingLaunchParameters(
             const uint3& a_ResolutionAndDepth,
-            const RayBatch* const a_PrimaryRays,
-            const IntersectionBuffer* a_PrimaryIntersections,
-            const RayBatch* const a_PrevRays,
+            const RayBatch* const a_PrimaryRaysPrevFrame,
+            const IntersectionBuffer* a_PrimaryIntersectionsPrevFrame,
+            const RayBatch* const a_CurrentRays,
             const IntersectionBuffer* a_Intersections,
             RayBatch* a_SecondaryRays,
             ShadowRayBatch* a_ShadowRayBatch,
             const LightBuffer* a_Lights)
             :
         m_ResolutionAndDepth(a_ResolutionAndDepth),
-        m_PrimaryRays(a_PrimaryRays),
-        m_PrimaryIntersections(a_PrimaryIntersections),
-        m_PrevRays(a_PrevRays),
+        m_PrimaryRaysPrevFrame(a_PrimaryRaysPrevFrame),
+        m_PrimaryIntersectionsPrevFrame(a_PrimaryIntersectionsPrevFrame),
+        m_CurrentRays(a_CurrentRays),
         m_Intersections(a_Intersections),
         m_LightBuffer(a_Lights),
         m_SecondaryRays(a_SecondaryRays),
@@ -420,9 +483,9 @@ namespace WaveFront
 
         //Read only
         const uint3 m_ResolutionAndDepth;
-        const RayBatch* const m_PrimaryRays;
-        const IntersectionBuffer* const m_PrimaryIntersections;
-        const RayBatch* const m_PrevRays;
+        const RayBatch* const m_PrimaryRaysPrevFrame;
+        const IntersectionBuffer* const m_PrimaryIntersectionsPrevFrame;
+        const RayBatch* const m_CurrentRays;
         const IntersectionBuffer* const m_Intersections;
         //TODO: Geometry buffer
         //TODO: Light buffer
@@ -471,15 +534,16 @@ namespace WaveFront
     struct CommonOptixLaunchParameters
     {
 
-        OptixTraversableHandle m_Solids;
-        OptixTraversableHandle m_Volumes;
+        uint3 m_ResolutionAndDepth;
+        OptixTraversableHandle m_Traversable;
 
     };
 
     struct ResolveRaysLaunchParameters
     {
 
-        uint3 m_ResolutionAndDepth;
+        CommonOptixLaunchParameters m_Common;
+
         RayBatch* m_Rays;
         IntersectionBuffer* m_Intersections;
 
@@ -488,8 +552,8 @@ namespace WaveFront
     struct ResolveShadowRaysLaunchParameters
     {
 
+        CommonOptixLaunchParameters m_Common;
 
-        uint3 m_ResolutionAndDepth;
         ShadowRayBatch* m_ShadowRays;
         ResultBuffer* m_Results;
 

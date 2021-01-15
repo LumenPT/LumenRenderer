@@ -12,7 +12,7 @@
 #include <vector>
 #include <memory>
 #include <Optix/optix_types.h>
-#include "Cuda/builtin_types.h"
+#include <CUDA/builtin_types.h>
 
 using GLuint = unsigned;
 
@@ -33,6 +33,10 @@ public:
 
     struct InitializationData
     {
+
+        uint8_t m_MaxDepth;
+        uint8_t m_RaysPerPixel;
+        uint8_t m_ShadowRaysPerPixel;
         uint2 m_Resolution;
 
     };
@@ -84,27 +88,43 @@ private:
         int ContinuationSize;
     };
 
+    enum class PipelineType
+    {
+        RESOLVE_RAYS,
+        RESOLVE_SHADOW_RAYS
+    };
+
 
 
     bool Initialize(const InitializationData& a_InitializationData);
 
     void InitializeContext();
 
-    void InitializePipelineOptions();
+    OptixPipelineCompileOptions CreatePipelineOptions(
+        const std::string& a_LaunchParamName, 
+        unsigned int a_NumPayloadValues, 
+        unsigned int a_NumAttributes) const;
 
-    bool CreatePipeline();
+    bool CreatePipelines(const std::string& a_ShaderPath);
+    bool CreatePipeline(
+        const OptixModule& a_module,
+        const OptixPipelineCompileOptions& a_PipelineOptions,
+        PipelineType a_type, 
+        const std::string& a_RayGenFuncName, 
+        const std::string& a_HitFuncName, 
+        OptixPipeline& a_Pipeline);
 
     void CreateOutputBuffer();
 
     void CreateDataBuffers();
 
-    OptixModule CreateModule(const std::string& a_PtxPath);
+    OptixModule CreateModule(const std::string& a_PtxPath, const OptixPipelineCompileOptions& a_PipelineOptions) const;
 
     OptixProgramGroup CreateProgramGroup(OptixProgramGroupDesc a_ProgramGroupDesc, const std::string& a_Name);
 
-    void CreateShaderBindingTable();
-
     ProgramGroupHeader GetProgramGroupHeader(const std::string& a_GroupName) const;
+
+    void CreateShaderBindingTable();
 
     static void DebugCallback(unsigned int a_Level, const char* a_Tag, const char* a_Message, void* /*extra data provided during context initialization*/);
 
@@ -112,21 +132,25 @@ private:
 
     static ComputedStackSizes ComputeStackSizes(OptixStackSizes a_StackSizes, int a_TraceDepth, int a_DirectDepth, int a_ContinuationDepth);
 
+    unsigned int GetNextRayBatchIndex(unsigned int a_CurrentDepth);
+
+    unsigned int GetNextPrimRayBatchIndex(bool a_Overwrite);
+
 
 
     PTServiceLocator m_ServiceLocator;
 
-    OptixDeviceContext              m_DeviceContext;
+    OptixDeviceContext m_DeviceContext;
 
-    OptixPipelineCompileOptions     m_PipelineCompileOptions;
-    OptixPipeline                   m_Pipeline;
+    static constexpr char s_RaysRayGenPGName[] = "RaysRayGenPG";
+    static constexpr char s_RaysHitPGName[] = "RaysHitPG";
+    static constexpr char s_ShadowRaysRayGenPGName[] = "ShadowRaysRayGenPG";
+    static constexpr char s_ShadowRaysHitPGName[] = "ShadowRaysHitPG";
+
+    OptixPipeline m_PipelineRays;
+    OptixPipeline m_PipelineShadowRays;
 
     std::unique_ptr<ShaderBindingTableGenerator> m_ShaderBindingTableGenerator;
-
-
-    RecordHandle<RaygenData>    m_RayGenRecord;
-    RecordHandle<MissData>      m_MissRecord;
-    RecordHandle<HitData>       m_HitRecord;
 
     std::map<std::string, OptixProgramGroup> m_ProgramGroups;
 
@@ -136,21 +160,28 @@ private:
     std::vector<std::unique_ptr<MemoryBuffer>> m_TempBuffers;
 
     //Data buffers for the wavefront algorithm.
+    static constexpr unsigned int s_NumRayBatches = 3;
+    static constexpr unsigned int s_NumIntersectionBuffers = 2;
+
+    unsigned int m_PrimRaysPrevFrameBatchIndex;
+    unsigned int m_PrimHitsPrevFrameBatchIndex;
 
     //ResultBuffer storing the different PixelBuffers as different light channels;
     std::unique_ptr<MemoryBuffer> m_ResultBuffer;
-    //3 PixelBuffers for the different channels in the ResultBuffer and 1 PixelBuffer for the merged results.
-    std::unique_ptr<MemoryBuffer> m_PixelBuffers[4];
+    //2 PixelBuffers 1 for the different channels in the ResultBuffer and 1 PixelBuffer for the merged results.
+    std::unique_ptr<MemoryBuffer> m_PixelBuffer3Channels;
+    std::unique_ptr<MemoryBuffer> m_PixelBuffer1Channel;
     //2 ray batches, 1 for storing primary rays, other for overwriting secondary rays.
-    std::unique_ptr<MemoryBuffer> m_RayBatches[3];
+    std::unique_ptr<MemoryBuffer> m_RayBatches[s_NumRayBatches];
     //2 intersection buffers, 1 for storing primary intersections, other for overwriting secondary intersections.
-    std::unique_ptr<MemoryBuffer> m_IntersectionBuffers[2];
+    std::unique_ptr<MemoryBuffer> m_IntersectionBuffers[s_NumIntersectionBuffers];
     //1 shadow ray batch to overwrite with shadow rays.
     std::unique_ptr<MemoryBuffer> m_ShadowRayBatch;
 
     std::unique_ptr<class Texture> m_Texture;
 
     uint2 m_Resolution;
+    uint8_t m_MaxDepth;
     bool m_Initialized;
 
 };
