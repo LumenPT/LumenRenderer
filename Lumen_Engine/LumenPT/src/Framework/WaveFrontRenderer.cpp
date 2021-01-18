@@ -531,7 +531,7 @@ GLuint WaveFrontRenderer::TraceFrame()
     MemoryBuffer& newPrimaryRayBatch = *m_RayBatches[newPrimRayBatchIndex];
     
     const WaveFront::SetupLaunchParameters setupParams(m_Resolution, cameraData, newPrimaryRayBatch.GetDevicePtr<RayBatch>());
-    //GenerateRays(setupParams);
+    GenerateRays(setupParams);
 
     //Loop
     //Trace buffer of rays using Optix ResolveRays pipeline

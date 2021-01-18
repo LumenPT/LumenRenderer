@@ -560,3 +560,7 @@ namespace WaveFront
     };
 
 }
+
+#undef CPU_ONLY 
+#undef CPU_GPU
+#undef GPU_ONLY 

@@ -4,19 +4,10 @@
 #include "../Shaders/CppCommon/WaveFrontDataStructs.h"
 
 //Some defines to make the functions less scary and more readable
-#ifdef GPU_ONLY
-#undef GPU_ONLY
-#endif
-#ifdef CPU_GPU
-#undef CPU_GPU
-#endif
-#ifdef CPU_ONLY
-#undef CPU_ONLY
-#endif
 
 #define GPU_ONLY __device__ __forceinline__ //Runs on GPU only, available on GPU only.
 #define CPU_GPU __global__ __forceinline__ //Runs on GPU, available on GPU and CPU.
-#define CPU_ONLY __host__ __forceinline__
+#define CPU_ONLY __host__
 
 using namespace WaveFront;
 

@@ -1,7 +1,7 @@
 cmake_minimum_required (VERSION 3.16)
 
 #project name (i.e. VS solution)
-project ("Lumen_Engine")
+project ("Lumen_Engine" LANGUAGES C CXX)
 
 add_compile_definitions(LMN_PLATFORM_WINDOWS)
 

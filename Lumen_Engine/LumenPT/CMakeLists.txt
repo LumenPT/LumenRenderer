@@ -32,26 +32,6 @@ elseif(
 	
 endif()
 
-#function to transform input paths to output paths.
-function(changePath REGEX_MATCH REGEX_REPLACE RESULT_VAR_NAME)
-
-	set(RESULT "")
-
-	foreach(ARG IN LISTS ARGN)
-
-		string(REGEX REPLACE ${REGEX_MATCH} ${REGEX_REPLACE} OUTPUTPATH ${ARG})
-		list(APPEND RESULT ${OUTPUTPATH})
-
-		#message("\n Replaced: ${ARG} \n with: ${OUTPUTPATH}")
-
-	endforeach()
-
-	set(${RESULT_VAR_NAME} ${RESULT} PARENT_SCOPE)
-	
-endfunction()
-
-
-
 #Add CUDA files
 file(GLOB_RECURSE CUDA_HEADER_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/Shaders/*.cuh
@@ -85,6 +65,7 @@ set(CUDA_FILES_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/Assets/PrecompiledShaders)
 #https://cmake.org/cmake/help/v3.19/variable/CMAKE_CFG_INTDIR.html#variable:CMAKE_CFG_INTDIR
 
 #replace input file paths with output path and extension. Capture first part because otherwise first path will not be replaced.
+include(${CMAKE_SOURCE_DIR}/cmake/functions.cmake)
 changePath("(.*\\/)([A-Za-z0-9_\\.]+\\.)cu\\;?$" "${CUDA_FILES_OUTPUT_DIR}/\\2ptx" CUDA_FILES_OUTPUT "${CUDA_SOURCE_FILES}")
 
 message("CUDA_FILES_OUTPUT: ${CUDA_FILES_OUTPUT}")
@@ -122,7 +103,6 @@ set_property(TARGET LumenPT APPEND_STRING PROPERTY COMPILE_DEFINITIONS CONFIG_NA
 set_property(TARGET LumenPT APPEND PROPERTY COMPILE_DEFINITIONS LUMEN_PT)
 set_property(TARGET LumenPT APPEND PROPERTY COMPILE_DEFINITIONS WAVEFRONT)
 
-include(${CMAKE_SOURCE_DIR}/cmake/functions.cmake)
 assign_source_group(${CPP_HEADER_FILES})
 assign_source_group(${CPP_SOURCE_FILES})
 
