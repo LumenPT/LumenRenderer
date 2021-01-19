@@ -1,6 +1,14 @@
 #pragma once
 #include <cinttypes>
 
+#include "../CUDAKernels/ReSTIRKernels.cuh"
+#include "../Shaders/CppCommon/ReSTIRData.h"
+#include "MemoryBuffer.h"
+
+
+namespace WaveFront {
+    struct IntersectionBuffer;
+}
 
 /*
  * All configurable settings for ReSTIR.
@@ -52,17 +60,36 @@ struct ReSTIRSettings
 class ReSTIR
 {
 public:
+	ReSTIR() : m_SwapChainIndex(0), m_SwapDirtyFlag(true)
+    {}
+
 	/*
 	 * Initialize the ReSTIR required buffers for the given screen dimensions.
 	 */
-	void Initialize(const ReSTIRSettings& a_Settings);
+	CPU_ONLY void Initialize(const ReSTIRSettings& a_Settings);
 
 	/*
 	 * Run ReSTIR.
 	 */
-	void Run();
+	CPU_ONLY void Run(const WaveFront::IntersectionBuffer* const a_CurrentIntersections, const WaveFront::IntersectionBuffer* const a_PreviousIntersections, const std::vector<TriangleLight>& a_Lights);
+
+	/*
+	 * Swap the front and back buffer. This has to be called once per frame.
+	 */
+	void SwapBuffers();
 
 
 private:
 	ReSTIRSettings m_Settings;
+	int m_SwapChainIndex;
+	bool m_SwapDirtyFlag;	//Dirty flag to assert if someone forgets to swap the buffers.
+
+	//Memory buffers only used in the current frame.
+	MemoryBuffer m_Lights;		//All the triangle lights stored contiguously. Size of the amount of lights.
+	MemoryBuffer m_CDF;			//The CDF which is the size of a CDF entry times the amount of lights. TODO make own class with GPU_ONLY member functions. Easier to encapsulate it.
+	MemoryBuffer m_LightBags;	//All light bags as a single array. Size of num light bags * size of light bag * light index or something.
+	MemoryBuffer m_ShadowRays;	//Buffer for each shadow ray in a frame. Size of screen dimensions * ray size.
+
+	//Memory buffers that need to be temporally available.
+	MemoryBuffer m_Reservoirs[2];	//Reservoir buffers per frame.
 };

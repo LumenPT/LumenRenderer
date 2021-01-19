@@ -1,10 +1,8 @@
 #pragma once
 
 #include <cuda_runtime.h>
+#include "../Shaders/CppCommon/ReSTIRData.h"
 
-//Some defines to make the functions less scary and more readable
+__host__ void ResetReservoirs(int a_NumReservoirs, Reservoir* a_ReservoirPointer);
 
-#define GPU_ONLY __device__ __forceinline__ //Runs on GPU only, available on GPU only.
-#define CPU_GPU __global__ __forceinline__ //Runs on GPU, available on GPU and CPU.
-#define CPU_ONLY __host__
-
+__global__ void ResetReservoirInternal(int a_NumReservoirs, Reservoir* a_ReservoirPointer);
