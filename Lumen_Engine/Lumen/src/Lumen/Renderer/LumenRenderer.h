@@ -9,6 +9,7 @@
 #include <glm/vec4.hpp>
 
 #include <memory>
+#include <string>
 
 namespace Lumen
 {
@@ -53,7 +54,8 @@ public:
 	virtual std::shared_ptr<Lumen::ILumenTexture> CreateTexture(void* a_PixelData, uint32_t a_Width, uint32_t a_Height) = 0;
 	virtual std::shared_ptr<Lumen::ILumenMaterial> CreateMaterial(const MaterialData& a_MaterialData) = 0;
 	virtual std::shared_ptr<Lumen::ILumenScene> CreateScene(SceneData a_SceneData);
-
+	virtual std::shared_ptr<Lumen::ILumenVolume> CreateVolume(const std::string& a_FilePath) = 0;
+	
 	std::shared_ptr<Lumen::ILumenScene> m_Scene;
 
 private:

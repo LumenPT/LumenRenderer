@@ -78,6 +78,8 @@ public:
 
     std::shared_ptr<Lumen::ILumenScene> CreateScene(SceneData a_SceneData) override;
 
+    std::shared_ptr<Lumen::ILumenVolume> CreateVolume(const std::string& a_FilePath) override;
+	
     void CreateOutputBuffer();
 
     GLuint TraceFrame();

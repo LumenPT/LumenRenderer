@@ -21,6 +21,7 @@
 
 #include "PTMesh.h"
 #include "PTPrimitive.h"
+#include "PTVolume.h"
 
 void CheckOptixRes(const OptixResult& a_res)
 {
@@ -736,4 +737,11 @@ std::shared_ptr<Lumen::ILumenMaterial> WaveFrontRenderer::CreateMaterial(const M
 std::shared_ptr<Lumen::ILumenScene> WaveFrontRenderer::CreateScene(SceneData a_SceneData)
 {
     return std::make_shared<PTScene>(a_SceneData, m_ServiceLocator);
+}
+
+std::shared_ptr<Lumen::ILumenVolume> WaveFrontRenderer::CreateVolume(const std::string& a_FilePath)
+{
+    std::shared_ptr<Lumen::ILumenVolume> volume = std::make_shared<PTVolume>(a_FilePath, m_ServiceLocator);
+
+    return volume;
 }

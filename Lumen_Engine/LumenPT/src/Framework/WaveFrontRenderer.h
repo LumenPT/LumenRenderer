@@ -70,7 +70,8 @@ public:
     std::shared_ptr<Lumen::ILumenMaterial> CreateMaterial(const MaterialData& a_MaterialData) override;
 
     std::shared_ptr<Lumen::ILumenScene> CreateScene(SceneData a_SceneData) override;
-
+	
+    std::shared_ptr<Lumen::ILumenVolume> LumenRenderer::CreateVolume(const std::string& a_FilePath) override;
    
 
     GLuint TraceFrame();

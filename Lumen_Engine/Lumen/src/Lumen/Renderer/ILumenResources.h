@@ -37,4 +37,10 @@ namespace Lumen
         std::vector<std::unique_ptr<ILumenPrimitive>> m_Primitives;
     };
 
+    class ILumenVolume
+    {
+    public:
+        virtual ~ILumenVolume() {};
+    };
+
 }

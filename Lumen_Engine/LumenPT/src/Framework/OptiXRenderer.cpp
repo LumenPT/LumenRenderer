@@ -33,6 +33,7 @@
 
 #include "Material.h"
 #include "PTScene.h"
+#include "PTVolume.h"
 
 const uint32_t gs_ImageWidth = 800;
 const uint32_t gs_ImageHeight = 600;
@@ -543,4 +544,11 @@ std::shared_ptr<Lumen::ILumenMaterial> OptiXRenderer::CreateMaterial(const Mater
 std::shared_ptr<Lumen::ILumenScene> OptiXRenderer::CreateScene(SceneData a_SceneData)
 {
     return std::make_shared<PTScene>(a_SceneData, m_ServiceLocator);
+}
+
+std::shared_ptr<Lumen::ILumenVolume> OptiXRenderer::CreateVolume(const std::string& a_FilePath)
+{
+    std::shared_ptr<Lumen::ILumenVolume> volume = std::make_shared<PTVolume>(a_FilePath, m_ServiceLocator);
+
+    return volume;
 }

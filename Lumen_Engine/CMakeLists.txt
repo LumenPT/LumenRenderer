@@ -19,7 +19,7 @@ add_subdirectory ("Lumen/vendor/Glad")
 	#ImGui
 add_subdirectory ("Lumen/vendor/ImGui")
 	#NanoVDB
-add_subdirectory ("Lumen/vendor/openvdb/nanovdb")
+add_subdirectory ("LumenPT/vendor/openvdb/nanovdb")
 	#Lumen
 add_subdirectory ("Lumen")
 	#LumenPT
