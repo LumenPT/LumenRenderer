@@ -24,13 +24,15 @@ struct Vertex
 struct DeviceMaterial
 {
     NONAMESPACE::float4 m_DiffuseColor;
+    NONAMESPACE::float3 m_EmissionColor;
     cudaTextureObject_t m_DiffuseTexture;
+
 };
 
 struct DevicePrimitive
 {
-    Vertex*     m_VertexBuffer;
-    unsigned int*  m_IndexBuffer;
+    Vertex*         m_VertexBuffer;
+    unsigned int*   m_IndexBuffer;
     DeviceMaterial* m_Material;
 };
 

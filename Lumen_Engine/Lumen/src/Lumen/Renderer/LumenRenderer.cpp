@@ -10,6 +10,5 @@ std::shared_ptr<Lumen::ILumenScene> LumenRenderer::CreateScene(SceneData a_Scene
         scene->m_MeshInstances.push_back(std::make_unique<Lumen::MeshInstance>(mesh));
     }
 
-
     return scene;
 }

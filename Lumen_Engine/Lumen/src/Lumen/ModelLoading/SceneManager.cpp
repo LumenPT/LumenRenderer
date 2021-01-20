@@ -229,6 +229,16 @@ void Lumen::SceneManager::LoadMaterials(fx::gltf::Document& a_Doc, GLTFResource&
 			mat->SetDiffuseTexture(tex);
 		}
 
+		if (fxMat.emissiveFactor != std::array<float, 3>{0.0f, 0.0f, 0.0f})
+		{
+			mat->SetEmission(glm::vec3(
+				fxMat.emissiveFactor.at(0),
+				fxMat.emissiveFactor.at(1),
+				fxMat.emissiveFactor.at(2)
+			));
+		}
+
+
 		materials.push_back(mat);
 	}
 

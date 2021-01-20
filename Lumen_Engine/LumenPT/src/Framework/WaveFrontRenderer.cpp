@@ -462,6 +462,8 @@ void WaveFrontRenderer::CreateDataBuffers()
     const unsigned maxDepth = 3;
     const unsigned numOutputChannels = ResultBuffer::s_NumOutputChannels;
 
+    //const unsigned int lightBuffer = LightBuffer::
+	
     //Allocate pixel buffer.
     m_PixelBuffer3Channels = std::make_unique<MemoryBuffer>(sizeof(PixelBuffer) + numPixels * numOutputChannels * sizeof(float3));
     m_PixelBuffer3Channels->Write(numPixels, 0);
@@ -844,7 +846,8 @@ std::shared_ptr<Lumen::ILumenMaterial> WaveFrontRenderer::CreateMaterial(const M
     auto mat = std::make_shared<Material>();
     mat->SetDiffuseColor(a_MaterialData.m_DiffuseColor);
     mat->SetDiffuseTexture(a_MaterialData.m_DiffuseTexture);
-
+    mat->SetEmission(a_MaterialData.m_EmssivionVal);
+	
     return mat;
 
 }
