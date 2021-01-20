@@ -20,6 +20,7 @@ file(GLOB_RECURSE SOURCE_FILES
 
 # Add header and source files to library
 add_library (Lumen STATIC ${HEADER_FILES} ${SOURCE_FILES})
+set_property(TARGET Lumen APPEND PROPERTY COMPILE_DEFINITIONS LUMEN)
 
 include(${CMAKE_SOURCE_DIR}/cmake/functions.cmake)
 assign_source_group(${HEADER_FILES})
@@ -37,6 +38,7 @@ set(LIBS
 	GLFW
 	Glad
 	ImGui
+	libnanovdb
 )
 
 set(INCLUDES
@@ -49,6 +51,7 @@ set(INCLUDES
 	"vendor/fx"
 	"vendor/stb"
 	"src"
+	${NANOVDB_HEADERS}
 )
 
 add_compile_definitions(GLFW_INCLUDE_NONE)

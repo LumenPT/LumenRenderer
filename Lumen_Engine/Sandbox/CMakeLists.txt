@@ -1,4 +1,5 @@
 cmake_minimum_required (VERSION 3.16)
+enable_language(CUDA)
 
 # specify the C++ standard
 set(CMAKE_CXX_STANDARD 17)
@@ -26,6 +27,10 @@ assign_source_group(${HEADER_FILES})
 assign_source_group(${SOURCE_FILES})
 
 set_property(TARGET Sandbox PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
+
+if(${USE_WAVEFRONT})
+	set_property(TARGET Sandbox PROPERTY COMPILE_DEFINITIONS WAVEFRONT)
+endif()
 
 #Add header directory includes
 target_include_directories(Sandbox PUBLIC

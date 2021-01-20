@@ -6,6 +6,8 @@
 
 #include "Glad/glad.h"
 
+#include "imgui/imgui.h"
+
 #include <iostream>
 
 #include "Lumen/KeyCodes.h"
@@ -55,7 +57,12 @@ OutputLayer::OutputLayer()
 
 	m_Program = program;
 
-	LumenPT::InitializationData init;
+	LumenPT::InitializationData init{};
+
+#ifdef WAVEFRONT
+	init.m_Resolution = { 800, 600 };
+#else
+#endif
 
 	m_LumenPT = std::make_unique<LumenPT>(init);
 
@@ -74,10 +81,30 @@ void OutputLayer::OnUpdate(){
 	auto texture = m_LumenPT->TraceFrame(); // TRACE SUM
 
 
-	
 	glBindTexture(GL_TEXTURE_2D, texture);
 	glUseProgram(m_Program);
 	glDrawArrays(GL_TRIANGLES, 0, 3);
+}
+
+void OutputLayer::OnImGuiRender()
+{
+
+
+	auto& tarTransform = m_LumenPT->m_Scene->m_MeshInstances[0]->m_Transform;
+
+	glm::vec3 pos, scale;
+	pos = tarTransform.GetPosition();
+	scale = tarTransform.GetScale();
+	auto rot = tarTransform.GetRotationEuler();
+
+	ImGui::Begin("ModelBoi 3000");
+	ImGui::DragFloat3("Position", &pos[0]);
+	ImGui::DragFloat3("Scale", &scale[0]);
+	ImGui::DragFloat3("Rotation", &rot[0]);
+	ImGui::End();
+	tarTransform.SetPosition(pos);
+	tarTransform.SetScale(scale);
+	tarTransform.SetRotation(rot);
 }
 
 void OutputLayer::HandleCameraInput(Camera& a_Camera)
@@ -89,11 +116,11 @@ void OutputLayer::HandleCameraInput(Camera& a_Camera)
 	
 	if (Lumen::Input::IsKeyPressed(LMN_KEY_UP) || Lumen::Input::IsKeyPressed(LMN_KEY_W))
 	{
-		movementDirection += glm::normalize(V) * movementSpeed;
+		movementDirection += glm::normalize(W) * movementSpeed;
 	}
 	if (Lumen::Input::IsKeyPressed(LMN_KEY_DOWN) || Lumen::Input::IsKeyPressed(LMN_KEY_S))
 	{
-		movementDirection -= glm::normalize(V) * movementSpeed;
+		movementDirection -= glm::normalize(W) * movementSpeed;
 	}
 	if (Lumen::Input::IsKeyPressed(LMN_KEY_LEFT) || Lumen::Input::IsKeyPressed(LMN_KEY_A))
 	{
@@ -102,6 +129,14 @@ void OutputLayer::HandleCameraInput(Camera& a_Camera)
 	if (Lumen::Input::IsKeyPressed(LMN_KEY_RIGHT) || Lumen::Input::IsKeyPressed(LMN_KEY_D))
 	{
 		movementDirection -= glm::normalize(U) * movementSpeed;
+	}
+	if (Lumen::Input::IsKeyPressed(LMN_KEY_LEFT_SHIFT) || Lumen::Input::IsKeyPressed(LMN_KEY_LEFT_CONTROL))
+	{
+		movementDirection -= glm::normalize(V) * movementSpeed;
+	}
+	if (Lumen::Input::IsKeyPressed(LMN_KEY_SPACE))
+	{
+		movementDirection += glm::normalize(V) * movementSpeed;
 	}
 
 	if(glm::length(movementDirection))
@@ -120,5 +155,6 @@ void OutputLayer::HandleCameraInput(Camera& a_Camera)
 		yawRotation -= rotationSpeed;
 	}
 
-	a_Camera.SetYaw(a_Camera.GetYaw() + yawRotation);
+	a_Camera.IncrementYaw(glm::radians(yawRotation));
+	//a_Camera.SetYaw(a_Camera.GetYaw() + yawRotation);
 }

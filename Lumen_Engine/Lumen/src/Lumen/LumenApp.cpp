@@ -9,6 +9,7 @@
 
 #include "Input.h"
 
+
 namespace Lumen
 {
 #define BIND_EVENT_FN(x) std::bind(&LumenApp::x, this, std::placeholders::_1)
@@ -51,6 +52,7 @@ namespace Lumen
 			m_ImGuiLayer->Begin();
 			for (Layer* layer : m_LayerStack)
 			{
+				layer->OnDraw();
 				layer->OnImGuiRender();
 			}
 			m_ImGuiLayer->End();

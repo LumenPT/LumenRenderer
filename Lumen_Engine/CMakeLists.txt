@@ -1,7 +1,7 @@
 cmake_minimum_required (VERSION 3.16)
 
 #project name (i.e. VS solution)
-project ("Lumen_Engine")
+project ("Lumen_Engine" LANGUAGES C CXX)
 
 add_compile_definitions(LMN_PLATFORM_WINDOWS)
 
@@ -10,11 +10,16 @@ add_compile_definitions(LMN_PLATFORM_WINDOWS)
 set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+
+option(USE_WAVEFRONT "Use the Wavefront rendering pipeline?" ON)
+
 add_subdirectory("Lumen/vendor/GLFW")
 	#Glad
 add_subdirectory ("Lumen/vendor/Glad")
 	#ImGui
 add_subdirectory ("Lumen/vendor/ImGui")
+	#NanoVDB
+add_subdirectory ("LumenPT/vendor/openvdb/nanovdb")
 	#Lumen
 add_subdirectory ("Lumen")
 	#LumenPT

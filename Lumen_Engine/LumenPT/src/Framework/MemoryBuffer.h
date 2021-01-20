@@ -1,13 +1,18 @@
 #pragma once
 
 #include <type_traits>
+#include <vector>
 
 class MemoryBuffer
 {
 public:
 
     MemoryBuffer(size_t a_Size = 0);
+    template<typename ElementType>
+    MemoryBuffer(std::vector<ElementType>& a_VectorData);
     ~MemoryBuffer();
+
+    MemoryBuffer(MemoryBuffer&& a_Other);
 
     unsigned long long& operator*();
 
@@ -38,3 +43,12 @@ private:
     };
     size_t m_Size;
 };
+
+template <typename ElementType>
+MemoryBuffer::MemoryBuffer(std::vector<ElementType>& a_VectorData)
+    : m_DevPtr(0)
+{
+    Resize(a_VectorData.size() * sizeof(ElementType));
+
+    Write(a_VectorData.data(), a_VectorData.size() * sizeof(ElementType));
+}

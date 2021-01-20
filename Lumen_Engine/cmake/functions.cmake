@@ -10,3 +10,21 @@ function(assign_source_group)
         source_group("${_source_path_msvc}" FILES "${_source}")
     endforeach()
 endfunction(assign_source_group)
+
+#function to transform input paths to output paths.
+function(changePath REGEX_MATCH REGEX_REPLACE RESULT_VAR_NAME)
+
+	set(RESULT "")
+
+	foreach(ARG IN LISTS ARGN)
+
+		string(REGEX REPLACE ${REGEX_MATCH} ${REGEX_REPLACE} OUTPUTPATH ${ARG})
+		list(APPEND RESULT ${OUTPUTPATH})
+
+		#message("\n Replaced: ${ARG} \n with: ${OUTPUTPATH}")
+
+	endforeach()
+
+	set(${RESULT_VAR_NAME} ${RESULT} PARENT_SCOPE)
+	
+endfunction()

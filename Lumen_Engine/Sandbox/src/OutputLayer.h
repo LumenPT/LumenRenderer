@@ -5,10 +5,20 @@
 
 #include <cstdint>
 
-class OptiXRenderer;
+
 class Camera;
 
+#ifdef WAVEFRONT
+
+class WaveFrontRenderer;
+using LumenPT = WaveFrontRenderer;
+
+#else
+
+class OptiXRenderer;
 using LumenPT = OptiXRenderer;
+
+#endif
 
 class OutputLayer : public Lumen::Layer
 {
@@ -17,6 +27,10 @@ public:
     ~OutputLayer();
 
     void OnUpdate() override;
+
+    void OnImGuiRender() override;
+
+    LumenPT* GetPipeline() { return m_LumenPT.get(); };
 
 private:
 
