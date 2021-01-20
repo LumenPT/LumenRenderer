@@ -57,7 +57,7 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
      //Generate shadow rays for specular highlights.
     ShadeSpecular<<<1,1>>>();
     //Generate shadow rays for direct lights.
-    ShadeDirect<<<1,1>>>(a_ShadingParams.m_ResolutionAndDepth, a_ShadingParams.m_CurrentRays, a_ShadingParams.m_Intersections, a_ShadingParams.m_ShadowRaysBatch, a_ShadingParams.m_LightBuffer);   
+    ShadeDirect<<<1,1>>>(a_ShadingParams.m_ResolutionAndDepth, a_ShadingParams.m_CurrentRays, a_ShadingParams.m_CurrentIntersections, a_ShadingParams.m_ShadowRaysBatch, a_ShadingParams.m_LightBuffer);   
 }
 
 
