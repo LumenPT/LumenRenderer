@@ -36,24 +36,6 @@ namespace WaveFront
         LightData m_Lights[];
     };
 
-    struct MeshData
-    {
-
-        //Buffer handles
-        //Buffer vertex layouts
-
-    };
-
-    struct MeshBuffer
-    {
-
-        const unsigned int m_Size;
-        MeshData m_Meshes[];
-
-    };
-
-
-
     //Ray & Intersection data and buffers
 
     struct RayData
@@ -77,9 +59,9 @@ namespace WaveFront
         {}
 
         //Read only
-        /*__align__(16)*/ float3 m_Origin;
-        /*__align__(16)*/ float3 m_Direction;
-        /*__align__(16)*/ float3 m_Contribution;
+        float3 m_Origin;
+        float3 m_Direction;
+        float3 m_Contribution;
 
         GPU_ONLY bool IsValidRay() const
         {
@@ -107,7 +89,7 @@ namespace WaveFront
         const unsigned int m_RaysPerPixel;
 
         //Read/Write
-        /*__align__(16)*/ RayData m_Rays[];
+        RayData m_Rays[];
 
         CPU_GPU unsigned int GetSize() const
         {
