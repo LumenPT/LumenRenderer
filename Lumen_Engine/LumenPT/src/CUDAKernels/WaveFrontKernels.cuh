@@ -6,7 +6,7 @@
 //Some defines to make the functions less scary and more readable
 
 #define GPU_ONLY __device__ __forceinline__ //Runs on GPU only, available on GPU only.
-#define CPU_GPU __global__ __forceinline__ //Runs on GPU, available on GPU and CPU.
+#define CPU_GPU __global__ //Runs on GPU, available on GPU and CPU.
 #define CPU_ONLY __host__
 
 using namespace WaveFront;
@@ -46,4 +46,4 @@ CPU_GPU void WriteToOutput(int a_NumPixels, const uint2& a_Dimensions, PixelBuff
 
 
 //Generate some rays based on the thread index.
-CPU_GPU void GenerateRay(int a_NumRays, RayBatch* const a_Buffer, const float3& a_U, const float3& a_V, const float3& a_W, const float3& a_Eye, const int2& a_Dimensions);
+CPU_GPU void GenerateRay(int a_NumRays, RayBatch* const a_Buffer, float3 a_U, float3 a_V, float3 a_W, float3 a_Eye, int2 a_Dimensions);

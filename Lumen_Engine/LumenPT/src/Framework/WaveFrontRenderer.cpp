@@ -1,12 +1,14 @@
 #include "WaveFrontRenderer.h"
 #include "PTMesh.h"
 #include "PTScene.h"
+#include "PTPrimitive.h"
 #include "AccelerationStructure.h"
 #include "Material.h"
 #include "Texture.h"
 #include "MemoryBuffer.h"
 #include "OutputBuffer.h"
 #include "ShaderBindingTableGen.h"
+#include "CudaUtilities.h"
 #include "../Shaders/CppCommon/LumenPTConsts.h"
 #include "../CUDAKernels/WaveFrontKernels.cuh"
 
@@ -19,30 +21,7 @@
 #include <glm/gtx/compatibility.hpp>
 
 
-#include "PTMesh.h"
-#include "PTPrimitive.h"
 
-void CheckOptixRes(const OptixResult& a_res)
-{
-    if(a_res != OPTIX_SUCCESS)
-    {
-        std::string errorName = optixGetErrorName(a_res);
-        std::string errorMessage = optixGetErrorString(a_res);
-
-        std::fprintf(
-            stderr, 
-            "Optix error occured: %s \n Description: %s", 
-            errorName.c_str(), 
-            errorMessage.c_str());
-    }
-}
-
-#if defined(OPTIX_NOCHECK)
-#define CHECKOPTIXRESULT(x)
-#elif defined(OPTIX_CHECK) || defined(_DEBUG)
-#define CHECKOPTIXRESULT(x)\
-    CheckOptixRes(x);
-#endif
 
 WaveFrontRenderer::WaveFrontRenderer(const InitializationData& a_InitializationData)
     :
@@ -50,12 +29,15 @@ m_ServiceLocator({}),
 m_DeviceContext(nullptr),
 m_PipelineRays(nullptr),
 m_PipelineShadowRays(nullptr),
-m_ShaderBindingTableGenerator(nullptr),
+m_PipelineRaysLaunchParams(nullptr),
+m_PipelineShadowRaysLaunchParams(nullptr),
+m_RaysSBTGenerator(nullptr),
+m_ShadowRaysSBTGenerator(nullptr),
 m_ProgramGroups({}),
 m_OutputBuffer(nullptr),
 m_SBTBuffer(nullptr),
 m_TempBuffers(),
-m_PrimRaysPrevFrameBatchIndex(0u),
+m_RayBatchIndices({0}),
 m_ResultBuffer(nullptr),
 m_PixelBuffer3Channels(nullptr),
 m_PixelBuffer1Channel(nullptr),
@@ -75,14 +57,15 @@ m_Initialized(false)
         return;
     }
 
-    m_ShaderBindingTableGenerator = std::make_unique<ShaderBindingTableGenerator>();
+    m_RaysSBTGenerator = std::make_unique<ShaderBindingTableGenerator>();
+    m_ShadowRaysSBTGenerator = std::make_unique<ShaderBindingTableGenerator>();
 
     m_Texture = std::make_unique<Texture>(LumenPTConsts::gs_AssetDirectory + "debugTex.jpg");
 
-    m_ServiceLocator.m_SBTGenerator = m_ShaderBindingTableGenerator.get();
+    m_ServiceLocator.m_SBTGenerator = m_RaysSBTGenerator.get();
     m_ServiceLocator.m_Renderer = this;
 
-    CreateShaderBindingTable();
+    CreateShaderBindingTables();
 
 
 }
@@ -92,17 +75,24 @@ WaveFrontRenderer::~WaveFrontRenderer()
 
 bool WaveFrontRenderer::Initialize(const InitializationData& a_InitializationData)
 {
-    bool success = true;\
+    bool success = true;
     //Temporary(put into init data)
     const std::string shaderPath = LumenPTConsts::gs_ShaderPathBase + "WaveFrontShaders.ptx";
 
     m_Resolution = a_InitializationData.m_Resolution;
-    m_MaxDepth = a_InitializationData.m_MaxDepth;
+    //m_MaxDepth = a_InitializationData.m_MaxDepth;
+    m_MaxDepth = 5;
 
     InitializeContext();
     success &= CreatePipelines(shaderPath);
+    CreatePipelineBuffers();
     CreateOutputBuffer();
     CreateDataBuffers();
+    SetupInitialBufferIndices();
+
+    cudaDeviceSynchronize();
+
+    CHECKLASTCUDAERROR;
 
     return success;
 
@@ -139,6 +129,7 @@ OptixPipelineCompileOptions WaveFrontRenderer::CreatePipelineOptions(
     return pipelineOptions;
 
 }
+
 
 
 bool WaveFrontRenderer::CreatePipelines(const std::string& a_ShaderPath)
@@ -282,6 +273,14 @@ bool WaveFrontRenderer::CreatePipeline(
 
 }
 
+void WaveFrontRenderer::CreatePipelineBuffers()
+{
+
+    m_PipelineRaysLaunchParams = std::make_unique<MemoryBuffer>(sizeof(WaveFront::ResolveRaysLaunchParameters));
+    m_PipelineShadowRaysLaunchParams = std::make_unique<MemoryBuffer>(sizeof(WaveFront::ResolveShadowRaysLaunchParameters));
+
+}
+
 OptixModule WaveFrontRenderer::CreateModule(const std::string& a_PtxPath, const OptixPipelineCompileOptions& a_PipelineOptions) const
 {
 
@@ -359,7 +358,7 @@ std::unique_ptr<AccelerationStructure> WaveFrontRenderer::BuildGeometryAccelerat
     OptixTraversableHandle handle;
     // It is possible to have functionality similar to DX12 Command lists with cuda streams, though it is not required.
     // Just worth mentioning if we want that functionality.
-    CheckOptixRes(optixAccelBuild(m_DeviceContext, 0, &a_BuildOptions, &a_BuildInput, 1, *tempBuffer, sizes.tempSizeInBytes,
+    CHECKOPTIXRESULT(optixAccelBuild(m_DeviceContext, 0, &a_BuildOptions, &a_BuildInput, 1, *tempBuffer, sizes.tempSizeInBytes,
         **resultBuffer, sizes.outputSizeInBytes, &handle, nullptr, 0));
 
     // Needs to return the resulting memory buffer and the traversable handle
@@ -423,10 +422,26 @@ std::unique_ptr<AccelerationStructure> WaveFrontRenderer::BuildInstanceAccelerat
 }
 
 //TODO add necessary data to shaderBindingTable.
-void WaveFrontRenderer::CreateShaderBindingTable()
+void WaveFrontRenderer::CreateShaderBindingTables()
 {
     
+    m_RaysRayGenRecord = m_RaysSBTGenerator->SetRayGen<ResolveRaysRayGenData>();
+    m_RaysHitRecord = m_RaysSBTGenerator->AddHitGroup<ResolveRaysHitData>();
 
+    auto& raysRayGenRecord = m_RaysRayGenRecord.GetRecord();
+    raysRayGenRecord.m_Header = GetProgramGroupHeader(s_RaysRayGenPGName);
+
+    auto& raysHitRecord = m_RaysHitRecord.GetRecord();
+    raysHitRecord.m_Header = GetProgramGroupHeader(s_RaysHitPGName);
+
+    m_ShadowRaysRayGenRecord = m_ShadowRaysSBTGenerator->SetRayGen<ResolveShadowRaysRayGenData>();
+    m_ShadowRaysHitRecord = m_ShadowRaysSBTGenerator->AddHitGroup<ResolveShadowRaysHitData>();
+
+    auto& shadowRaysRayGenRecord = m_ShadowRaysRayGenRecord.GetRecord();
+    shadowRaysRayGenRecord.m_Header = GetProgramGroupHeader(s_ShadowRaysRayGenPGName);
+
+    auto& shadowRaysHitRecord = m_ShadowRaysHitRecord.GetRecord();
+    shadowRaysHitRecord.m_Header = GetProgramGroupHeader(s_ShadowRaysHitPGName);
    
 }
 
@@ -462,10 +477,17 @@ void WaveFrontRenderer::CreateDataBuffers()
     m_ResultBuffer = std::make_unique<MemoryBuffer>(sizeof(ResultBuffer));
     m_ResultBuffer->Write(pixelBufferPtr, 0);
 
+    const unsigned rayBatchEmptySize = sizeof(RayBatch);
+    const unsigned rayDataStructSize = sizeof(RayData);
+
     //Allocate and initialize ray batches.
     for(auto& rayBatch : m_RayBatches)
     {
-        rayBatch = std::make_unique<MemoryBuffer>(sizeof(RayBatch) + numPixels * raysPerPixel * sizeof(RayData));
+        rayBatch = std::make_unique<MemoryBuffer>(
+            static_cast<size_t>(rayBatchEmptySize) + 
+            static_cast<size_t>(numPixels) * 
+            static_cast<size_t>(raysPerPixel) * 
+            static_cast<size_t>(rayDataStructSize));
         rayBatch->Write(numPixels, 0);
         rayBatch->Write(raysPerPixel, sizeof(RayBatch::m_NumPixels));
     }
@@ -484,6 +506,19 @@ void WaveFrontRenderer::CreateDataBuffers()
 
 }
 
+void WaveFrontRenderer::SetupInitialBufferIndices()
+{
+
+    m_RayBatchIndices[static_cast<unsigned>(RayBatchTypeIndex::PRIM_RAYS_PREV_FRAME)] = 0;
+    m_RayBatchIndices[static_cast<unsigned>(RayBatchTypeIndex::CURRENT_RAYS)] = s_NumRayBatchTypes - 1;
+    m_RayBatchIndices[static_cast<unsigned>(RayBatchTypeIndex::SECONDARY_RAYS)] = 1;
+
+    m_HitBufferIndices[static_cast<unsigned>(HitBufferTypeIndex::PRIM_HITS_PREV_FRAME)] = 0;
+    m_HitBufferIndices[static_cast<unsigned>(HitBufferTypeIndex::CURRENT_HITS)] = s_NumHitBufferTypes - 1;
+}
+
+
+
 void WaveFrontRenderer::DebugCallback(unsigned a_Level, const char* a_Tag, const char* a_Message, void*)
 {
 
@@ -495,7 +530,7 @@ void WaveFrontRenderer::AccumulateStackSizes(OptixProgramGroup a_ProgramGroup, O
 {
 
     OptixStackSizes localSizes;
-    optixProgramGroupGetStackSize(a_ProgramGroup, &localSizes);
+    CHECKOPTIXRESULT(optixProgramGroupGetStackSize(a_ProgramGroup, &localSizes));
     a_StackSizes.cssRG = std::max(a_StackSizes.cssRG, localSizes.cssRG);
     a_StackSizes.cssMS = std::max(a_StackSizes.cssMS, localSizes.cssMS);
     a_StackSizes.cssIS = std::max(a_StackSizes.cssIS, localSizes.cssIS);
@@ -513,7 +548,7 @@ ProgramGroupHeader WaveFrontRenderer::GetProgramGroupHeader(const std::string& a
 
     ProgramGroupHeader header{};
 
-    optixSbtRecordPackHeader(m_ProgramGroups.at(a_GroupName), &header);
+    CHECKOPTIXRESULT(optixSbtRecordPackHeader(m_ProgramGroups.at(a_GroupName), &header));
 
     return header;
 
@@ -525,13 +560,21 @@ GLuint WaveFrontRenderer::TraceFrame()
     //Generate Camera rays using CUDA kernel.
     float3 eye, u, v, w;
     m_Camera.GetVectorData(eye, u, v, w);
-
     const WaveFront::DeviceCameraData cameraData(eye, u, v, w);
-    const unsigned int newPrimRayBatchIndex = GetNextPrimRayBatchIndex(false);
-    MemoryBuffer& newPrimaryRayBatch = *m_RayBatches[newPrimRayBatchIndex];
+
+    std::array<unsigned, s_NumRayBatchTypes> batchIndices{};
+    GetRayBatchIndices(0, m_RayBatchIndices, batchIndices);
+    MemoryBuffer& currentRaysBatch = *m_RayBatches[batchIndices[static_cast<unsigned>(RayBatchTypeIndex::CURRENT_RAYS)]];
     
-    const WaveFront::SetupLaunchParameters setupParams(m_Resolution, cameraData, newPrimaryRayBatch.GetDevicePtr<RayBatch>());
+    const WaveFront::SetupLaunchParameters setupParams(m_Resolution, cameraData, currentRaysBatch.GetDevicePtr<RayBatch>());
+
+    CHECKLASTCUDAERROR;
+
     GenerateRays(setupParams);
+
+    WaveFront::ResolveRaysLaunchParameters optixLaunchParams{};
+
+    //optixLaunchParams.m_Common.m_Traversable = dynamic_cast<PTScene&>(*m_Scene).GetSceneAccelerationStructure();
 
     //Loop
     //Trace buffer of rays using Optix ResolveRays pipeline
@@ -540,15 +583,48 @@ GLuint WaveFrontRenderer::TraceFrame()
     for(unsigned waveIndex = 0; waveIndex < m_MaxDepth; ++waveIndex)
     {
 
-        //Launch Optix ResolveRays pipeline
-
+        //Resolution and current depth(, current depth = current wave index)
         const uint3 resolutionAndDepth = make_uint3(m_Resolution.x, m_Resolution.y, waveIndex);
 
-        const unsigned int oldPrimRayBatchIndex = m_PrimRaysPrevFrameBatchIndex;
-        MemoryBuffer& oldPrimRayBatch = *m_RayBatches[oldPrimRayBatchIndex];
-        
+        GetRayBatchIndices(waveIndex, m_RayBatchIndices, m_RayBatchIndices);
+        GetHitBufferIndices(waveIndex, m_HitBufferIndices, m_HitBufferIndices);
+
+        MemoryBuffer& primRaysPrevFrame =   *m_RayBatches[m_RayBatchIndices[static_cast<unsigned>(RayBatchTypeIndex::PRIM_RAYS_PREV_FRAME)]];
+        MemoryBuffer& currentRays =         *m_RayBatches[m_RayBatchIndices[static_cast<unsigned>(RayBatchTypeIndex::CURRENT_RAYS)]];
+        MemoryBuffer& secondaryRays =       *m_RayBatches[m_RayBatchIndices[static_cast<unsigned>(RayBatchTypeIndex::SECONDARY_RAYS)]];
+
+        MemoryBuffer& primHitsPrevFrame =   *m_IntersectionBuffers[m_HitBufferIndices[static_cast<unsigned>(HitBufferTypeIndex::PRIM_HITS_PREV_FRAME)]];
+        MemoryBuffer& currentHits =         *m_IntersectionBuffers[m_HitBufferIndices[static_cast<unsigned>(HitBufferTypeIndex::CURRENT_HITS)]];
+
+
+        /*printf(
+            "Indices: %i %i %i \n",
+            m_RayBatchIndices[static_cast<unsigned>(RayBatchTypeIndex::PRIM_RAYS_PREV_FRAME)],
+            m_RayBatchIndices[static_cast<unsigned>(RayBatchTypeIndex::CURRENT_RAYS)],
+            m_RayBatchIndices[static_cast<unsigned>(RayBatchTypeIndex::SECONDARY_RAYS)]);*/
+
+        optixLaunchParams.m_Common.m_ResolutionAndDepth = resolutionAndDepth;
+        optixLaunchParams.m_Rays = currentRays.GetDevicePtr<RayBatch>();
+        optixLaunchParams.m_Intersections = currentHits.GetDevicePtr<IntersectionBuffer>();
+
+        m_PipelineRaysLaunchParams->Write(optixLaunchParams);
+
+        OptixShaderBindingTable SBT = m_RaysSBTGenerator->GetTableDesc();
+
+        //Launch OptiX ResolveRays pipeline
+        optixLaunch(
+            m_PipelineRays,
+            0,
+            *(*m_PipelineRaysLaunchParams),
+            m_PipelineRaysLaunchParams->GetSize(),
+            &SBT,
+            m_Resolution.x,
+            m_Resolution.y,
+            1);
 
     }
+
+    //printf("\n");
 
     //Trace buffer of shadow rays using Optix ResolveShadowRays.
     //Post processing using CUDA kernel.
@@ -581,57 +657,97 @@ WaveFrontRenderer::ComputedStackSizes WaveFrontRenderer::ComputeStackSizes(
 
 }
 
-unsigned WaveFrontRenderer::GetNextRayBatchIndex(unsigned a_CurrentDepth)
+void WaveFrontRenderer::GetRayBatchIndices(
+    unsigned a_WaveIndex, 
+    const std::array<unsigned, s_NumRayBatchTypes>& a_CurrentIndices, 
+    std::array<unsigned, s_NumRayBatchTypes>& a_Indices)
 {
-    //Never return PrimaryRaysPrevFrame batch index.
-    //To make it easier to select a batch index that is not the PrimaryRaysPrevFrame batch, use only the first and last indices for the primary ray batches.
-    //This makes its easier because you either include the first index (0) when the PrimaryRaysPrevFrame batch is not 0 and run up to lastIndex -1;
-    //or when the PrimaryRaysPrevFrame buffer is 0 run, start from index 1 and run up to lastIndex.
-    //This means that the range is always: (num ray batches - 1)
 
-    const unsigned lastIndex = s_NumRayBatches - 1;
-    const bool usesLastBatch = (m_PrimRaysPrevFrameBatchIndex == (lastIndex));
+    ////Create a copy of the current indices so that even if the references point to the same data it works.
+    //const std::array<unsigned, s_NumRayBatchTypes> tempCurrentIndices = a_CurrentIndices;
 
-    unsigned index = a_CurrentDepth % (lastIndex); //This number includes the lastIndex but since it returns remainder it will never be lastIndex.
-    //Example: lastIndex = 2, 0 % 2 = 0, 1 % 2 = 1, 2 % 2 = 0. This makes the range to be: (num ray batches -1)
+    //GetPrimRayBatchIndex(a_WaveIndex, tempCurrentIndices, a_Indices);
+    //GetCurrentRayBatchIndex(a_WaveIndex, tempCurrentIndices, a_Indices);
+    //GetSecondaryRayBatchIndex(a_WaveIndex, tempCurrentIndices, a_Indices);
 
-    if (usesLastBatch) //If the primary ray batch is on the last index
+    const unsigned lastIndex = s_NumRayBatchTypes - 1;
+    const unsigned primRayBatchIndex = a_CurrentIndices[static_cast<unsigned>(RayBatchTypeIndex::PRIM_RAYS_PREV_FRAME)];
+    const unsigned currentRayBatchIndex = a_CurrentIndices[static_cast<unsigned>(RayBatchTypeIndex::CURRENT_RAYS)];
+    const unsigned secondaryRayBatchIndex = a_CurrentIndices[static_cast<unsigned>(RayBatchTypeIndex::SECONDARY_RAYS)];
+    const bool primRayBatchUsesLastIndex = primRayBatchIndex == lastIndex;
+
+    if(a_WaveIndex == 0)
     {
-        return index; //range = 0 -> lastIndex-1
+        //During wave 0, use the opposite buffer of the Prim Ray Batch in order to generate camera rays.
+        if(primRayBatchUsesLastIndex)
+        {
+            a_Indices[static_cast<unsigned>(RayBatchTypeIndex::CURRENT_RAYS)] = 0;
+            a_Indices[static_cast<unsigned>(RayBatchTypeIndex::SECONDARY_RAYS)] = 1;
+        }
+        else
+        {
+            a_Indices[static_cast<unsigned>(RayBatchTypeIndex::CURRENT_RAYS)] = lastIndex;
+            a_Indices[static_cast<unsigned>(RayBatchTypeIndex::SECONDARY_RAYS)] = lastIndex - 1;
+        }
+
+        //Prim Ray Batch stays the same during wave 0.
+        a_Indices[static_cast<unsigned>(RayBatchTypeIndex::PRIM_RAYS_PREV_FRAME)] = primRayBatchIndex;
+
     }
-    else //the primary ray batch is on the first index
+
+    else if(a_WaveIndex == 1)
     {
-        return index + 1; //range = 1 -> lastIndex
+
+        //Prim Ray Batch changes to the Current Ray Batch from wave 0 at wave 1.
+        a_Indices[static_cast<unsigned>(RayBatchTypeIndex::PRIM_RAYS_PREV_FRAME)] = currentRayBatchIndex;
+
+        //During wave 1 the Secondary Ray Batch from wave 0 becomes the Current Ray Batch.
+        a_Indices[static_cast<unsigned>(RayBatchTypeIndex::CURRENT_RAYS)] = secondaryRayBatchIndex;
+
+        //During wave 1 the Primary Ray Batch changes and the original batch becomes the Secondary Ray Batch.
+        a_Indices[static_cast<unsigned>(RayBatchTypeIndex::SECONDARY_RAYS)] = primRayBatchIndex;
+
     }
+
+    else
+    {
+
+        //Prim Ray Batch stays the same after wave 1.
+        a_Indices[static_cast<unsigned>(RayBatchTypeIndex::PRIM_RAYS_PREV_FRAME)] = primRayBatchIndex;
+
+        //During wave 1+ the Secondary Ray Batch from the previous wave becomes the Current Ray Batch and vice versa to swap the batches around.
+        a_Indices[static_cast<unsigned>(RayBatchTypeIndex::CURRENT_RAYS)] = secondaryRayBatchIndex;
+        a_Indices[static_cast<unsigned>(RayBatchTypeIndex::SECONDARY_RAYS)] = currentRayBatchIndex;
+
+    }
+
+
 
 }
 
-unsigned WaveFrontRenderer::GetNextPrimRayBatchIndex(bool a_Overwrite)
+void WaveFrontRenderer::GetHitBufferIndices(
+    unsigned a_WaveIndex, 
+    const std::array<unsigned, s_NumHitBufferTypes>& a_CurrentIndices, 
+    std::array<unsigned, s_NumHitBufferTypes>& a_Indices)
 {
 
-    const unsigned lastIndex = s_NumRayBatches - 1;
-    const bool usesLastBatch = (m_PrimRaysPrevFrameBatchIndex == (lastIndex));
-
-    if(usesLastBatch)
+    if(a_WaveIndex == 1)
     {
-        if (a_Overwrite)
-        {
-            m_PrimRaysPrevFrameBatchIndex = 0;
-        }
 
-        return 0;
+        const unsigned currentHitBufferIndex = a_CurrentIndices[static_cast<unsigned>(HitBufferTypeIndex::CURRENT_HITS)];
+        a_Indices[static_cast<unsigned>(HitBufferTypeIndex::PRIM_HITS_PREV_FRAME)] = currentHitBufferIndex;
+
     }
     else
     {
-        if(a_Overwrite)
-        {
-            m_PrimRaysPrevFrameBatchIndex = lastIndex;
-        }
 
-        return lastIndex;
+        a_Indices = a_CurrentIndices;
+
     }
 
 }
+
+
 
 
 
@@ -705,9 +821,9 @@ std::unique_ptr<Lumen::ILumenPrimitive> WaveFrontRenderer::CreatePrimitive(Primi
 
     prim->m_Material = a_PrimitiveData.m_Material;
 
-    prim->m_RecordHandle = m_ShaderBindingTableGenerator->AddHitGroup<DevicePrimitive>();
+    prim->m_RecordHandle = m_RaysSBTGenerator->AddHitGroup<DevicePrimitive>();
     auto& rec = prim->m_RecordHandle.GetRecord();
-    rec.m_Header = GetProgramGroupHeader("Hit");
+    rec.m_Header = GetProgramGroupHeader(s_RaysHitPGName);
     rec.m_Data.m_VertexBuffer = prim->m_VertBuffer->GetDevicePtr<Vertex>();
     rec.m_Data.m_IndexBuffer = prim->m_IndexBuffer->GetDevicePtr<unsigned int>();
     rec.m_Data.m_Material = static_cast<Material*>(prim->m_Material.get())->GetDeviceMaterial();

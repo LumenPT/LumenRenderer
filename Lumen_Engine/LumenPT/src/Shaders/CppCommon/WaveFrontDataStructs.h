@@ -3,6 +3,7 @@
 #include <Optix/optix.h>
 #include <Cuda/cuda/helpers.h>
 #include <assert.h>
+#include <cstdio>
 
 /*TODO: check if usage of textures can benefit performance
  *for buffers like intersectionBuffer or OutputBuffer.
@@ -60,9 +61,9 @@ namespace WaveFront
 
         CPU_GPU RayData()
             :
-        m_Origin(make_float3(0.f,0.f,0.f)),
-        m_Direction(make_float3(0.f, 0.f, 0.f)),
-        m_Contribution(make_float3(0.f, 0.f, 0.f))
+        m_Origin(make_float3(0.f)),
+        m_Direction(make_float3(0.f)),
+        m_Contribution(make_float3(0.f))
         {}
 
         CPU_GPU RayData(
@@ -76,9 +77,9 @@ namespace WaveFront
         {}
 
         //Read only
-        float3 m_Origin;
-        float3 m_Direction;
-        float3 m_Contribution;
+        /*__align__(16)*/ float3 m_Origin;
+        /*__align__(16)*/ float3 m_Direction;
+        /*__align__(16)*/ float3 m_Contribution;
 
         GPU_ONLY bool IsValidRay() const
         {
@@ -106,7 +107,7 @@ namespace WaveFront
         const unsigned int m_RaysPerPixel;
 
         //Read/Write
-        RayData m_Rays[];
+        /*__align__(16)*/ RayData m_Rays[];
 
         CPU_GPU unsigned int GetSize() const
         {
@@ -118,6 +119,9 @@ namespace WaveFront
             unsigned int a_PixelIndex,
             unsigned int a_RayIndex)
         {
+            /*RayData* rayPtr =  &m_Rays[GetRayIndex(a_PixelIndex, a_RayIndex)];
+            printf("Buffer Start: %p, Buffer ptr: %p , Buffer Offset: %lli ", m_Rays, rayPtr, (reinterpret_cast<char*>(rayPtr) - reinterpret_cast<char*>(m_Rays)));*/
+
             m_Rays[GetRayIndex(a_PixelIndex, a_RayIndex)] = a_Data;
         }
 
@@ -464,7 +468,7 @@ namespace WaveFront
             const RayBatch* const a_PrimaryRaysPrevFrame,
             const IntersectionBuffer* a_PrimaryIntersectionsPrevFrame,
             const RayBatch* const a_CurrentRays,
-            const IntersectionBuffer* a_Intersections,
+            const IntersectionBuffer* a_CurrentIntersections,
             RayBatch* a_SecondaryRays,
             ShadowRayBatch* a_ShadowRayBatch,
             const LightBuffer* a_Lights)
@@ -473,7 +477,7 @@ namespace WaveFront
         m_PrimaryRaysPrevFrame(a_PrimaryRaysPrevFrame),
         m_PrimaryIntersectionsPrevFrame(a_PrimaryIntersectionsPrevFrame),
         m_CurrentRays(a_CurrentRays),
-        m_Intersections(a_Intersections),
+        m_CurrentIntersections(a_CurrentIntersections),
         m_LightBuffer(a_Lights),
         m_SecondaryRays(a_SecondaryRays),
         m_ShadowRaysBatch(a_ShadowRayBatch)
@@ -486,7 +490,7 @@ namespace WaveFront
         const RayBatch* const m_PrimaryRaysPrevFrame;
         const IntersectionBuffer* const m_PrimaryIntersectionsPrevFrame;
         const RayBatch* const m_CurrentRays;
-        const IntersectionBuffer* const m_Intersections;
+        const IntersectionBuffer* const m_CurrentIntersections;
         //TODO: Geometry buffer
         //TODO: Light buffer
         const LightBuffer* const m_LightBuffer;
@@ -557,6 +561,22 @@ namespace WaveFront
         ShadowRayBatch* m_ShadowRays;
         ResultBuffer* m_Results;
 
+    };
+
+    struct ResolveRaysRayGenData
+    {
+    };
+
+    struct ResolveRaysHitData
+    {
+    };
+
+    struct ResolveShadowRaysRayGenData
+    {
+    };
+
+    struct ResolveShadowRaysHitData
+    {
     };
 
 }

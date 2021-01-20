@@ -1,12 +1,24 @@
 #include "WaveFrontKernels.cuh"
-
-#include "../../vendor/Include/Cuda/cuda/helpers.h"
 #include "../Shaders/CppCommon/RenderingUtility.h"
 
-#include "device_launch_parameters.h"
+#include "../../vendor/Include/Cuda/cuda/helpers.h"
+#include "../../vendor/Include/Cuda/device_launch_parameters.h"
 #include "../../vendor/Include/sutil/vec_math.h"
+#include <cstdio>
 
 using namespace WaveFront;
+
+CPU_ONLY void CheckLastCudaError()
+{
+
+    cudaError err = cudaGetLastError();
+    if(err != cudaSuccess)
+    {
+        printf("CUDA error occured: %s : %s", cudaGetErrorName(err), cudaGetErrorString(err));
+        abort();
+    }
+
+}
 
 CPU_ONLY void GenerateRays(const SetupLaunchParameters& a_SetupParams)
 {
@@ -20,7 +32,14 @@ CPU_ONLY void GenerateRays(const SetupLaunchParameters& a_SetupParams)
     const int blockSize = 256;
     const int numBlocks = (numRays + blockSize - 1) / blockSize;
 
-    GenerateRay <<<numBlocks, blockSize >>> (numRays, a_SetupParams.m_PrimaryRays, u, v, w, eye, dimensions);
+    cudaDeviceSynchronize();
+    CheckLastCudaError();
+
+    GenerateRay <<<numBlocks, blockSize>>> (numRays, a_SetupParams.m_PrimaryRays, u, v, w, eye, dimensions);
+
+    cudaDeviceSynchronize();
+    CheckLastCudaError();
+
 }
 
 
@@ -34,11 +53,11 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
      */
 
      //Generate secondary rays.
-    ShadeIndirect<<<1,1>>>(a_ShadingParams.m_ResolutionAndDepth, a_ShadingParams.m_Intersections, a_ShadingParams.m_CurrentRays, a_ShadingParams.m_SecondaryRays); 
+    ShadeIndirect<<<1,1>>>(a_ShadingParams.m_ResolutionAndDepth, a_ShadingParams.m_CurrentIntersections, a_ShadingParams.m_CurrentRays, a_ShadingParams.m_SecondaryRays); 
      //Generate shadow rays for specular highlights.
     ShadeSpecular<<<1,1>>>();
     //Generate shadow rays for direct lights.
-    ShadeDirect<<<1,1>>>(a_ShadingParams.m_ResolutionAndDepth, a_ShadingParams.m_Intersections, a_ShadingParams.m_ShadowRaysBatch, a_ShadingParams.m_LightBuffer);   
+    ShadeDirect<<<1,1>>>(a_ShadingParams.m_ResolutionAndDepth, a_ShadingParams.m_CurrentIntersections, a_ShadingParams.m_ShadowRaysBatch, a_ShadingParams.m_LightBuffer);   
 }
 
 
@@ -233,15 +252,27 @@ CPU_GPU void WriteToOutput(int a_NumPixels, const uint2& a_Dimensions, PixelBuff
     }
 }
 
-CPU_GPU void GenerateRay(int a_NumRays, RayBatch* const a_Buffer, const float3& a_U, const float3& a_V,
-                         const float3& a_W,
-                         const float3& a_Eye, const int2& a_Dimensions)
+CPU_GPU void GenerateRay(
+    int a_NumRays, 
+    RayBatch* const a_Buffer, 
+    float3 a_U, 
+    float3 a_V,
+    float3 a_W,
+    float3 a_Eye, 
+    int2 a_Dimensions)
 {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     int stride = blockDim.x * gridDim.x;
 
+    
+
+    //printf("NumPixel RayBatch: %i \n", a_Buffer->GetSize());
+    //printf("NumRays RayBatch: %i \n", a_Buffer->m_RaysPerPixel);
+
     for (int i = index; i < a_NumRays; i += stride)
     {
+
+        
         //Convert the index into the screen dimensions.
         const int screenY = i / a_Dimensions.x;
         const int screenX = i - (screenY * a_Dimensions.x);
@@ -253,8 +284,11 @@ CPU_GPU void GenerateRay(int a_NumRays, RayBatch* const a_Buffer, const float3& 
         direction.x = -(direction.x * 2.0f - 1.0f);
         direction.y = -(direction.y * 2.0f - 1.0f);
         direction = normalize(direction.x * a_U + direction.y * a_V + a_W);
-
+        
         RayData ray { origin, direction, make_float3(1.f, 1.f, 1.f) };
         a_Buffer->SetRay(ray, i, 0);
+
+        //printf("Stride: %i, NumRays: %i, Pixel index: %i \n", stride, a_NumRays, i);
+
     }
 }
