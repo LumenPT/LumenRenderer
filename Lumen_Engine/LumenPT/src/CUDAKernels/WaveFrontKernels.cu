@@ -149,7 +149,9 @@ CPU_GPU void ShadeDirect(
     	{
             auto& l = a_Lights[i];
         	// light vertices are in world space
-			sRayDir = normalize(float3(l.) - sRayOrigin);
+        	//????????? idk wtf????? this may not work ????? to find light position in world space???? uhhhh???? heh?
+            float3 pos = (l.m_Lights->p0 + l.m_Lights->p1 + l.m_Lights->p2) * 0.33f;
+			sRayDir = normalize(pos - sRayOrigin);
     	}
 
         // hacky epsilon value... very temporary
