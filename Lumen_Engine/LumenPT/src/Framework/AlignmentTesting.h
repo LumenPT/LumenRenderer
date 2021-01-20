@@ -18,8 +18,9 @@ public:
 	 */
     void RunTest()
 	{
+		constexpr int offset = 16;
 		constexpr int numElements = 3;
-		m_MemBuffer.Resize(3 * sizeof(Test1));
+		m_MemBuffer.Resize(3 * sizeof(Test1) + offset);
 
 		//Fill data with expected values.
 		Test1 data[numElements];
@@ -28,9 +29,11 @@ public:
 		data[2] = Test1{7, 8, 9, 10,  11, 11, 11, 11 };
 
 		//Upload to the GPU.
-		m_MemBuffer.Write(data, 3 * sizeof(Test1), 0);
+		m_MemBuffer.Write(data, 3 * sizeof(Test1), offset);
+		char* ptr = (char*)m_MemBuffer.GetDevicePtr();
+		ptr += offset;
 
-		PrintTest1OnGPU(static_cast<Test1*>(m_MemBuffer.GetDevicePtr()), numElements);
+		PrintTest1OnGPU(reinterpret_cast<Test1*>(ptr), numElements);
 		cudaDeviceSynchronize();
 	}
 
