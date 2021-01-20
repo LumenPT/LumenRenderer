@@ -106,3 +106,96 @@ struct Reservoir
     float weight;
     LightSample sample;
 };
+
+struct CDF
+{
+    __device__ void Reset()
+    {
+        sum = 0.f;
+        size = 0;
+    }
+
+    /*
+     * Insert an element into the CDF.
+     * The element will have the index of the current CDF size.
+     * The weight is appended to the total weight sum and size is incremented by one.
+     */
+    __device__ void Insert(float a_Weight)
+    {
+        //Important: This is not thread safe. Build from a single thread.
+        sum += a_Weight;
+        data[size] = sum;
+        ++size;
+    }
+
+    /*
+     * Get the index and value stored for an input value.
+     * The input value has to be normalized between 0.0 and 1.0, both inclusive.
+     * The found element's index and PDF will be stored in the passed references.
+     */
+    __device__ void Get(float a_Value, unsigned& a_LightIndex, float& a_LightPdf)
+    {
+        //Index is not normalized in the actual set.
+        int index = static_cast<int>(sum * a_Value);
+
+        //Binary search
+        int entry = BinarySearch(0, size - 1, index);
+
+        float higher = data[entry];
+        float lower = 0.f;
+        if (entry != 0)
+        {
+            lower = data[entry - 1];
+        }
+
+        //Pdf is proportional to all entries in the dataset.
+        a_LightIndex = entry;
+        a_LightPdf = (higher - lower) / sum;
+    }
+
+    /*
+     *
+     */
+    __device__ int BinarySearch(int a_First, int a_Last, float a_Value)
+    {
+        assert(a_Value >= 0.f && a_Value <= sum && "Binary search key must be within set bounds.");
+        assert(a_First >= 0 && a_First <= a_Last);
+
+        //Get the middle element.
+        const int center = a_First + (a_Last - a_First) / 2;
+
+        //Upper and lower bound.
+        float higher = data[center];
+        float lower = 0.f;
+
+        if(center != 0)
+        {
+            lower = data[center - 1];
+        }
+
+        //Element is smaller, so search in the lower half of the data range.
+        if (a_Value < lower)
+        {
+            return BinarySearch(a_First, center - 1, a_Value);
+        }
+
+        //Bigger, so search in the upper half of the data range.
+        if (a_Value > higher)
+        {
+            return BinarySearch(center + 1, a_Last, a_Value);
+        }
+
+        //The value lies between the lower and higher bound, so the current element is the right one.
+        return center;
+    }
+
+    float sum;
+    unsigned size;
+    float data[];
+};
+
+struct LightBagEntry
+{
+    unsigned lightIndex;
+    float pdf;
+};
