@@ -38,7 +38,7 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
      //Generate shadow rays for specular highlights.
     ShadeSpecular<<<1,1>>>();
     //Generate shadow rays for direct lights.
-    ShadeDirect<<<1,1>>>(a_ShadingParams.m_ResolutionAndDepth, a_ShadingParams.m_Intersections, a_ShadingParams.m_ShadowRaysBatch, a_ShadingParams.m_LightBuffer);   
+    ShadeDirect<<<1,1>>>(a_ShadingParams.m_ResolutionAndDepth, a_ShadingParams.m_CurrentRays, a_ShadingParams.m_Intersections, a_ShadingParams.m_ShadowRaysBatch, a_ShadingParams.m_LightBuffer);   
 }
 
 
@@ -110,7 +110,6 @@ CPU_GPU void ShadeDirect(
      *              find intersecting triangle properties through MeshID & TriangleID
      */
 
-    float3 direction = { 0.0f,1.0f,0.0f };
     float3 potRadiance = { 0.5f,0.5f,0.5f };
 
 
@@ -147,54 +146,6 @@ CPU_GPU void ShadeDirect(
     	
         // using intersection buffer & current ray batch, with helper functions, which take pixel index etc.
     }
-
-    return;
-	
-    {
-	    for (unsigned int i = pixelIndex; i < numPixels; i += stride)
-	    {
-	        //temp and probably shit, looping through all lights in buffer (rather than those nearby)
-	        for (unsigned int j = 0; i < a_Lights->m_Size; j++)
-	        {
-	            direction = normalize(a_Lights->m_Lights[j].m_Position);// - intersectionPosition;
-
-	        }
-
-	        //write shadow ray direction etc. to shadow ray batch   // TEMP
-	        //ShadowRayData shadowRay(
-	        //    origin,
-	        //    direction,
-	        //    1000.f,
-	        //    potRadiance,    //not sure what this represents
-	        //    ResultBuffer::OutputChannel::DIRECT
-	        //);
-    		//pass in correct indices & shadow ray data
-	        //a_ShadowRays->SetShadowRay(shadowRay, a_ResolutionAndDepth.z, i, 0);
-	    }
-    }
-
-    //ShadowRayData shadowRay(
-    //    origin,
-    //    direction,
-    //    1000.f,
-    //    potRadiance,    //not sure what this represents
-    //    ResultBuffer::OutputChannel::DIRECT
-    //);
-	//a_ShadowRays->SetShadowRay(shadowRay, a_ResolutionAndDepth.z, numPixels, 0);
-
-    // look at generaterays function
-
-    // just need a pointer to start of buffer to start processing data
-
-    // need to get material and properties from intersection
-
-    // call BRDF functions
-
-    // buffers may require regular device pointers(?)
-
-    // hold array of buffer handles, so you can look up the buffers that belong to a certain mesh
-        // then inside those buffers you look up the triangleID to get the properties of the actual triangle
-
 }
 
 CPU_GPU void ShadeSpecular()
