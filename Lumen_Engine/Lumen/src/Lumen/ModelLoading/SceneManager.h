@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "Lumen/Renderer/ILumenResources.h"
+#include "VolumeManager.h"
 
 namespace Lumen
 {
@@ -24,7 +25,7 @@ namespace Lumen
 
 namespace Lumen
 {
-	
+
 	class SceneManager
 	{
 	public:
@@ -43,12 +44,12 @@ namespace Lumen
 			// Also contain lights
 			// Also contain camera
 			// Also contain sky??  
-			
+
 			// Generic resource. Perhaps contains volumes, too?
 		};
-		
+
 		SceneManager() {};
-		~SceneManager(){};
+		~SceneManager() {};
 
 		SceneManager(SceneManager&) = delete;
 		SceneManager(SceneManager&&) = delete;
@@ -59,11 +60,14 @@ namespace Lumen
 
 		void SetPipeline(LumenRenderer& a_Renderer);
 
+		//TODO: public for testing, make this private later
+		VolumeManager m_VolumeManager;
+
 		// Load OpenVDB?
-		
+
 	private:
 		std::map<std::string, GLTFResource> m_LoadedScenes;
-		
+
 		//std::vector<std::shared_ptr<Texture>> LoadTextures(fx::gltf::Document& a_Doc, std::string a_Filepath);
 		//std::vector<std::shared_ptr<Texture>> LoadMaterials(fx::gltf::Document& a_Doc, GLTFResource& a_resource);
 		//std::vector<std::shared_ptr<Texture>> LoadMeshes(fx::gltf::Document& a_Doc, std::string a_Filepath);
@@ -76,7 +80,7 @@ namespace Lumen
 		std::vector<uint8_t> LoadBinary(fx::gltf::Document& a_Doc, uint32_t a_AccessorIndx);
 		uint32_t GetComponentCount(fx::gltf::Accessor& a_Accessor);
 		uint32_t GetComponentSize(fx::gltf::Accessor& a_Accessor);
-		
+
 		LumenRenderer* m_RenderPipeline;
 
 	};

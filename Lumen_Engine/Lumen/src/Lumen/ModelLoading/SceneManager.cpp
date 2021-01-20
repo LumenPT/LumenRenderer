@@ -35,6 +35,7 @@ Lumen::SceneManager::GLTFResource* Lumen::SceneManager::LoadGLTF(std::string a_P
 void Lumen::SceneManager::SetPipeline(LumenRenderer& a_Renderer)
 {
 	m_RenderPipeline = &a_Renderer;
+	m_VolumeManager.SetPipeline(a_Renderer);
 }
 
 void Lumen::SceneManager::LoadNodes(fx::gltf::Document& a_Doc, GLTFResource& a_Res, glm::mat4& a_TransformMat)
@@ -144,7 +145,7 @@ void Lumen::SceneManager::LoadMeshes(fx::gltf::Document& a_Doc, GLTFResource& a_
 
 
 			auto indexBufferAcc = a_Doc.accessors[fxPrim.indices];
-		    auto indexBin = LoadBinary(a_Doc, fxPrim.indices);
+			auto indexBin = LoadBinary(a_Doc, fxPrim.indices);
 			auto indexSize = GetComponentSize(indexBufferAcc); // indices are are always a single component
 			assert(indexSize <= 4);
 
