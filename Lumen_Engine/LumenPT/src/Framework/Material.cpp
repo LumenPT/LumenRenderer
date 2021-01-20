@@ -39,6 +39,12 @@ void Material::SetDiffuseTexture(std::shared_ptr<Lumen::ILumenTexture> a_NewDiff
     m_DeviceMaterialDirty = true;
 }
 
+void Material::SetEmission(const glm::vec3& a_EmissiveVal)
+{
+    m_EmissiveColor = make_float3(a_EmissiveVal.x, a_EmissiveVal.y, a_EmissiveVal.z);
+    m_DeviceMaterialDirty = true;
+}
+
 glm::vec4 Material::GetDiffuseColor() const
 {
     return glm::vec4(m_DiffuseColor.x, m_DiffuseColor.y, m_DiffuseColor.z, m_DiffuseColor.w);
@@ -53,9 +59,10 @@ DeviceMaterial Material::CreateDeviceMaterial() const
 {
     DeviceMaterial m;
     m.m_DiffuseColor = m_DiffuseColor;
+    m.m_EmissionColor = m_EmissiveColor;
     if (m_DiffuseTexture)
     {
-        m.m_DiffuseTexture = **m_DiffuseTexture;        
+        m.m_DiffuseTexture = **m_DiffuseTexture;
     }
 
     return m;

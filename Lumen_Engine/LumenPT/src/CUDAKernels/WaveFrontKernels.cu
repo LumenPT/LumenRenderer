@@ -147,11 +147,18 @@ CPU_GPU void ShadeDirect(
     	//Temporary forloop. Obviously not how you would wanna figure out which lights to sample
         for (int i = 0; i < a_Lights->m_Size; i++) // choose arbitrary light (temp) to figure out direction it.
     	{
-			sRayDir = normalize(a_Lights->m_Lights[i].m_Position - sRayOrigin);
+            auto& l = a_Lights[i];
+        	// light vertices are in world space
+        	//????????? idk wtf????? this may not work ????? to find light position in world space???? uhhhh???? heh?
+            float3 pos = (l.m_Lights->p0 + l.m_Lights->p1 + l.m_Lights->p2) * 0.33f;
+			sRayDir = normalize(pos - sRayOrigin);
     	}
 
         // hacky epsilon value... very temporary
         sRayOrigin = sRayOrigin + (sRayDir * 0.001f);
+
+        //check for fallof check what color the potential radiance is
+    		//check if there is something related to contribution calculation
     	
         ShadowRayData shadowRay(
             sRayOrigin,

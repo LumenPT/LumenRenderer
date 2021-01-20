@@ -38,6 +38,7 @@ public:
 	struct MaterialData
 	{
 		glm::vec4 m_DiffuseColor;
+		glm::vec4 m_EmssivionVal;
 		std::shared_ptr<Lumen::ILumenTexture> m_DiffuseTexture;
 		std::shared_ptr<Lumen::ILumenTexture> m_NormalMap;
 	};

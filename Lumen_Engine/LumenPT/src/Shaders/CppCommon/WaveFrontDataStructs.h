@@ -2,6 +2,8 @@
 
 #include <Optix/optix.h>
 #include <Cuda/cuda/helpers.h>
+#include "ModelStructs.h"
+#include "ReSTIRData.h"
 #include <assert.h>
 #include <cstdio>
 
@@ -18,22 +20,26 @@ namespace WaveFront
 
     //Scene data
 
-    struct LightData    //placeholder contents
-    {
-        LightData(float a_Intensity, float3 a_Color);
+    //struct LightData    //placeholder contents
+    //{
+    //    LightData(float a_Intensity, float3 a_Color);
 
-        // material or something?
-        float m_Intensity;
-        float3 m_Color;
-        float3 m_Position;
-    };
+    //    // material or something?
+    //    float3 m_Position;
+    //    DevicePrimitive* m_LightMesh;
+
+    //	
+    //};
 
     struct LightBuffer  //placeholder contents
     {
         LightBuffer(unsigned int a_Size);
 
         const unsigned int m_Size;
-        LightData m_Lights[];
+        //LightData m_Lights[];
+
+        TriangleLight m_Lights[];
+
     };
 
     //Ray & Intersection data and buffers
