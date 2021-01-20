@@ -57,7 +57,7 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
      //Generate shadow rays for specular highlights.
     ShadeSpecular<<<1,1>>>();
     //Generate shadow rays for direct lights.
-    ShadeDirect<<<1,1>>>(a_ShadingParams.m_ResolutionAndDepth, a_ShadingParams.m_CurrentIntersections, a_ShadingParams.m_ShadowRaysBatch, a_ShadingParams.m_LightBuffer);   
+    ShadeDirect<<<1,1>>>(a_ShadingParams.m_ResolutionAndDepth, a_ShadingParams.m_CurrentRays, a_ShadingParams.m_Intersections, a_ShadingParams.m_ShadowRaysBatch, a_ShadingParams.m_LightBuffer);   
 }
 
 
@@ -104,6 +104,7 @@ CPU_ONLY void GenerateMotionVectors()
 
 CPU_GPU void ShadeDirect(
     const uint3& a_ResolutionAndDepth, 
+	const RayBatch* const a_CurrentRays,
     const IntersectionBuffer* const a_Intersections, 
     ShadowRayBatch* const a_ShadowRays,
     const LightBuffer* const a_Lights)
@@ -112,55 +113,58 @@ CPU_GPU void ShadeDirect(
         // I get triangleID and meshID, so need to use that to look up actual data based on those IDs
         // 
 
-    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    int pixelIndex = blockIdx.x * blockDim.x + threadIdx.x;  //use in intersection and shadowray batches
     int stride = blockDim.x * gridDim.x;
 
-    const int numRays =a_ResolutionAndDepth.x * a_ResolutionAndDepth.y;
+	//max number of pixels
+    const int numPixels = a_ResolutionAndDepth.x * a_ResolutionAndDepth.y;
 
-    float3 origin = { 0.0f,0.0f,0.0f };
+	//outgoing shadow ray origin
+
+	//into intersection buffer
+	
 
     /*
      * a_ShadingParams->m_Intersections.m_Intersections[i]  //      intersection data
      *              find intersecting triangle properties through MeshID & TriangleID
      */
 
-    float3 direction = { 0.0f,0.0f,0.0f };
-    float3 potRadiance = { 0.0f,0.0f,0.0f };
+    float3 potRadiance = { 0.5f,0.5f,0.5f };
 
-    for (unsigned int i = index; i < numRays; i += stride)
+
+	const auto& currIntersection =  a_Intersections->GetIntersection(pixelIndex);
+	
+    if(pixelIndex < numPixels && currIntersection.IsIntersection())
     {
-        //temp and probably shit, looping through all lights in buffer (rather than those nearby)
-        for (unsigned int j = 0; i < a_Lights->m_Size; j++)
-        {
-            direction = normalize(a_Lights->m_Lights[j].m_Position);// - intersectionPosition;
+	    // get position of intersection
+        unsigned int currRayIndex = a_CurrentRays->GetRayIndex(pixelIndex, /*Temp*/ a_CurrentRays->GetSize());   //figure out ray index
+        const auto& currRay = a_CurrentRays->GetRay(pixelIndex, currRayIndex);
 
-        }
+    	//World space??
+        float3 sRayOrigin = currRay.m_Origin + (currRay.m_Direction * currIntersection.m_IntersectionT);
+        float3 sRayDir {0.0f, 1.0f, 0.0f};
+    	
+    	//Temporary forloop. Obviously not how you would wanna figure out which lights to sample
+        for (int i = 0; i < a_Lights->m_Size; i++) // choose arbitrary light (temp) to figure out direction it.
+    	{
+			sRayDir = normalize(a_Lights->m_Lights[i].m_Position - sRayOrigin);
+    	}
 
-        //write shadow ray direction etc. to shadow ray batch   // TEMP
+        // hacky epsilon value... very temporary
+        sRayOrigin = sRayOrigin + (sRayDir * 0.001f);
+    	
         ShadowRayData shadowRay(
-            origin,
-            direction,
+            sRayOrigin,
+            sRayDir,
             1000.f,
-            potRadiance,    //not sure what this represents
+            potRadiance,    // contribution/importance(?) value
             ResultBuffer::OutputChannel::DIRECT
         );
 
-        a_ShadowRays->SetShadowRay(shadowRay, a_ResolutionAndDepth.z, i, 0);
+        a_ShadowRays->SetShadowRay(shadowRay, a_ResolutionAndDepth.z, pixelIndex, currRayIndex);
+    	
+        // using intersection buffer & current ray batch, with helper functions, which take pixel index etc.
     }
-
-    // look at generaterays function
-
-    // just need a pointer to start of buffer to start processing data
-
-    // need to get material and properties from intersection
-
-    // call BRDF functions
-
-    // buffers may require regular device pointers(?)
-
-    // hold array of buffer handles, so you can look up the buffers that belong to a certain mesh
-        // then inside those buffers you look up the triangleID to get the properties of the actual triangle
-
 }
 
 CPU_GPU void ShadeSpecular()

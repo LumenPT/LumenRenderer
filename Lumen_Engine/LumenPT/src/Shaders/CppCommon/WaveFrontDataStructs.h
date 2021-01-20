@@ -382,7 +382,7 @@ namespace WaveFront
             const ShadowRayData& a_Data, 
             unsigned int a_DepthIndex, 
             unsigned int a_PixelIndex, 
-            unsigned int a_RayIndex)
+            unsigned int a_RayIndex = 0)
         {
             m_ShadowRays[GetShadowRayIndex(a_DepthIndex, a_PixelIndex, a_RayIndex)] = a_Data;
         }

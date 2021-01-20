@@ -2,6 +2,7 @@
 #include "PTMesh.h"
 #include "PTScene.h"
 #include "PTPrimitive.h"
+#include "PTVolume.h"
 #include "AccelerationStructure.h"
 #include "Material.h"
 #include "Texture.h"
@@ -19,7 +20,6 @@
 #include "Cuda/cuda_runtime.h"
 #include "Optix/optix_stubs.h"
 #include <glm/gtx/compatibility.hpp>
-
 
 
 
@@ -852,4 +852,11 @@ std::shared_ptr<Lumen::ILumenMaterial> WaveFrontRenderer::CreateMaterial(const M
 std::shared_ptr<Lumen::ILumenScene> WaveFrontRenderer::CreateScene(SceneData a_SceneData)
 {
     return std::make_shared<PTScene>(a_SceneData, m_ServiceLocator);
+}
+
+std::shared_ptr<Lumen::ILumenVolume> WaveFrontRenderer::CreateVolume(const std::string& a_FilePath)
+{
+    std::shared_ptr<Lumen::ILumenVolume> volume = std::make_shared<PTVolume>(a_FilePath, m_ServiceLocator);
+
+    return volume;
 }

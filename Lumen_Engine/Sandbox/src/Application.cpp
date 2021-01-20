@@ -86,7 +86,10 @@ public:
 		manager.SetPipeline(*m_ContextLayer->GetPipeline());
 		auto res = manager.LoadGLTF(p_string);
 
-
+		std::string vndbFilePath = { p.string() };
+		vndbFilePath.append("/Sandbox/assets/volume/Sphere.vndb");
+		auto volumeRes = manager.m_VolumeManager.LoadVDB(vndbFilePath);
+		
 		auto lumenPT = m_ContextLayer->GetPipeline();
 
 		LumenRenderer::SceneData scData = {};
@@ -102,6 +105,8 @@ public:
 
 		auto someMatidk = mesh->m_Transform.GetTransformationMatrix();
 
+		auto volume = lumenPT->m_Scene->AddVolume();
+		volume->SetVolume(volumeRes->m_Volume);
 	}
 
 	~Sandbox()
