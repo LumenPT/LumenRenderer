@@ -51,6 +51,8 @@ target_include_directories(CudaPTX PUBLIC
 	"vendor/Include/Cuda"
 	"src/Shaders"
 	"src/Shaders/CppCommon"
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/openvdb/nanovdb"
+	${NANOVDB_HEADERS}
 )
 
 set(CUDA_FILES_OUTPUT "")
