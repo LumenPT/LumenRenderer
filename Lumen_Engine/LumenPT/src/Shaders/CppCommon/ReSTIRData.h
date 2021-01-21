@@ -133,7 +133,7 @@ struct CDF
      * The input value has to be normalized between 0.0 and 1.0, both inclusive.
      * The found element's index and PDF will be stored in the passed references.
      */
-    __device__ void Get(float a_Value, unsigned& a_LightIndex, float& a_LightPdf)
+    __device__ void Get(float a_Value, unsigned& a_LightIndex, float& a_LightPdf) const
     {
         //Index is not normalized in the actual set.
         int index = static_cast<int>(sum * a_Value);
@@ -156,7 +156,7 @@ struct CDF
     /*
      *
      */
-    __device__ int BinarySearch(int a_First, int a_Last, float a_Value)
+    __device__ int BinarySearch(int a_First, int a_Last, float a_Value) const
     {
         assert(a_Value >= 0.f && a_Value <= sum && "Binary search key must be within set bounds.");
         assert(a_First >= 0 && a_First <= a_Last);
@@ -196,6 +196,6 @@ struct CDF
 
 struct LightBagEntry
 {
-    unsigned lightIndex;
+    TriangleLight light;
     float pdf;
 };
