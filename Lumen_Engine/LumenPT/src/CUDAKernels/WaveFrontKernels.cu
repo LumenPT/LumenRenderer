@@ -4,6 +4,7 @@
 #include "../../vendor/Include/Cuda/cuda/helpers.h"
 #include "../../vendor/Include/Cuda/device_launch_parameters.h"
 #include "../../vendor/Include/sutil/vec_math.h"
+#include "../../vendor/Include/Cuda/curand.h"
 #include <cstdio>
 
 using namespace WaveFront;
@@ -57,7 +58,7 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
      //Generate shadow rays for specular highlights.
     ShadeSpecular<<<1,1>>>();
     //Generate shadow rays for direct lights.
-    ShadeDirect<<<1,1>>>(a_ShadingParams.m_ResolutionAndDepth, a_ShadingParams.m_CurrentRays, a_ShadingParams.m_CurrentIntersections, a_ShadingParams.m_ShadowRaysBatch, a_ShadingParams.m_LightBuffer);   
+    ShadeDirect<<<1,1>>>(a_ShadingParams.m_ResolutionAndDepth, a_ShadingParams.m_CurrentRays, a_ShadingParams.m_CurrentIntersections, a_ShadingParams.m_ShadowRaysBatch, a_ShadingParams.m_LightBuffer, a_ShadingParams.m_CDF);   
 }
 
 
@@ -107,56 +108,68 @@ CPU_GPU void ShadeDirect(
 	const RayBatch* const a_CurrentRays,
     const IntersectionBuffer* const a_Intersections, 
     ShadowRayBatch* const a_ShadowRays,
-    const LightBuffer* const a_Lights)
+    const LightBuffer* const a_Lights,
+    CDF* const a_CDF)
 {
-    // need access to light & mesh
-        // I get triangleID and meshID, so need to use that to look up actual data based on those IDs
-        //
-        //
-
     int pixelIndex = blockIdx.x * blockDim.x + threadIdx.x;  //use in intersection and shadowray batches
     int stride = blockDim.x * gridDim.x;
 
 	//max number of pixels
     const int numPixels = a_ResolutionAndDepth.x * a_ResolutionAndDepth.y;
 
-	//outgoing shadow ray origin
-
-	//into intersection buffer
-	
-
-    /*
-     * a_ShadingParams->m_Intersections.m_Intersections[i]  //      intersection data
-     *              find intersecting triangle properties through MeshID & TriangleID
-     */
-
     float3 potRadiance = { 0.5f,0.5f,0.5f };
 
+    //keep CDF pointer here
+	//extract light index from CDF. just random float or smth
 
+	//PDF probability density funciton
+
+	//calculate potential radiance vector from PDF and BRDF
+	
 	const auto& currIntersection =  a_Intersections->GetIntersection(pixelIndex);
 	
     if(pixelIndex < numPixels && currIntersection.IsIntersection())
     {
+        unsigned int lightIndex = 0;
+        float lightPDF = 0;
+        float random = 0.69f;
+        //float random = [=] __device__(float s){ s ^= s << 13, s ^= s >> 17, s ^= s << 5; return s; }; //trying cuda lambdas without success.
+    	
+        // uint seed = WangHash( pathIdx * 17 + R0  /* well-seeded xor32 is all you need */ );
+        //unsigned int WangHash(unsigned int s) { s = (s ^ 61) ^ (s >> 16), s *= 9, s = s ^ (s >> 4), s *= 0x27d4eb2d, s = s ^ (s >> 15); return s; }
+        //unsigned int RandomInt(unsigned int& s) { s ^= s << 13, s ^= s >> 17, s ^= s << 5; return s; }
+        //float RandomFloat(unsigned int& s) { return RandomInt(s) * 2.3283064365387e-10f; }
+    	
+        //pass in random number into CDF
+        //get PDF from it
+        a_CDF->Get(random, lightIndex, lightPDF);
+
 	    // get position of intersection
         unsigned int currRayIndex = a_CurrentRays->GetRayIndex(pixelIndex, /*Temp*/ a_CurrentRays->GetSize());   //figure out ray index
         const auto& currRay = a_CurrentRays->GetRay(pixelIndex, currRayIndex);
 
     	//World space??
         float3 sRayOrigin = currRay.m_Origin + (currRay.m_Direction * currIntersection.m_IntersectionT);
-        float3 sRayDir {0.0f, 1.0f, 0.0f};
+
+        const auto& light = a_Lights[lightIndex];
+
+    	//worldspace position of emissive triangle
+        const float3 lightPos = (light.m_Lights->p0 + light.m_Lights->p1 + light.m_Lights->p2) * 0.33f;
+        float3 sRayDir = normalize(lightPos - sRayOrigin);
+
+        // apply epsilon... very hacky, very temporary
+        sRayOrigin = sRayOrigin + (sRayDir * 0.001f);
     	
     	//Temporary forloop. Obviously not how you would wanna figure out which lights to sample
-        for (int i = 0; i < a_Lights->m_Size; i++) // choose arbitrary light (temp) to figure out direction it.
-    	{
-            auto& l = a_Lights[i];
-        	// light vertices are in world space
-        	//????????? idk wtf????? this may not work ????? to find light position in world space???? uhhhh???? heh?
-            float3 pos = (l.m_Lights->p0 + l.m_Lights->p1 + l.m_Lights->p2) * 0.33f;
-			sRayDir = normalize(pos - sRayOrigin);
-    	}
+   //     for (int i = 0; i < a_Lights->m_Size; i++) // choose arbitrary light (temp) to figure out direction it.
+   // 	{
+   //         auto& l = a_Lights[i];
+   //     	// light vertices are in world space
+   //     	//????????? idk wtf????? this may not work ????? to find light position in world space???? uhhhh???? heh?
+   //         float3 pos = (l.m_Lights->p0 + l.m_Lights->p1 + l.m_Lights->p2) * 0.33f;
+			//sRayDir = normalize(pos - sRayOrigin);
+   // 	}
 
-        // hacky epsilon value... very temporary
-        sRayOrigin = sRayOrigin + (sRayDir * 0.001f);
 
         //check for fallof check what color the potential radiance is
     		//check if there is something related to contribution calculation
@@ -170,8 +183,6 @@ CPU_GPU void ShadeDirect(
         );
 
         a_ShadowRays->SetShadowRay(shadowRay, a_ResolutionAndDepth.z, pixelIndex, currRayIndex);
-    	
-        // using intersection buffer & current ray batch, with helper functions, which take pixel index etc.
     }
 }
 
