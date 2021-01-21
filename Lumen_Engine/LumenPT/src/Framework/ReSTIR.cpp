@@ -42,7 +42,7 @@ CPU_ONLY void ReSTIR::Initialize(const ReSTIRSettings& a_Settings)
 		m_Reservoirs[0].Resize(size);
 		m_Reservoirs[1].Resize(size);
 
-		//Reset both buffers.
+		//Reset both buffers. TODO: Wait after every task may not be needed. Check if it is required between kernel calls.
 		ResetReservoirs(numReservoirs, static_cast<Reservoir*>(m_Reservoirs[0].GetDevicePtr()));
 		ResetReservoirs(numReservoirs, static_cast<Reservoir*>(m_Reservoirs[1].GetDevicePtr()));
 	}
@@ -68,19 +68,31 @@ CPU_ONLY void ReSTIR::Run(const WaveFront::IntersectionBuffer* const a_CurrentIn
 		}
 		m_Lights.Write(&a_Lights[0], size, 0);
 	}
+
+	//Light bag generation
+	const auto numGridCellsX = std::ceilf(m_Settings.width / static_cast<float>(m_Settings.pixelGridSize));
+	const auto numGridCellsY = ceilf(m_Settings.height / static_cast<float>(m_Settings.pixelGridSize));
+	const size_t numLightBags = static_cast<size_t>(numGridCellsX) * static_cast<size_t>(numGridCellsY);
 	{
-	    //Light bag buffer containing indices of lights. One bag per grid cell.
-		const auto numGridCellsX = std::ceilf(m_Settings.width / static_cast<float>(m_Settings.pixelGridSize));
-		const auto numGridCellsY = ceilf(m_Settings.height / static_cast<float>(m_Settings.pixelGridSize));
-		const size_t numLightBags = static_cast<size_t>(numGridCellsX) * static_cast<size_t>(numGridCellsY);
             
-		const size_t size = sizeof(int) * m_Settings.numLightsPerBag * numLightBags;
+		const size_t size = sizeof(LightBagEntry) * m_Settings.numLightsPerBag * numLightBags;
 		if (m_LightBags.GetSize() < size)
 		{
 			m_LightBags.Resize(size);
 		}
 	}
-	//TODO CDF
+	//CDF
+	{
+		//Allocate enough memory for the CDF struct and the fixed sum entries.
+		m_CDF.Resize(sizeof(CDF) + (a_Lights.size() * sizeof(float)));
+
+		//Insert the light data in the CDF.
+		FillCDF(static_cast<CDF*>(m_CDF.GetDevicePtr()), static_cast<TriangleLight*>(m_Lights.GetDevicePtr()), m_Lights.GetSize());
+	}
+	//Fill light bags with values from the CDF.
+	{
+		FillLightBags(numLightBags, static_cast<CDF*>(m_CDF.GetDevicePtr()), static_cast<LightBagEntry*>(m_LightBags.GetDevicePtr()));
+	}
 
 	//TODO run algorithm.
 
