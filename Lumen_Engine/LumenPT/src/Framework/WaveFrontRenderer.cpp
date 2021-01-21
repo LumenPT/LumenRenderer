@@ -37,7 +37,6 @@ m_ShadowRaysSBTGenerator(nullptr),
 m_ProgramGroups({}),
 m_OutputBuffer(nullptr),
 m_SBTBuffer(nullptr),
-m_TempBuffers(),
 m_RayBatchIndices({0}),
 m_ResultBuffer(nullptr),
 m_PixelBuffer3Channels(nullptr),
@@ -346,92 +345,15 @@ OptixProgramGroup WaveFrontRenderer::CreateProgramGroup(OptixProgramGroupDesc a_
 
 }
 
-std::unique_ptr<AccelerationStructure> WaveFrontRenderer::BuildGeometryAccelerationStructure(
-    const OptixAccelBuildOptions& a_BuildOptions, 
-    const OptixBuildInput& a_BuildInput)
-{
-
-    // Let Optix compute how much memory the output buffer and the temporary buffer need to have, then create these buffers
-    OptixAccelBufferSizes sizes;
-    CHECKOPTIXRESULT(optixAccelComputeMemoryUsage(m_DeviceContext, &a_BuildOptions, &a_BuildInput, 1, &sizes));
-    MemoryBuffer tempBuffer(sizes.tempSizeInBytes);
-    std::unique_ptr<MemoryBuffer> resultBuffer = std::make_unique<MemoryBuffer>(sizes.outputSizeInBytes);
-
-    OptixTraversableHandle handle;
-    // It is possible to have functionality similar to DX12 Command lists with cuda streams, though it is not required.
-    // Just worth mentioning if we want that functionality.
-    CHECKOPTIXRESULT(optixAccelBuild(m_DeviceContext, 0, &a_BuildOptions, &a_BuildInput, 1, *tempBuffer, sizes.tempSizeInBytes,
-        **resultBuffer, sizes.outputSizeInBytes, &handle, nullptr, 0));
-
-    // Needs to return the resulting memory buffer and the traversable handle
-    return std::make_unique<AccelerationStructure>(handle, std::move(resultBuffer));
-
-}
-
-std::unique_ptr<AccelerationStructure> WaveFrontRenderer::BuildInstanceAccelerationStructure(std::vector<OptixInstance> a_Instances)
-{
-
-
-    auto instanceBuffer = MemoryBuffer(a_Instances.size() * sizeof(OptixInstance));
-    instanceBuffer.Write(a_Instances.data(), a_Instances.size() * sizeof(OptixInstance), 0);
-    OptixBuildInput buildInput = {};
-
-    assert(*instanceBuffer % OPTIX_INSTANCE_BYTE_ALIGNMENT == 0);
-
-    buildInput.type = OPTIX_BUILD_INPUT_TYPE_INSTANCES;
-    buildInput.instanceArray.instances = *instanceBuffer;
-    buildInput.instanceArray.numInstances = static_cast<uint32_t>(a_Instances.size());
-    buildInput.instanceArray.aabbs = 0;
-    buildInput.instanceArray.numAabbs = 0;
-
-    OptixAccelBuildOptions buildOptions = {};
-    // Based on research, it is more efficient to continuously be rebuilding most instance acceleration structures rather than to update them
-    // This is because updating an acceleration structure reduces its quality, thus lowering the ray traversal speed through it
-    // while rebuilding will preserve this quality. Since instance acceleration structures are cheap to build, it is faster to rebuild them than deal
-    // with the lower traversal speed
-    buildOptions.buildFlags = OPTIX_BUILD_FLAG_PREFER_FAST_TRACE;
-    buildOptions.operation = OPTIX_BUILD_OPERATION_BUILD;
-    buildOptions.motionOptions.numKeys = 0; // No motion
-
-    OptixAccelBufferSizes sizes;
-    CHECKOPTIXRESULT(optixAccelComputeMemoryUsage(
-        m_DeviceContext,
-        &buildOptions,
-        &buildInput,
-        1,
-        &sizes));
-
-    auto tempBuffer = MemoryBuffer(sizes.tempSizeInBytes);
-    auto resultBuffer = std::make_unique<MemoryBuffer>(sizes.outputSizeInBytes);
-
-    OptixTraversableHandle handle;
-    CHECKOPTIXRESULT(optixAccelBuild(
-        m_DeviceContext,
-        0,
-        &buildOptions,
-        &buildInput,
-        1,
-        *tempBuffer,
-        sizes.tempSizeInBytes,
-        **resultBuffer,
-        sizes.outputSizeInBytes,
-        &handle,
-        nullptr,
-        0));
-
-    return std::make_unique<AccelerationStructure>(handle, std::move(resultBuffer));;
-    
-}
-
 //TODO add necessary data to shaderBindingTable.
 void WaveFrontRenderer::CreateShaderBindingTables()
 {
 
     //Do these need a data struct if there is no data needed per "shader"??
     
-    m_RaysRayGenRecord = m_RaysSBTGenerator->SetRayGen<void>();
-    m_RaysHitRecord = m_RaysSBTGenerator->AddHitGroup<void>();
-    m_RaysMissRecord = m_RaysSBTGenerator->AddMiss<void>();
+    m_RaysRayGenRecord = m_RaysSBTGenerator->SetRayGen<ResolveRaysRayGenData>();
+    m_RaysHitRecord = m_RaysSBTGenerator->AddHitGroup<ResolveRaysHitData>();
+    m_RaysMissRecord = m_RaysSBTGenerator->AddMiss<ResolveRaysMissData>();
 
     auto& raysRayGenRecord = m_RaysRayGenRecord.GetRecord();
     raysRayGenRecord.m_Header = GetProgramGroupHeader(s_RaysRayGenPGName);
@@ -439,9 +361,9 @@ void WaveFrontRenderer::CreateShaderBindingTables()
     auto& raysHitRecord = m_RaysHitRecord.GetRecord();
     raysHitRecord.m_Header = GetProgramGroupHeader(s_RaysHitPGName);
 
-    m_ShadowRaysRayGenRecord = m_ShadowRaysSBTGenerator->SetRayGen<void>();
-    m_ShadowRaysHitRecord = m_ShadowRaysSBTGenerator->AddHitGroup<void>();
-    m_ShadowRaysMissRecord = m_ShadowRaysSBTGenerator->AddMiss<void>();
+    m_ShadowRaysRayGenRecord = m_ShadowRaysSBTGenerator->SetRayGen<ResolveShadowRaysRayGenData>();
+    m_ShadowRaysHitRecord = m_ShadowRaysSBTGenerator->AddHitGroup<ResolveShadowRaysHitData>();
+    m_ShadowRaysMissRecord = m_ShadowRaysSBTGenerator->AddMiss<ResolveShadowRaysMissData>();
 
     auto& shadowRaysRayGenRecord = m_ShadowRaysRayGenRecord.GetRecord();
     shadowRaysRayGenRecord.m_Header = GetProgramGroupHeader(s_ShadowRaysRayGenPGName);
@@ -530,8 +452,26 @@ void WaveFrontRenderer::CreateDataBuffers()
 
 
     const unsigned LightBufferEmptySize = sizeof(LightBuffer);
+    const unsigned LightDataStructSize = sizeof(TriangleLight);
 
-    m_LightBufferTemp = std::make_unique<MemoryBuffer>(0);
+    m_LightBufferTemp = std::make_unique<MemoryBuffer>(
+        static_cast<size_t>(LightBufferEmptySize) +
+        static_cast<size_t>(3) *
+        static_cast<size_t>(LightDataStructSize));
+
+
+    TriangleLight lights[3] = {
+        {{0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}},
+        {{0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}},
+        {{0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}} };
+    LightBuffer tempLightBuffer(3,lights);
+
+
+    m_LightBufferTemp->Write(
+        &tempLightBuffer, 
+        static_cast<size_t>(LightBufferEmptySize) +
+        static_cast<size_t>(3) *
+        static_cast<size_t>(LightDataStructSize));
 
 }
 
@@ -838,6 +778,83 @@ void WaveFrontRenderer::GetHitBufferIndices(
 
 
 
+
+std::unique_ptr<AccelerationStructure> WaveFrontRenderer::BuildGeometryAccelerationStructure(
+    const OptixAccelBuildOptions& a_BuildOptions,
+    const OptixBuildInput& a_BuildInput)
+{
+
+    // Let Optix compute how much memory the output buffer and the temporary buffer need to have, then create these buffers
+    OptixAccelBufferSizes sizes;
+    CHECKOPTIXRESULT(optixAccelComputeMemoryUsage(m_DeviceContext, &a_BuildOptions, &a_BuildInput, 1, &sizes));
+    MemoryBuffer tempBuffer(sizes.tempSizeInBytes);
+    std::unique_ptr<MemoryBuffer> resultBuffer = std::make_unique<MemoryBuffer>(sizes.outputSizeInBytes);
+
+    OptixTraversableHandle handle;
+    // It is possible to have functionality similar to DX12 Command lists with cuda streams, though it is not required.
+    // Just worth mentioning if we want that functionality.
+    CHECKOPTIXRESULT(optixAccelBuild(m_DeviceContext, 0, &a_BuildOptions, &a_BuildInput, 1, *tempBuffer, sizes.tempSizeInBytes,
+        **resultBuffer, sizes.outputSizeInBytes, &handle, nullptr, 0));
+
+    // Needs to return the resulting memory buffer and the traversable handle
+    return std::make_unique<AccelerationStructure>(handle, std::move(resultBuffer));
+
+}
+
+std::unique_ptr<AccelerationStructure> WaveFrontRenderer::BuildInstanceAccelerationStructure(std::vector<OptixInstance> a_Instances)
+{
+
+
+    auto instanceBuffer = MemoryBuffer(a_Instances.size() * sizeof(OptixInstance));
+    instanceBuffer.Write(a_Instances.data(), a_Instances.size() * sizeof(OptixInstance), 0);
+    OptixBuildInput buildInput = {};
+
+    assert(*instanceBuffer % OPTIX_INSTANCE_BYTE_ALIGNMENT == 0);
+
+    buildInput.type = OPTIX_BUILD_INPUT_TYPE_INSTANCES;
+    buildInput.instanceArray.instances = *instanceBuffer;
+    buildInput.instanceArray.numInstances = static_cast<uint32_t>(a_Instances.size());
+    buildInput.instanceArray.aabbs = 0;
+    buildInput.instanceArray.numAabbs = 0;
+
+    OptixAccelBuildOptions buildOptions = {};
+    // Based on research, it is more efficient to continuously be rebuilding most instance acceleration structures rather than to update them
+    // This is because updating an acceleration structure reduces its quality, thus lowering the ray traversal speed through it
+    // while rebuilding will preserve this quality. Since instance acceleration structures are cheap to build, it is faster to rebuild them than deal
+    // with the lower traversal speed
+    buildOptions.buildFlags = OPTIX_BUILD_FLAG_PREFER_FAST_TRACE;
+    buildOptions.operation = OPTIX_BUILD_OPERATION_BUILD;
+    buildOptions.motionOptions.numKeys = 0; // No motion
+
+    OptixAccelBufferSizes sizes;
+    CHECKOPTIXRESULT(optixAccelComputeMemoryUsage(
+        m_DeviceContext,
+        &buildOptions,
+        &buildInput,
+        1,
+        &sizes));
+
+    auto tempBuffer = MemoryBuffer(sizes.tempSizeInBytes);
+    auto resultBuffer = std::make_unique<MemoryBuffer>(sizes.outputSizeInBytes);
+
+    OptixTraversableHandle handle;
+    CHECKOPTIXRESULT(optixAccelBuild(
+        m_DeviceContext,
+        0,
+        &buildOptions,
+        &buildInput,
+        1,
+        *tempBuffer,
+        sizes.tempSizeInBytes,
+        **resultBuffer,
+        sizes.outputSizeInBytes,
+        &handle,
+        nullptr,
+        0));
+
+    return std::make_unique<AccelerationStructure>(handle, std::move(resultBuffer));;
+
+}
 
 std::unique_ptr<MemoryBuffer> WaveFrontRenderer::InterleaveVertexData(const PrimitiveData& a_MeshData)
 {

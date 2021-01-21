@@ -4,6 +4,7 @@
 #include "MemoryBuffer.h"
 #include "Camera.h"
 #include "PTServiceLocator.h"
+#include "../Shaders/CppCommon/WaveFrontDataStructs.h"
 
 #include "Renderer/LumenRenderer.h"
 
@@ -186,20 +187,18 @@ private:
     std::unique_ptr<ShaderBindingTableGenerator> m_RaysSBTGenerator;
     std::unique_ptr<ShaderBindingTableGenerator> m_ShadowRaysSBTGenerator;
 
-    RecordHandle<void> m_RaysRayGenRecord;
-    RecordHandle<void> m_RaysHitRecord;
-    RecordHandle<void> m_RaysMissRecord;
+    RecordHandle<WaveFront::ResolveRaysRayGenData> m_RaysRayGenRecord;
+    RecordHandle<WaveFront::ResolveRaysHitData> m_RaysHitRecord;
+    RecordHandle<WaveFront::ResolveRaysMissData> m_RaysMissRecord;
 
-    RecordHandle<void> m_ShadowRaysRayGenRecord;
-    RecordHandle<void> m_ShadowRaysHitRecord;
-    RecordHandle<void> m_ShadowRaysMissRecord;
+    RecordHandle<WaveFront::ResolveShadowRaysRayGenData> m_ShadowRaysRayGenRecord;
+    RecordHandle<WaveFront::ResolveShadowRaysHitData> m_ShadowRaysHitRecord;
+    RecordHandle<WaveFront::ResolveShadowRaysMissData> m_ShadowRaysMissRecord;
 
     std::map<std::string, OptixProgramGroup> m_ProgramGroups;
 
     std::unique_ptr<OutputBuffer> m_OutputBuffer;
     std::unique_ptr<MemoryBuffer> m_SBTBuffer;
-
-    std::vector<std::unique_ptr<MemoryBuffer>> m_TempBuffers;
 
     //Data buffers for the wavefront algorithm.
 

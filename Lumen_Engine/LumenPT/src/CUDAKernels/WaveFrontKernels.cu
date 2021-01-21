@@ -111,7 +111,8 @@ CPU_GPU void ShadeDirect(
 {
     // need access to light & mesh
         // I get triangleID and meshID, so need to use that to look up actual data based on those IDs
-        // 
+        //
+        //
 
     int pixelIndex = blockIdx.x * blockDim.x + threadIdx.x;  //use in intersection and shadowray batches
     int stride = blockDim.x * gridDim.x;

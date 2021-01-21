@@ -6,10 +6,21 @@
 #include "ReSTIRData.h"
 #include <assert.h>
 #include <cstdio>
+#include <array>
 
 /*TODO: check if usage of textures can benefit performance
  *for buffers like intersectionBuffer or OutputBuffer.
 */
+
+#if defined CPU_ONLY
+#undef CPU_ONLY
+#endif
+#if defined CPU_GPU
+#undef CPU_GPU
+#endif
+#if defined GPU_ONLY
+#undef GPU_ONLY
+#endif
 
 #define CPU_ONLY __host__
 #define CPU_GPU __host__ __device__
@@ -20,25 +31,37 @@ namespace WaveFront
 
     //Scene data
 
-    //struct LightData    //placeholder contents
-    //{
-    //    LightData(float a_Intensity, float3 a_Color);
-
-    //    // material or something?
-    //    float3 m_Position;
-    //    DevicePrimitive* m_LightMesh;
-
-    //	
-    //};
-
-    struct LightBuffer  //placeholder contents
+    struct LightBuffer
     {
-        LightBuffer(unsigned int a_Size);
+
+        CPU_GPU LightBuffer(unsigned int a_Size)
+            :
+        m_Size(a_Size),
+        m_Lights()
+        {}
+
+        //TEMPORARY CONSTRUCTOR, not very good practice probs... TODO: Figure out if there is a way to make it better.
+        CPU_ONLY LightBuffer(unsigned int a_Size, TriangleLight a_Lights[])
+            :
+        m_Size(a_Size),
+        m_Lights()
+        {
+
+            m_LightPtr = reinterpret_cast<TriangleLight*>(malloc(static_cast<size_t>(m_Size) * sizeof(TriangleLight)));
+            if(m_LightPtr != nullptr)
+            {
+                memcpy(m_LightPtr, a_Lights, static_cast<size_t>(m_Size) * sizeof(TriangleLight));
+            }
+
+        }
 
         const unsigned int m_Size;
-        //LightData m_Lights[];
 
-        TriangleLight m_Lights[];
+        union
+        {
+            TriangleLight m_Lights[];
+            TriangleLight* m_LightPtr;
+        };
 
     };
 
@@ -559,11 +582,19 @@ namespace WaveFront
     {
     };
 
+    struct ResolveRaysMissData
+    {
+    };
+
     struct ResolveShadowRaysRayGenData
     {
     };
 
     struct ResolveShadowRaysHitData
+    {
+    };
+
+    struct ResolveShadowRaysMissData
     {
     };
 
