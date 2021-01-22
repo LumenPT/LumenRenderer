@@ -1,11 +1,9 @@
 #include "PTScene.h"
 #include "AccelerationStructure.h"
-
 #include "PTMesh.h"
-
 #include "PTMeshInstance.h"
-
-#include "WaveFrontRenderer.h"
+#include "PTServiceLocator.h"
+#include "RendererDefinition.h"
 
 PTScene::PTScene(LumenRenderer::SceneData& a_SceneData, PTServiceLocator& a_ServiceLocator)
     : m_Services(a_ServiceLocator)

@@ -25,6 +25,7 @@
 #define CPU_ONLY __host__
 #define CPU_GPU __host__ __device__
 #define GPU_ONLY __device__
+#define INLINE __forceinline__
 
 namespace WaveFront
 {
@@ -92,7 +93,7 @@ namespace WaveFront
         float3 m_Direction;
         float3 m_Contribution;
 
-        GPU_ONLY bool IsValidRay() const
+        GPU_ONLY INLINE bool IsValidRay() const
         {
 
             return !(m_Direction.x == 0.f &&
@@ -120,12 +121,12 @@ namespace WaveFront
         //Read/Write
         RayData m_Rays[];
 
-        CPU_GPU unsigned int GetSize() const
+        CPU_GPU INLINE unsigned int GetSize() const
         {
             return m_NumPixels * m_RaysPerPixel;
         }
 
-        GPU_ONLY void SetRay(
+        GPU_ONLY INLINE void SetRay(
             const RayData& a_Data, 
             unsigned int a_PixelIndex,
             unsigned int a_RayIndex)
@@ -136,14 +137,14 @@ namespace WaveFront
             m_Rays[GetRayIndex(a_PixelIndex, a_RayIndex)] = a_Data;
         }
 
-        GPU_ONLY const RayData& GetRay(unsigned int a_PixelIndex, const unsigned int a_RayIndex) const
+        GPU_ONLY INLINE const RayData& GetRay(unsigned int a_PixelIndex, const unsigned int a_RayIndex) const
         {
 
             return m_Rays[GetRayIndex(a_PixelIndex, a_RayIndex)];
 
         }
 
-        GPU_ONLY const RayData& GetRay(unsigned int a_RayIndex) const
+        GPU_ONLY INLINE const RayData& GetRay(unsigned int a_RayIndex) const
         {
             assert(a_RayIndex < GetSize());
 
@@ -152,7 +153,7 @@ namespace WaveFront
         }
 
         //Gets an index to a Ray in the m_Rays array, taking into account the number of pixels and the number of rays per pixel.
-        GPU_ONLY unsigned int GetRayIndex(unsigned int a_PixelIndex, const unsigned int a_RayIndex) const
+        GPU_ONLY INLINE unsigned int GetRayIndex(unsigned int a_PixelIndex, const unsigned int a_RayIndex) const
         {
 
             assert(a_PixelIndex < m_NumPixels&& a_RayIndex < m_RaysPerPixel);
@@ -187,7 +188,7 @@ namespace WaveFront
         m_MeshAndInstanceId(a_MeshAndInstanceId)
         {}
 
-        CPU_GPU bool IsIntersection() const
+        CPU_GPU INLINE bool IsIntersection() const
         {
             return (m_IntersectionT > 0.f);
         }
@@ -217,12 +218,12 @@ namespace WaveFront
         //Read/Write
         IntersectionData m_Intersections[];
 
-        CPU_GPU unsigned int GetSize() const
+        CPU_GPU INLINE unsigned int GetSize() const
         {
             return m_NumPixels * m_IntersectionsPerPixel;
         }
 
-        GPU_ONLY void SetIntersection(
+        GPU_ONLY INLINE void SetIntersection(
             const IntersectionData& a_Data, 
             unsigned int a_PixelIndex, 
             unsigned int a_IntersectionIndex)
@@ -232,14 +233,14 @@ namespace WaveFront
 
         }
 
-        GPU_ONLY  const IntersectionData& GetIntersection(unsigned int a_PixelIndex, unsigned int a_IntersectionIndex)
+        GPU_ONLY INLINE const IntersectionData& GetIntersection(unsigned int a_PixelIndex, unsigned int a_IntersectionIndex)
         {
 
             return m_Intersections[GetRayIndex(a_PixelIndex, a_IntersectionIndex)];
 
         }
 
-        GPU_ONLY const IntersectionData& GetIntersection(unsigned int a_RayIndex) const
+        GPU_ONLY INLINE const IntersectionData& GetIntersection(unsigned int a_RayIndex) const
         {
             assert(a_RayIndex < GetSize());
 
@@ -248,7 +249,7 @@ namespace WaveFront
         }
 
         //Gets a index to IntersectionData in the m_Intersections array, taking into account the number of pixels and the number of rays per pixel.
-        GPU_ONLY unsigned int GetRayIndex(unsigned int a_PixelIndex, unsigned int a_IntersectionIndex) const
+        GPU_ONLY INLINE unsigned int GetRayIndex(unsigned int a_PixelIndex, unsigned int a_IntersectionIndex) const
         {
 
             assert(a_PixelIndex < m_NumPixels && a_IntersectionIndex < m_IntersectionsPerPixel);
@@ -276,14 +277,14 @@ namespace WaveFront
         //Read/Write
         float3 m_Pixels[];
 
-        GPU_ONLY void SetPixel(const float3& a_value, unsigned int a_PixelIndex, unsigned int a_ChannelIndex)
+        GPU_ONLY INLINE void SetPixel(const float3& a_value, unsigned int a_PixelIndex, unsigned int a_ChannelIndex)
         {
 
             m_Pixels[GetPixelIndex(a_PixelIndex, a_ChannelIndex)] = a_value;
 
         }
 
-        GPU_ONLY const float3& GetPixel(unsigned int a_PixelIndex, unsigned int a_ChannelIndex) const
+        GPU_ONLY INLINE const float3& GetPixel(unsigned int a_PixelIndex, unsigned int a_ChannelIndex) const
         {
 
             return m_Pixels[GetPixelIndex(a_PixelIndex, a_ChannelIndex)];
@@ -291,7 +292,7 @@ namespace WaveFront
         }
 
         //Gets an index to a pixel in the m_Pixels array, taking into account number of channels per pixel.
-        GPU_ONLY unsigned int GetPixelIndex(unsigned int a_PixelIndex, unsigned int a_ChannelIndex) const
+        GPU_ONLY INLINE unsigned int GetPixelIndex(unsigned int a_PixelIndex, unsigned int a_ChannelIndex) const
         {
 
             assert(a_PixelIndex < m_NumPixels&& a_ChannelIndex < m_ChannelsPerPixel);
@@ -384,12 +385,12 @@ namespace WaveFront
         //Read/Write
         ShadowRayData m_ShadowRays[];
 
-        CPU_GPU unsigned int GetSize() const
+        CPU_GPU INLINE unsigned int GetSize() const
         {
             return m_MaxDepth * m_NumPixels * m_RaysPerPixel;
         }
 
-        GPU_ONLY void SetShadowRay(
+        GPU_ONLY INLINE void SetShadowRay(
             const ShadowRayData& a_Data, 
             unsigned int a_DepthIndex, 
             unsigned int a_PixelIndex, 
@@ -398,7 +399,7 @@ namespace WaveFront
             m_ShadowRays[GetShadowRayIndex(a_DepthIndex, a_PixelIndex, a_RayIndex)] = a_Data;
         }
 
-        GPU_ONLY const ShadowRayData& GetShadowRayData(unsigned int a_DepthIndex, unsigned int a_PixelIndex, unsigned int a_RayIndex) const
+        GPU_ONLY INLINE const ShadowRayData& GetShadowRayData(unsigned int a_DepthIndex, unsigned int a_PixelIndex, unsigned int a_RayIndex) const
         {
 
             return m_ShadowRays[GetShadowRayIndex(a_DepthIndex, a_PixelIndex, a_RayIndex)];
@@ -406,7 +407,7 @@ namespace WaveFront
         }
 
         //Gets a index to a ShadowRay in the m_ShadowRays array, taking into account the max dept, number of pixels and number of rays per pixel.
-        GPU_ONLY unsigned int GetShadowRayIndex(unsigned int a_DepthIndex, unsigned int a_PixelIndex, unsigned int a_RayIndex) const
+        GPU_ONLY INLINE unsigned int GetShadowRayIndex(unsigned int a_DepthIndex, unsigned int a_PixelIndex, unsigned int a_RayIndex) const
         {
 
             assert(a_DepthIndex < m_MaxDepth&& a_PixelIndex < m_NumPixels&& a_RayIndex < m_RaysPerPixel);

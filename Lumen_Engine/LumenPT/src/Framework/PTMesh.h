@@ -6,7 +6,7 @@
 
 #include <map>
 
-class PTServiceLocator;
+struct PTServiceLocator;
 class AccelerationStructure;
 class PTPrimitive;
 

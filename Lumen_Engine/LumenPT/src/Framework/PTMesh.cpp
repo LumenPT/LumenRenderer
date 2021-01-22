@@ -2,7 +2,7 @@
 #include "AccelerationStructure.h"
 #include "PTPrimitive.h"
 #include "PTServiceLocator.h"
-#include "WaveFrontRenderer.h"
+#include "RendererDefinition.h"
 
 #include "glm/mat4x4.hpp"
 

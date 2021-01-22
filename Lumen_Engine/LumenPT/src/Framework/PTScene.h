@@ -7,7 +7,7 @@
 
 #include <set>
 
-class PTServiceLocator;
+struct PTServiceLocator;
 class PTMeshInstance;
 
 class PTScene : public Lumen::ILumenScene

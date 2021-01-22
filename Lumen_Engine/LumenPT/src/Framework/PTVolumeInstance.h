@@ -4,7 +4,7 @@
 #include "Optix/optix_types.h"
 
 class PTScene;
-class PTServiceLocator;
+struct PTServiceLocator;
 
 class PTVolumeInstance : public Lumen::VolumeInstance
 {

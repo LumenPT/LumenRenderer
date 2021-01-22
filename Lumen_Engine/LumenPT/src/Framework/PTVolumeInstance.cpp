@@ -1,11 +1,7 @@
 #include "PTVolumeInstance.h"
-
+#include "MemoryBuffer.h"
 #include "AccelerationStructure.h"
-
 #include "PTScene.h"
-
-
-#include "OptiXRenderer.h"
 #include "PTPrimitive.h"
 
 PTVolumeInstance::PTVolumeInstance(PTServiceLocator& a_ServiceLocator)

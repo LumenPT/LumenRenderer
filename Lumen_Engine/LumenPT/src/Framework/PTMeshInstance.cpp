@@ -1,12 +1,9 @@
 #include "PTMeshInstance.h"
-
+#include "MemoryBuffer.h"
 #include "AccelerationStructure.h"
-
 #include "PTScene.h"
-
-
-#include "OptiXRenderer.h"
 #include "PTPrimitive.h"
+#include "PTServiceLocator.h"
 
 PTMeshInstance::PTMeshInstance(PTServiceLocator& a_ServiceLocator)
     : m_Services(a_ServiceLocator)
