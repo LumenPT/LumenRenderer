@@ -31,7 +31,7 @@ CPU_ONLY void GenerateRays(const SetupLaunchParameters& a_SetupParams);
 CPU_ONLY void GenerateMotionVectors();
 
 //Called during shading
-CPU_GPU void ShadeDirect(const uint3& a_ResolutionAndDepth, const RayBatch* const a_CurrentRays, const IntersectionBuffer* const a_Intersections, ShadowRayBatch* const a_ShadowRays, const LightBuffer* const a_Lights);
+CPU_GPU void ShadeDirect(const uint3& a_ResolutionAndDepth, const RayBatch* const a_CurrentRays, const IntersectionBuffer* const a_Intersections, ShadowRayBatch* const a_ShadowRays, const LightBuffer* const a_Lights, CDF* const a_CDF /*const CDF* a_CDF*/);
 CPU_GPU void ShadeSpecular();
 CPU_GPU void ShadeIndirect(const uint3& a_ResolutionAndDepth, const IntersectionBuffer* const a_Intersections, const RayBatch* const a_PrimaryRays, RayBatch* a_Output);
 

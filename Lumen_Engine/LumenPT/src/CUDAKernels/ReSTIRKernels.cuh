@@ -17,6 +17,13 @@ __global__ void ResetCDF(CDF* a_Cdf);
 
 __global__ void FillCDFInternal(CDF* a_Cdf, TriangleLight* a_Lights, unsigned a_LightCount);
 
-__host__ void FillLightBags(unsigned a_NumLightBags, CDF* a_Cdf, LightBagEntry* a_LightBagPtr);
+__host__ void FillLightBags(unsigned a_NumLightBags, CDF* a_Cdf, LightBagEntry* a_LightBagPtr, TriangleLight* a_Lights);
 
-__global__ void FillLightBagsInternal(unsigned a_NumLightBags, CDF* a_Cdf, LightBagEntry* a_LightBagPtr);
+__global__ void FillLightBagsInternal(unsigned a_NumLightBags, CDF* a_Cdf, LightBagEntry* a_LightBagPtr, TriangleLight* a_Lights);
+
+/*
+ * Prick primary lights and apply reservoir sampling.
+ */
+__host__ void PickPrimarySamples(LightBagEntry* a_LightBags, Reservoir* a_Reservoirs, const int2& a_Dimensions, unsigned a_PixelGridSize);
+
+__global__ void PickPrimarySamplesInternal(LightBagEntry* a_LightBags, Reservoir* a_Reservoirs, const int2& a_Dimensions, unsigned a_PixelGridSize);

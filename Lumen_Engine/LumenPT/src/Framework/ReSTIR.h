@@ -28,6 +28,9 @@ struct ReSTIRSettings
 	//The amount of lights per light bag.
 	std::uint32_t numLightsPerBag = 1000;
 
+	//The total amount of light bags to generate.
+	std::uint32_t numLightBags = 50;
+
 	//The amount of initial samples to take each frame.
 	std::uint32_t numPrimarySamples = 32;
 
@@ -78,6 +81,11 @@ public:
 	 */
 	void SwapBuffers();
 
+	/*
+	 * Get a GPU pointer to the CDF.
+	 */
+	CDF* GetCdfGpuPointer() const;
+
 
 private:
 	ReSTIRSettings m_Settings;
@@ -86,7 +94,7 @@ private:
 
 	//Memory buffers only used in the current frame.
 	MemoryBuffer m_Lights;		//All the triangle lights stored contiguously. Size of the amount of lights.
-	MemoryBuffer m_CDF;			//The CDF which is the size of a CDF entry times the amount of lights.
+	MemoryBuffer m_Cdf;			//The CDF which is the size of a CDF entry times the amount of lights.
 	MemoryBuffer m_LightBags;	//All light bags as a single array. Size of num light bags * size of light bag * light index or something.
 	MemoryBuffer m_ShadowRays;	//Buffer for each shadow ray in a frame. Size of screen dimensions * ray size.
 

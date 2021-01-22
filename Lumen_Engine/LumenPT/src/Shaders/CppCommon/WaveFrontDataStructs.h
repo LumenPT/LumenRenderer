@@ -483,7 +483,8 @@ namespace WaveFront
             const IntersectionBuffer* a_CurrentIntersections,
             RayBatch* a_SecondaryRays,
             ShadowRayBatch* a_ShadowRayBatch,
-            const LightBuffer* a_Lights)
+            const LightBuffer* a_Lights,
+            CDF* const a_CDF = nullptr)
             :
         m_ResolutionAndDepth(a_ResolutionAndDepth),
         m_PrimaryRaysPrevFrame(a_PrimaryRaysPrevFrame),
@@ -492,7 +493,8 @@ namespace WaveFront
         m_CurrentIntersections(a_CurrentIntersections),
         m_LightBuffer(a_Lights),
         m_SecondaryRays(a_SecondaryRays),
-        m_ShadowRaysBatch(a_ShadowRayBatch)
+        m_ShadowRaysBatch(a_ShadowRayBatch),
+		m_CDF(a_CDF)
         {}
 
         CPU_ONLY ~ShadingLaunchParameters() = default;
@@ -506,7 +508,8 @@ namespace WaveFront
         //TODO: Geometry buffer
         //TODO: Light buffer
         const LightBuffer* const m_LightBuffer;
-
+        CDF* const m_CDF;
+    	
         //Write
         RayBatch* const m_SecondaryRays;
         ShadowRayBatch* const m_ShadowRaysBatch;
