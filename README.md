@@ -55,7 +55,7 @@ However, it is recommended and somewhat expected by the teachers to stay with yo
 
 #### Contributions per contributor
 * **Person 1**
-  * Wavefront algorithm
+  * [**Wavefront algorithm**](./README.md#-wavefront-algorithm)
 
 ### Additional contributors
 
@@ -98,8 +98,8 @@ However, it is recommended and somewhat expected by the teachers to stay with yo
 * If you place the project solution in the same folder as the root folder it supposed to work, however this has not been tested extensively.
   This means that selecting another folder is recommended.
   CMake documentation refers to these methods as `in-source` and `out-of-source`.
-* [The documentation for using the CMake command line can be found here: https://cmake.org/cmake/help/latest/manual/cmake.1.html](https://cmake.org/cmake/help/latest/manual/cmake.1.html)
-* [Tutorials for using CMake can be found here: https://cmake.org/cmake/help/latest/guide/tutorial/index.html](https://cmake.org/cmake/help/latest/guide/tutorial/index.html)
+* The documentation for using the CMake command line can be found here: https://cmake.org/cmake/help/latest/manual/cmake.1.html
+* Tutorials for using CMake can be found here: https://cmake.org/cmake/help/latest/guide/tutorial/index.html
   
 ### Build Instructions using Premake5. You will need Visual Studio 2019 for this.
 - Download Premake5: https://premake.github.io/download.html#v5
