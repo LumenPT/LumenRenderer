@@ -32,7 +32,7 @@ Each block there is chance for the students to switch between on-going projects.
 However, it is recommended and somewhat expected by the teachers to stay with your project for the entire year.
 
 ### Project features and systems
-#### * Wavefront algorithm
+#### • Wavefront algorithm
   The wavefront algorithm is an algorithm that aims to utilize the parallel computation potential to calculate shading.
   To do this we combine the Optix SDK and the CUDA language.
   We use the Optix SDK to utilize the ray tracing capabilities of the GPU.
@@ -54,12 +54,12 @@ However, it is recommended and somewhat expected by the teachers to stay with yo
 | **Person 7** | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |  |
 
 #### Contributions per contributor
-* **Person1**
+* **Person 1**
   * Wavefront algorithm
 
 ### Additional contributors
 
-**Person 1:**
+* **Person 1:**
  - Contribution 1
  
 
@@ -81,7 +81,7 @@ However, it is recommended and somewhat expected by the teachers to stay with yo
     6. Now there should be a project solution in the selected folder.
 * **To use the command-line**
     1. Open the command line.
-    2. Type the command: `cmake [options] -S <path to root folder> -B <path to project solution folder>.
+    2. Type the command: `cmake [options] -S <path to root folder> -B <path to project solution folder>`.
        Replace the `<path to root folder>` with the path to the root folder of the project.
        Replace the `<path to project solution folder>` with the path to the folder where you want to place the project solution.
        Optionally the `[options]` with the options that you want to use to generate the project solution.
@@ -91,7 +91,7 @@ However, it is recommended and somewhat expected by the teachers to stay with yo
 #### Options
 | Option | Description |
 | :--- | :--- |
-| *USE_WAVEFRONT* | Whether to use the wavefront rendering pipeline or not. The wavefront rendering pipeline is a is the main rendering pipeline and probably has better support than the old rendering pipeline. This option adds the WAVEFRONT preprocessor defintions to the `Sandbox` and `LumenPT` projects. |
+| **USE_WAVEFRONT** | Whether to use the wavefront rendering pipeline or not. The wavefront rendering pipeline is a is the main rendering pipeline and probably has better support than the old rendering pipeline. This option adds the WAVEFRONT preprocessor defintions to the `Sandbox` and `LumenPT` projects. |
 
 #### Notes
 * The root folder is by default: `<Path to download folder>/Lumen_Engine`. It is the first directory containing a `CMakeLists.txt` file.
