@@ -60,7 +60,7 @@ However, it is recommended and somewhat expected by the teachers to stay with yo
 ### Additional contributors
 
 * **Person 1:**
- - Contribution 1
+  - Contribution 1
  
 
 ## Getting started with the project.
@@ -71,22 +71,24 @@ However, it is recommended and somewhat expected by the teachers to stay with yo
 * [Visual Studio 2019](https://visualstudio.microsoft.com/)
 
 ### Build Instructions using CMake
-* Download the project.
+* **Download the project.**
 * **To use the CMake-GUI**
-    1. Open the CMake-GUI application.
-    2. Select the path to the root folder of the project.
-    3. Select the path to the folder where you want to place the project solution.
-    4. Press configure and select the options that you want to use.
-    5. Press configure again and then press generate.
-    6. Now there should be a project solution in the selected folder.
+  1. Open the CMake-GUI application.
+  2. Select the path to the root folder of the project.
+  3. Select the path to the folder where you want to place the project solution.
+  4. Press configure and select the options that you want to use.
+  5. Press configure again and then press generate.
+  6. Now there should be a project solution in the selected folder.
 * **To use the command-line**
-    1. Open the command line.
-    2. Type the command: `cmake [options] -S <path to root folder> -B <path to project solution folder>`.
-       Replace the `<path to root folder>` with the path to the root folder of the project.
-       Replace the `<path to project solution folder>` with the path to the folder where you want to place the project solution.
-       Optionally the `[options]` with the options that you want to use to generate the project solution.
-       These need to be in the format: `-D<option>:<type>=<value>` or `-D<option>=<value>` where you replace `<option>` with the option name and `<value>` with the value you want the option to be. Optionally you can also specify a type by replacing `<type>`.
-    3. After executing the command the project solution should be in the selected folder.
+  1. Open the command line.
+  2. Type the command: `cmake [options] -S <path to root folder> -B <path to project solution folder>`.
+     Replace the `<path to root folder>` with the path to the root folder of the project.
+     Replace the `<path to project solution folder>` with the path to the folder where you want to place the project solution.
+     Optionally the `[options]` with the options that you want to use to generate the project solution.
+     These need to be in the format: `-D<option>:<type>=<value>` or `-D<option>=<value>`,
+     where you replace `<option>` with the option name and `<value>` with the value you want the option to be. 
+     Optionally you can also specify a type by replacing `<type>`.
+  3. After executing the command the project solution should be in the selected folder.
 
 #### Options
 | Option | Description |
