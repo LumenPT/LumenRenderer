@@ -39,7 +39,9 @@ public:
         uint8_t m_MaxDepth;
         uint8_t m_RaysPerPixel;
         uint8_t m_ShadowRaysPerPixel;
-        uint2 m_Resolution;
+
+        uint2 m_RenderResolution;
+        uint2 m_OutputResolution;
 
     };
 
@@ -81,6 +83,11 @@ public:
     Camera m_Camera;
 
     Lumen::Transform m_TestTransform;
+
+    static inline const uint2 s_minResolution = make_uint2(1, 1);
+    static inline const uint8_t s_minDepth = 1;
+    static inline const uint8_t s_minRaysPerPixel = 1;
+    static inline const uint8_t s_minShadowRaysPerPixel = 1;
 
 private:
 
@@ -208,8 +215,8 @@ private:
     //ResultBuffer storing the different PixelBuffers as different light channels;
     std::unique_ptr<MemoryBuffer> m_ResultBuffer;
     //2 PixelBuffers 1 for the different channels in the ResultBuffer and 1 PixelBuffer for the merged results.
-    std::unique_ptr<MemoryBuffer> m_PixelBuffer3Channels;
-    std::unique_ptr<MemoryBuffer> m_PixelBuffer1Channel;
+    std::unique_ptr<MemoryBuffer> m_PixelBufferMultiChannel;
+    std::unique_ptr<MemoryBuffer> m_PixelBufferSingleChannel;
     //2 ray batches, 1 for storing primary rays, other for overwriting secondary rays.
     std::unique_ptr<MemoryBuffer> m_RayBatches[s_NumRayBatchTypes];
     //2 intersection buffers, 1 for storing primary intersections, other for overwriting secondary intersections.
@@ -222,8 +229,13 @@ private:
 
     std::unique_ptr<class Texture> m_Texture;
 
-    uint2 m_Resolution;
+    uint2 m_RenderResolution;
+    uint2 m_OutputResolution;
+
     uint8_t m_MaxDepth;
+    uint8_t m_RaysPerPixel;
+    uint8_t m_ShadowRaysPerPixel;
+
     bool m_Initialized;
 
 };

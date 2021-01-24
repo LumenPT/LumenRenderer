@@ -68,6 +68,18 @@ namespace WaveFront
 
     //Ray & Intersection data and buffers
 
+
+    /// <summary>
+    /// <b>Description</b> \n
+    /// Stores definition of a ray and additional data.\n
+    /// <b>Type</b>: Struct\n
+    /// <para>
+    /// <b>Member variables:</b> \n
+    /// <b>• m_Origin</b> <em>(float3)</em>: Origin of the ray. \n
+    /// <b>• m_Direction</b> <em>(float3)</em>: Direction of the ray. \n
+    /// <b>• m_Contribution</b> <em>(float3)</em>: Contribution scalar for the returned radiance. \n
+    /// </para>
+    /// </summary>
     struct RayData
     {
 
@@ -88,72 +100,109 @@ namespace WaveFront
         m_Contribution(a_Contribution)
         {}
 
-        //Read only
-        float3 m_Origin;
-        float3 m_Direction;
-        float3 m_Contribution;
 
+
+        /// <summary> Checks if the ray is a valid ray.</summary>
+        /// <returns> Returns true if <b>all</b> of the components of m_Direction are not equal to 0. <em>(boolean)</em> </returns>
         GPU_ONLY INLINE bool IsValidRay() const
         {
 
             return !(m_Direction.x == 0.f &&
-                    m_Direction.y == 0.f &&
-                    m_Direction.z == 0.f);
+                m_Direction.y == 0.f &&
+                m_Direction.z == 0.f);
 
         }
 
+
+
+        /// <summary>
+        /// <b>Description</b> \n Stores the position of the ray interpreted as a world-space position. \n
+        /// <b>Default</b>: (0.f, 0.f, 0.f)
+        /// </summary>
+        float3 m_Origin;
+        /// <summary>
+        /// <b>Description</b> \n Stores the direction of the ray interpreted as a normalized vector. \n
+        /// <b>Default</b>: (0.f, 0.f, 0.f)
+        /// </summary>
+        float3 m_Direction;
+        /// <summary>
+        /// <b>Description</b> \n Stores the contribution of the radiance returned by the ray as a scalar for each rgb-channel. \n
+        /// <b>Default</b>: (0.f, 0.f, 0.f)
+        /// </summary>
+        float3 m_Contribution;
+
     };
 
+    /// <summary>
+    /// <b>Description</b> \n
+    /// Stores a buffer of RayData structs. \n
+    /// <b>Type</b>: Struct\n
+    /// <para>
+    /// <b>Member variables</b> \n
+    /// <b>• m_NumPixels</b> <em>(const unsigned int)</em>: Number of pixels the buffer stores data for.\n
+    /// <b>• m_RaysPerPixel</b> <em>(const unsigned int)</em>: Number of rays per pixel the buffer stores data for.\n
+    /// <b>• m_Rays</b> <em>(RayData[])</em>: Array storing all the RayData structs.\n
+    /// </para>
+    /// </summary>
     struct RayBatch
     {
 
         RayBatch()
             :
-        m_NumPixels(0u),
-        m_RaysPerPixel(0u),
-        m_Rays()
+            m_NumPixels(0u),
+            m_RaysPerPixel(0u),
+            m_Rays()
         {}
 
-        //Read only
-        const unsigned int m_NumPixels;
-        const unsigned int m_RaysPerPixel;
 
-        //Read/Write
-        RayData m_Rays[];
 
+        /// <summary> Gets the size of the buffer. \n Takes into account the number of pixels and the number of rays per pixel. </summary>
+        /// <returns> Size of the buffer.  <em>(unsigned int)</em> </returns>
         CPU_GPU INLINE unsigned int GetSize() const
         {
             return m_NumPixels * m_RaysPerPixel;
         }
 
+        /// <summary> Sets the ray data from a ray for a certain sample for a certain pixel. </summary>
+        /// <param name="a_Data">\n • Description: Ray data to set.</param>
+        /// <param name="a_PixelIndex">\n • Description: Index of the pixel to set the ray data for. \n • Range: (0 : m_NumPixels-1) </param>
+        /// <param name="a_RayIndex">\n • Description: Index of the sample to set the ray data for. \n • Range: (0 : m_RaysPerPixel-1)</param>
         GPU_ONLY INLINE void SetRay(
             const RayData& a_Data, 
             unsigned int a_PixelIndex,
-            unsigned int a_RayIndex)
+            unsigned int a_RayIndex = 0)
         {
-            /*RayData* rayPtr =  &m_Rays[GetRayIndex(a_PixelIndex, a_RayIndex)];
-            printf("Buffer Start: %p, Buffer ptr: %p , Buffer Offset: %lli ", m_Rays, rayPtr, (reinterpret_cast<char*>(rayPtr) - reinterpret_cast<char*>(m_Rays)));*/
-
-            m_Rays[GetRayIndex(a_PixelIndex, a_RayIndex)] = a_Data;
+            m_Rays[GetRayArrayIndex(a_PixelIndex, a_RayIndex)] = a_Data;
         }
 
+        /// <summary> Gets the ray data from a ray for a certain sample for a certain pixel. </summary>
+        /// <param name="a_PixelIndex">\n • Description: The index of the pixel to get the ray data from. \n • Range (0 : m_NumPixels-1)</param>
+        /// <param name="a_RayIndex">\n • Description: The index of the ray for the pixel. \n • Range: (0 : m_RaysPerPixel-1)</param>
+        /// <returns> Data of the specified ray. <em>(const RayData&)</em>  </returns>
         GPU_ONLY INLINE const RayData& GetRay(unsigned int a_PixelIndex, const unsigned int a_RayIndex) const
         {
 
-            return m_Rays[GetRayIndex(a_PixelIndex, a_RayIndex)];
+            return m_Rays[GetRayArrayIndex(a_PixelIndex, a_RayIndex)];
 
         }
 
-        GPU_ONLY INLINE const RayData& GetRay(unsigned int a_RayIndex) const
+        /// <summary Gets the ray data from a ray for a certain sample for a certain pixel </summary>
+        /// <remarks To get the right index for the pixel and sample you can use the GetRayArrayIndex function </remarks>
+        /// <param name="a_RayArrayIndex">\n • Description: The index in the m_Rays array to get the ray data from. \n • Range (0 : (m_NumPixels * m_RaysPerPixel)-1)</param>
+        /// <returns> Data of the specified ray. <em>(const RayData&)</em>  </returns>
+        GPU_ONLY INLINE const RayData& GetRay(unsigned int a_RayArrayIndex) const
         {
-            assert(a_RayIndex < GetSize());
+            assert(a_RayArrayIndex < GetSize());
 
-            return m_Rays[a_RayIndex];
+            return m_Rays[a_RayArrayIndex];
 
         }
 
-        //Gets an index to a Ray in the m_Rays array, taking into account the number of pixels and the number of rays per pixel.
-        GPU_ONLY INLINE unsigned int GetRayIndex(unsigned int a_PixelIndex, const unsigned int a_RayIndex) const
+        /// <summary> Get the index in the m_Rays array for a certain sample at a certain pixel </summary>
+        /// <param name="a_PixelIndex">\n • Description: The index of the pixel to get the index for. \n • Range (0 : m_NumPixels-1)</param>
+        /// <param name="a_RayIndex">\n • Description: The index of the sample to get the index for. \n • Range (0 : m_RaysPerPixel-1)</param>
+        /// <returns> Index into the m_Rays array for the sample at the pixel. <em>(unsigned int)</em>  </returns>
+        GPU_ONLY INLINE unsigned int GetRayArrayIndex(unsigned int a_PixelIndex, const unsigned int a_RayIndex = 0) const
         {
 
             assert(a_PixelIndex < m_NumPixels&& a_RayIndex < m_RaysPerPixel);
@@ -162,8 +211,39 @@ namespace WaveFront
 
         }
 
+
+
+        /// <summary>
+        /// <b>Description</b> \n The number of pixels the buffer stores data for. \n
+        /// <b>Default</b>: 0
+        /// </summary>
+        const unsigned int m_NumPixels;
+
+        /// <summary>
+        /// <b>Description</b> \n  The number of rays per pixel the buffer stores data for. \n
+        /// <b>Default</b>: 0
+        /// </summary>
+        const unsigned int m_RaysPerPixel;
+
+        /// <summary>
+        /// <b>Description</b> \n Array storing the RayData structs. \n Has a size of m_NumPixels * m_RaysPerPixel. \n
+        /// <b>Default</b>: empty
+        /// </summary>
+        RayData m_Rays[];
+
     };
 
+    /// <summary>
+    /// <b>Description</b> \n
+    /// Stores data of an intersection. \n
+    /// <b>Type</b>: Struct\n
+    /// <para>
+    /// <b>Member variables</b> \n
+    /// <b>• m_RayIndex</b> <em>(unsigned int)</em>: Index in the m_Rays member of a RayBatch of the ray the intersection belongs to.\n
+    /// <b>• m_IntersectionT</b> <em>(float)</em>: Distance along the ray to the intersection.\n
+    /// <b>• m_PrimitiveIndex</b> <em>(unsigned int): Index of the primitive of the mesh intersected by the ray.</em>: .\n
+    /// </para>
+    /// </summary>
     struct IntersectionData
     {
 
@@ -171,7 +251,7 @@ namespace WaveFront
             :
         m_RayIndex(0),
         m_IntersectionT(-1.f),
-        m_TriangleId(0),
+        m_PrimitiveIndex(0),
         m_MeshAndInstanceId(0)
         {}
         
@@ -179,25 +259,49 @@ namespace WaveFront
         CPU_GPU IntersectionData(
             unsigned int a_RayIndex,
             float a_IntersectionT,
-            unsigned int a_TriangleId,
+            unsigned int a_PrimitiveIndex,
             unsigned int a_MeshAndInstanceId)
             :
         m_RayIndex(a_RayIndex),
         m_IntersectionT(a_IntersectionT),
-        m_TriangleId(a_TriangleId),
+        m_PrimitiveIndex(a_PrimitiveIndex),
         m_MeshAndInstanceId(a_MeshAndInstanceId)
         {}
 
+
+
+        /// <summary> Checks if the data defines an intersection. </summary>
+        /// <returns> Returns true if m_IntersectionT is higher than 0.  <em>(boolean)</em> </returns>
         CPU_GPU INLINE bool IsIntersection() const
         {
             return (m_IntersectionT > 0.f);
         }
 
-        //Read only
+
+
+        /// <summary>
+        /// <b>Description</b> \n The index in the m_Rays array of a RayBatch of the ray the intersection belongs to. \n
+        /// <b>Default</b>: 0
+        /// </summary>
         unsigned int m_RayIndex;
+
+        /// <summary>
+        /// <b>Description</b> \n Distance along the ray the intersection happened. \n
+        /// <b>Default</b>: -1.f
+        /// </summary>
         float m_IntersectionT;
-        unsigned int m_TriangleId;
-        unsigned int m_MeshAndInstanceId; //Might need to change to pointer to a DeviceMesh.
+
+        /// <summary>
+        /// <b>Description</b> \n The index of the primitive of the mesh that the ray intersected with. \n
+        /// <b>Default</b>: 0
+        /// </summary>
+        unsigned int m_PrimitiveIndex;
+
+        /// <summary>
+        /// <b>Description</b> \n The index of the primitive of the mesh that the ray intersected with. \n
+        /// <b>Default</b>: 0
+        /// </summary>
+        unsigned int m_MeshAndInstanceId; //TODO: Might need to change to pointer to a DeviceMesh.
 
     };
 
@@ -211,12 +315,7 @@ namespace WaveFront
         m_Intersections()
         {}
 
-        //Read only
-        const unsigned int m_NumPixels;
-        const unsigned int m_IntersectionsPerPixel;
 
-        //Read/Write
-        IntersectionData m_Intersections[];
 
         CPU_GPU INLINE unsigned int GetSize() const
         {
@@ -226,17 +325,17 @@ namespace WaveFront
         GPU_ONLY INLINE void SetIntersection(
             const IntersectionData& a_Data, 
             unsigned int a_PixelIndex, 
-            unsigned int a_IntersectionIndex)
+            unsigned int a_IntersectionIndex = 0)
         {
 
-            m_Intersections[GetRayIndex(a_PixelIndex, a_IntersectionIndex)] = a_Data;
+            m_Intersections[GetIntersectionArrayIndex(a_PixelIndex, a_IntersectionIndex)] = a_Data;
 
         }
 
-        GPU_ONLY INLINE const IntersectionData& GetIntersection(unsigned int a_PixelIndex, unsigned int a_IntersectionIndex)
+        GPU_ONLY INLINE const IntersectionData& GetIntersection(unsigned int a_PixelIndex, unsigned int a_IntersectionIndex) const
         {
 
-            return m_Intersections[GetRayIndex(a_PixelIndex, a_IntersectionIndex)];
+            return m_Intersections[GetIntersectionArrayIndex(a_PixelIndex, a_IntersectionIndex)];
 
         }
 
@@ -249,7 +348,7 @@ namespace WaveFront
         }
 
         //Gets a index to IntersectionData in the m_Intersections array, taking into account the number of pixels and the number of rays per pixel.
-        GPU_ONLY INLINE unsigned int GetRayIndex(unsigned int a_PixelIndex, unsigned int a_IntersectionIndex) const
+        GPU_ONLY INLINE unsigned int GetIntersectionArrayIndex(unsigned int a_PixelIndex, unsigned int a_IntersectionIndex = 0) const
         {
 
             assert(a_PixelIndex < m_NumPixels && a_IntersectionIndex < m_IntersectionsPerPixel);
@@ -257,6 +356,15 @@ namespace WaveFront
             return a_PixelIndex * m_IntersectionsPerPixel + a_IntersectionIndex;
 
         }
+
+
+
+        //Read only
+        const unsigned int m_NumPixels;
+        const unsigned int m_IntersectionsPerPixel;
+
+        //Read/Write
+        IntersectionData m_Intersections[];
 
     };
 
@@ -277,27 +385,41 @@ namespace WaveFront
         //Read/Write
         float3 m_Pixels[];
 
-        GPU_ONLY INLINE void SetPixel(const float3& a_value, unsigned int a_PixelIndex, unsigned int a_ChannelIndex)
+        CPU_GPU unsigned int GetSize() const
+        {
+            return m_NumPixels * m_ChannelsPerPixel;
+        }
+
+        //Gets an index to a pixel in the m_Pixels array, taking into account number of channels per pixel.
+        GPU_ONLY INLINE unsigned int GetPixelArrayIndex(unsigned int a_PixelIndex, unsigned int a_ChannelIndex = 0) const
         {
 
-            m_Pixels[GetPixelIndex(a_PixelIndex, a_ChannelIndex)] = a_value;
+            assert(a_PixelIndex < m_NumPixels&& a_ChannelIndex < m_ChannelsPerPixel);
+
+            return a_PixelIndex * m_ChannelsPerPixel + a_ChannelIndex;
 
         }
 
         GPU_ONLY INLINE const float3& GetPixel(unsigned int a_PixelIndex, unsigned int a_ChannelIndex) const
         {
 
-            return m_Pixels[GetPixelIndex(a_PixelIndex, a_ChannelIndex)];
+            return m_Pixels[GetPixelArrayIndex(a_PixelIndex, a_ChannelIndex)];
 
         }
 
-        //Gets an index to a pixel in the m_Pixels array, taking into account number of channels per pixel.
-        GPU_ONLY INLINE unsigned int GetPixelIndex(unsigned int a_PixelIndex, unsigned int a_ChannelIndex) const
+        GPU_ONLY INLINE const float3& GetPixel(unsigned int a_PixelArrayIndex) const
         {
 
-            assert(a_PixelIndex < m_NumPixels&& a_ChannelIndex < m_ChannelsPerPixel);
+            assert(a_PixelArrayIndex < GetSize());
 
-            return a_PixelIndex * m_ChannelsPerPixel + a_ChannelIndex;
+            return m_Pixels[a_PixelArrayIndex];
+
+        }
+
+        GPU_ONLY INLINE void SetPixel(const float3& a_value, unsigned int a_PixelIndex, unsigned int a_ChannelIndex)
+        {
+
+            m_Pixels[GetPixelArrayIndex(a_PixelIndex, a_ChannelIndex)] = a_value;
 
         }
 
@@ -314,20 +436,71 @@ namespace WaveFront
             NUM_CHANNELS
         };
 
-        ResultBuffer()
-            :
-        //m_PrimaryRays(nullptr),
-        //m_PrimaryIntersections(nullptr),
-        m_PixelOutput(nullptr)
-        {}
-
-        //Read only (Might not be necessary to store the primary rays and intersections here)
-        //const RayBatch* const m_PrimaryRays;
-        //const IntersectionBuffer* const m_PrimaryIntersections;
         constexpr static unsigned int s_NumOutputChannels = static_cast<unsigned>(OutputChannel::NUM_CHANNELS);
 
-        //Read/Write
-        PixelBuffer* const m_PixelOutput;
+
+
+        ResultBuffer()
+            :
+        m_PixelBuffer(nullptr)
+        {}
+
+
+
+        CPU_GPU static unsigned int GetNumOutputChannels()
+        {
+            return static_cast<unsigned>(OutputChannel::NUM_CHANNELS);
+        }
+
+        GPU_ONLY INLINE void SetPixel(const float3& a_Value, unsigned a_PixelIndex, OutputChannel a_Channel)
+        {
+
+            assert(a_Channel != OutputChannel::NUM_CHANNELS);
+
+            m_PixelBuffer->SetPixel(a_Value, a_PixelIndex, static_cast<unsigned>(a_Channel));
+
+        }
+
+        GPU_ONLY INLINE void SetPixel(const float3 a_Values[static_cast<unsigned>(OutputChannel::NUM_CHANNELS)], unsigned a_PixelIndex)
+        {
+
+            const unsigned numOutputChannels = GetNumOutputChannels();
+            for(unsigned int i = 0u; i < numOutputChannels; ++i)
+            {
+                m_PixelBuffer->SetPixel(a_Values[i], a_PixelIndex, i);
+            }
+
+        }
+
+        GPU_ONLY INLINE const float3& GetPixel(unsigned a_PixelIndex, OutputChannel a_channel) const
+        {
+
+            assert(a_channel != OutputChannel::NUM_CHANNELS);
+
+            return m_PixelBuffer->GetPixel(a_PixelIndex, static_cast<unsigned>(a_channel));
+
+        }
+
+        GPU_ONLY INLINE float3 GetPixelCombined(unsigned a_PixelIndex) const
+        {
+
+            float3 result = {0.f, 0.f, 0.f};
+
+            const unsigned numOutputChannels = GetNumOutputChannels();
+            for(unsigned i = 0; i < numOutputChannels; ++i)
+            {
+                result += m_PixelBuffer->GetPixel(a_PixelIndex, i);
+            }
+
+            
+
+            return result;
+
+        }
+
+
+
+        PixelBuffer* const m_PixelBuffer;
 
     };
 
@@ -396,18 +569,18 @@ namespace WaveFront
             unsigned int a_PixelIndex, 
             unsigned int a_RayIndex = 0)
         {
-            m_ShadowRays[GetShadowRayIndex(a_DepthIndex, a_PixelIndex, a_RayIndex)] = a_Data;
+            m_ShadowRays[GetShadowRayArrayIndex(a_DepthIndex, a_PixelIndex, a_RayIndex)] = a_Data;
         }
 
         GPU_ONLY INLINE const ShadowRayData& GetShadowRayData(unsigned int a_DepthIndex, unsigned int a_PixelIndex, unsigned int a_RayIndex) const
         {
 
-            return m_ShadowRays[GetShadowRayIndex(a_DepthIndex, a_PixelIndex, a_RayIndex)];
+            return m_ShadowRays[GetShadowRayArrayIndex(a_DepthIndex, a_PixelIndex, a_RayIndex)];
 
         }
 
         //Gets a index to a ShadowRay in the m_ShadowRays array, taking into account the max dept, number of pixels and number of rays per pixel.
-        GPU_ONLY INLINE unsigned int GetShadowRayIndex(unsigned int a_DepthIndex, unsigned int a_PixelIndex, unsigned int a_RayIndex) const
+        GPU_ONLY INLINE unsigned int GetShadowRayArrayIndex(unsigned int a_DepthIndex, unsigned int a_PixelIndex, unsigned int a_RayIndex) const
         {
 
             assert(a_DepthIndex < m_MaxDepth&& a_PixelIndex < m_NumPixels&& a_RayIndex < m_RaysPerPixel);
@@ -548,7 +721,7 @@ namespace WaveFront
 
 
 
-    // Shader Launch parameters
+    // OptiX shader data parameters
 
     struct CommonOptixLaunchParameters
     {

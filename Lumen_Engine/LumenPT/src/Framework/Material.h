@@ -20,7 +20,7 @@ public:
 
     void SetDiffuseColor(const glm::vec4& a_NewDiffuseColor) override;
     void SetDiffuseTexture(std::shared_ptr<Lumen::ILumenTexture> a_NewDiffuseTexture) override;
-    void SetEmission(const glm::vec3& a_EmissiveVal = glm::vec3( 1.0f, 1.0f, 1.0f)) override;
+    void SetEmission(const glm::vec3& a_EmissiveVal = glm::vec3( 0.0f, 0.0f, 0.0f)) override;
 
     glm::vec4 GetDiffuseColor() const override;
     Lumen::ILumenTexture& GetDiffuseTexture() const override;

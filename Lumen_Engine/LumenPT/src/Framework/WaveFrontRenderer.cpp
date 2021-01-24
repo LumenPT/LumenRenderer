@@ -39,15 +39,18 @@ m_OutputBuffer(nullptr),
 m_SBTBuffer(nullptr),
 m_RayBatchIndices({0}),
 m_ResultBuffer(nullptr),
-m_PixelBuffer3Channels(nullptr),
-m_PixelBuffer1Channel(nullptr),
+m_PixelBufferMultiChannel(nullptr),
+m_PixelBufferSingleChannel(nullptr),
 m_RayBatches(),
 m_IntersectionBuffers(),
 m_ShadowRayBatch(nullptr),
 m_LightBufferTemp(nullptr),
 m_Texture(nullptr),
-m_Resolution({0u, 0u}),
-m_MaxDepth(0u),
+m_RenderResolution(max(a_InitializationData.m_RenderResolution, s_minResolution)),
+m_OutputResolution(max(a_InitializationData.m_OutputResolution, s_minResolution)),
+m_MaxDepth(max(a_InitializationData.m_MaxDepth, s_minDepth)),
+m_RaysPerPixel(max(a_InitializationData.m_RaysPerPixel, s_minRaysPerPixel)),
+m_ShadowRaysPerPixel(max(a_InitializationData.m_ShadowRaysPerPixel, s_minShadowRaysPerPixel)),
 m_Initialized(false)
 {
 
@@ -79,10 +82,6 @@ bool WaveFrontRenderer::Initialize(const InitializationData& a_InitializationDat
     bool success = true;
     //Temporary(put into init data)
     const std::string shaderPath = LumenPTConsts::gs_ShaderPathBase + "WaveFrontShaders.ptx";
-
-    m_Resolution = a_InitializationData.m_Resolution;
-    //m_MaxDepth = a_InitializationData.m_MaxDepth;
-    m_MaxDepth = 5;
 
     InitializeContext();
     success &= CreatePipelines(shaderPath);
@@ -376,36 +375,42 @@ void WaveFrontRenderer::CreateShaderBindingTables()
 void WaveFrontRenderer::CreateOutputBuffer()
 {
 
-    m_OutputBuffer = std::make_unique<::OutputBuffer>(m_Resolution.x, m_Resolution.y);
+    m_OutputBuffer = std::make_unique<::OutputBuffer>(m_OutputResolution.x, m_OutputResolution.y);
 
 }
 
 void WaveFrontRenderer::CreateDataBuffers()
 {
 
-    const unsigned numPixels = static_cast<unsigned>(m_Resolution.x) * static_cast<unsigned>(m_Resolution.y);
-
-    const unsigned raysPerPixel = 1;
-    const unsigned shadowRaysPerPixel = 1;
-    const unsigned maxDepth = 3;
+    const unsigned numPixels = static_cast<unsigned>(m_RenderResolution.x) * static_cast<unsigned>(m_RenderResolution.y);
     const unsigned numOutputChannels = ResultBuffer::s_NumOutputChannels;
 
     //const unsigned int lightBuffer = LightBuffer::
-	
+
+    const unsigned pixelBufferEmptySize = sizeof(PixelBuffer);
+    const unsigned pixelDataStructSize = sizeof(float3);
+
     //Allocate pixel buffer.
-    m_PixelBuffer3Channels = std::make_unique<MemoryBuffer>(sizeof(PixelBuffer) + numPixels * numOutputChannels * sizeof(float3));
-    m_PixelBuffer3Channels->Write(numPixels, 0);
-    m_PixelBuffer3Channels->Write(numOutputChannels, sizeof(PixelBuffer::m_NumPixels));
+    m_PixelBufferMultiChannel = std::make_unique<MemoryBuffer>(
+        static_cast<size_t>(pixelBufferEmptySize) + 
+        static_cast<size_t>(numPixels) *
+        static_cast<size_t>(numOutputChannels) *
+        static_cast<size_t>(pixelDataStructSize));
+    m_PixelBufferMultiChannel->Write(numPixels, 0);
+    m_PixelBufferMultiChannel->Write(numOutputChannels, sizeof(PixelBuffer::m_NumPixels));
 
-    m_PixelBuffer1Channel = std::make_unique<MemoryBuffer>(sizeof(PixelBuffer) + numPixels * 1 * sizeof(float3));
-    m_PixelBuffer1Channel->Write(numPixels, 0);
-    m_PixelBuffer1Channel->Write(1, sizeof(PixelBuffer::m_NumPixels));
+    m_PixelBufferSingleChannel = std::make_unique<MemoryBuffer>(
+        static_cast<size_t>(pixelBufferEmptySize) + 
+        static_cast<size_t>(numPixels)*
+        static_cast<size_t>(pixelDataStructSize));
+    m_PixelBufferSingleChannel->Write(numPixels, 0);
+    m_PixelBufferSingleChannel->Write(1, sizeof(PixelBuffer::m_NumPixels));
 
-    const PixelBuffer* pixelBufferPtr = m_PixelBuffer3Channels->GetDevicePtr<PixelBuffer>();
+    const PixelBuffer* pixelBufferPtr = m_PixelBufferMultiChannel->GetDevicePtr<PixelBuffer>();
 
     //Allocate result buffer.
     m_ResultBuffer = std::make_unique<MemoryBuffer>(sizeof(ResultBuffer));
-    m_ResultBuffer->Write(pixelBufferPtr, 0);
+    m_ResultBuffer->Write(&pixelBufferPtr, sizeof(ResultBuffer::m_PixelBuffer), 0);
 
     const unsigned rayBatchEmptySize = sizeof(RayBatch);
     const unsigned rayDataStructSize = sizeof(RayData);
@@ -416,10 +421,10 @@ void WaveFrontRenderer::CreateDataBuffers()
         rayBatch = std::make_unique<MemoryBuffer>(
             static_cast<size_t>(rayBatchEmptySize) + 
             static_cast<size_t>(numPixels) * 
-            static_cast<size_t>(raysPerPixel) * 
+            static_cast<size_t>(m_RaysPerPixel) * 
             static_cast<size_t>(rayDataStructSize));
         rayBatch->Write(numPixels, 0);
-        rayBatch->Write(raysPerPixel, sizeof(RayBatch::m_NumPixels));
+        rayBatch->Write(m_RaysPerPixel, sizeof(RayBatch::m_NumPixels));
     }
 
     const unsigned intersectionBufferEmptySize = sizeof(IntersectionBuffer);
@@ -430,10 +435,10 @@ void WaveFrontRenderer::CreateDataBuffers()
         intersectionBuffer = std::make_unique<MemoryBuffer>(
            static_cast<size_t>(intersectionBufferEmptySize) +
            static_cast<size_t>(numPixels) * 
-           static_cast<size_t>(raysPerPixel) * 
+           static_cast<size_t>(m_RaysPerPixel) *
            static_cast<size_t>(intersectionDataStructSize));
         intersectionBuffer->Write(numPixels, 0);
-        intersectionBuffer->Write(raysPerPixel, sizeof(IntersectionBuffer::m_NumPixels));
+        intersectionBuffer->Write(m_RaysPerPixel, sizeof(IntersectionBuffer::m_NumPixels));
     }
 
     const unsigned ShadowRayBatchEmptySize = sizeof(ShadowRayBatch);
@@ -441,13 +446,13 @@ void WaveFrontRenderer::CreateDataBuffers()
 
     m_ShadowRayBatch = std::make_unique<MemoryBuffer>(
         static_cast<size_t>(ShadowRayBatchEmptySize) + 
-        static_cast<size_t>(maxDepth) * 
+        static_cast<size_t>(m_MaxDepth) * 
         static_cast<size_t>(numPixels) * 
-        static_cast<size_t>(shadowRaysPerPixel) * 
+        static_cast<size_t>(m_ShadowRaysPerPixel) * 
         static_cast<size_t>(ShadowRayDataStructSize));
-    m_ShadowRayBatch->Write(maxDepth, 0);
+    m_ShadowRayBatch->Write(m_MaxDepth, 0);
     m_ShadowRayBatch->Write(numPixels, sizeof(ShadowRayBatch::m_MaxDepth));
-    m_ShadowRayBatch->Write(shadowRaysPerPixel, sizeof(ShadowRayBatch::m_MaxDepth) + sizeof(ShadowRayBatch::m_NumPixels));
+    m_ShadowRayBatch->Write(m_ShadowRaysPerPixel, sizeof(ShadowRayBatch::m_MaxDepth) + sizeof(ShadowRayBatch::m_NumPixels));
 
 
 
@@ -539,14 +544,14 @@ GLuint WaveFrontRenderer::TraceFrame()
     MemoryBuffer& currentRaysBatch = *m_RayBatches[batchIndices[static_cast<unsigned>(RayBatchTypeIndex::CURRENT_RAYS)]];
 
     //Generate primary rays using the setup parameters
-    const WaveFront::SetupLaunchParameters setupParams(m_Resolution, cameraData, currentRaysBatch.GetDevicePtr<RayBatch>());
+    const WaveFront::SetupLaunchParameters setupParams(m_RenderResolution, cameraData, currentRaysBatch.GetDevicePtr<RayBatch>());
     GenerateRays(setupParams);
 
     //Initialize resolveRaysLaunchParameters with common variables between different waves.
     WaveFront::ResolveRaysLaunchParameters optixRaysLaunchParams{};
     optixRaysLaunchParams.m_Common.m_Traversable = dynamic_cast<PTScene&>(*m_Scene).GetSceneAccelerationStructure(); //TODO: make sure if scene is empty it doesn't result in errors.
 
-    uint3 resolutionAndDepth = make_uint3(m_Resolution.x, m_Resolution.y, 0);
+    uint3 resolutionAndDepth = make_uint3(m_RenderResolution.x, m_RenderResolution.y, 0);
 
     //Loop
     //Trace buffer of rays using Optix ResolveRays pipeline
@@ -564,26 +569,13 @@ GLuint WaveFrontRenderer::TraceFrame()
         MemoryBuffer& primHitsPrevFrame =   *m_IntersectionBuffers[m_HitBufferIndices[static_cast<unsigned>(HitBufferTypeIndex::PRIM_HITS_PREV_FRAME)]];
         MemoryBuffer& currentHits =         *m_IntersectionBuffers[m_HitBufferIndices[static_cast<unsigned>(HitBufferTypeIndex::CURRENT_HITS)]];
 
-
-        /*printf(
-            "Wave %i: Indices: %i %i %i \n",
-            WaveIndex,
-            m_RayBatchIndices[static_cast<unsigned>(RayBatchTypeIndex::PRIM_RAYS_PREV_FRAME)],
-            m_RayBatchIndices[static_cast<unsigned>(RayBatchTypeIndex::CURRENT_RAYS)],
-            m_RayBatchIndices[static_cast<unsigned>(RayBatchTypeIndex::SECONDARY_RAYS)]);*/
-
-        /*printf(
-            "Wave %i: Hit Buffer Indices: %i %i \n",
-            waveIndex,
-            m_HitBufferIndices[static_cast<unsigned>(HitBufferTypeIndex::PRIM_HITS_PREV_FRAME)],
-            m_HitBufferIndices[static_cast<unsigned>(HitBufferTypeIndex::CURRENT_HITS)]);*/
-
         //Resolution and current depth(, current depth = current wave index)
         resolutionAndDepth.z = waveIndex;
 
         optixRaysLaunchParams.m_Common.m_ResolutionAndDepth = resolutionAndDepth;
         optixRaysLaunchParams.m_Rays = currentRays.GetDevicePtr<RayBatch>();
         optixRaysLaunchParams.m_Intersections = currentHits.GetDevicePtr<IntersectionBuffer>();
+
 
         m_PipelineRaysLaunchParams->Write(optixRaysLaunchParams);
 
@@ -596,8 +588,8 @@ GLuint WaveFrontRenderer::TraceFrame()
             *(*m_PipelineRaysLaunchParams),
             m_PipelineRaysLaunchParams->GetSize(),
             &SBT,
-            m_Resolution.x,
-            m_Resolution.y,
+            m_RenderResolution.x,
+            m_RenderResolution.y,
             1); //Depth = 1 as the waves only trace one bounce per wave.
 
         WaveFront::ShadingLaunchParameters shadingLaunchParams(
@@ -634,23 +626,24 @@ GLuint WaveFrontRenderer::TraceFrame()
         *(*m_PipelineShadowRaysLaunchParams),
         m_PipelineShadowRaysLaunchParams->GetSize(),
         &SBT,
-        m_Resolution.x,
-        m_Resolution.y,
+        m_RenderResolution.x,
+        m_RenderResolution.y,
         m_MaxDepth);
+
+    cudaDeviceSynchronize();
+    CHECKLASTCUDAERROR;
 
 
     
     PostProcessLaunchParameters postProcessLaunchParams(
-        m_Resolution,
-        m_Resolution,
+        m_RenderResolution,
+        m_OutputResolution,
         m_ResultBuffer->GetDevicePtr<ResultBuffer>(),
-        m_PixelBuffer1Channel->GetDevicePtr<PixelBuffer>(),
+        m_PixelBufferSingleChannel->GetDevicePtr<PixelBuffer>(),
         m_OutputBuffer->GetDevicePointer());
 
     //Post processing using CUDA kernel.
     PostProcess(postProcessLaunchParams);
-
-
 
     //Return output image.
     return m_OutputBuffer->GetTexture();

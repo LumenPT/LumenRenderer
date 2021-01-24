@@ -10,7 +10,7 @@ PTMesh::PTMesh(std::vector<std::unique_ptr<Lumen::ILumenPrimitive>>& a_Primitive
     : ILumenMesh(a_Primitives)
     , m_Services(a_ServiceLocator)
 {
-    
+    UpdateAccelerationStructure();
 }
 
 void PTMesh::UpdateAccelerationStructure()
