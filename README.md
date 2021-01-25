@@ -43,7 +43,7 @@ However, it is recommended and somewhat expected by the teachers to stay with yo
 ## Contributions
 ### Main contributors
 
-| Name | Block 1 | Block 2 | Block 3 | Block 4 |
+| Name | Concepting | Pre-production | Production | Release |
 | :--- | :---: | :---: | :---: | :---: |
 | **Person 1** | :heavy_check_mark: | :x: | :x: |  |
 | **Person 2** | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |  |
@@ -102,9 +102,3 @@ However, it is recommended and somewhat expected by the teachers to stay with yo
   CMake documentation refers to these methods as `in-source` and `out-of-source`.
 * The documentation for using the CMake command line can be found here: https://cmake.org/cmake/help/latest/manual/cmake.1.html
 * Tutorials for using CMake can be found here: https://cmake.org/cmake/help/latest/guide/tutorial/index.html
-  
-### Build Instructions using Premake5. You will need Visual Studio 2019 for this.
-- Download Premake5: https://premake.github.io/download.html#v5
-- Create a new folder path inside the Lumen_Engine directory called "vendor" > "bin" > "premake".
-- Put the Premake5 executable in the the premake folder.
-- Run "GenerateProject.bat" and open the solution in generates. 
