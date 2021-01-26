@@ -4,7 +4,7 @@
 #include <Cuda/cuda/helpers.h>
 #include "ModelStructs.h"
 #include "ReSTIRData.h"
-#include <assert.h>
+#include <cassert>
 #include <cstdio>
 #include <array>
 
@@ -249,23 +249,22 @@ namespace WaveFront
 
         CPU_GPU IntersectionData()
             :
-        m_RayIndex(0),
+        m_RayArrayIndex(0),
         m_IntersectionT(-1.f),
         m_PrimitiveIndex(0),
-        m_MeshAndInstanceId(0)
+        m_Primitive(0)
         {}
-        
 
         CPU_GPU IntersectionData(
-            unsigned int a_RayIndex,
+            unsigned int a_RayArrayIndex,
             float a_IntersectionT,
             unsigned int a_PrimitiveIndex,
-            unsigned int a_MeshAndInstanceId)
+            DevicePrimitive* a_Primitive)
             :
-        m_RayIndex(a_RayIndex),
+        m_RayArrayIndex(a_RayArrayIndex),
         m_IntersectionT(a_IntersectionT),
         m_PrimitiveIndex(a_PrimitiveIndex),
-        m_MeshAndInstanceId(a_MeshAndInstanceId)
+        m_Primitive(a_Primitive)
         {}
 
 
@@ -283,7 +282,7 @@ namespace WaveFront
         /// <b>Description</b> \n The index in the m_Rays array of a RayBatch of the ray the intersection belongs to. \n
         /// <b>Default</b>: 0
         /// </summary>
-        unsigned int m_RayIndex;
+        unsigned int m_RayArrayIndex;
 
         /// <summary>
         /// <b>Description</b> \n Distance along the ray the intersection happened. \n
@@ -301,7 +300,7 @@ namespace WaveFront
         /// <b>Description</b> \n The index of the primitive of the mesh that the ray intersected with. \n
         /// <b>Default</b>: 0
         /// </summary>
-        unsigned int m_MeshAndInstanceId; //TODO: Might need to change to pointer to a DeviceMesh.
+        DevicePrimitive* m_Primitive; //TODO: Might need to change to pointer to a DeviceMesh.
 
     };
 
@@ -579,6 +578,15 @@ namespace WaveFront
 
         }
 
+        GPU_ONLY INLINE const ShadowRayData& GetShadowRayData(unsigned int a_ShadowRayArrayIndex) const
+        {
+
+            assert(a_ShadowRayArrayIndex < GetSize());
+
+            return m_ShadowRays[a_ShadowRayArrayIndex];
+
+        }
+
         //Gets a index to a ShadowRay in the m_ShadowRays array, taking into account the max dept, number of pixels and number of rays per pixel.
         GPU_ONLY INLINE unsigned int GetShadowRayArrayIndex(unsigned int a_DepthIndex, unsigned int a_PixelIndex, unsigned int a_RayIndex) const
         {
@@ -753,6 +761,10 @@ namespace WaveFront
 
     struct ResolveRaysRayGenData
     {
+
+        float m_MinDistance;
+        float m_MaxDistance;
+
     };
 
     struct ResolveRaysHitData
@@ -765,6 +777,10 @@ namespace WaveFront
 
     struct ResolveShadowRaysRayGenData
     {
+
+        float m_MinDistance;
+        float m_MaxDistance;
+
     };
 
     struct ResolveShadowRaysHitData
