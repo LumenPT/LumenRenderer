@@ -9,16 +9,73 @@
 #include <Cuda/cuda/helpers.h>
 #include <assert.h>
 #include <limits>
+#include <cinttypes>
 
 constexpr float MINFLOAT = std::numeric_limits<float>::min();
 
+/*
+ * All configurable settings for ReSTIR.
+ * The defaults are the values used in the ReSTIR paper.
+ */
+struct ReSTIRSettings
+{
+    //Screen width in pixels.
+    std::uint32_t width = 0;
+
+    //Screen height in pixels.
+    std::uint32_t height = 0;
+
+    //The amount of reservoirs used per pixel.
+    std::uint32_t numReservoirsPerPixel = 5;
+
+    //The amount of lights per light bag.
+    std::uint32_t numLightsPerBag = 1000;
+
+    //The total amount of light bags to generate.
+    std::uint32_t numLightBags = 50;
+
+    //The amount of initial samples to take each frame.
+    std::uint32_t numPrimarySamples = 32;
+
+    //The amount of spatial neighbours to consider.
+    std::uint32_t numSpatialSamples = 5;
+
+    //The maximum distance for spatial samples.
+    std::uint32_t spatialSampleRadius = 30;
+
+    //The x and y size of the pixel grid per light bag. This indirectly determines the amount of light bags.
+    std::uint32_t pixelGridSize = 16;
+
+    //The amount of spatial iterations to perform. Previous output becomes current input.
+    std::uint32_t numSpatialIterations = 2;
+
+    //Use the biased algorithm or not. When false, the unbiased algorithm is used instead.
+    bool enableBiased = true;
+
+    //Enable spatial sampling.
+    bool enableSpatial = true;
+
+    //Enable temporal sampling.
+    bool enableTemporal = true;
+};
+
+/*
+ * A visibility ray used by ReSTIR to determine if a light sample is occluded or not.
+ */
+struct RestirShadowRay
+{
+    float3 origin;      //Ray origin.
+    float3 direction;   //Ray direction, normalized.
+    float distance;     //The distance of the light source from the origin along the ray direction.
+    unsigned index;     //The index into the reservoir buffer at which to set weight to 0 when occluded.
+};
 
  /*
   * LightSample contains information about a light, specific to a surface in the scene.
   */
 struct LightSample
 {
-    LightSample() : radiance({0.f, 0.f, 0.f}), normal({ 0.f, 0.f, 0.f }), position({ 0.f, 0.f, 0.f }), solidAnglePdf(0.f) {}
+    __host__ __device__ LightSample() : radiance({0.f, 0.f, 0.f}), normal({ 0.f, 0.f, 0.f }), position({ 0.f, 0.f, 0.f }), solidAnglePdf(0.f) {}
 
     float3 radiance;
     float3 normal;
@@ -59,7 +116,8 @@ struct Reservoir
         ++sampleCount;
 
         //Generate a random float between 0 and 1 and then overwrite the sample based on the probability of this sample being chosen.
-        const float r = static_cast<float>(rand()) / static_cast <float> (RAND_MAX);
+        //TODO generate random float between 0 and 1. both inclusive.
+        const float r = 0;// static_cast<float>(rand()) / static_cast <float> (RAND_MAX);
 
         //In this case R is inclusive with 0.0 and 1.0. This means that the first sample is always chosen.
         //If weight is 0, then a division by 0 would happen. Also it'd be impossible to pick this sample.

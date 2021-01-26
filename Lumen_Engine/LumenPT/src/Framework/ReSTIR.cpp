@@ -17,6 +17,7 @@ CPU_ONLY void ReSTIR::Initialize(const ReSTIRSettings& a_Settings)
 	assert(m_Settings.numPrimarySamples > 0 && "Num primary samples needs to be at least 1.");
 	assert(m_Settings.numReservoirsPerPixel > 0 && "Num reservoirs per pixel needs to be at least 1.");
 	assert(m_Settings.numSpatialIterations > 0 && "The amount of spatial iterations needs to be at least 1.");
+	assert(m_Settings.numSpatialIterations % 2 == 0 && "The amount of spatial iterations needs to be an even number (so that final output ends up in the right buffer).");
 	assert(m_Settings.numSpatialSamples > 0 && "The amount of spatial samples needs to be at least 1.");
 	assert(m_Settings.pixelGridSize > 0 && "The pixel grid size needs to be at least 1 by 1 pixels.");
 	assert(m_Settings.spatialSampleRadius > 0 && "The spatial sample radius needs to be at least 1 pixel.");
@@ -59,10 +60,19 @@ CPU_ONLY void ReSTIR::Initialize(const ReSTIRSettings& a_Settings)
 	cudaDeviceSynchronize();
 }
 
-CPU_ONLY void ReSTIR::Run(const WaveFront::IntersectionBuffer* const a_CurrentIntersections,
-    const WaveFront::IntersectionBuffer* const a_PreviousIntersections, const std::vector<TriangleLight>& a_Lights)
+CPU_ONLY void ReSTIR::Run(
+	const WaveFront::IntersectionData* const a_CurrentIntersections,
+	const WaveFront::RayData* const a_RayBuffer,
+    const WaveFront::IntersectionData* const a_PreviousIntersections,
+	const WaveFront::RayData* const a_PreviousRayBuffer,
+	const std::vector<TriangleLight>& a_Lights
+)
 {
 	assert(m_SwapDirtyFlag && "SwapBuffers has to be called once per frame for ReSTIR to properly work.");
+
+	//Index of the reservoir buffers (current and temporal).
+	auto currentIndex = m_SwapChainIndex;
+	auto temporalIndex = currentIndex == 1 ? 0 : 1;
 
 	/*
 	 * Resize buffers based on the amount of lights and update data.
@@ -89,8 +99,35 @@ CPU_ONLY void ReSTIR::Run(const WaveFront::IntersectionBuffer* const a_CurrentIn
 		FillLightBags(m_Settings.numLightBags, static_cast<CDF*>(m_Cdf.GetDevicePtr()), static_cast<LightBagEntry*>(m_LightBags.GetDevicePtr()), static_cast<TriangleLight*>(m_Lights.GetDevicePtr()));
 	}
 
-	//TODO run algorithm.
+	/*
+	 * Pick primary samples in parallel. Store the samples in the reservoirs.
+	 */
+	PickPrimarySamples(a_RayBuffer, a_CurrentIntersections, static_cast<LightBagEntry*>(m_LightBags.GetDevicePtr()), static_cast<Reservoir*>(m_Reservoirs->GetDevicePtr()), m_Settings);
 
+	/*
+	 * Generate shadow rays for each reservoir and resolve them.
+	 * If a shadow ray is occluded, the reservoirs weight is set to 0.
+	 */
+	VisibilityPass(static_cast<Reservoir*>(m_Reservoirs[m_SwapChainIndex].GetDevicePtr()), m_Settings.width * m_Settings.height * m_Settings.numReservoirsPerPixel);
+
+	/*
+	 * Temporal sampling where reservoirs are combined with those of the previous frame.
+	 */
+	if(m_Settings.enableTemporal)
+	{
+		SpatialNeighbourSampling(static_cast<Reservoir*>(m_Reservoirs[currentIndex].GetDevicePtr()), static_cast<Reservoir*>(m_Reservoirs[2].GetDevicePtr()), m_Settings);
+	}
+
+	/*
+	 * Spatial sampling where neighbouring reservoirs are combined.
+	 */
+	if(m_Settings.enableSpatial)
+	{
+		TemporalNeighbourSampling(static_cast<Reservoir*>(m_Reservoirs[currentIndex].GetDevicePtr()), static_cast<Reservoir*>(m_Reservoirs[temporalIndex].GetDevicePtr()), m_Settings);
+	}
+
+	//TODO: Extract the data from the reservoirs to generate shadow rays and store them in the wavefront shadow ray data struct.
+	//TODO: thought: Since earlier visibility pass might still be valid, is it worth remembering that? Or is it uncommon?
 
 	 //Ensure that swap buffers is called.
 	m_SwapDirtyFlag = false;
