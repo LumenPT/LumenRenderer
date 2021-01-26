@@ -26,7 +26,6 @@ struct DeviceMaterial
     NONAMESPACE::float4 m_DiffuseColor;
     NONAMESPACE::float3 m_EmissionColor;
     cudaTextureObject_t m_DiffuseTexture;
-
 };
 
 struct DevicePrimitive

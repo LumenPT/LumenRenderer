@@ -195,23 +195,23 @@ CPU_GPU void ShadeDirect(
     //i will update to a new pixel index if there is less threads than there are pixels.
     for(unsigned int i = index; i < numPixels; i += stride) 
     {
-
         // Get intersection.
         const IntersectionData& currIntersection = a_CurrentIntersections->GetIntersection(i, 0 /*There is only one ray per pixel, only one intersection per pixel (for now)*/);
         // Get ray used to calculate intersection.   
         const RayData& currRay = a_CurrentRays->GetRay(i, 0 /*Ray index is 0 as there is only one ray per pixel*/);
 
+        unsigned int lightIndex = 0;
+        float lightPDF = 0;
+        float random = RandomFloat(lightIndex);
 
-        const unsigned int lightIndex = 0;
-        //float lightPDF = 0;
-        //float random = 0.69f;
-        ////float random = [=] __device__(float s){ s ^= s << 13, s ^= s >> 17, s ^= s << 5; return s; }; //trying cuda lambdas without success.
-    	//
-        //// uint seed = WangHash( pathIdx * 17 + R0  /* well-seeded xor32 is all you need */ );
-        //unsigned int WangHash(unsigned int s) { s = (s ^ 61) ^ (s >> 16), s *= 9, s = s ^ (s >> 4), s *= 0x27d4eb2d, s = s ^ (s >> 15); return s; }
-        //unsigned int RandomInt(unsigned int& s) { s ^= s << 13, s ^= s >> 17, s ^= s << 5; return s; }
-        //float RandomFloat(unsigned int& s) { return RandomInt(s) * 2.3283064365387e-10f; }
-    	//
+        auto& diffColor = currIntersection.m_Primitive->m_Material->m_DiffuseColor;
+    	
+        potRadiance = {
+            diffColor.x,
+            diffColor.y,
+            diffColor.z
+        };
+
         ////pass in random number into CDF
         //get PDF from it
         //if(a_CDF != nullptr) a_CDF currently causes errors as it is not being passed in as a valid shading launch parameter.
@@ -224,10 +224,16 @@ CPU_GPU void ShadeDirect(
 
         const auto& light = a_Lights[lightIndex];
 
+        //placeholder device primitive pointer
+
     	//worldspace position of emissive triangle
         const float3 lightPos = (light.m_Lights->p0 + light.m_Lights->p1 + light.m_Lights->p2) * 0.33f;
         float3 sRayDir = normalize(lightPos - sRayOrigin);
 
+        unsigned int x, y, z;
+        sRayDir = { RandomFloat(x), RandomFloat(y), RandomFloat(z) };
+        sRayDir = normalize(sRayDir);
+    	
         // apply epsilon... very hacky, very temporary
         sRayOrigin = sRayOrigin + (sRayDir * 0.001f);
     	
