@@ -260,7 +260,8 @@ bool WaveFrontRenderer::CreatePipeline(
         hitProgram == nullptr || 
         missProgram == nullptr)
     {
-        printf("Could not create program groups: (RayGenProgram: %p , HitProgram: %p, MissProgram: %p) \n", 
+        printf("Could not create program groups for pipeline type: %i: (RayGenProgram: %p , HitProgram: %p, MissProgram: %p) \n",
+            a_Type,
             rayGenProgram, 
             hitProgram, 
             missProgram);
@@ -342,7 +343,7 @@ OptixModule WaveFrontRenderer::CreateModule(const std::string& a_PtxPath, const 
 
     char log[2048];
     auto logSize = sizeof(log);
-    OptixModule module;
+    OptixModule module{};
 
 
 
@@ -862,7 +863,7 @@ std::unique_ptr<AccelerationStructure> WaveFrontRenderer::BuildGeometryAccelerat
 {
 
     // Let Optix compute how much memory the output buffer and the temporary buffer need to have, then create these buffers
-    OptixAccelBufferSizes sizes;
+    OptixAccelBufferSizes sizes{};
     CHECKOPTIXRESULT(optixAccelComputeMemoryUsage(m_DeviceContext, &a_BuildOptions, &a_BuildInput, 1, &sizes));
     MemoryBuffer tempBuffer(sizes.tempSizeInBytes);
     std::unique_ptr<MemoryBuffer> resultBuffer = std::make_unique<MemoryBuffer>(sizes.outputSizeInBytes);
