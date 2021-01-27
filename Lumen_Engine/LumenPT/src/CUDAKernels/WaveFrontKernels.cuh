@@ -1,13 +1,11 @@
 #pragma once
-
-#include <cuda_runtime.h>
+#include "../Shaders/CppCommon/CudaDefines.h"
 #include "../Shaders/CppCommon/WaveFrontDataStructs.h"
 
-//Some defines to make the functions less scary and more readable
+#include <cuda_runtime.h>
 
-#define GPU_ONLY __device__ __forceinline__ //Runs on GPU only, available on GPU only.
-#define CPU_GPU __global__ //Runs on GPU, available on GPU and CPU.
-#define CPU_ONLY __host__
+
+//Some defines to make the functions less scary and more readable
 
 using namespace WaveFront;
 
@@ -48,7 +46,7 @@ CPU_ONLY void PostProcess(const PostProcessLaunchParameters& a_PostProcessParams
 //The below functions are only called internally from the GPU_ONLY within the above defined functions.
 
 //Generate some rays based on the thread index.
-CPU_GPU void GenerateRay(
+CPU_ON_GPU void GenerateRay(
     int a_NumRays, 
     RayBatch* const a_Buffer, 
     float3 a_U, 
@@ -64,7 +62,7 @@ CPU_GPU void GenerateRay(
  * Calculates direct shading as potential light contribution.
  * Defines a shadow ray that is used to validate the potential light contribution.
  */
-CPU_GPU void ShadeDirect(
+CPU_ON_GPU void ShadeDirect(
     const uint3 a_ResolutionAndDepth, 
     const RayBatch* const a_CurrentRays, 
     const IntersectionBuffer* const a_CurrentIntersections, 
@@ -75,12 +73,12 @@ CPU_GPU void ShadeDirect(
 /*
  *
  */
-CPU_GPU void ShadeSpecular();
+CPU_ON_GPU void ShadeSpecular();
 
 /*
  *
  */
-CPU_GPU void ShadeIndirect(
+CPU_ON_GPU void ShadeIndirect(
     const uint3 a_ResolutionAndDepth, 
     const IntersectionBuffer* const a_Intersections, 
     const RayBatch* const a_PrimaryRays, 
@@ -91,12 +89,12 @@ CPU_GPU void ShadeIndirect(
 /*
  *
  */
-CPU_GPU void Denoise();
+CPU_ON_GPU void Denoise();
 
 /*
  *
  */
-CPU_GPU void MergeLightChannels(
+CPU_ON_GPU void MergeLightChannels(
     const uint2 a_Resolution, 
     const ResultBuffer* const a_Input, 
     PixelBuffer* const a_Output);
@@ -104,30 +102,55 @@ CPU_GPU void MergeLightChannels(
 /*
  *
  */
-CPU_GPU void DLSS();
+CPU_ON_GPU void DLSS();
 
 /*
  *
  */
-CPU_GPU void PostProcessingEffects();
+CPU_ON_GPU void PostProcessingEffects();
 
 //Temporary step till post-processing is in place.
-CPU_GPU void WriteToOutput( 
+CPU_ON_GPU void WriteToOutput(
     const uint2 a_Resolution, 
     const PixelBuffer* const a_Input, 
     uchar4* a_Output);
 
-GPU_ONLY inline unsigned int WangHash(unsigned int a_S)
-{
-    a_S = (a_S ^ 61) ^ (a_S >> 16), a_S *= 9, a_S = a_S ^ (a_S >> 4), a_S *= 0x27d4eb2d, a_S = a_S ^ (a_S >> 15); return a_S;
-}
 
-GPU_ONLY inline unsigned int RandomInt(unsigned int& a_S)
-{
-    a_S ^= a_S << 13, a_S ^= a_S >> 17, a_S ^= a_S << 5; return a_S;
-};
 
-GPU_ONLY inline float RandomFloat(unsigned int& a_S)
-{
-    return RandomInt(a_S) * 2.3283064365387e-10f;
-}
+//Helper functions.
+
+GPU_ONLY INLINE unsigned int WangHash(unsigned int a_S);
+
+GPU_ONLY INLINE unsigned int RandomInt(unsigned int& a_S);
+
+GPU_ONLY INLINE float RandomFloat(unsigned int& a_S);
+
+
+
+//Data buffer helper functions.
+
+CPU_ON_GPU void ResetRayBatchMembers(
+    RayBatch* const a_RayBatch, 
+    unsigned int a_NumPixels, 
+    unsigned int a_RaysPerPixel);
+
+CPU_ON_GPU void ResetRayBatchBuffer(RayBatch* const a_RayBatch);
+
+CPU_ONLY void ResetRayBatch(
+    RayBatch* const a_RayBatchDevPtr, 
+    unsigned int a_NumPixels, 
+    unsigned int a_RaysPerPixel);
+
+CPU_ON_GPU void ResetShadowRayBatchMembers(
+    ShadowRayBatch* const a_ShadowRayBatch, 
+    unsigned int a_MaxDepth, 
+    unsigned int a_NumPixels, 
+    unsigned int a_RaysPerPixel);
+
+CPU_ON_GPU void ResetShadowRayBatchBuffer(ShadowRayBatch* const a_ShadowRayBatch);
+
+CPU_ONLY void ResetShadowRayBatch(
+    ShadowRayBatch* a_ShadowRayBatchDevPtr,
+    unsigned int a_MaxDepth,
+    unsigned int a_NumPixels,
+    unsigned int a_RaysPerPixel);

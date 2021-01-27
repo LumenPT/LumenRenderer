@@ -97,7 +97,7 @@ CPU_ONLY void PostProcess(const PostProcessLaunchParameters& a_PostProcessParams
     cudaDeviceSynchronize();
     CHECKLASTCUDAERROR;
 
-    MergeLightChannels <<<numBlocks, blockSize>>> (
+    MergeLightChannels <<<1, 1>>> (
         a_PostProcessParams.m_Resolution, 
         a_PostProcessParams.m_WavefrontOutput,
         a_PostProcessParams.m_MergedResults);
@@ -135,7 +135,7 @@ CPU_ONLY void PostProcess(const PostProcessLaunchParameters& a_PostProcessParams
 
 
 
-CPU_GPU void GenerateRay(
+CPU_ON_GPU void GenerateRay(
     int a_NumRays,
     RayBatch* const a_Buffer,
     float3 a_U,
@@ -168,7 +168,7 @@ CPU_GPU void GenerateRay(
     }
 }
 
-CPU_GPU void ShadeDirect(
+CPU_ON_GPU void ShadeDirect(
     const uint3 a_ResolutionAndDepth, 
 	const RayBatch* const a_CurrentRays,
     const IntersectionBuffer* const a_CurrentIntersections, 
@@ -195,79 +195,64 @@ CPU_GPU void ShadeDirect(
     //i will update to a new pixel index if there is less threads than there are pixels.
     for(unsigned int i = index; i < numPixels; i += stride) 
     {
+
         // Get intersection.
         const IntersectionData& currIntersection = a_CurrentIntersections->GetIntersection(i, 0 /*There is only one ray per pixel, only one intersection per pixel (for now)*/);
-        // Get ray used to calculate intersection.   
-        const RayData& currRay = a_CurrentRays->GetRay(i, 0 /*Ray index is 0 as there is only one ray per pixel*/);
 
-        unsigned int lightIndex = 0;
-        float lightPDF = 0;
-        float random = RandomFloat(lightIndex);
+        if(currIntersection.IsIntersection())
+        {
 
-        auto& diffColor = currIntersection.m_Primitive->m_Material->m_DiffuseColor;
-    	
-        potRadiance = {
-            diffColor.x,
-            diffColor.y,
-            diffColor.z
-        };
+            // Get ray used to calculate intersection.
+            const unsigned int rayArrayIndex = currIntersection.m_RayArrayIndex;
 
-        ////pass in random number into CDF
-        //get PDF from it
-        //if(a_CDF != nullptr) a_CDF currently causes errors as it is not being passed in as a valid shading launch parameter.
-        //{
-        //    a_CDF->Get(random, lightIndex, lightPDF);
-        //}
+            const RayData& currRay = a_CurrentRays->GetRay(rayArrayIndex);
+            
+            //unsigned int lightIndex = 0;
+            //float lightPDF = 0;
+            //float random = RandomFloat(lightIndex);
 
-    	//World space??
-        float3 sRayOrigin = currRay.m_Origin + (currRay.m_Direction * currIntersection.m_IntersectionT);
+            //auto& diffColor = currIntersection.m_Primitive->m_Material->m_DiffuseColor;
+            
+            //potRadiance = make_float3(diffColor);
 
-        const auto& light = a_Lights[lightIndex];
+            potRadiance = make_float3(1.f);
 
-        //placeholder device primitive pointer
-
-    	//worldspace position of emissive triangle
-        const float3 lightPos = (light.m_Lights->p0 + light.m_Lights->p1 + light.m_Lights->p2) * 0.33f;
-        float3 sRayDir = normalize(lightPos - sRayOrigin);
-
-        unsigned int x, y, z;
-        sRayDir = { RandomFloat(x), RandomFloat(y), RandomFloat(z) };
-        sRayDir = normalize(sRayDir);
-    	
-        // apply epsilon... very hacky, very temporary
-        sRayOrigin = sRayOrigin + (sRayDir * 0.001f);
-    	
-    	//Temporary forloop. Obviously not how you would wanna figure out which lights to sample
-   //     for (int i = 0; i < a_Lights->m_Size; i++) // choose arbitrary light (temp) to figure out direction it.
-   // 	{
-   //         auto& l = a_Lights[i];
-   //     	// light vertices are in world space
-   //     	//????????? idk wtf????? this may not work ????? to find light position in world space???? uhhhh???? heh?
-   //         float3 pos = (l.m_Lights->p0 + l.m_Lights->p1 + l.m_Lights->p2) * 0.33f;
-			//sRayDir = normalize(pos - sRayOrigin);
-   // 	}
+            float3 sRayOrigin = currRay.m_Origin + (currRay.m_Direction * currIntersection.m_IntersectionT);
+            
+            //const auto& light = a_Lights[lightIndex];
+            //
+            ////worldspace position of emissive triangle
+            //const float3 lightPos = (light.m_Lights->p0 + light.m_Lights->p1 + light.m_Lights->p2) * 0.33f;
+            //float3 sRayDir = normalize(lightPos - sRayOrigin);
 
 
-        //check for fallof check what color the potential radiance is
-    		//check if there is something related to contribution calculation
-    	
-        ShadowRayData shadowRay(
-            sRayOrigin,
-            sRayDir,
-            1000.f,
-            potRadiance,    // light contribution value at intersection point that will reflect in the direction of the incoming ray (intersection ray).
-            ResultBuffer::OutputChannel::DIRECT
-        );
+            unsigned int x = threadIdx.x , y = threadIdx.y, z = threadIdx.z;
+            float3 sRayDir = { RandomFloat(x), RandomFloat(y), RandomFloat(z) };
+            sRayDir = normalize(sRayDir);
+            
+            // apply epsilon... very hacky, very temporary
+            sRayOrigin = sRayOrigin + (sRayDir * 0.001f);
 
-        a_ShadowRays->SetShadowRay(shadowRay, a_ResolutionAndDepth.z, i, 0 /*Ray index is 0 as there is only one ray per pixel*/);
+            ShadowRayData shadowRay(
+                sRayOrigin,
+                sRayDir,
+                0.11f,
+                potRadiance,    // light contribution value at intersection point that will reflect in the direction of the incoming ray (intersection ray).
+                ResultBuffer::OutputChannel::DIRECT
+            );
+            
+            a_ShadowRays->SetShadowRay(shadowRay, a_ResolutionAndDepth.z, i, 0 /*Ray index is 0 as there is only one ray per pixel*/);
+
+        }
+        
     }
 }
 
-CPU_GPU void ShadeSpecular()
+CPU_ON_GPU void ShadeSpecular()
 {
 }
 
-CPU_GPU void ShadeIndirect(
+CPU_ON_GPU void ShadeIndirect(
     const uint3 a_ResolutionAndDepth, 
     const IntersectionBuffer* const a_Intersections, 
     const RayBatch* const a_PrimaryRays, 
@@ -312,11 +297,11 @@ CPU_GPU void ShadeIndirect(
 
 
 
-CPU_GPU void Denoise()
+CPU_ON_GPU void Denoise()
 {
 }
 
-CPU_GPU void MergeLightChannels(
+CPU_ON_GPU void MergeLightChannels(
     const uint2 a_Resolution, 
     const ResultBuffer* const a_Input, 
     PixelBuffer* const a_Output)
@@ -335,20 +320,23 @@ CPU_GPU void MergeLightChannels(
     
         //Mix the results;
         float3 mergedColor = a_Input->GetPixelCombined(i);
-        a_Output->SetPixel(make_float3(0.f), i, 0);
+        a_Output->SetPixel(mergedColor, i, 0);
+
+        //printf("MergedColor: %f, %f, %f \n", mergedColor.x, mergedColor.y, mergedColor.z);
+
     }
 
 }
 
-CPU_GPU void DLSS()
+CPU_ON_GPU void DLSS()
 {
 }
 
-CPU_GPU void PostProcessingEffects()
+CPU_ON_GPU void PostProcessingEffects()
 {
 }
 
-CPU_GPU void WriteToOutput(
+CPU_ON_GPU void WriteToOutput(
     const uint2 a_Resolution, 
     const PixelBuffer* const a_Input, 
     uchar4* a_Output)
@@ -362,4 +350,112 @@ CPU_GPU void WriteToOutput(
         const auto color = make_color(a_Input->GetPixel(i, 0 /*Only one channel per pixel in the merged result*/ ));
         a_Output[i] = color;
     }
+}
+
+
+
+//Helper functions
+
+GPU_ONLY INLINE unsigned int WangHash(unsigned int a_S)
+{
+    a_S = (a_S ^ 61) ^ (a_S >> 16), a_S *= 9, a_S = a_S ^ (a_S >> 4), a_S *= 0x27d4eb2d, a_S = a_S ^ (a_S >> 15); return a_S;
+}
+
+GPU_ONLY INLINE unsigned int RandomInt(unsigned int& a_S)
+{
+    a_S ^= a_S << 13, a_S ^= a_S >> 17, a_S ^= a_S << 5; return a_S;
+}
+
+GPU_ONLY INLINE float RandomFloat(unsigned int& a_S)
+{
+    return RandomInt(a_S) * 2.3283064365387e-10f;
+}
+
+
+
+//Data buffer helper functions
+
+CPU_ON_GPU void ResetRayBatchMembers(
+    RayBatch* const a_RayBatch, 
+    unsigned int a_NumPixels, 
+    unsigned int a_RaysPerPixel)
+{
+    *const_cast<unsigned*>(&a_RayBatch->m_NumPixels) = a_NumPixels;
+    *const_cast<unsigned*>(&a_RayBatch->m_RaysPerPixel) = a_RaysPerPixel;
+
+}
+
+CPU_ON_GPU void ResetRayBatchBuffer(RayBatch* const a_RayBatch)
+{
+
+    const unsigned int bufferSize = a_RayBatch->GetSize();
+    const unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
+    const unsigned int stride = blockDim.x * gridDim.x;
+
+    for (unsigned int i = index; i < bufferSize; i+=stride)
+    {
+        a_RayBatch->m_Rays[i] = RayData{};
+    }
+
+}
+
+CPU_ONLY void ResetRayBatch(
+    RayBatch* const a_RayBatchDevPtr, 
+    unsigned int a_NumPixels, 
+    unsigned int a_RaysPerPixel)
+{
+
+    ResetRayBatchMembers <<<1,1>>> (a_RayBatchDevPtr, a_NumPixels, a_RaysPerPixel);
+
+    const int numRays = a_NumPixels * a_RaysPerPixel;
+    const int blockSize = 256;
+    const int numBlocks = (numRays + blockSize - 1) / blockSize;
+
+    ResetRayBatchBuffer<<<numBlocks,blockSize>>>(a_RayBatchDevPtr);
+
+}
+
+CPU_ON_GPU void ResetShadowRayBatchMembers(
+    ShadowRayBatch* const a_ShadowRayBatch,
+    unsigned int a_MaxDepth,
+    unsigned int a_NumPixels,
+    unsigned int a_RaysPerPixel)
+{
+
+    *const_cast<unsigned*>(&a_ShadowRayBatch->m_MaxDepth) = a_MaxDepth;
+    *const_cast<unsigned*>(&a_ShadowRayBatch->m_NumPixels) = a_NumPixels;
+    *const_cast<unsigned*>(&a_ShadowRayBatch->m_RaysPerPixel) = a_RaysPerPixel;
+
+}
+
+CPU_ON_GPU void ResetShadowRayBatchBuffer(ShadowRayBatch* const a_ShadowRayBatch)
+{
+
+    const unsigned int bufferSize = a_ShadowRayBatch->GetSize();
+    const unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
+    const unsigned int stride = blockDim.x * gridDim.x;
+
+    for(unsigned int i = index; i < bufferSize; i += stride)
+    {
+
+        a_ShadowRayBatch->m_ShadowRays[i] = ShadowRayData{};
+    }
+
+}
+
+CPU_ONLY void ResetShadowRayBatch(
+    ShadowRayBatch* a_ShadowRayBatchDevPtr,
+    unsigned int a_MaxDepth,
+    unsigned int a_NumPixels,
+    unsigned int a_RaysPerPixel)
+{
+
+    ResetShadowRayBatchMembers<<<1,1>>>(a_ShadowRayBatchDevPtr, a_MaxDepth, a_NumPixels, a_RaysPerPixel);
+
+    const int numRays = a_MaxDepth * a_NumPixels * a_RaysPerPixel;
+    const int blockSize = 256;
+    const int numBlocks = (numRays + blockSize - 1) / blockSize;
+
+    ResetShadowRayBatchBuffer<<<numBlocks, blockSize>>>(a_ShadowRayBatchDevPtr);
+
 }

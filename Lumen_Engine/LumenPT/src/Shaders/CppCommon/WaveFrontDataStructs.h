@@ -1,31 +1,18 @@
 #pragma once
+#include "CudaDefines.h"
+#include "ModelStructs.h"
+#include "ReSTIRData.h"
 
 #include <Optix/optix.h>
 #include <Cuda/cuda/helpers.h>
-#include "ModelStructs.h"
-#include "ReSTIRData.h"
 #include <cassert>
 #include <cstdio>
 #include <array>
 
+
 /*TODO: check if usage of textures can benefit performance
  *for buffers like intersectionBuffer or OutputBuffer.
 */
-
-#if defined CPU_ONLY
-#undef CPU_ONLY
-#endif
-#if defined CPU_GPU
-#undef CPU_GPU
-#endif
-#if defined GPU_ONLY
-#undef GPU_ONLY
-#endif
-
-#define CPU_ONLY __host__
-#define CPU_GPU __host__ __device__
-#define GPU_ONLY __device__
-#define INLINE __forceinline__
 
 namespace WaveFront
 {
@@ -107,9 +94,9 @@ namespace WaveFront
         GPU_ONLY INLINE bool IsValidRay() const
         {
 
-            return !(m_Direction.x == 0.f &&
-                m_Direction.y == 0.f &&
-                m_Direction.z == 0.f);
+            return (m_Direction.x != 0.f ||
+                    m_Direction.y != 0.f ||
+                    m_Direction.z != 0.f);
 
         }
 
@@ -418,7 +405,13 @@ namespace WaveFront
         GPU_ONLY INLINE void SetPixel(const float3& a_value, unsigned int a_PixelIndex, unsigned int a_ChannelIndex)
         {
 
-            m_Pixels[GetPixelArrayIndex(a_PixelIndex, a_ChannelIndex)] = a_value;
+            /*if(a_value.x != 0.f || a_value.y != 0.f || a_value.z != 0.f)
+            {
+                printf("PixelBuffer: SetPixel: %f, %f, %f\n", a_value.x, a_value.y, a_value.z);
+            }*/
+
+            float3& pixel = m_Pixels[GetPixelArrayIndex(a_PixelIndex, a_ChannelIndex)];
+            pixel = a_value;
 
         }
 
@@ -456,6 +449,11 @@ namespace WaveFront
 
             assert(a_Channel != OutputChannel::NUM_CHANNELS);
 
+            /*if(a_Value.x != 0.f || a_Value.y != 0.f || a_Value.z != 0.f)
+            {
+                printf("ResultBuffer SetPixel: %f, %f, %f \n", a_Value.x, a_Value.y, a_Value.z);
+            }*/
+
             m_PixelBuffer->SetPixel(a_Value, a_PixelIndex, static_cast<unsigned>(a_Channel));
 
         }
@@ -480,18 +478,32 @@ namespace WaveFront
 
         }
 
-        GPU_ONLY INLINE float3 GetPixelCombined(unsigned a_PixelIndex) const
+        GPU_ONLY float3 GetPixelCombined(unsigned a_PixelIndex) const
         {
 
-            float3 result = {0.f, 0.f, 0.f};
+            float3 result = make_float3(0.0f);
 
             const unsigned numOutputChannels = GetNumOutputChannels();
+
             for(unsigned i = 0; i < numOutputChannels; ++i)
             {
-                result += m_PixelBuffer->GetPixel(a_PixelIndex, i);
+
+                const float3& color = m_PixelBuffer->GetPixel(a_PixelIndex, i);
+                result += color;
+
+                if( color.x != 0.f || color.y != 0.f || color.z != 0.f)
+                {
+                    printf("CombinePixel: Color: %f, %f, %f \n", result.x, result.y, result.z);
+                }
+
             }
 
-            
+            if( result.x != 0.f ||
+                result.y != 0.f ||
+                result.z != 0.f)
+            {
+                printf("Color Combined: %f, %f, %f \n", result.x, result.y, result.z);
+            }
 
             return result;
 
@@ -528,6 +540,16 @@ namespace WaveFront
             m_PotentialRadiance(a_PotentialRadiance),
             m_OutputChannelIndex(a_OutputChannelIndex)
         {}
+
+        GPU_ONLY INLINE bool IsValidRay() const
+        {
+
+            return  (m_Direction.x != 0.f ||
+                     m_Direction.y != 0.f ||
+                     m_Direction.z != 0.f)&& 
+                     m_MaxDistance > 0.f;
+
+        }
 
         //Read only
         float3 m_Origin;
@@ -730,6 +752,7 @@ namespace WaveFront
 
 
     // OptiX shader data parameters
+    // Launch parameters
 
     struct CommonOptixLaunchParameters
     {
@@ -759,6 +782,28 @@ namespace WaveFront
 
     };
 
+
+
+    // Shader helper structs
+
+    struct Occlusion
+    {
+
+        CPU_GPU Occlusion(float a_MaxDistance)
+            :
+            m_MaxDistance(a_MaxDistance),
+            m_Occluded(false)
+        {}
+
+        const float m_MaxDistance;
+        bool m_Occluded;
+
+    };
+
+
+
+    // ShaderBindingTable data
+
     struct ResolveRaysRayGenData
     {
 
@@ -769,10 +814,16 @@ namespace WaveFront
 
     struct ResolveRaysHitData
     {
+
+        int m_Dummy;
+
     };
 
     struct ResolveRaysMissData
     {
+
+        int m_Dummy;
+
     };
 
     struct ResolveShadowRaysRayGenData
@@ -785,14 +836,16 @@ namespace WaveFront
 
     struct ResolveShadowRaysHitData
     {
+
+        int m_Dummy;
+
     };
 
     struct ResolveShadowRaysMissData
     {
+
+        int m_Dummy;
+
     };
 
 }
-
-#undef CPU_ONLY 
-#undef CPU_GPU
-#undef GPU_ONLY 

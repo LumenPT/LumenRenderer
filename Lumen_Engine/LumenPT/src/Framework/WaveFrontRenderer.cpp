@@ -38,6 +38,7 @@ m_ProgramGroups({}),
 m_OutputBuffer(nullptr),
 m_SBTBuffer(nullptr),
 m_RayBatchIndices({0}),
+m_HitBufferIndices({0}),
 m_ResultBuffer(nullptr),
 m_PixelBufferMultiChannel(nullptr),
 m_PixelBufferSingleChannel(nullptr),
@@ -58,7 +59,7 @@ m_Initialized(false)
     if(!m_Initialized)
     {
         std::fprintf(stderr, "Initialization of wavefront renderer unsuccessful");
-        return;
+        abort();
     }
 
     m_RaysSBTGenerator = std::make_unique<ShaderBindingTableGenerator>();
@@ -140,9 +141,12 @@ bool WaveFrontRenderer::CreatePipelines(const std::string& a_ShaderPath)
     const std::string resolveRaysParams = "resolveRaysParams";
     const std::string resolveRaysRayGenFuncName = "__raygen__ResolveRaysRayGen";
     const std::string resolveRaysHitFuncName = "__closesthit__ResolveRaysClosestHit";
+    const std::string resolveRaysMissFuncName = "__miss__ResolveRaysMiss";
+
     const std::string resolveShadowRaysParams = "resolveShadowRaysParams";
     const std::string resolveShadowRaysRayGenFuncName = "__raygen__ResolveShadowRaysRayGen";
     const std::string resolveShadowRaysHitFuncName = "__anyhit__ResolveShadowRaysAnyHit";
+    const std::string resolveShadowRaysMissFuncName = "__miss__ResolveShadowRaysMiss";
 
     OptixPipelineCompileOptions compileOptions = CreatePipelineOptions(resolveRaysParams, 2, 2);
 
@@ -154,10 +158,13 @@ bool WaveFrontRenderer::CreatePipelines(const std::string& a_ShaderPath)
         compileOptions,
         PipelineType::RESOLVE_RAYS, 
         resolveRaysRayGenFuncName, 
-        resolveRaysHitFuncName, 
+        resolveRaysHitFuncName,
+        resolveRaysMissFuncName,
         m_PipelineRays);
 
-    compileOptions = CreatePipelineOptions(resolveShadowRaysParams, 1, 2);
+    //optixModuleDestroy(shaderModule);
+
+    compileOptions = CreatePipelineOptions(resolveShadowRaysParams, 2, 2);
     shaderModule = CreateModule(a_ShaderPath, compileOptions);
     if (shaderModule == nullptr) { return false; }
 
@@ -166,8 +173,11 @@ bool WaveFrontRenderer::CreatePipelines(const std::string& a_ShaderPath)
         compileOptions,
         PipelineType::RESOLVE_SHADOW_RAYS, 
         resolveShadowRaysRayGenFuncName, 
-        resolveShadowRaysHitFuncName, 
+        resolveShadowRaysHitFuncName,
+        resolveShadowRaysMissFuncName,
         m_PipelineShadowRays);
+
+    //optixModuleDestroy(shaderModule);
 
     return success;
 
@@ -185,11 +195,13 @@ bool WaveFrontRenderer::CreatePipeline(
     PipelineType a_Type, 
     const std::string& a_RayGenFuncName, 
     const std::string& a_HitFuncName,
+    const std::string& a_MissFuncName,
     OptixPipeline& a_Pipeline)
 {
 
     OptixProgramGroup rayGenProgram = nullptr;
     OptixProgramGroup hitProgram = nullptr;
+    OptixProgramGroup missProgram = nullptr;
 
     OptixProgramGroupDesc rgGroupDesc = {};
     rgGroupDesc.kind = OPTIX_PROGRAM_GROUP_KIND_RAYGEN;
@@ -199,6 +211,9 @@ bool WaveFrontRenderer::CreatePipeline(
     OptixProgramGroupDesc htGroupDesc = {};
     htGroupDesc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
 
+    OptixProgramGroupDesc msGroupDesc = {};
+    msGroupDesc.kind = OPTIX_PROGRAM_GROUP_KIND_MISS;
+
     switch (a_Type)
     {
 
@@ -207,8 +222,12 @@ bool WaveFrontRenderer::CreatePipeline(
                 htGroupDesc.hitgroup.entryFunctionNameCH = a_HitFuncName.c_str();
                 htGroupDesc.hitgroup.moduleCH = a_Module;
 
+                msGroupDesc.miss.entryFunctionName = a_MissFuncName.c_str();
+                msGroupDesc.miss.module = a_Module;
+
                 rayGenProgram = CreateProgramGroup(rgGroupDesc, s_RaysRayGenPGName);
                 hitProgram = CreateProgramGroup(htGroupDesc, s_RaysHitPGName);
+                missProgram = CreateProgramGroup(msGroupDesc, s_RaysMissPGName);
 
                 break;
             }
@@ -218,23 +237,41 @@ bool WaveFrontRenderer::CreatePipeline(
                 htGroupDesc.hitgroup.entryFunctionNameAH = a_HitFuncName.c_str();
                 htGroupDesc.hitgroup.moduleAH = a_Module;
 
+                msGroupDesc.miss.entryFunctionName = a_MissFuncName.c_str();
+                msGroupDesc.miss.module = a_Module;
+
                 rayGenProgram = CreateProgramGroup(rgGroupDesc, s_ShadowRaysRayGenPGName);
                 hitProgram = CreateProgramGroup(htGroupDesc, s_ShadowRaysHitPGName);
+                missProgram = CreateProgramGroup(msGroupDesc, s_ShadowRaysMissPGName);
 
                 break;
             }
         default:
             {
                 rayGenProgram = nullptr;
+                hitProgram = nullptr;
+                missProgram = nullptr;
+
             }
             break;
+    }
+
+    if( rayGenProgram == nullptr ||
+        hitProgram == nullptr || 
+        missProgram == nullptr)
+    {
+        printf("Could not create program groups: (RayGenProgram: %p , HitProgram: %p, MissProgram: %p) \n", 
+            rayGenProgram, 
+            hitProgram, 
+            missProgram);
+        return false;
     }
 
     OptixPipelineLinkOptions pipelineLinkOptions = {};
     pipelineLinkOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_FULL;
     pipelineLinkOptions.maxTraceDepth = 1;
 
-    OptixProgramGroup programGroups[] = { rayGenProgram, hitProgram };
+    OptixProgramGroup programGroups[] = { rayGenProgram, missProgram, hitProgram };
 
     char log[2048];
     auto logSize = sizeof(log);
@@ -250,6 +287,8 @@ bool WaveFrontRenderer::CreatePipeline(
         log,
         &logSize,
         &a_Pipeline));
+
+    puts(log);
 
     if (error) { return false; }
 
@@ -287,7 +326,7 @@ OptixModule WaveFrontRenderer::CreateModule(const std::string& a_PtxPath, const 
     OptixModuleCompileOptions moduleOptions = {};
     moduleOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_LINEINFO;
     moduleOptions.maxRegisterCount = OPTIX_COMPILE_DEFAULT_MAX_REGISTER_COUNT;
-    moduleOptions.optLevel = OPTIX_COMPILE_OPTIMIZATION_DEFAULT;
+    moduleOptions.optLevel = OPTIX_COMPILE_OPTIMIZATION_LEVEL_0;
 
     std::ifstream stream;
     stream.open(a_PtxPath);
@@ -305,7 +344,11 @@ OptixModule WaveFrontRenderer::CreateModule(const std::string& a_PtxPath, const 
     auto logSize = sizeof(log);
     OptixModule module;
 
-    CHECKOPTIXRESULT(optixModuleCreateFromPTX(
+
+
+    OptixResult error{};
+
+    CHECKOPTIXRESULT(error = optixModuleCreateFromPTX(
         m_DeviceContext, 
         &moduleOptions, 
         &a_PipelineOptions, 
@@ -314,6 +357,12 @@ OptixModule WaveFrontRenderer::CreateModule(const std::string& a_PtxPath, const 
         log, 
         &logSize, 
         &module));
+
+    if(error)
+    {
+        puts(log);
+        abort();
+    }
 
     return module;
 
@@ -329,7 +378,11 @@ OptixProgramGroup WaveFrontRenderer::CreateProgramGroup(OptixProgramGroupDesc a_
 
     OptixProgramGroup programGroup;
 
-    CHECKOPTIXRESULT(optixProgramGroupCreate(
+
+
+    OptixResult error{};
+
+    CHECKOPTIXRESULT(error = optixProgramGroupCreate(
         m_DeviceContext, 
         &a_ProgramGroupDesc, 
         1, 
@@ -338,13 +391,18 @@ OptixProgramGroup WaveFrontRenderer::CreateProgramGroup(OptixProgramGroupDesc a_
         &logSize, 
         &programGroup));
 
+    if(error)
+    {
+        puts(log);
+        abort();
+    }
+
     m_ProgramGroups.emplace(a_Name, programGroup);
 
     return programGroup;
 
 }
 
-//TODO add necessary data to shaderBindingTable.
 void WaveFrontRenderer::CreateShaderBindingTables()
 {
 
@@ -356,9 +414,14 @@ void WaveFrontRenderer::CreateShaderBindingTables()
 
     auto& raysRayGenRecord = m_RaysRayGenRecord.GetRecord();
     raysRayGenRecord.m_Header = GetProgramGroupHeader(s_RaysRayGenPGName);
+    raysRayGenRecord.m_Data.m_MinDistance = s_MinTraceDistance;
+    raysRayGenRecord.m_Data.m_MaxDistance = s_MaxTraceDistance;
 
     auto& raysHitRecord = m_RaysHitRecord.GetRecord();
     raysHitRecord.m_Header = GetProgramGroupHeader(s_RaysHitPGName);
+
+    auto& raysMissRecord = m_RaysMissRecord.GetRecord();
+    raysMissRecord.m_Header = GetProgramGroupHeader(s_RaysMissPGName);
 
     m_ShadowRaysRayGenRecord = m_ShadowRaysSBTGenerator->SetRayGen<ResolveShadowRaysRayGenData>();
     m_ShadowRaysHitRecord = m_ShadowRaysSBTGenerator->AddHitGroup<ResolveShadowRaysHitData>();
@@ -369,7 +432,10 @@ void WaveFrontRenderer::CreateShaderBindingTables()
 
     auto& shadowRaysHitRecord = m_ShadowRaysHitRecord.GetRecord();
     shadowRaysHitRecord.m_Header = GetProgramGroupHeader(s_ShadowRaysHitPGName);
-   
+
+    auto& shadowRaysMissRecord = m_ShadowRaysMissRecord.GetRecord();
+    shadowRaysMissRecord.m_Header = GetProgramGroupHeader(s_ShadowRaysMissPGName);
+
 }
 
 void WaveFrontRenderer::CreateOutputBuffer()
@@ -423,9 +489,15 @@ void WaveFrontRenderer::CreateDataBuffers()
             static_cast<size_t>(numPixels) * 
             static_cast<size_t>(m_RaysPerPixel) * 
             static_cast<size_t>(rayDataStructSize));
-        rayBatch->Write(numPixels, 0);
-        rayBatch->Write(m_RaysPerPixel, sizeof(RayBatch::m_NumPixels));
+        //rayBatch->Write(numPixels, 0);
+        //rayBatch->Write(m_RaysPerPixel, sizeof(RayBatch::m_NumPixels));
+
+        ResetRayBatch(rayBatch->GetDevicePtr<RayBatch>(), numPixels, m_RaysPerPixel);
+
     }
+
+    cudaDeviceSynchronize();
+    CHECKLASTCUDAERROR;
 
     const unsigned intersectionBufferEmptySize = sizeof(IntersectionBuffer);
     const unsigned intersectionDataStructSize = sizeof(IntersectionData);
@@ -451,8 +523,13 @@ void WaveFrontRenderer::CreateDataBuffers()
         static_cast<size_t>(m_ShadowRaysPerPixel) * 
         static_cast<size_t>(ShadowRayDataStructSize));
     m_ShadowRayBatch->Write(m_MaxDepth, 0);
-    m_ShadowRayBatch->Write(numPixels, sizeof(ShadowRayBatch::m_MaxDepth));
-    m_ShadowRayBatch->Write(m_ShadowRaysPerPixel, sizeof(ShadowRayBatch::m_MaxDepth) + sizeof(ShadowRayBatch::m_NumPixels));
+    //m_ShadowRayBatch->Write(numPixels, sizeof(ShadowRayBatch::m_MaxDepth));
+    //m_ShadowRayBatch->Write(m_ShadowRaysPerPixel, sizeof(ShadowRayBatch::m_MaxDepth) + sizeof(ShadowRayBatch::m_NumPixels));
+
+    ResetShadowRayBatch(m_ShadowRayBatch->GetDevicePtr<ShadowRayBatch>(), m_MaxDepth, numPixels, m_ShadowRaysPerPixel);
+
+    cudaDeviceSynchronize();
+    CHECKLASTCUDAERROR;
 
 
 
@@ -544,12 +621,12 @@ GLuint WaveFrontRenderer::TraceFrame()
     MemoryBuffer& currentRaysBatch = *m_RayBatches[batchIndices[static_cast<unsigned>(RayBatchTypeIndex::CURRENT_RAYS)]];
 
     //Generate primary rays using the setup parameters
-    const WaveFront::SetupLaunchParameters setupParams(m_RenderResolution, cameraData, currentRaysBatch.GetDevicePtr<RayBatch>());
+    const SetupLaunchParameters setupParams(m_RenderResolution, cameraData, currentRaysBatch.GetDevicePtr<RayBatch>());
     GenerateRays(setupParams);
 
     //Initialize resolveRaysLaunchParameters with common variables between different waves.
-    WaveFront::ResolveRaysLaunchParameters optixRaysLaunchParams{};
-    optixRaysLaunchParams.m_Common.m_Traversable = dynamic_cast<PTScene&>(*m_Scene).GetSceneAccelerationStructure(); //TODO: make sure if scene is empty it doesn't result in errors.
+    ResolveRaysLaunchParameters optixRaysLaunchParams{};
+    optixRaysLaunchParams.m_Common.m_Traversable = dynamic_cast<PTScene&>(*m_Scene).GetSceneAccelerationStructure();
 
     uint3 resolutionAndDepth = make_uint3(m_RenderResolution.x, m_RenderResolution.y, 0);
 
@@ -581,8 +658,11 @@ GLuint WaveFrontRenderer::TraceFrame()
 
         OptixShaderBindingTable SBT = m_RaysSBTGenerator->GetTableDesc();
 
+        cudaDeviceSynchronize();
+        CHECKLASTCUDAERROR;
+
         //Launch OptiX ResolveRays pipeline to resolve all of the rays in Current Rays Batch (Secondary ray batch from previous wave).
-        optixLaunch(
+        CHECKOPTIXRESULT(optixLaunch(
             m_PipelineRays,
             0,
             *(*m_PipelineRaysLaunchParams),
@@ -590,9 +670,13 @@ GLuint WaveFrontRenderer::TraceFrame()
             &SBT,
             m_RenderResolution.x,
             m_RenderResolution.y,
-            1); //Depth = 1 as the waves only trace one bounce per wave.
+            m_RaysPerPixel)); //Number of rays per pixel, number of samples per pixel.
+        
+        //cudaStreamSynchronize(0);
+        cudaDeviceSynchronize();
+        CHECKLASTCUDAERROR;
 
-        WaveFront::ShadingLaunchParameters shadingLaunchParams(
+        ShadingLaunchParameters shadingLaunchParams(
             resolutionAndDepth, 
             primRaysPrevFrame.GetDevicePtr<RayBatch>(),
             primHitsPrevFrame.GetDevicePtr<IntersectionBuffer>(),
@@ -611,7 +695,7 @@ GLuint WaveFrontRenderer::TraceFrame()
     ResolveShadowRaysLaunchParameters optixShadowRaysLaunchParams{};
 
     optixShadowRaysLaunchParams.m_Common.m_ResolutionAndDepth = resolutionAndDepth;
-    optixShadowRaysLaunchParams.m_Common.m_Traversable = dynamic_cast<PTScene&>(*m_Scene).GetSceneAccelerationStructure();
+    optixShadowRaysLaunchParams.m_Common.m_Traversable = optixRaysLaunchParams.m_Common.m_Traversable;
     optixShadowRaysLaunchParams.m_ShadowRays = m_ShadowRayBatch->GetDevicePtr<ShadowRayBatch>();
     optixShadowRaysLaunchParams.m_Results = m_ResultBuffer->GetDevicePtr<ResultBuffer>();
 
@@ -620,7 +704,7 @@ GLuint WaveFrontRenderer::TraceFrame()
     OptixShaderBindingTable SBT = m_ShadowRaysSBTGenerator->GetTableDesc();
 
     //Trace buffer of shadow rays using Optix ResolveShadowRays.
-    optixLaunch(
+    CHECKOPTIXRESULT(optixLaunch(
         m_PipelineShadowRays,
         0,
         *(*m_PipelineShadowRaysLaunchParams),
@@ -628,8 +712,8 @@ GLuint WaveFrontRenderer::TraceFrame()
         &SBT,
         m_RenderResolution.x,
         m_RenderResolution.y,
-        m_MaxDepth);
-
+        m_MaxDepth));
+     
     cudaDeviceSynchronize();
     CHECKLASTCUDAERROR;
 
@@ -924,7 +1008,7 @@ std::unique_ptr<Lumen::ILumenPrimitive> WaveFrontRenderer::CreatePrimitive(Primi
     rec.m_Header = GetProgramGroupHeader(s_RaysHitPGName);
     rec.m_Data.m_VertexBuffer = prim->m_VertBuffer->GetDevicePtr<Vertex>();
     rec.m_Data.m_IndexBuffer = prim->m_IndexBuffer->GetDevicePtr<unsigned int>();
-    rec.m_Data.m_Material = static_cast<Material*>(prim->m_Material.get())->GetDeviceMaterial();
+    rec.m_Data.m_Material = reinterpret_cast<Material*>(prim->m_Material.get())->GetDeviceMaterial();
 
     return prim;
 }

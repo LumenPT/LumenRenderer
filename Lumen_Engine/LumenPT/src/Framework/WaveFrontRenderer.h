@@ -121,6 +121,8 @@ private:
 
     static constexpr unsigned s_NumRayBatchTypes = static_cast<unsigned>(RayBatchTypeIndex::NUM_RAY_BATCH_TYPES);
     static constexpr unsigned s_NumHitBufferTypes = static_cast<unsigned>(HitBufferTypeIndex::NUM_HIT_BUFFER_TYPES);
+    static constexpr float s_MinTraceDistance = 0.1f;
+    static constexpr float s_MaxTraceDistance = 1000.f;
 
 
 
@@ -139,7 +141,8 @@ private:
         const OptixPipelineCompileOptions& a_PipelineOptions,
         PipelineType a_type, 
         const std::string& a_RayGenFuncName, 
-        const std::string& a_HitFuncName, 
+        const std::string& a_HitFuncName,
+        const std::string& a_MissFuncName,
         OptixPipeline& a_Pipeline);
 
     void CreatePipelineBuffers();
@@ -182,8 +185,11 @@ private:
 
     static constexpr char s_RaysRayGenPGName[] = "RaysRayGenPG";
     static constexpr char s_RaysHitPGName[] = "RaysHitPG";
+    static constexpr char s_RaysMissPGName[] = "RaysMissPG";
+
     static constexpr char s_ShadowRaysRayGenPGName[] = "ShadowRaysRayGenPG";
     static constexpr char s_ShadowRaysHitPGName[] = "ShadowRaysHitPG";
+    static constexpr char s_ShadowRaysMissPGName[] = "ShadowRaysMissPG";
 
     OptixPipeline m_PipelineRays;
     OptixPipeline m_PipelineShadowRays;

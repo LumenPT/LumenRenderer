@@ -99,7 +99,7 @@ struct TriangleLight
  */
 struct Reservoir
 {
-    GPU_ONLY Reservoir() : weightSum(0.f), sampleCount(0), weight(0.f)
+    GPU_ONLY INLINE Reservoir() : weightSum(0.f), sampleCount(0), weight(0.f)
     {
 
     }
@@ -107,7 +107,7 @@ struct Reservoir
     /*
      * Update this reservoir with a light and a weight for that light relative to the total set.
      */
-    GPU_ONLY bool Update(const LightSample& a_Sample, float a_Weight)
+    GPU_ONLY INLINE bool Update(const LightSample& a_Sample, float a_Weight)
     {
         assert(a_Weight >= 0.f);
 
@@ -133,7 +133,7 @@ struct Reservoir
     /*
      * Calculate the weight for this reservoir.
      */
-    GPU_ONLY void UpdateWeight()
+    GPU_ONLY INLINE void UpdateWeight()
     {
         //If no samples have been considered yet, then the weight is also 0 (prevents division by 0).
         //Also 0 if none of the considered samples contributed.
@@ -147,7 +147,7 @@ struct Reservoir
         weight = (1.f / fmaxf(sample.solidAnglePdf, MINFLOAT)) * ((1.f / static_cast<float>(sampleCount)) * weightSum);
     }
 
-    GPU_ONLY void Reset()
+    GPU_ONLY INLINE void Reset()
     {
         weightSum = 0.f;
         sampleCount = 0;
@@ -167,7 +167,7 @@ struct Reservoir
 
 struct CDF
 {
-    __device__ void Reset()
+    GPU_ONLY void Reset()
     {
         sum = 0.f;
         size = 0;
@@ -178,7 +178,7 @@ struct CDF
      * The element will have the index of the current CDF size.
      * The weight is appended to the total weight sum and size is incremented by one.
      */
-    __device__ void Insert(float a_Weight)
+    GPU_ONLY void Insert(float a_Weight)
     {
         //Important: This is not thread safe. Build from a single thread.
         sum += a_Weight;
@@ -191,7 +191,7 @@ struct CDF
      * The input value has to be normalized between 0.0 and 1.0, both inclusive.
      * The found element's index and PDF will be stored in the passed references.
      */
-    __device__ void Get(float a_Value, unsigned& a_LightIndex, float& a_LightPdf) const
+    GPU_ONLY void Get(float a_Value, unsigned& a_LightIndex, float& a_LightPdf) const
     {
         //Index is not normalized in the actual set.
         int index = static_cast<int>(sum * a_Value);
@@ -214,7 +214,7 @@ struct CDF
     /*
      *
      */
-    __device__ int BinarySearch(int a_First, int a_Last, float a_Value) const
+    GPU_ONLY int BinarySearch(int a_First, int a_Last, float a_Value) const
     {
         assert(a_Value >= 0.f && a_Value <= sum && "Binary search key must be within set bounds.");
         assert(a_First >= 0 && a_First <= a_Last);
