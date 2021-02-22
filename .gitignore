@@ -469,3 +469,4 @@ _deps
 *.ptx
 *.ptx
 Lumen_Engine/LumenPT/Assets/PrecompiledShaders/Debug/draw_solid_color.ptx
+*.ptx

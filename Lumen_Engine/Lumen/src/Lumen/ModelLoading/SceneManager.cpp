@@ -225,7 +225,7 @@ void Lumen::SceneManager::LoadMaterials(fx::gltf::Document& a_Doc, GLTFResource&
 			int x, y, c;
 			auto stbTex = stbi_load((a_Res.m_Path + "/../" + fxTex.uri).c_str(), &x, &y, &c, 4);
 			auto& tex = m_RenderPipeline->CreateTexture(stbTex, x, y);
-
+			stbi_image_free(stbTex);
 			mat->SetDiffuseTexture(tex);
 		}
 
@@ -237,9 +237,6 @@ void Lumen::SceneManager::LoadMaterials(fx::gltf::Document& a_Doc, GLTFResource&
 				fxMat.emissiveFactor.at(2)
 			));
 		}
-
-
-		materials.push_back(mat);
 	}
 
 	a_Res.m_MaterialPool = materials;

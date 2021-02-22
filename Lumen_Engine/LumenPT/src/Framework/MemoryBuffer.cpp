@@ -24,11 +24,8 @@ MemoryBuffer::MemoryBuffer(size_t a_Size)
     : m_Size(a_Size)
     , m_DevPtr(nullptr)
 {
-    //Resize(a_Size);
+    Resize(a_Size);
 
-    CudaCheck(cudaMalloc(&m_DevPtr, a_Size));
-
-    //m_CudaPtr = reinterpret_cast<CUdeviceptr>(m_DevPtr);
 };
 
 MemoryBuffer::~MemoryBuffer()

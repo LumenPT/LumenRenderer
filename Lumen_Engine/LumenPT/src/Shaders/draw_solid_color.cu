@@ -110,7 +110,11 @@ __global__ void __miss__MissShader()
 extern "C"
 __global__ void __closesthit__HitShader()
 {
+    // Reinterpret the pointer to the expected data
     DevicePrimitive* prim = reinterpret_cast<DevicePrimitive*>(optixGetSbtDataPointer());;
+
+    unsigned int* indexBuffer = prim->m_IndexBuffer;
+    DeviceMaterial* mat = prim->m_Material;
 
     const float2 barycentrics = optixGetTriangleBarycentrics();
     float U = barycentrics.x;
@@ -118,9 +122,9 @@ __global__ void __closesthit__HitShader()
     float W = 1.0f - (U + V);
     unsigned int vertIndex = 3 * optixGetPrimitiveIndex();
 
-    Vertex* A = &prim->m_VertexBuffer[prim->m_IndexBuffer[vertIndex + 0]];
-    Vertex* B = &prim->m_VertexBuffer[prim->m_IndexBuffer[vertIndex + 1]];
-    Vertex* C = &prim->m_VertexBuffer[prim->m_IndexBuffer[vertIndex + 2]];
+    Vertex* A = &prim->m_VertexBuffer[indexBuffer[vertIndex + 0]];
+    Vertex* B = &prim->m_VertexBuffer[indexBuffer[vertIndex + 1]];
+    Vertex* C = &prim->m_VertexBuffer[indexBuffer[vertIndex + 2]];
 
     if (U + V + W != 1.0f)
     {
@@ -142,8 +146,8 @@ __global__ void __closesthit__HitShader()
         optixSetPayload_3(0);
     }
 
-    float4 smpCol = tex2D<float4>(prim->m_Material->m_DiffuseTexture, texCoords.x, texCoords.y);
-    float4 finalCol = smpCol * prim->m_Material->m_DiffuseColor;
+    float4 smpCol = tex2D<float4>(mat->m_DiffuseTexture, texCoords.x, texCoords.y);
+    float4 finalCol = smpCol * mat->m_DiffuseColor;
 
     optixSetPayload_0(float_as_int(finalCol.x));
     optixSetPayload_1(float_as_int(finalCol.y));
