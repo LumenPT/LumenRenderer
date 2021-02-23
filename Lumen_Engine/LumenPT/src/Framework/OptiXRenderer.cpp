@@ -88,10 +88,15 @@ void OptiXRenderer::InitializeContext()
 void OptiXRenderer::InitializePipelineOptions()
 {
     m_PipelineCompileOptions.traversableGraphFlags = OptixTraversableGraphFlags::OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_ANY;
-    m_PipelineCompileOptions.numAttributeValues = 2; // Defaults to 2, maximum is 8. Defines how many 32-bit values can be output from an intersection shader
-    m_PipelineCompileOptions.numPayloadValues = 4; // Defines how many 32-bit values can be output by a hit shader
-    m_PipelineCompileOptions.exceptionFlags = OptixExceptionFlags::OPTIX_EXCEPTION_FLAG_DEBUG | OPTIX_EXCEPTION_FLAG_TRACE_DEPTH | OPTIX_EXCEPTION_FLAG_STACK_OVERFLOW;
-    m_PipelineCompileOptions.usesPrimitiveTypeFlags = 0; // 0 corresponds to enabling custom primitives and triangles, but nothing else 
+    // Defaults to 2, maximum is 8. Defines how many 32-bit values can be output from an intersection shader
+    m_PipelineCompileOptions.numAttributeValues = 2;
+    // Defines how many 32-bit values can be output by a miss or hit shader
+    m_PipelineCompileOptions.numPayloadValues = 4;
+    // What exceptions can the pipeline throw.
+    m_PipelineCompileOptions.exceptionFlags = OptixExceptionFlags::OPTIX_EXCEPTION_FLAG_DEBUG
+    | OPTIX_EXCEPTION_FLAG_TRACE_DEPTH | OPTIX_EXCEPTION_FLAG_STACK_OVERFLOW;
+    // 0 corresponds to enabling custom primitives and triangles, but nothing else 
+    m_PipelineCompileOptions.usesPrimitiveTypeFlags = 0; 
     m_PipelineCompileOptions.usesMotionBlur = false;
     // Name by which the launch parameters will be accessible in the shaders. This must match with the shaders.
     m_PipelineCompileOptions.pipelineLaunchParamsVariableName = "params";
@@ -105,32 +110,36 @@ void OptiXRenderer::CreatePipeline()
 
     // Create a module, these need to be saved somehow I believe
     // Note multiple program groups can be created from a single module
-    auto someMod = CreateModule(LumenPTConsts::gs_ShaderPathBase + "draw_solid_color.ptx");
+    auto optixModule = CreateModule(LumenPTConsts::gs_ShaderPathBase + "draw_solid_color.ptx");
 
     // Descriptor of the program group, including its type, modules it uses and the name of the entry function
     OptixProgramGroupDesc rtGroupDesc = {};
     rtGroupDesc.kind = OPTIX_PROGRAM_GROUP_KIND_RAYGEN;
     rtGroupDesc.raygen.entryFunctionName = "__raygen__draw_solid_color";
-    rtGroupDesc.raygen.module = someMod;
+    rtGroupDesc.raygen.module = optixModule;
 
     auto raygen = CreateProgramGroup(rtGroupDesc, "RayGen");
 
+    // Create a miss program group
     OptixProgramGroupDesc msGroupDesc = {};
     msGroupDesc.kind = OPTIX_PROGRAM_GROUP_KIND_MISS;
     msGroupDesc.miss.entryFunctionName = "__miss__MissShader";
-    msGroupDesc.miss.module = someMod;
+    msGroupDesc.miss.module = optixModule;
 
+    // Create a hit program group with only a closest hit shader
     auto miss = CreateProgramGroup(msGroupDesc, "Miss");
     OptixProgramGroupDesc htGroupDesc = {};
     htGroupDesc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
     htGroupDesc.hitgroup.entryFunctionNameCH = "__closesthit__HitShader";
-    htGroupDesc.hitgroup.moduleCH = someMod;
+    htGroupDesc.hitgroup.moduleCH = optixModule;
 
     auto hit = CreateProgramGroup(htGroupDesc, "Hit");
 
 
     OptixPipelineLinkOptions pipelineLinkOptions = {};
+    // How much debug information do we want from the pipeline.
     pipelineLinkOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_LINEINFO;
+    // How far is the recursion allowed to go.
     pipelineLinkOptions.maxTraceDepth = 1;
 
     // The program groups to include in the pipeline, can be replaced with an std::vector
