@@ -1,3 +1,4 @@
+#if ! defined(WAVEFRONT)
 #include "OptiXRenderer.h"
 #include "../Shaders/CppCommon/LumenPTConsts.h"
 
@@ -47,7 +48,7 @@ OptiXRenderer::OptiXRenderer(const InitializationData& /*a_InitializationData*/)
 
     m_ShaderBindingTableGenerator = std::make_unique<ShaderBindingTableGenerator>();
 
-    //m_ServiceLocator.m_Renderer = this;
+    m_ServiceLocator.m_Renderer = this;
     m_ServiceLocator.m_SBTGenerator = m_ShaderBindingTableGenerator.get();
 
     uchar4 px[] = {
@@ -88,7 +89,7 @@ void OptiXRenderer::InitializePipelineOptions()
 {
     m_PipelineCompileOptions.traversableGraphFlags = OptixTraversableGraphFlags::OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_ANY;
     m_PipelineCompileOptions.numAttributeValues = 2; // Defaults to 2, maximum is 8. Defines how many 32-bit values can be output from an intersection shader
-    m_PipelineCompileOptions.numPayloadValues = 3; // Defines how many 32-bit values can be output by a hit shader
+    m_PipelineCompileOptions.numPayloadValues = 4; // Defines how many 32-bit values can be output by a hit shader
     m_PipelineCompileOptions.exceptionFlags = OptixExceptionFlags::OPTIX_EXCEPTION_FLAG_DEBUG | OPTIX_EXCEPTION_FLAG_TRACE_DEPTH | OPTIX_EXCEPTION_FLAG_STACK_OVERFLOW;
     m_PipelineCompileOptions.usesPrimitiveTypeFlags = 0; // 0 corresponds to enabling custom primitives and triangles, but nothing else 
     m_PipelineCompileOptions.usesMotionBlur = false;
@@ -165,6 +166,12 @@ OptixModule OptiXRenderer::CreateModule(const std::string& a_PtxPath)
     // Open the ptx file as an input stream and load all of it into a string using a string stream
     std::ifstream stream;
     stream.open(a_PtxPath);
+
+    if(!stream.is_open())
+    {
+        abort();
+    }
+
     std::stringstream stringStream;
     stringStream << stream.rdbuf();
     std::string source = stringStream.str();
@@ -552,3 +559,5 @@ std::shared_ptr<Lumen::ILumenVolume> OptiXRenderer::CreateVolume(const std::stri
 
     return volume;
 }
+
+#endif

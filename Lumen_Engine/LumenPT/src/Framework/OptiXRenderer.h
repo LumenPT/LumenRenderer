@@ -1,4 +1,5 @@
 #pragma once
+#if ! defined(WAVEFRONT)
 #include "MemoryBuffer.h"
 #include "ShaderBindingTableRecord.h"
 #include "../Shaders/CppCommon/LaunchParameters.h"
@@ -177,3 +178,4 @@ std::unique_ptr<AccelerationStructure> OptiXRenderer::BuildGeometryAccelerationS
 
 }
 
+#endif

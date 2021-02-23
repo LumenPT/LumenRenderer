@@ -402,7 +402,7 @@ namespace WaveFront
 
         }
 
-        GPU_ONLY INLINE void SetPixel(const float3& a_value, unsigned int a_PixelIndex, unsigned int a_ChannelIndex)
+        GPU_ONLY INLINE void SetPixel(float3 a_value, unsigned int a_PixelIndex, unsigned int a_ChannelIndex)
         {
 
             /*if(a_value.x != 0.f || a_value.y != 0.f || a_value.z != 0.f)
@@ -412,6 +412,14 @@ namespace WaveFront
 
             float3& pixel = m_Pixels[GetPixelArrayIndex(a_PixelIndex, a_ChannelIndex)];
             pixel = a_value;
+
+            /*if (a_value.x != 0.f || a_value.y != 0.f || a_value.z != 0.f)
+            {
+
+                float3 result = m_Pixels[GetPixelArrayIndex(a_PixelIndex, a_ChannelIndex)];
+                printf("PixelBuffer: SetPixel Result: %f, %f, %f \n", result.x, result.y, result.z);
+
+            }*/
 
         }
 
@@ -444,7 +452,7 @@ namespace WaveFront
             return static_cast<unsigned>(OutputChannel::NUM_CHANNELS);
         }
 
-        GPU_ONLY INLINE void SetPixel(const float3& a_Value, unsigned a_PixelIndex, OutputChannel a_Channel)
+        GPU_ONLY INLINE void SetPixel(float3 a_Value, unsigned a_PixelIndex, OutputChannel a_Channel)
         {
 
             assert(a_Channel != OutputChannel::NUM_CHANNELS);
@@ -491,19 +499,19 @@ namespace WaveFront
                 const float3& color = m_PixelBuffer->GetPixel(a_PixelIndex, i);
                 result += color;
 
-                if( color.x != 0.f || color.y != 0.f || color.z != 0.f)
+                /*if( color.x != 0.f || color.y != 0.f || color.z != 0.f)
                 {
                     printf("CombinePixel: Color: %f, %f, %f \n", result.x, result.y, result.z);
-                }
+                }*/
 
             }
 
-            if( result.x != 0.f ||
+            /*if( result.x != 0.f ||
                 result.y != 0.f ||
                 result.z != 0.f)
             {
                 printf("Color Combined: %f, %f, %f \n", result.x, result.y, result.z);
-            }
+            }*/
 
             return result;
 

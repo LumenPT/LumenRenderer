@@ -198,11 +198,15 @@ __global__ void __raygen__ResolveShadowRaysRayGen()
     {
         resolveShadowRaysParams.m_Results->SetPixel(rayData.m_PotentialRadiance, pixelIndex, rayData.m_OutputChannelIndex);
 
-        float3 setColor = resolveShadowRaysParams.m_Results->GetPixel(pixelIndex, rayData.m_OutputChannelIndex);
+        float3 setColor = resolveShadowRaysParams.m_Results->m_PixelBuffer->GetPixel(pixelIndex, static_cast<unsigned>(rayData.m_OutputChannelIndex));
+
+        const unsigned pixelArrIndex = resolveShadowRaysParams.m_Results->m_PixelBuffer->GetPixelArrayIndex(pixelIndex, static_cast<unsigned>(rayData.m_OutputChannelIndex));
+
+        const float3* pixelPtr = &resolveShadowRaysParams.m_Results->m_PixelBuffer->m_Pixels[pixelArrIndex];
 
         if(setColor.x != 0.f || setColor.y != 0.f || setColor.z != 0.f)
         {
-            printf("PixelIndex:%i ColorSet: %f, %f, %f \n", pixelIndex, setColor.x, setColor.y, setColor.z);
+            printf("PixelIndex:%i PixelPtr: %p ColorSet: %f, %f, %f \n", pixelIndex, pixelPtr, setColor.x, setColor.y, setColor.z);
         }
 
     }

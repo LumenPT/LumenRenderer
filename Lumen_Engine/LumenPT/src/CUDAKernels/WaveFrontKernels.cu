@@ -310,6 +310,7 @@ CPU_ON_GPU void MergeLightChannels(
     const unsigned int numPixels = a_Resolution.x * a_Resolution.y;
     const unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
     const unsigned int stride = blockDim.x * gridDim.x;
+    const float3* firstPixel = a_Input->m_PixelBuffer->m_Pixels;
 
     for (int i = index; i < numPixels; i += stride)
     {
@@ -317,7 +318,7 @@ CPU_ON_GPU void MergeLightChannels(
         //Convert the index into the screen dimensions.
         const int screenY = i / a_Resolution.x;
         const int screenX = i - (screenY * a_Resolution.x);
-    
+
         //Mix the results;
         float3 mergedColor = a_Input->GetPixelCombined(i);
         a_Output->SetPixel(mergedColor, i, 0);
