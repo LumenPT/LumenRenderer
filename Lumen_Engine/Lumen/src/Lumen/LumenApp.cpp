@@ -5,7 +5,10 @@
 
 #include <glad/glad.h>
 
+#include <gltf.h>	//temp
+
 #include "Input.h"
+
 
 namespace Lumen
 {
@@ -49,6 +52,7 @@ namespace Lumen
 			m_ImGuiLayer->Begin();
 			for (Layer* layer : m_LayerStack)
 			{
+				layer->OnDraw();
 				layer->OnImGuiRender();
 			}
 			m_ImGuiLayer->End();

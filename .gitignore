@@ -2,15 +2,49 @@
 # Created by https://www.toptal.com/developers/gitignore/api/visualstudio,c++,cuda
 # Edit at https://www.toptal.com/developers/gitignore?templates=visualstudio,c++,cuda
 
+#Git ignore file documentation: https://git-scm.com/docs/gitignore
+#TAKE NOTE:
+#As we are building with CMake not everyone uses in-tree builds, meaning that not everyones cmake generates the project files inside <path>/Lumen_Engine/ directory.
+#When adding ignores to this file it is better suited to make them relative to the top level CMakeLists.txt which is located in <path>/Lumen_Engine/.
+#This means ignoring a file that has the following path: <path>/Lumen_Engine/Lumen/IgnoreMePls.txt is better to be ignored using
+# **/Lumen/IgnoreMePls.txt instead of **/Lumen_Engine/Lumen/IgnoreMePls.txt
+# ** = any file path so  **/Lumen/** means any filepath before and after /Lumen/
+#* = any directory or file that does not contain a filepath separator( = / or \) so */Lumen/* means any directory before /Lumen/ and any file or directory after.
+#-----
 
-Lumen_Engine/Lumen_Engine.sln
-Lumen_Engine/Sandbox/Sandbox.vcxproj
-Lumen_Engine/Lumen/Lumen.vcxproj
-Lumen_Engine/Lumen/Lumen.vcxproj.filters
+#Ignore project specific directories
+*.lib
+*.tlog
+**/build/**
+**/out/**
+**/LumenPT/config/**
+**/Lumen/Lumen.dir/**
+**/LumenPT/LumenPT.dir/**
+**/LumenPT/CudaPTX.dir/**
+**/LumenPT/Assets/CompiledShaders/**
+**/Sandbox/Sandbox.dir/**
+**/Lumen/vendor/Glad/Glad.dir/**
+**/Lumen/vendor/imgui/ImGui.dir/**
+
+
+
+#Ignore project specific files.
+**/Lumen/Lumen.vcxproj
+**/Lumen_Engine.sln
+**/Lumen/Lumen.vcxproj.filters
+**/Lumen/Lumen.dir/Debug/Lumen.vcxproj.FileListAbsolute.txt
+**/LumenPT/config/LumenConfig.h
+**/LumenPT/LumenPT.dir/Debug/LumenPT.vcxproj.FileListAbsolute.txt
+**/Sandbox/Sandbox.vcxproj
+**/Lumen/vendor/Glad/Glad.dir/Debug/Glad.vcxproj.FileListAbsolute.txt
+**/Lumen/vendor/imgui/ImGui.dir/Debug/ImGui.vcxproj.FileListAbsolute.txt
+**/imgui.ini
 .vs/CMake Overview
 .vs/ProjectSettings.json
 .vs/slnx.sqlite
 .vs/VSWorkspaceState.json
+*.ptx
+
 
 ### C++ ###
 # Prerequisites
@@ -39,7 +73,6 @@ Lumen_Engine/Lumen/Lumen.vcxproj.filters
 *.lai
 *.la
 *.a
-*.lib
 
 # Executables
 *.exe
@@ -50,7 +83,6 @@ Lumen_Engine/Lumen/Lumen.vcxproj.filters
 *.i
 *.ii
 *.gpu
-*.ptx
 *.cubin
 *.fatbin
 
@@ -66,6 +98,7 @@ Lumen_Engine/Lumen/Lumen.vcxproj.filters
 *.user
 *.userosscache
 *.sln.docstates
+*.sln
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
@@ -410,3 +443,29 @@ MigrationBackup/
 # End of https://www.toptal.com/developers/gitignore/api/visualstudio,c++,cuda
 *.vcxproj
 *.filters
+
+
+# Created by https://www.toptal.com/developers/gitignore/api/cmake
+# Edit at https://www.toptal.com/developers/gitignore?templates=cmake
+
+### CMake ###
+CMakeLists.txt.user
+CMakeCache.txt
+CMakeFiles
+CMakeScripts
+Testing
+Makefile
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+_deps
+
+### CMake Patch ###
+# External projects
+*-prefix/
+
+# End of https://www.toptal.com/developers/gitignore/api/cmake
+*.ptx
+*.ptx
+Lumen_Engine/LumenPT/Assets/PrecompiledShaders/Debug/draw_solid_color.ptx
