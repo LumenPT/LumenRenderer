@@ -21,7 +21,7 @@
 **/Lumen/Lumen.dir/**
 **/LumenPT/LumenPT.dir/**
 **/LumenPT/CudaPTX.dir/**
-**/LumenPT/Assets/CompiledShaders/**
+**Lumen_Engine/LumenPT/Assets/PrecompiledShaders/**
 **/Sandbox/Sandbox.dir/**
 **/Lumen/vendor/Glad/Glad.dir/**
 **/Lumen/vendor/imgui/ImGui.dir/**
@@ -466,6 +466,10 @@ _deps
 *-prefix/
 
 # End of https://www.toptal.com/developers/gitignore/api/cmake
+# Precompield shader directory
+Lumen_Engine/LumenPT/Assets/PrecompiledShaders/
+
 *.ptx
 *.ptx
 Lumen_Engine/LumenPT/Assets/PrecompiledShaders/Debug/draw_solid_color.ptx
+*.ptx
