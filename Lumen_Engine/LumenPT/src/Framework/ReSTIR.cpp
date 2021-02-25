@@ -27,7 +27,7 @@ CPU_ONLY void ReSTIR::Initialize(const ReSTIRSettings& a_Settings)
 	//Shadow rays.
 	{
 		//At most one shadow ray per reservoir. Always resize even when big enough already, because this is initialization so it should not happen often.
-		const size_t shadowRaySize = 1;//sizeof(WaveFront::ShadowRayData);//TODO enable
+		const size_t shadowRaySize = sizeof(RestirShadowRay);
 		const size_t size = static_cast<size_t>(m_Settings.width) * static_cast<size_t>(m_Settings.height) * m_Settings.numReservoirsPerPixel * shadowRaySize;
 		m_ShadowRays.Resize(size);
 
@@ -55,6 +55,9 @@ CPU_ONLY void ReSTIR::Initialize(const ReSTIRSettings& a_Settings)
 			m_LightBags.Resize(size);
 		}
 	}
+
+	//Atomic counter buffer
+	m_Atomics.Resize(sizeof(int) * 1);
 
 	//Wait for CUDA to finish executing.
 	cudaDeviceSynchronize();
@@ -110,14 +113,22 @@ CPU_ONLY void ReSTIR::Run(
 	 * Generate shadow rays for each reservoir and resolve them.
 	 * If a shadow ray is occluded, the reservoirs weight is set to 0.
 	 */
-	VisibilityPass(static_cast<Reservoir*>(m_Reservoirs[m_SwapChainIndex].GetDevicePtr()), m_Settings.width * m_Settings.height * m_Settings.numReservoirsPerPixel);
+	VisibilityPass(&m_Atomics, static_cast<Reservoir*>(m_Reservoirs[m_SwapChainIndex].GetDevicePtr()), a_CurrentIntersections, a_RayBuffer, m_Settings.numReservoirsPerPixel, m_Settings.width * m_Settings.height, m_ShadowRays.GetDevicePtr<RestirShadowRay>());
 
 	/*
-	 * Temporal sampling where reservoirs are combined with those of the previous frame.
-	 */
-	if(m_Settings.enableTemporal)
+     * Temporal sampling where reservoirs are combined with those of the previous frame.
+     */
+	if (m_Settings.enableTemporal)
 	{
-		SpatialNeighbourSampling(static_cast<Reservoir*>(m_Reservoirs[currentIndex].GetDevicePtr()), static_cast<Reservoir*>(m_Reservoirs[2].GetDevicePtr()), m_Settings);
+		TemporalNeighbourSampling(
+			m_Reservoirs[currentIndex].GetDevicePtr<Reservoir>(),
+			m_Reservoirs[temporalIndex].GetDevicePtr<Reservoir>(),
+			a_CurrentIntersections,
+			a_PreviousIntersections,
+			a_RayBuffer,
+			a_PreviousRayBuffer,			
+			m_Settings
+		);
 	}
 
 	/*
@@ -125,7 +136,7 @@ CPU_ONLY void ReSTIR::Run(
 	 */
 	if(m_Settings.enableSpatial)
 	{
-		TemporalNeighbourSampling(static_cast<Reservoir*>(m_Reservoirs[currentIndex].GetDevicePtr()), static_cast<Reservoir*>(m_Reservoirs[temporalIndex].GetDevicePtr()), m_Settings);
+		SpatialNeighbourSampling(static_cast<Reservoir*>(m_Reservoirs[currentIndex].GetDevicePtr()), static_cast<Reservoir*>(m_Reservoirs[2].GetDevicePtr()), m_Settings);
 	}
 
 	//TODO: Extract the data from the reservoirs to generate shadow rays and store them in the wavefront shadow ray data struct.

@@ -6,12 +6,14 @@
 
 #include "../../vendor/Include/Cuda/cuda/helpers.h"
 #include "../Shaders/CppCommon/ReSTIRData.h"
+#include "../Framework/MemoryBuffer.h"
 
 /*
  * Macros used to access elements at a certain index.
  */
 #define RESERVOIR_INDEX(INTERSECTION_INDEX, DEPTH, MAX_DEPTH) (((INTERSECTION_INDEX) * (MAX_DEPTH)) + (DEPTH))
 
+class MemoryBuffer;
 
 namespace WaveFront {
     struct RayData;
@@ -43,7 +45,10 @@ __global__ void PickPrimarySamplesInternal(const WaveFront::RayData* const a_Ray
  * Generate shadow rays for the given reservoirs.
  * These shadow rays are then resolved with Optix, and reservoirs weights are updated to reflect mutual visibility.
  */
-__host__ void VisibilityPass(Reservoir* a_Reservoirs, unsigned a_NumReservoirs);
+__host__ void VisibilityPass(MemoryBuffer* a_AtomicCounter, Reservoir* a_Reservoirs, const WaveFront::IntersectionData* a_IntersectionData, const WaveFront::RayData* const a_RayData, unsigned a_NumReservoirsPerPixel, const std::uint32_t a_NumPixels, RestirShadowRay* a_ShadowRays);
+
+//Generate a shadow ray based on the thread ID.
+__global__ void GenerateShadowRay(int* a_AtomicCounter, const std::uint32_t a_NumPixels, std::uint32_t a_NumReservoirsPerPixel, const WaveFront::RayData* const a_RayData, Reservoir* a_Reservoirs, const WaveFront::IntersectionData* a_IntersectionData,  RestirShadowRay* a_ShadowRays);
 
 /*
  * Resample spatial neighbours with an intermediate output buffer.
@@ -54,7 +59,24 @@ __host__ void SpatialNeighbourSampling(Reservoir* a_Reservoirs, Reservoir* a_Res
 /*
  * Resample temporal neighbours and combine reservoirs.
  */
-__host__ void TemporalNeighbourSampling(Reservoir* a_Reservoirs, Reservoir* a_TemporalReservoirs, const ReSTIRSettings& a_Settings);
+__host__ void TemporalNeighbourSampling(
+    Reservoir* a_CurrentReservoirs,
+    Reservoir* a_PreviousReservoirs,
+    const WaveFront::IntersectionData* a_CurrentIntersectionData,
+    const WaveFront::IntersectionData* a_PreviousIntersectionData,
+    const WaveFront::RayData* const a_CurrentRayData,
+    const WaveFront::RayData* const a_PreviousRayData,
+    const ReSTIRSettings& a_Settings);
+
+__global__ void CombineTemporalSamplesInternal(
+    int a_NumPixels,
+    Reservoir* a_CurrentReservoirs,
+    Reservoir* a_PreviousReservoirs,
+    const WaveFront::IntersectionData* a_CurrentIntersectionData,
+    const WaveFront::IntersectionData* a_PreviousIntersectionData,
+    const WaveFront::RayData* const a_CurrentRayData,
+    const WaveFront::RayData* const a_PreviousRayData,
+    const bool a_Biased);
 
 /*
  * Combine multiple reservoirs unbiased.
@@ -63,7 +85,7 @@ __host__ void TemporalNeighbourSampling(Reservoir* a_Reservoirs, Reservoir* a_Te
  * a_Count indicates the amount of pixels to process in a_ToCombine.
  * This runs for every reservoir at a_PixelIndex.
  */
-__device__ void CombineUnbiased(int a_PixelIndex, int a_Count, int a_MaxReservoirDepth, Reservoir* a_Reservoirs, PixelData* a_ToCombine);
+__device__ void CombineUnbiased(int a_PixelIndex, int a_Count, int a_MaxReservoirDepth, Reservoir** a_Reservoirs, PixelData** a_ToCombine);
 
 /*
  * Combine multiple reservoirs biased.
@@ -72,7 +94,7 @@ __device__ void CombineUnbiased(int a_PixelIndex, int a_Count, int a_MaxReservoi
  * a_Count indicates the amount of indices to process in a_ToCombineIndices.
  * This runs for every reservoir depth.
  */
-__device__ void CombineBiased(int a_PixelIndex, int a_Count, int a_MaxReservoirDepth, Reservoir* a_Reservoirs, PixelData* a_ToCombine);
+__device__ void CombineBiased(int a_PixelIndex, int a_Count, int a_MaxReservoirDepth, Reservoir** a_Reservoirs, PixelData** a_ToCombine);
 
 /*
  * Resample an old light sample.
