@@ -11,6 +11,7 @@
 #include "../../src/Shaders/CppCommon/VolumeStructs.h"
 #include "../../Lumen/src/Lumen/Renderer/ILumenResources.h"
 
+class AccelerationStructure;
 struct PTServiceLocator;
 
 class PTVolume : public Lumen::ILumenVolume
@@ -28,6 +29,8 @@ public:
 
 	RecordHandle<DeviceVolume> m_RecordHandle;
 
+	std::unique_ptr<AccelerationStructure> m_AccelerationStructure = nullptr;
+	
 	//TODO: make this a vector to support multiple grids
 	nanovdb::GridHandle<nanovdb::CudaDeviceBuffer> m_Handle;
 };

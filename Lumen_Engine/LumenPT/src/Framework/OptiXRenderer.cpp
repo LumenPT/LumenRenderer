@@ -611,8 +611,27 @@ std::shared_ptr<Lumen::ILumenVolume> OptiXRenderer::CreateVolume(const std::stri
     rec.m_Header = GetProgramGroupHeader("VolumetricHit");
     rec.m_Data.m_Grid = volume->m_Handle.grid<float>();
 	
-    //work in progress
+    uint32_t geomFlags[1] = { OPTIX_GEOMETRY_FLAG_NONE };
 
+    OptixAccelBuildOptions buildOptions = {};
+    buildOptions.buildFlags = OPTIX_BUILD_FLAG_PREFER_FAST_TRACE;
+    buildOptions.operation = OPTIX_BUILD_OPERATION_BUILD;
+    buildOptions.motionOptions = {};
+
+    OptixAabb aabb = { -1.5f, -1.5f, -1.5f, 1.5f, 1.5f, 1.5f };
+    MemoryBuffer aabb_buffer(sizeof(OptixAabb));
+    aabb_buffer.Write(aabb);
+	
+    OptixBuildInput buildInput = {};
+    buildInput.type = OPTIX_BUILD_INPUT_TYPE_CUSTOM_PRIMITIVES;
+    buildInput.customPrimitiveArray.aabbBuffers = aabb_buffer.GetDevicePtr<CUdeviceptr>();
+    buildInput.customPrimitiveArray.numPrimitives = 1;
+    buildInput.customPrimitiveArray.flags = geomFlags;
+    buildInput.customPrimitiveArray.numSbtRecords = 1;
+
+    /*volume->m_AccelerationStructure = BuildGeometryAccelerationStructure(buildOptions, buildInput);
+    m_testVolumeGAS = volume->m_AccelerationStructure.get();*/
+	
     return volume;
 }
 
