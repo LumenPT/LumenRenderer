@@ -65,7 +65,8 @@ CPU_ONLY void ReSTIR::Run(
 	const WaveFront::RayData* const a_RayBuffer,
     const WaveFront::IntersectionData* const a_PreviousIntersections,
 	const WaveFront::RayData* const a_PreviousRayBuffer,
-	const std::vector<TriangleLight>& a_Lights
+	const std::vector<TriangleLight>& a_Lights,
+	const float3 a_CameraPosition
 )
 {
 	assert(m_SwapDirtyFlag && "SwapBuffers has to be called once per frame for ReSTIR to properly work.");
@@ -76,6 +77,7 @@ CPU_ONLY void ReSTIR::Run(
 
 	/*
 	 * Resize buffers based on the amount of lights and update data.
+	 * This uploads all triangle lights. May want to move this to the wavefront pipeline class and instead take the pointer from it.
 	 */
 	{
 		//Light buffer

@@ -32,7 +32,9 @@ public:
 		const WaveFront::RayData* const a_RayBuffer,
 		const WaveFront::IntersectionData* const a_PreviousIntersections,
 		const WaveFront::RayData* const a_PreviousRayBuffer,
-		const std::vector<TriangleLight>& a_Lights);
+		const std::vector<TriangleLight>& a_Lights,
+	    const float3 a_CameraPosition
+	);
 
 	/*
 	 * Swap the front and back buffer. This has to be called once per frame.
