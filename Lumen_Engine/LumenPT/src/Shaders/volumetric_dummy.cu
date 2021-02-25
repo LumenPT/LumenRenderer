@@ -17,12 +17,11 @@ __global__ void __closesthit__VolumetricHitShader()
 
     //auto& grid = *tempGrid;
 
-    optixSetPayload_0(float_as_int(0.0f));
+    optixSetPayload_0(float_as_int(1.0f));
     optixSetPayload_1(float_as_int(0.0f));
     optixSetPayload_2(float_as_int(1.0f));
     optixSetPayload_3(1);
 	
-    printf("test");
 
     return;
 }
@@ -30,18 +29,16 @@ __global__ void __closesthit__VolumetricHitShader()
 extern "C"
 __global__ void __anyhit__VolumetricHitShader()
 {
-    printf("test");
     return;
 }
 
 extern "C"
 __global__ void __intersection__VolumetricHitShader()
 {
-    printf("test");
 	
     make_float3(0.f, 0.f, 0.f);
 
-    optixReportIntersection(0.f, 0);
+    optixReportIntersection(1.f, 0);
 	
     return;
 }

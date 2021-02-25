@@ -446,8 +446,11 @@ GLuint OptiXRenderer::TraceFrame()
     //auto str = static_cast<PTScene*>(m_Scene.get())->GetSceneAccelerationStructure();
     auto str = BuildGeometryAccelerationStructure(vert);
 
+    cudaDeviceSynchronize();
+    auto err = cudaGetLastError();
+
     params.m_Image = m_OutputBuffer->GetDevicePointer();
-    //params.m_Handle = str->m_TraversableHandle;
+    params.m_Handle = str->m_TraversableHandle;
     params.m_Handle = m_testVolumeGAS->m_TraversableHandle;
 	
     params.m_ImageWidth = gs_ImageWidth;
@@ -458,6 +461,7 @@ GLuint OptiXRenderer::TraceFrame()
     glm::vec3 eye, U, V, W;
     m_Camera.GetVectorData(eye, U, V, W);
     params.eye = make_float3(eye.x, eye.y, eye.z);
+    //params.eye = make_float3(eye.x, eye.y, -5.f); //bookmark
     params.U = make_float3(U.x, U.y, U.z);
     params.V = make_float3(V.x, V.y, V.z);
     params.W = make_float3(W.x, W.y, W.z);
