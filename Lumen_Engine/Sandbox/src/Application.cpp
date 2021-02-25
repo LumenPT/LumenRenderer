@@ -79,7 +79,8 @@ public:
 		std::filesystem::path p = std::filesystem::current_path();
 		std::string p_string{ p.string() };
 		std::replace(p_string.begin(), p_string.end(), '\\', '/');
-		p_string.append("/Sandbox/assets/models/Lantern.gltf");
+		p_string.append("/Sandbox/assets/models/Sponza/Sponza.gltf");
+		//p_string.append("/Sandbox/assets/models/Lantern.gltf");
 		LMN_TRACE(p_string);
 		
 		Lumen::SceneManager manager = Lumen::SceneManager();
