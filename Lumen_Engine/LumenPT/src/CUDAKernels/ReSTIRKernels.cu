@@ -2,6 +2,8 @@
 
 #include "../Shaders/CppCommon/RenderingUtility.h"
 #include "../Shaders/CppCommon/WaveFrontDataStructs.h"
+#include <cuda_runtime_api.h>
+#include <cuda/device_atomic_functions.h>
 
 __host__ void ResetReservoirs(int a_NumReservoirs, Reservoir* a_ReservoirPointer)
 {
@@ -175,13 +177,67 @@ __global__ void PickPrimarySamplesInternal(const WaveFront::RayData* const a_Ray
     }
 }
 
-__host__ void VisibilityPass(Reservoir* a_Reservoirs, unsigned a_NumReservoirs)
+__host__ void VisibilityPass(MemoryBuffer* a_Atomic, Reservoir* a_Reservoirs, const WaveFront::IntersectionData* a_IntersectionData, const WaveFront::RayData* const a_RayData, unsigned a_NumReservoirsPerPixel, const std::uint32_t a_NumPixels, RestirShadowRay* a_ShadowRays)
 {
-    //TODO use this struct
-    RestirShadowRay ray;
-    ray.index = a_NumReservoirs; //index of the reservoir corresponding to the ray.
+    //Counter that is atomically incremented. Copy it to the GPU.
+    int atomic = 0;
+    a_Atomic->Write(atomic);
+    auto devicePtr = a_Atomic->GetDevicePtr<int>();
 
-    //TODO generate shadow rays and then resolve them in optix. In the optix shader set the reservoir at each rays index to 0 if occluded.
+    //Call in parallel.
+    const int blockSize = 256;
+    const int numBlocks = (a_NumPixels + blockSize - 1) / blockSize;
+    GenerateShadowRay<<<numBlocks, blockSize>>> (devicePtr, a_NumPixels, a_NumReservoirsPerPixel, a_RayData, a_Reservoirs, a_IntersectionData, a_ShadowRays);
+    cudaDeviceSynchronize();
+
+    //Copy value back to the CPU.
+    a_Atomic->Read(&atomic, sizeof(int), 0);
+
+    //TODO: optix launch. Set reservoir at index of occluded rays to 0 weight.
+}
+
+__global__ void GenerateShadowRay(int* a_AtomicCounter, const std::uint32_t a_NumPixels, std::uint32_t a_NumReservoirsPerPixel, const WaveFront::RayData* const a_RayData, Reservoir* a_Reservoirs, const WaveFront::IntersectionData* a_IntersectionData, RestirShadowRay* a_ShadowRays)
+{
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    int stride = blockDim.x * gridDim.x;
+
+    for (int pixel = index; pixel < a_NumPixels; pixel += stride)
+    {
+        auto* intersectionData = &a_IntersectionData[pixel];
+        
+
+        //Only run for valid intersections.
+        if(a_IntersectionData[pixel].m_IntersectionT > 0.f)
+        {
+            //The ray 
+            auto* rayData = &a_RayData[intersectionData->m_RayArrayIndex];
+            float3 pixelPosition = rayData->m_Direction * intersectionData->m_IntersectionT + rayData->m_Origin;
+
+            //Run for every reservoir for the pixel.
+            for(int depth = 0; depth < a_NumReservoirsPerPixel; ++depth)
+            {
+                //If the reservoir has a weight, add a shadow ray.
+                Reservoir* reservoir = &a_Reservoirs[RESERVOIR_INDEX(pixel, depth, a_NumReservoirsPerPixel)];
+                if(reservoir->weight > 0.f)
+                {
+
+                    int shadowIndex = atomicAdd(a_AtomicCounter, 1);
+
+                    float3 pixelToLight = (reservoir->sample.position - pixelPosition);
+                    float l = length(pixelToLight);
+                    pixelToLight /= l;
+
+                    RestirShadowRay ray;
+                    ray.index = pixel;
+                    ray.direction = pixelToLight;
+                    ray.origin = pixelPosition;
+                    ray.distance = l - 0.005f; //Make length a little bit shorter to prevent self-shadowing.
+
+                    a_ShadowRays[shadowIndex] = ray;
+                }
+            }            
+        }
+    }
 }
 
 __host__ void SpatialNeighbourSampling(Reservoir* a_Reservoirs, Reservoir* a_ReservoirSwapBuffer,
@@ -191,14 +247,107 @@ __host__ void SpatialNeighbourSampling(Reservoir* a_Reservoirs, Reservoir* a_Res
     //TODO Use the swap buffer as intermediate output. Synchronize between each pass.
 }
 
-__host__ void TemporalNeighbourSampling(Reservoir* a_Reservoirs, Reservoir* a_TemporalReservoirs,
-                                        const ReSTIRSettings& a_Settings)
+__host__ void TemporalNeighbourSampling(
+    Reservoir* a_CurrentReservoirs,
+    Reservoir* a_PreviousReservoirs,
+    const WaveFront::IntersectionData* a_CurrentIntersectionData,
+    const WaveFront::IntersectionData* a_PreviousIntersectionData,
+    const WaveFront::RayData* const a_CurrentRayData,
+    const WaveFront::RayData* const a_PreviousRayData,
+    const ReSTIRSettings& a_Settings)
 {
-    //TODO have a biased and unbiased implementation based on settings.
-    //TODO Combine the reservoirs by finding temporal sample in buffer based on motion vector. For now use the same index.
+    const int numPixels = (a_Settings.width * a_Settings.height);
+    const int blockSize = 256;
+    const int numBlocks = (numPixels + blockSize - 1) / blockSize;
+
+    //TODO pass the motion vector information in here.
+
+    CombineTemporalSamplesInternal << <numBlocks, blockSize >> > (numPixels, a_CurrentReservoirs, a_PreviousReservoirs, a_CurrentIntersectionData, a_PreviousIntersectionData, a_CurrentRayData, a_PreviousRayData, a_Settings.enableBiased);
 }
 
-__device__ void CombineUnbiased(int a_PixelIndex, int a_Count, int a_MaxReservoirDepth, Reservoir* a_Reservoirs, PixelData* a_ToCombine)
+
+__global__ void CombineTemporalSamplesInternal(
+    int a_NumPixels,
+    int a_NumReservoirsPerPixel,
+    Reservoir* a_CurrentReservoirs,
+    Reservoir* a_PreviousReservoirs,
+    const WaveFront::IntersectionData* a_CurrentIntersectionData,
+    const WaveFront::IntersectionData* a_PreviousIntersectionData,
+    const WaveFront::RayData* const a_CurrentRayData,
+    const WaveFront::RayData* const a_PreviousRayData,
+    const bool a_Biased)
+{
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    int stride = blockDim.x * gridDim.x;
+
+    for (int i = index; i < a_NumPixels; i += stride)
+    {
+        auto* intersection = &a_CurrentIntersectionData[i];
+
+        //Ensure that the pixel has a valid intersection.
+        if (intersection->m_IntersectionT <= 0.f)
+        {
+            continue;
+        }
+
+        //TODO instead look up the motion vector and use that to find the right pixel.
+        const int temporalIndex = i;
+
+        //Also continue if last frame wasn't valid.
+        auto* temporalIntersection = &a_PreviousIntersectionData[temporalIndex];
+        if (temporalIntersection->m_IntersectionT <= 0.f)
+        {
+            continue;;
+        }
+
+        //Pixel current intersection ray.
+        auto* ray = &a_CurrentRayData[i];
+        auto* temporalRay = &a_PreviousRayData[temporalIndex];
+
+        //For every reservoir at the current pixel.
+        for (int depth = 0; depth < a_NumReservoirsPerPixel; ++depth)
+        {
+            Reservoir* toCombine[2];
+            toCombine[0] = &a_PreviousReservoirs[RESERVOIR_INDEX(temporalIndex, depth, a_NumReservoirsPerPixel)];
+            toCombine[1] = &a_CurrentReservoirs[RESERVOIR_INDEX(i, depth, a_NumReservoirsPerPixel)];
+
+            //Create the pixel array of pixels and pointers to them.
+            //This is needed because the initial array doesn't have to be contiguous in memory.
+            PixelData pixels[2];
+            PixelData* pixelPointers[]{ &pixels[0], &pixels[1] };
+
+            //temporal intersection.
+            pixels[0].worldPosition = ray->m_Origin + ray->m_Direction * intersection->m_IntersectionT;
+            pixels[0].directionIncoming = ray->m_Direction;
+            pixels[0].worldNormal;   //TODO get surface normal from the intersection buffer.
+            pixels[0].diffuse;      //TODO get diffuse color from intersection buffer.
+            pixels[0].roughness;    //TODO get rougghness from intersection.
+            pixels[0].metallic;     //TODO get metallic factor from intersection.
+
+            //current intersection.
+            pixels[0].worldPosition = temporalRay->m_Origin + temporalRay->m_Direction * temporalIntersection->m_IntersectionT;
+            pixels[0].directionIncoming = ray->m_Direction;
+            pixels[0].worldNormal;   //TODO get surface normal from the intersection buffer.
+            pixels[0].diffuse;      //TODO get diffuse color from intersection buffer.
+            pixels[0].roughness;    //TODO get rougghness from intersection.
+            pixels[0].metallic;     //TODO get metallic factor from intersection.
+
+            //Cap sample count at 20x current to reduce temporal influence. Would grow infinitely large otherwise.
+            toCombine[0]->sampleCount = fminf(toCombine[0]->sampleCount, toCombine[1]->sampleCount * 20);
+
+            if (a_Biased)
+            {
+                CombineBiased(i, 2, a_NumReservoirsPerPixel, toCombine, pixelPointers);
+            }
+            else
+            {
+                CombineUnbiased(i, 2, a_NumReservoirsPerPixel, toCombine, pixelPointers);
+            }
+        }
+    }
+}
+
+__device__ void CombineUnbiased(int a_PixelIndex, int a_Count, int a_MaxReservoirDepth, Reservoir** a_Reservoirs, PixelData** a_ToCombine)
 {
 
     for (int depth = 0; depth < a_MaxReservoirDepth; ++depth)
@@ -208,11 +357,12 @@ __device__ void CombineUnbiased(int a_PixelIndex, int a_Count, int a_MaxReservoi
 
         for (int index = 0; index < a_Count; ++index)
         {
-            auto* otherReservoir = &a_Reservoirs[RESERVOIR_INDEX(index, depth, a_MaxReservoirDepth)];
+            auto* otherReservoir = a_Reservoirs[RESERVOIR_INDEX(index, depth, a_MaxReservoirDepth)];
             LightSample resampled;
-            Resample(&otherReservoir->sample, &a_ToCombine[index], &resampled);
+            Resample(&otherReservoir->sample, a_ToCombine[index], &resampled);
 
-            const float weight = static_cast<float>(otherReservoir->sampleCount) * otherReservoir->weight * resampled.solidAnglePdf;
+            const float weight = static_cast<float>(otherReservoir->sampleCount) * otherReservoir->weight * resampled.
+                solidAnglePdf;
 
             output.Update(resampled, weight);
 
@@ -226,13 +376,13 @@ __device__ void CombineUnbiased(int a_PixelIndex, int a_Count, int a_MaxReservoi
 
         for (int index = 0; index < a_Count; ++index)
         {
-            auto* otherPixel = &a_ToCombine[index];
+            auto* otherPixel = a_ToCombine[index];
             LightSample resampled;
             Resample(&output.sample, otherPixel, &resampled);
 
             if (resampled.solidAnglePdf > 0)
             {
-                correction += a_Reservoirs[RESERVOIR_INDEX(otherPixel->index, depth, a_MaxReservoirDepth)].sampleCount;
+                correction += a_Reservoirs[RESERVOIR_INDEX(otherPixel->index, depth, a_MaxReservoirDepth)]->sampleCount;
             }
         }
 
@@ -248,7 +398,7 @@ __device__ void CombineUnbiased(int a_PixelIndex, int a_Count, int a_MaxReservoi
     }
 }
 
-__device__ void CombineBiased(int a_PixelIndex, int a_Count, int a_MaxReservoirDepth, Reservoir* a_Reservoirs, PixelData* a_ToCombine)
+__device__ void CombineBiased(int a_PixelIndex, int a_Count, int a_MaxReservoirDepth, Reservoir** a_Reservoirs, PixelData** a_ToCombine)
 {
     //Loop over every depth.
     for (int depth = 0; depth < a_MaxReservoirDepth; ++depth)
@@ -259,13 +409,14 @@ __device__ void CombineBiased(int a_PixelIndex, int a_Count, int a_MaxReservoirD
         //Iterate over the intersection data to combine.
         for (int i = 0; i < a_Count; ++i)
         {
-            auto* pixel = &a_ToCombine[i];
-            auto* reservoir = &a_Reservoirs[RESERVOIR_INDEX(pixel->index, depth, a_MaxReservoirDepth)];
+            auto* pixel = a_ToCombine[i];
+            auto* reservoir = a_Reservoirs[RESERVOIR_INDEX(pixel->index, depth, a_MaxReservoirDepth)];
 
             LightSample resampled;
             Resample(&reservoir->sample, pixel, &resampled);
 
-            const float weight = static_cast<float>(reservoir->sampleCount) * reservoir->weight * resampled.solidAnglePdf;
+            const float weight = static_cast<float>(reservoir->sampleCount) * reservoir->weight * resampled.
+                solidAnglePdf;
 
             assert(resampled.solidAnglePdf >= 0.f);
 
@@ -281,7 +432,7 @@ __device__ void CombineBiased(int a_PixelIndex, int a_Count, int a_MaxReservoirD
         assert(output.weight >= 0.f && output.weightSum >= 0.f);
 
         //Override the reservoir for the output at this depth.
-        a_Reservoirs[RESERVOIR_INDEX(a_PixelIndex, depth, a_MaxReservoirDepth)] = output;
+        *a_Reservoirs[RESERVOIR_INDEX(a_PixelIndex, depth, a_MaxReservoirDepth)] = output;
     }
 }
 
@@ -289,11 +440,16 @@ __device__ void Resample(LightSample* a_Input, const PixelData* a_PixelData, Lig
 {
     *a_Output = *a_Input;
 
-    float3 pixelToLightDir = a_Input->position - a_PixelData->worldPosition;                                   //Direction from pixel to light.
-    const float lDistance = length(pixelToLightDir);                                                               //Light distance from pixel.
-    pixelToLightDir /= lDistance;                                                                                          //Normalize.
-    const float cosIn = clamp(dot(pixelToLightDir, a_PixelData->worldNormal), 0.f, 1.f);           //Lambertian term clamped between 0 and 1. SurfaceN dot ToLight
-    const float cosOut = clamp(dot(a_Input->normal, -pixelToLightDir), 0.f, 1.f);    //Light normal at sample point dotted with light direction. Invert light dir for this (light to pixel instead of pixel to light)
+    float3 pixelToLightDir = a_Input->position - a_PixelData->worldPosition;
+    //Direction from pixel to light.
+    const float lDistance = length(pixelToLightDir);
+    //Light distance from pixel.
+    pixelToLightDir /= lDistance;
+    //Normalize.
+    const float cosIn = clamp(dot(pixelToLightDir, a_PixelData->worldNormal), 0.f, 1.f);
+    //Lambertian term clamped between 0 and 1. SurfaceN dot ToLight
+    const float cosOut = clamp(dot(a_Input->normal, -pixelToLightDir), 0.f, 1.f);
+    //Light normal at sample point dotted with light direction. Invert light dir for this (light to pixel instead of pixel to light)
 
     //Light is not facing towards the surface or too close to the surface.
     if(cosIn <= 0 || cosOut <= 0 || lDistance <= 0.01f)
@@ -306,7 +462,8 @@ __device__ void Resample(LightSample* a_Input, const PixelData* a_PixelData, Lig
     const float solidAngle = (cosOut * a_Input->area) / (lDistance * lDistance);
 
     //BSDF is equal to material color for now.
-    const auto brdf = MicrofacetBRDF(-pixelToLightDir, a_PixelData->directionIncoming, a_PixelData->worldNormal, a_PixelData->diffuse, a_PixelData->metallic, a_PixelData->roughness);
+    const auto brdf = MicrofacetBRDF(-pixelToLightDir, a_PixelData->directionIncoming, a_PixelData->worldNormal,
+                                     a_PixelData->diffuse, a_PixelData->metallic, a_PixelData->roughness);
 
     //The unshadowed contribution (contributed if no obstruction is between the light and surface) takes the BRDF,
     //geometry factor and solid angle into account. Also the light radiance.
@@ -316,5 +473,6 @@ __device__ void Resample(LightSample* a_Input, const PixelData* a_PixelData, Lig
 
     //For the PDF, I take the unshadowed path contribution as a single float value. Average for now.
     //TODO might be better to instead take the max value? Ask Jacco.
-    a_Output->solidAnglePdf = (unshadowedPathContribution.x + unshadowedPathContribution.y + unshadowedPathContribution.z) / 3.f;
+    a_Output->solidAnglePdf = (unshadowedPathContribution.x + unshadowedPathContribution.y + unshadowedPathContribution.
+        z) / 3.f;
 }
