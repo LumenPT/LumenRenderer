@@ -94,7 +94,7 @@ void OutputLayer::OnImGuiRender()
 {
 
 
-	auto& tarTransform = m_LumenPT->m_Scene->m_MeshInstances[0]->m_Transform;
+	/*auto& tarTransform = m_LumenPT->m_Scene->m_MeshInstances[0]->m_Transform;
 
 	glm::vec3 pos, scale;
 	pos = tarTransform.GetPosition();
@@ -108,7 +108,7 @@ void OutputLayer::OnImGuiRender()
 	ImGui::End();
 	tarTransform.SetPosition(pos);
 	tarTransform.SetScale(scale);
-	tarTransform.SetRotation(rot);
+	tarTransform.SetRotation(rot);*/
 }
 
 void OutputLayer::HandleCameraInput(Camera& a_Camera)

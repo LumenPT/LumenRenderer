@@ -399,11 +399,12 @@ void OptiXRenderer::CreateShaderBindingTable()
     missRecord.m_Data.m_Num = 2;
     missRecord.m_Data.m_Color = { 0.f, 0.f, 1.f };
 
-    m_HitRecord = m_ShaderBindingTableGenerator->AddHitGroup<HitData>();
+	//bookmark
+    /*m_HitRecord = m_ShaderBindingTableGenerator->AddHitGroup<HitData>();
     
     auto& hitRecord = m_HitRecord.GetRecord();
     hitRecord.m_Header = GetProgramGroupHeader("Hit");
-    hitRecord.m_Data.m_TextureObject = **m_Texture;
+    hitRecord.m_Data.m_TextureObject = **m_Texture;*/
 
 }
 
@@ -443,10 +444,12 @@ GLuint OptiXRenderer::TraceFrame()
     OptixShaderBindingTable sbt = m_ShaderBindingTableGenerator->GetTableDesc();
 
     auto str = static_cast<PTScene*>(m_Scene.get())->GetSceneAccelerationStructure();
-
+    //auto str = BuildGeometryAccelerationStructure(vert);
+	
     params.m_Image = m_OutputBuffer->GetDevicePointer();
     params.m_Handle = str;
-
+    //params.m_Handle = m_testVolumeGAS->m_TraversableHandle;
+	
     params.m_ImageWidth = gs_ImageWidth;
     params.m_ImageHeight = gs_ImageHeight;
     params.m_VertexBuffer = vertexBuffer.GetDevicePtr<Vertex>();
@@ -455,6 +458,7 @@ GLuint OptiXRenderer::TraceFrame()
     glm::vec3 eye, U, V, W;
     m_Camera.GetVectorData(eye, U, V, W);
     params.eye = make_float3(eye.x, eye.y, eye.z);
+    params.eye = make_float3(eye.x, eye.y, -5.f); //bookmark
     params.U = make_float3(U.x, U.y, U.z);
     params.V = make_float3(V.x, V.y, V.z);
     params.W = make_float3(W.x, W.y, W.z);
@@ -462,6 +466,8 @@ GLuint OptiXRenderer::TraceFrame()
     MemoryBuffer devBuffer(sizeof(params));
     devBuffer.Write(params);
 
+
+	
     auto res = optixLaunch(
         m_Pipeline,
         0,
@@ -621,16 +627,27 @@ std::shared_ptr<Lumen::ILumenVolume> OptiXRenderer::CreateVolume(const std::stri
     OptixAabb aabb = { -1.5f, -1.5f, -1.5f, 1.5f, 1.5f, 1.5f };
     MemoryBuffer aabb_buffer(sizeof(OptixAabb));
     aabb_buffer.Write(aabb);
+
+    /*CUdeviceptr d_aabb_buffer;
+    cudaMalloc(reinterpret_cast<void**>(&d_aabb_buffer), sizeof(OptixAabb));
+    cudaMemcpy(
+        reinterpret_cast<void*>(d_aabb_buffer),
+        &aabb,
+        sizeof(OptixAabb),
+        cudaMemcpyHostToDevice
+    );*/
+
+    OptixBuildInput aabb_input = {};
 	
     OptixBuildInput buildInput = {};
     buildInput.type = OPTIX_BUILD_INPUT_TYPE_CUSTOM_PRIMITIVES;
-    buildInput.customPrimitiveArray.aabbBuffers = aabb_buffer.GetDevicePtr<CUdeviceptr>();
+    buildInput.customPrimitiveArray.aabbBuffers = /*&d_aabb_buffer*/ &*aabb_buffer;
     buildInput.customPrimitiveArray.numPrimitives = 1;
     buildInput.customPrimitiveArray.flags = geomFlags;
     buildInput.customPrimitiveArray.numSbtRecords = 1;
 
-    /*volume->m_AccelerationStructure = BuildGeometryAccelerationStructure(buildOptions, buildInput);
-    m_testVolumeGAS = volume->m_AccelerationStructure.get();*/
+    volume->m_AccelerationStructure = BuildGeometryAccelerationStructure(buildOptions, buildInput);
+    m_testVolumeGAS = volume->m_AccelerationStructure.get();
 	
     return volume;
 }

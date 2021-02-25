@@ -84,7 +84,7 @@ public:
 		
 		Lumen::SceneManager manager = Lumen::SceneManager();
 		manager.SetPipeline(*m_ContextLayer->GetPipeline());
-		auto res = manager.LoadGLTF(p_string);
+		//auto res = manager.LoadGLTF(p_string);
 
 		std::string vndbFilePath = { p.string() };
 		vndbFilePath.append("/Sandbox/assets/volume/Sphere.vndb");
@@ -97,16 +97,16 @@ public:
 
 		lumenPT->m_Scene = lumenPT->CreateScene(scData);
 
-		auto mesh = lumenPT->m_Scene->AddMesh();
-		auto meshLight = lumenPT->m_Scene->AddMesh();
-		mesh->SetMesh(res->m_MeshPool[0]);
-		meshLight->SetMesh(res->m_MeshPool[0]);
+		/*auto mesh = lumenPT->m_Scene->AddMesh();
+		auto meshLight = lumenPT->m_Scene->AddMesh();*/
+		/*mesh->SetMesh(res->m_MeshPool[0]);
+		meshLight->SetMesh(res->m_MeshPool[0]);*/
 
-		mesh->m_Transform.SetPosition(glm::vec3(0.f, 0.f, 15.0f));
+		/*mesh->m_Transform.SetPosition(glm::vec3(0.f, 0.f, 15.0f));
 		mesh->m_Transform.SetScale(glm::vec3(1.0f));
 
 		meshLight->m_Transform.SetPosition(glm::vec3(0.f, 0.f, 15.0f));
-		meshLight->m_Transform.SetScale(glm::vec3(1.0f));
+		meshLight->m_Transform.SetScale(glm::vec3(1.0f));*/
 
 		auto volume = lumenPT->m_Scene->AddVolume();
 		volume->SetVolume(volumeRes->m_Volume);
