@@ -83,7 +83,7 @@ OptiXRenderer::OptiXRenderer(const InitializationData& a_InitializationData)
 
     CreateShaderBindingTable();
 
-
+    m_Camera.SetPosition(glm::vec3(0.f, 0.f, -25.f));
 }
 
 OptiXRenderer::~OptiXRenderer()
@@ -623,21 +623,26 @@ std::shared_ptr<Lumen::ILumenVolume> OptiXRenderer::CreateVolume(const std::stri
     buildOptions.motionOptions = {};
 
     OptixAabb aabb = { -1.5f, -1.5f, -1.5f, 1.5f, 1.5f, 1.5f };
+
+    auto grid = volume->GetHandle()->grid<float>();
+    auto bbox = grid->worldBBox();
+	
+    nanovdb::Vec3<double> temp = bbox.min();
+    float bboxMinX = bbox.min()[0];
+    float bboxMinY = bbox.min()[1];
+    float bboxMinZ = bbox.min()[2];
+    float bboxMaxX = bbox.max()[0];
+    float bboxMaxY = bbox.max()[1];
+    float bboxMaxZ = bbox.max()[2];
+	
+    aabb = { bboxMinX, bboxMinY, bboxMinZ, bboxMaxX, bboxMaxY, bboxMaxZ };
+	
     MemoryBuffer aabb_buffer(sizeof(OptixAabb));
     aabb_buffer.Write(aabb);
-
-    /*CUdeviceptr d_aabb_buffer;
-    cudaMalloc(reinterpret_cast<void**>(&d_aabb_buffer), sizeof(OptixAabb));
-    cudaMemcpy(
-        reinterpret_cast<void*>(d_aabb_buffer),
-        &aabb,
-        sizeof(OptixAabb),
-        cudaMemcpyHostToDevice
-    );*/
 	
     OptixBuildInput buildInput = {};
     buildInput.type = OPTIX_BUILD_INPUT_TYPE_CUSTOM_PRIMITIVES;
-    buildInput.customPrimitiveArray.aabbBuffers = /*&d_aabb_buffer*/ &*aabb_buffer;
+    buildInput.customPrimitiveArray.aabbBuffers = &*aabb_buffer;
     buildInput.customPrimitiveArray.numPrimitives = 1;
     buildInput.customPrimitiveArray.flags = geomFlags;
     buildInput.customPrimitiveArray.numSbtRecords = 1;
