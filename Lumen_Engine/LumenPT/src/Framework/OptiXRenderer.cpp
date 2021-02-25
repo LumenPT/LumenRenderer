@@ -15,6 +15,7 @@
 #include <cstdio>
 #include <fstream>
 #include <sstream>
+#include <filesystem>
 #include "Cuda/cuda.h"
 #include "Cuda/cuda_runtime.h"
 #include "Optix/optix_stubs.h"
@@ -213,7 +214,8 @@ void OptiXRenderer::CreatePipeline()
 
 OptixModule OptiXRenderer::CreateModule(const std::string& a_PtxPath)
 {
-
+    assert(std::filesystem::exists(a_PtxPath));
+	
     OptixModuleCompileOptions moduleOptions = {};
     moduleOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_LINEINFO;
     moduleOptions.maxRegisterCount = OPTIX_COMPILE_DEFAULT_MAX_REGISTER_COUNT;
