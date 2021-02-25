@@ -17,6 +17,12 @@
 namespace WaveFront
 {
 
+    template<typename T>
+    CPU_GPU bool IsNotNaN(T a_Val)
+    {
+        return (a_Val == a_Val);
+    }
+
     //Scene data
 
     struct LightBuffer
@@ -457,11 +463,6 @@ namespace WaveFront
 
             assert(a_Channel != OutputChannel::NUM_CHANNELS);
 
-            /*if(a_Value.x != 0.f || a_Value.y != 0.f || a_Value.z != 0.f)
-            {
-                printf("ResultBuffer SetPixel: %f, %f, %f \n", a_Value.x, a_Value.y, a_Value.z);
-            }*/
-
             m_PixelBuffer->SetPixel(a_Value, a_PixelIndex, static_cast<unsigned>(a_Channel));
 
         }
@@ -499,19 +500,7 @@ namespace WaveFront
                 const float3& color = m_PixelBuffer->GetPixel(a_PixelIndex, i);
                 result += color;
 
-                /*if( color.x != 0.f || color.y != 0.f || color.z != 0.f)
-                {
-                    printf("CombinePixel: Color: %f, %f, %f \n", result.x, result.y, result.z);
-                }*/
-
             }
-
-            /*if( result.x != 0.f ||
-                result.y != 0.f ||
-                result.z != 0.f)
-            {
-                printf("Color Combined: %f, %f, %f \n", result.x, result.y, result.z);
-            }*/
 
             return result;
 
@@ -555,7 +544,14 @@ namespace WaveFront
             return  (m_Direction.x != 0.f ||
                      m_Direction.y != 0.f ||
                      m_Direction.z != 0.f)&& 
-                     m_MaxDistance > 0.f;
+                     m_MaxDistance > 0.f &&
+                     IsNotNaN(m_Direction.x) &&
+                     IsNotNaN(m_Direction.y) &&
+                     IsNotNaN(m_Direction.z) &&
+                     IsNotNaN(m_Origin.x) &&
+                     IsNotNaN(m_Origin.y) &&
+                     IsNotNaN(m_Origin.z) &&
+                     IsNotNaN(m_MaxDistance);
 
         }
 

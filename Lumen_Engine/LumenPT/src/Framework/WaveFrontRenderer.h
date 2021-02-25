@@ -220,7 +220,7 @@ private:
 
     //ResultBuffer storing the different PixelBuffers as different light channels;
     std::unique_ptr<MemoryBuffer> m_ResultBuffer;
-    //2 PixelBuffers 1 for the different channels in the ResultBuffer and 1 PixelBuffer for the merged results.
+    //2 PixelBuffers 1 for the different channels in the ResultBuffer and 1 PixelBuffer for the merged results (to allow for up-scaling the output).
     std::unique_ptr<MemoryBuffer> m_PixelBufferMultiChannel;
     std::unique_ptr<MemoryBuffer> m_PixelBufferSingleChannel;
     //2 ray batches, 1 for storing primary rays, other for overwriting secondary rays.

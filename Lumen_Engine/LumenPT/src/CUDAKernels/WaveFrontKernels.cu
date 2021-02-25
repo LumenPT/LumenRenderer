@@ -55,14 +55,14 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
         a_ShadingParams.m_CurrentRays, 
         a_ShadingParams.m_SecondaryRays);
 
-    cudaDeviceSynchronize();
-    CHECKLASTCUDAERROR;
+    /*cudaDeviceSynchronize();
+    CHECKLASTCUDAERROR;*/
 
      //Generate shadow rays for specular highlights.
     ShadeSpecular<<<numBlocks, blockSize >>>();
 
-    cudaDeviceSynchronize();
-    CHECKLASTCUDAERROR;
+    /*cudaDeviceSynchronize();
+    CHECKLASTCUDAERROR;*/
 
     //Generate shadow rays for direct lights.
     ShadeDirect<<<numBlocks, blockSize>>>(
@@ -92,18 +92,18 @@ CPU_ONLY void PostProcess(const PostProcessLaunchParameters& a_PostProcessParams
     const int numBlocks = (numPixels + blockSize - 1) / blockSize;
 
     //TODO before merging.
-    Denoise<<<numBlocks, blockSize >>>();
+    //Denoise<<<numBlocks, blockSize >>>();
 
-    cudaDeviceSynchronize();
-    CHECKLASTCUDAERROR;
+    /*cudaDeviceSynchronize();
+    CHECKLASTCUDAERROR;*/
 
-    MergeLightChannels <<<1, 1>>> (
+    MergeLightChannels <<<numBlocks, blockSize>>> (
         a_PostProcessParams.m_Resolution, 
         a_PostProcessParams.m_WavefrontOutput,
         a_PostProcessParams.m_MergedResults);
 
-    cudaDeviceSynchronize();
-    CHECKLASTCUDAERROR;
+    /*cudaDeviceSynchronize();
+    CHECKLASTCUDAERROR;*/
 
     //TODO steal hidden Nvidia technology by breaking into their buildings
     //TODO copy merged results into image output after having run DLSS.
@@ -113,14 +113,14 @@ CPU_ONLY void PostProcess(const PostProcessLaunchParameters& a_PostProcessParams
     const int blockSizeUpscaled = 256;
     const int numBlocksUpscaled = (numPixelsUpscaled + blockSizeUpscaled - 1) / blockSizeUpscaled;
 
-    cudaDeviceSynchronize();
-    CHECKLASTCUDAERROR;
+    /*cudaDeviceSynchronize();
+    CHECKLASTCUDAERROR;*/
 
     //TODO
     PostProcessingEffects<<<numBlocksUpscaled, blockSizeUpscaled >>>();
 
-    cudaDeviceSynchronize();
-    CHECKLASTCUDAERROR;
+    /*cudaDeviceSynchronize();
+    CHECKLASTCUDAERROR;*/
 
     //TODO This is temporary till the post-processing is  in place. Let the last stage copy it directly to the output buffer.
     WriteToOutput<<<numBlocksUpscaled, blockSizeUpscaled >>>(
@@ -312,6 +312,12 @@ CPU_ON_GPU void MergeLightChannels(
     const unsigned int stride = blockDim.x * gridDim.x;
     const float3* firstPixel = a_Input->m_PixelBuffer->m_Pixels;
 
+    const unsigned int numPixelsBuffer = a_Input->m_PixelBuffer->m_NumPixels;
+    const unsigned int numChannelsPixelsBuffer = a_Input->m_PixelBuffer->m_ChannelsPerPixel;
+
+    /*printf("NumPixelsBuffer: %i NumChannelsPixelsBuffer: %i FirstPixelPtr: %p PixelBufferPtr: %p \n", 
+        numPixelsBuffer, numChannelsPixelsBuffer, firstPixel, a_Input->m_PixelBuffer);*/
+
     for (int i = index; i < numPixels; i += stride)
     {
     
@@ -460,3 +466,4 @@ CPU_ONLY void ResetShadowRayBatch(
     ResetShadowRayBatchBuffer<<<numBlocks, blockSize>>>(a_ShadowRayBatchDevPtr);
 
 }
+

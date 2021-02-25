@@ -17,10 +17,220 @@
 #include <cstdio>
 #include <fstream>
 #include <sstream>
+#include <filesystem>
 #include "Cuda/cuda.h"
 #include "Cuda/cuda_runtime.h"
 #include "Optix/optix_stubs.h"
 #include <glm/gtx/compatibility.hpp>
+
+const unsigned BYTES_PER_PIXEL = 3;
+
+#pragma pack(push, 1)
+
+struct BitmapFileHeader
+{
+    char m_Signature[2];
+    unsigned int m_ImageFileSizeBytes;
+    const unsigned int m_Reserved;
+    unsigned int m_PixelArrayOffset;
+};
+
+struct BitmapInfoHeader
+{
+    const unsigned int m_HeaderSize = sizeof(BitmapInfoHeader);
+    unsigned int m_ImageWidth;
+    unsigned int m_ImageHeight;
+    uint16_t m_numColorPlanes;
+    uint16_t m_bitsPerPixel;
+    unsigned int m_Compression;
+    unsigned int m_ImageSize;
+    unsigned int m_HorizontalResolution;
+    unsigned int m_VerticalResolution;
+    unsigned int m_numColorsInTable;
+    unsigned int m_numImportantColors;
+};
+
+#pragma pack(pop)
+
+BitmapFileHeader createBitmapFileHeader(unsigned a_Height, unsigned a_Stride)
+{
+    
+    const unsigned int fileSize = static_cast<unsigned>(sizeof(BitmapFileHeader)) + static_cast<unsigned>(sizeof(BitmapInfoHeader)) + (a_Stride * a_Height);
+
+    BitmapFileHeader fileHeader{};
+    fileHeader.m_Signature[0] = 'B';
+    fileHeader.m_Signature[1] = 'M';
+    fileHeader.m_ImageFileSizeBytes = fileSize;
+    fileHeader.m_PixelArrayOffset = sizeof(BitmapFileHeader) + sizeof(BitmapInfoHeader);
+
+    return fileHeader;
+}
+
+BitmapInfoHeader createBitmapInfoHeader(unsigned a_Height, unsigned a_Width)
+{
+
+    BitmapInfoHeader infoHeader{};
+
+    infoHeader.m_ImageWidth = a_Width;
+    infoHeader.m_ImageHeight = a_Height;
+    infoHeader.m_numColorPlanes = 1;
+    infoHeader.m_bitsPerPixel = BYTES_PER_PIXEL * 8;
+
+    return infoHeader;
+}
+
+//Get memory from GPU
+//Convert data to 24bit pixel values
+//Save data
+
+void SaveToBMP(
+    const unsigned char* a_ImagePtr,
+    const unsigned a_Width, 
+    const unsigned a_Height,
+    const std::filesystem::path& a_SaveFilePath)
+{
+
+    const unsigned int widthInBytes = a_Width * BYTES_PER_PIXEL;
+    const unsigned int paddingSize = (4 - widthInBytes % 4) % 4;
+    const unsigned int stride = widthInBytes + paddingSize;
+    const unsigned char padding[3] = { 0 };
+
+    BitmapFileHeader fileHeader = createBitmapFileHeader(a_Height, stride);
+    BitmapInfoHeader infoHeader = createBitmapInfoHeader(a_Height, a_Width);
+
+    std::fstream fileStream{};
+
+    fileStream.open(a_SaveFilePath, std::ios::out | std::ios::binary);
+
+    fileStream.write(reinterpret_cast<const char*>(&fileHeader), sizeof(fileHeader));
+    fileStream.write(reinterpret_cast<const char*>(&infoHeader), sizeof(infoHeader));
+
+    if (!fileStream.is_open())
+    {
+        printf("Error: could not open/create file to write image - path: %s \n", a_SaveFilePath.string().c_str());
+        return;
+    }
+
+    for(unsigned row = 0; row < a_Height; ++row)
+    {
+        const unsigned char* pixelDataPtr = &a_ImagePtr[row * widthInBytes];
+        fileStream.write(reinterpret_cast<const char*>(pixelDataPtr), widthInBytes);
+        fileStream.write(reinterpret_cast<const char*>(&padding), paddingSize);
+    }
+
+    fileStream.close();
+
+}
+
+
+void CreateTestBMP()
+{
+
+    const int height = 100;
+    const int width = 100;
+    unsigned char image[height][width][BYTES_PER_PIXEL];
+
+    int i, j;
+    for (i = 0; i < height; i++) {
+        for (j = 0; j < width; j++) {
+            image[i][j][2] = static_cast<unsigned char>(static_cast<float>(i) / static_cast<float>(height) * 255.f);
+            //image[i][j][2] = j < (width / 2) ? static_cast<unsigned char>(0) : static_cast<unsigned char>(255);
+            //image[i][j][2] = static_cast<unsigned char>(0);
+            image[i][j][1] = static_cast<unsigned char>(static_cast<float>(j) / static_cast<float>(width) * 255.f);
+            //image[i][j][1] = i < (height / 2) ? static_cast<unsigned char>(0) : static_cast<unsigned char>(255);
+            //image[i][j][1] = static_cast<unsigned char>(0);
+            image[i][j][0] = static_cast<unsigned char>(static_cast<float>(i + j) / static_cast<float>(height + width) * 255.f);
+            //image[i][j][0] = static_cast<unsigned char>(0);
+        }
+    }
+
+    SaveToBMP(reinterpret_cast<unsigned char*>(image), width, height, "./bitmapTest.bmp");
+
+}
+
+void SaveOutputBufferToBMP(
+    void* a_GpuMemPtr,
+    const unsigned int a_Width,
+    const unsigned int a_Height,
+    const unsigned int a_NumChannels,
+    const std::filesystem::path& a_SaveFileDirectory,
+    const std::string& a_SaveFileName)
+{
+
+    if (!is_directory(a_SaveFileDirectory))
+    {
+        printf("Error: Given path (%s) is not a directory \n", a_SaveFileDirectory.string().c_str());
+        return;
+    }
+
+    if (!exists(a_SaveFileDirectory))
+    {
+        create_directory(a_SaveFileDirectory);
+    }
+
+    const unsigned int totalPixels = a_Width * a_Height * a_NumChannels;
+    const unsigned int pixelsPerChannel = a_Width * a_Height;
+    const unsigned int byteSize = totalPixels * sizeof(float3);
+
+    void* cpuMemPtr = malloc(byteSize);
+    cudaMemcpy(cpuMemPtr, a_GpuMemPtr, byteSize, cudaMemcpyDeviceToHost);
+
+    const PixelBuffer* pixelBuffer = reinterpret_cast<PixelBuffer*>(cpuMemPtr);
+    const float3* pixelArrayFloat = pixelBuffer->m_Pixels;
+
+    printf("Info: Output buffer sizes - num pixels: %i numChannels %i \n", pixelBuffer->m_NumPixels, pixelBuffer->m_ChannelsPerPixel);
+
+
+
+    unsigned char* imageBuffer = reinterpret_cast<unsigned char*>(malloc(pixelsPerChannel * 3));
+
+    for(unsigned int channelIndex = 0; channelIndex < a_NumChannels; ++ channelIndex)
+    {
+
+        //Get File path for current channel image.
+        std::filesystem::path finalPath = a_SaveFileDirectory;
+        finalPath /= a_SaveFileName + std::to_string(channelIndex);
+
+        if (finalPath.has_extension()){ finalPath.replace_extension(".bmp"); }
+        else { finalPath += ".bmp"; }
+
+        if (!(finalPath.has_filename() && finalPath.has_extension()))
+        {
+            printf("Error: could not construct valid file path: %s \n", finalPath.string().c_str());
+            return;
+        }
+
+        //Convert GPU memory layout to Image layout expected by SaveToBMP function.
+        
+        for (unsigned int row = 0; row < a_Height; ++row)
+        {
+
+            for (unsigned int column = 0; column < a_Width; ++column)
+            {
+                const unsigned pixelIndex = row * a_Width + column;
+                const unsigned pixelArrIndex = pixelIndex * a_NumChannels + channelIndex; //Same pattern as is used in PixelBuffer data struct.
+                const float3& currentPixel = pixelArrayFloat[pixelArrIndex];
+
+                constexpr float maxColorChannelVal = static_cast<float>(0xFF);
+
+                const unsigned int rowIndexOffset = row * a_Width * 3;
+                const unsigned int columnIndexOffset = column * 3;
+                imageBuffer[rowIndexOffset + columnIndexOffset + 0] = static_cast<unsigned char>(std::round(currentPixel.z * maxColorChannelVal));
+                imageBuffer[rowIndexOffset + columnIndexOffset + 1] = static_cast<unsigned char>(std::round(currentPixel.y * maxColorChannelVal));
+                imageBuffer[rowIndexOffset + columnIndexOffset + 2] = static_cast<unsigned char>(std::round(currentPixel.x * maxColorChannelVal));
+
+            }
+        }
+
+        SaveToBMP(imageBuffer, a_Width, a_Height, finalPath);
+        printf("Info: saved Output buffer to %s \n", finalPath.string().c_str());
+
+    }
+
+    if (cpuMemPtr != nullptr) { free(cpuMemPtr); }
+    if (imageBuffer != nullptr) { free(imageBuffer); }
+
+}
 
 
 
@@ -94,6 +304,8 @@ bool WaveFrontRenderer::Initialize(const InitializationData& a_InitializationDat
     cudaDeviceSynchronize();
 
     CHECKLASTCUDAERROR;
+
+    CreateTestBMP();
 
     return success;
 
@@ -466,12 +678,30 @@ void WaveFrontRenderer::CreateDataBuffers()
     m_PixelBufferMultiChannel->Write(numPixels, 0);
     m_PixelBufferMultiChannel->Write(numOutputChannels, sizeof(PixelBuffer::m_NumPixels));
 
+    void* pixelBuffMultiChannelCuPtr = reinterpret_cast<void*>(*(*m_PixelBufferMultiChannel));
+    SaveOutputBufferToBMP(
+        pixelBuffMultiChannelCuPtr,
+        m_RenderResolution.x,
+        m_RenderResolution.y,
+        numOutputChannels,
+        "./DebugOutputs/",
+        "MultiChannelPixelBuffer-Initialized");
+
     m_PixelBufferSingleChannel = std::make_unique<MemoryBuffer>(
         static_cast<size_t>(pixelBufferEmptySize) + 
         static_cast<size_t>(numPixels)*
         static_cast<size_t>(pixelDataStructSize));
     m_PixelBufferSingleChannel->Write(numPixels, 0);
     m_PixelBufferSingleChannel->Write(1, sizeof(PixelBuffer::m_NumPixels));
+
+    void* pixelBuffSingleChannelCuPtr = reinterpret_cast<void*>(*(*m_PixelBufferSingleChannel));
+    SaveOutputBufferToBMP(
+        pixelBuffSingleChannelCuPtr,
+        m_RenderResolution.x,
+        m_RenderResolution.y,
+        1,
+        "./DebugOutputs/",
+        "SingleChannelPixelBuffer-Initialized");
 
     const PixelBuffer* pixelBufferPtr = m_PixelBufferMultiChannel->GetDevicePtr<PixelBuffer>();
 
@@ -523,7 +753,7 @@ void WaveFrontRenderer::CreateDataBuffers()
         static_cast<size_t>(numPixels) * 
         static_cast<size_t>(m_ShadowRaysPerPixel) * 
         static_cast<size_t>(ShadowRayDataStructSize));
-    m_ShadowRayBatch->Write(m_MaxDepth, 0);
+    //m_ShadowRayBatch->Write(m_MaxDepth, 0);
     //m_ShadowRayBatch->Write(numPixels, sizeof(ShadowRayBatch::m_MaxDepth));
     //m_ShadowRayBatch->Write(m_ShadowRaysPerPixel, sizeof(ShadowRayBatch::m_MaxDepth) + sizeof(ShadowRayBatch::m_NumPixels));
 
@@ -555,6 +785,10 @@ void WaveFrontRenderer::CreateDataBuffers()
         static_cast<size_t>(LightBufferEmptySize) +
         static_cast<size_t>(3) *
         static_cast<size_t>(LightDataStructSize));
+
+
+
+    
 
 }
 
@@ -674,8 +908,8 @@ GLuint WaveFrontRenderer::TraceFrame()
             m_RaysPerPixel)); //Number of rays per pixel, number of samples per pixel.
         
         //cudaStreamSynchronize(0);
-        cudaDeviceSynchronize();
-        CHECKLASTCUDAERROR;
+        /*cudaDeviceSynchronize();
+        CHECKLASTCUDAERROR;*/
 
         ShadingLaunchParameters shadingLaunchParams(
             resolutionAndDepth, 
@@ -704,6 +938,15 @@ GLuint WaveFrontRenderer::TraceFrame()
 
     OptixShaderBindingTable SBT = m_ShadowRaysSBTGenerator->GetTableDesc();
 
+    void* pixelBuffMultiChannelCuPtr = reinterpret_cast<void*>(*(*m_PixelBufferMultiChannel));
+    SaveOutputBufferToBMP(
+        pixelBuffMultiChannelCuPtr,
+        m_RenderResolution.x,
+        m_RenderResolution.y,
+        m_MaxDepth,
+        "./DebugOutputs/",
+        "MultiChannelPixelBuffer-BeforeLaunch");
+
     //Trace buffer of shadow rays using Optix ResolveShadowRays.
     CHECKOPTIXRESULT(optixLaunch(
         m_PipelineShadowRays,
@@ -718,7 +961,13 @@ GLuint WaveFrontRenderer::TraceFrame()
     cudaDeviceSynchronize();
     CHECKLASTCUDAERROR;
 
-
+    SaveOutputBufferToBMP(
+        pixelBuffMultiChannelCuPtr,
+        m_RenderResolution.x,
+        m_RenderResolution.y,
+        m_MaxDepth,
+        "./DebugOutputs/",
+        "MultiChannelPixelBuffer-AfterLaunch");
     
     PostProcessLaunchParameters postProcessLaunchParams(
         m_RenderResolution,
@@ -726,6 +975,14 @@ GLuint WaveFrontRenderer::TraceFrame()
         m_ResultBuffer->GetDevicePtr<ResultBuffer>(),
         m_PixelBufferSingleChannel->GetDevicePtr<PixelBuffer>(),
         m_OutputBuffer->GetDevicePointer());
+
+    SaveOutputBufferToBMP(
+        pixelBuffMultiChannelCuPtr,
+        m_RenderResolution.x,
+        m_RenderResolution.y,
+        m_MaxDepth,
+        "./DebugOutputs/",
+        "MultiChannelPixelBuffer-AfterPostProcess");
 
     //Post processing using CUDA kernel.
     PostProcess(postProcessLaunchParams);
