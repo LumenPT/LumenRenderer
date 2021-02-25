@@ -611,6 +611,8 @@ std::shared_ptr<Lumen::ILumenVolume> OptiXRenderer::CreateVolume(const std::stri
     rec.m_Header = GetProgramGroupHeader("VolumetricHit");
     rec.m_Data.m_Grid = volume->m_Handle.grid<float>();
 	
+    //work in progress
+
     return volume;
 }
 
