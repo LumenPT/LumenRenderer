@@ -7,6 +7,8 @@
 #include <nanovdb/util/IO.h>
 #include "nanovdb/util/CudaDeviceBuffer.h"
 
+#include "ShaderBindingTableRecord.h"
+#include "../../src/Shaders/CppCommon/VolumeStructs.h"
 #include "../../Lumen/src/Lumen/Renderer/ILumenResources.h"
 
 struct PTServiceLocator;
@@ -23,8 +25,9 @@ public:
 	nanovdb::GridHandle<nanovdb::CudaDeviceBuffer>* GetHandle() { return &m_Handle; };
 	
 	PTServiceLocator& m_Services;
-	
-private:
+
+	RecordHandle<DeviceVolume> m_RecordHandle;
+
 	//TODO: make this a vector to support multiple grids
 	nanovdb::GridHandle<nanovdb::CudaDeviceBuffer> m_Handle;
 };

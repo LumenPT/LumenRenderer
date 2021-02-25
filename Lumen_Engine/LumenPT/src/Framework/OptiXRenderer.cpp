@@ -28,6 +28,7 @@ const uint32_t gs_ImageHeight = 600;
 
 #include "PTMesh.h"
 #include "PTPrimitive.h"
+#include "PTVolume.h"
 
 void CheckOptixRes(const OptixResult & a_res)
 {
@@ -160,7 +161,24 @@ void OptiXRenderer::CreatePipeline()
     pipelineLinkOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_FULL;
     pipelineLinkOptions.maxTraceDepth = 3; //TODO: potentially add this as a init param.
 
-    OptixProgramGroup programGroups[] = { rayGenProgram, missProgram, hitProgram };
+    //volumetric_bookmark
+    OptixModule volumetricShaderModule = CreateModule(LumenPTConsts::gs_ShaderPathBase + "volumetric_dummy.ptx");
+
+    assert(volumetricShaderModule);
+
+    OptixProgramGroupDesc volumetric_htGroupdesc = {};
+    volumetric_htGroupdesc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
+    volumetric_htGroupdesc.hitgroup.moduleCH = volumetricShaderModule;
+    volumetric_htGroupdesc.hitgroup.entryFunctionNameCH = "__closesthit__VolumetricHitShader";
+    volumetric_htGroupdesc.hitgroup.moduleAH = volumetricShaderModule;
+    volumetric_htGroupdesc.hitgroup.entryFunctionNameAH = "__anyhit__VolumetricHitShader";
+    volumetric_htGroupdesc.hitgroup.moduleIS = volumetricShaderModule;
+    volumetric_htGroupdesc.hitgroup.entryFunctionNameIS = "__intersection__VolumetricHitShader";
+
+    OptixProgramGroup volumetrichitProgram = CreateProgramGroup(htGroupDesc, "VolumetricHit");
+
+    //volumetric_bookmark
+    OptixProgramGroup programGroups[] = { rayGenProgram, missProgram, hitProgram, volumetrichitProgram };
 
     char log[2048];
     auto logSize = sizeof(log);
@@ -583,8 +601,14 @@ std::shared_ptr<Lumen::ILumenScene> OptiXRenderer::CreateScene(SceneData a_Scene
 
 std::shared_ptr<Lumen::ILumenVolume> OptiXRenderer::CreateVolume(const std::string& a_FilePath)
 {
-    std::shared_ptr<Lumen::ILumenVolume> volume = std::make_shared<PTVolume>(a_FilePath, m_ServiceLocator);
+    std::shared_ptr<PTVolume> volume = std::make_shared<PTVolume>(a_FilePath, m_ServiceLocator);
 
+    //volumetric_bookmark
+    volume->m_RecordHandle = m_ShaderBindingTableGenerator->AddHitGroup<DeviceVolume>();
+    auto& rec = volume->m_RecordHandle.GetRecord();
+    rec.m_Header = GetProgramGroupHeader("VolumetricHit");
+    rec.m_Data.m_Grid = volume->m_Handle.grid<float>();
+	
     return volume;
 }
 
