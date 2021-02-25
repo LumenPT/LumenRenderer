@@ -23,12 +23,8 @@ void CudaCheck(cudaError_t err)
 MemoryBuffer::MemoryBuffer(size_t a_Size)
     : m_Size(a_Size)
     , m_DevPtr(nullptr)
-{
-    //Resize(a_Size);
-
-    CudaCheck(cudaMalloc(&m_DevPtr, a_Size));
-
-    //m_CudaPtr = reinterpret_cast<CUdeviceptr>(m_DevPtr);
+{  
+    Resize(a_Size);
 };
 
 MemoryBuffer::~MemoryBuffer()
@@ -54,7 +50,7 @@ void MemoryBuffer::Write(const void* a_Data, size_t a_Size, size_t a_Offset)
 
 void MemoryBuffer::Read(void* a_Dst, size_t a_ReadSize, size_t a_SrcOffset) const
 {
-    assert(a_SrcOffset + a_ReadSize < m_Size);
+    assert(a_SrcOffset + a_ReadSize <= m_Size);
     CudaCheck(cudaMemcpy(a_Dst, reinterpret_cast<void*>(reinterpret_cast<CUdeviceptr>(m_DevPtr) + a_SrcOffset), a_ReadSize, cudaMemcpyDeviceToHost));
 };
 

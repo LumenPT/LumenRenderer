@@ -7,6 +7,12 @@
 #include "../../vendor/Include/Cuda/cuda/helpers.h"
 #include "../Shaders/CppCommon/ReSTIRData.h"
 
+/*
+ * Macros used to access elements at a certain index.
+ */
+#define RESERVOIR_INDEX(INTERSECTION_INDEX, DEPTH, MAX_DEPTH) (((INTERSECTION_INDEX) * (MAX_DEPTH)) + (DEPTH))
+
+
 namespace WaveFront {
     struct RayData;
     struct IntersectionData;
@@ -31,7 +37,7 @@ __global__ void FillLightBagsInternal(unsigned a_NumLightBags, CDF* a_Cdf, Light
  */
 __host__ void PickPrimarySamples(const WaveFront::RayData* const a_RayData, const WaveFront::IntersectionData* const a_IntersectionData, const LightBagEntry* const a_LightBags, Reservoir* a_Reservoirs, const ReSTIRSettings& a_Settings);
 
-__global__ void PickPrimarySamplesInternal(const WaveFront::RayData* const a_RayData, const WaveFront::IntersectionData* const a_IntersectionData, const LightBagEntry* const a_LightBags, Reservoir* a_Reservoirs, const unsigned a_NumPrimarySamples, const unsigned a_NumReservoirs, const unsigned a_NumLightsPerBag, const unsigned a_NumLightBags);
+__global__ void PickPrimarySamplesInternal(const WaveFront::RayData* const a_RayData, const WaveFront::IntersectionData* const a_IntersectionData, const LightBagEntry* const a_LightBags, Reservoir* a_Reservoirs, const ReSTIRSettings& a_Settings);
 
 /*
  * Generate shadow rays for the given reservoirs.
@@ -49,3 +55,29 @@ __host__ void SpatialNeighbourSampling(Reservoir* a_Reservoirs, Reservoir* a_Res
  * Resample temporal neighbours and combine reservoirs.
  */
 __host__ void TemporalNeighbourSampling(Reservoir* a_Reservoirs, Reservoir* a_TemporalReservoirs, const ReSTIRSettings& a_Settings);
+
+/*
+ * Combine multiple reservoirs unbiased.
+ * Stores the result in the reservoirs with the given pixel index.
+ *
+ * a_Count indicates the amount of pixels to process in a_ToCombine.
+ * This runs for every reservoir at a_PixelIndex.
+ */
+__device__ void CombineUnbiased(int a_PixelIndex, int a_Count, int a_MaxReservoirDepth, Reservoir* a_Reservoirs, PixelData* a_ToCombine);
+
+/*
+ * Combine multiple reservoirs biased.
+ * Stores the result in the reservoirs with the given pixel index.
+ *
+ * a_Count indicates the amount of indices to process in a_ToCombineIndices.
+ * This runs for every reservoir depth.
+ */
+__device__ void CombineBiased(int a_PixelIndex, int a_Count, int a_MaxReservoirDepth, Reservoir* a_Reservoirs, PixelData* a_ToCombine);
+
+/*
+ * Resample an old light sample.
+ * This takes the given input, and resamples it against the given pixel data.
+ * The output is then stored in a_Output.
+ *
+ */
+__device__ void Resample(LightSample* a_Input, const PixelData* a_PixelData, LightSample* a_Output);
