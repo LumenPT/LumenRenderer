@@ -29,6 +29,8 @@ CPU_ONLY void GenerateRays(const SetupLaunchParameters& a_SetupParams)
     cudaDeviceSynchronize();
     CHECKLASTCUDAERROR;
 
+    
+
 }
 
 CPU_ONLY void GenerateMotionVectors()
@@ -49,29 +51,35 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
 
      //Generate secondary rays.
 
-    ShadeIndirect<<<numBlocks,blockSize>>>(
+    /*ShadeIndirect<<<numBlocks,blockSize>>>(
         a_ShadingParams.m_ResolutionAndDepth, 
-        a_ShadingParams.m_CurrentIntersections, 
         a_ShadingParams.m_CurrentRays, 
-        a_ShadingParams.m_SecondaryRays);
+        a_ShadingParams.m_CurrentIntersections, 
+        a_ShadingParams.m_SecondaryRays);*/
 
     /*cudaDeviceSynchronize();
     CHECKLASTCUDAERROR;*/
 
      //Generate shadow rays for specular highlights.
-    ShadeSpecular<<<numBlocks, blockSize >>>();
+    /*ShadeSpecular<<<numBlocks, blockSize >>>();*/
 
     /*cudaDeviceSynchronize();
     CHECKLASTCUDAERROR;*/
 
     //Generate shadow rays for direct lights.
-    ShadeDirect<<<numBlocks, blockSize>>>(
+    /*ShadeDirect<<<numBlocks, blockSize>>>(
         a_ShadingParams.m_ResolutionAndDepth, 
         a_ShadingParams.m_CurrentRays, 
         a_ShadingParams.m_CurrentIntersections, 
         a_ShadingParams.m_ShadowRaysBatch, 
         a_ShadingParams.m_LightBuffer, 
-        a_ShadingParams.m_CDF);
+        a_ShadingParams.m_CDF);*/
+
+    DEBUGShadePrimIntersections <<<numBlocks, blockSize >> > (
+        a_ShadingParams.m_ResolutionAndDepth,
+        a_ShadingParams.m_CurrentRays,
+        a_ShadingParams.m_CurrentIntersections,
+        a_ShadingParams.m_DEBUGResultBuffer);
 
     cudaDeviceSynchronize();
     CHECKLASTCUDAERROR;
@@ -254,8 +262,8 @@ CPU_ON_GPU void ShadeSpecular()
 
 CPU_ON_GPU void ShadeIndirect(
     const uint3 a_ResolutionAndDepth, 
+    const RayBatch* const a_PrimaryRays,  //TODO: These need to be the rays of that the current wave intersected before calling this wave.
     const IntersectionBuffer* const a_Intersections, 
-    const RayBatch* const a_PrimaryRays, 
     RayBatch* const a_Output)
 {
 
@@ -291,6 +299,43 @@ CPU_ON_GPU void ShadeIndirect(
     
         //Add to the output buffer.
         a_Output->SetRay({ pos, dir, totalLightTransport }, i, 0);
+    }
+
+}
+
+CPU_ON_GPU void DEBUGShadePrimIntersections(
+    const uint3 a_ResolutionAndDepth,
+    const RayBatch* const a_PrimaryRays,
+    const IntersectionBuffer* const a_PrimaryIntersections,
+    ResultBuffer* const a_Output)
+{
+
+    const unsigned int numPixels = a_ResolutionAndDepth.x * a_ResolutionAndDepth.y;
+    const unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
+    const unsigned int stride = blockDim.x * gridDim.x;
+
+    float3 potRadiance = { 0.f, 0.f, 0.f };
+
+    for (unsigned int i = index; i < numPixels; i += stride)
+    {
+
+        // Get intersection.
+        const IntersectionData& currIntersection = a_PrimaryIntersections->GetIntersection(i, 0 /*There is only one ray per pixel, only one intersection per pixel (for now)*/);
+
+        if (currIntersection.IsIntersection())
+        {
+
+            // Get ray used to calculate intersection.
+            const unsigned int rayArrayIndex = currIntersection.m_RayArrayIndex;
+
+            const RayData& currRay = a_PrimaryRays->GetRay(rayArrayIndex);
+
+            potRadiance = make_float3(1.f);
+
+            a_Output->SetPixel(potRadiance, rayArrayIndex, ResultBuffer::OutputChannel::DIRECT);
+
+        }
+
     }
 
 }

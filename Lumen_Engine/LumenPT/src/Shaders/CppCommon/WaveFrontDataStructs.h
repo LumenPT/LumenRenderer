@@ -269,6 +269,20 @@ namespace WaveFront
             return (m_IntersectionT > 0.f);
         }
 
+        /// <summary> Calculates the intersection point in world-space when given the right ray data as input.
+        /// If this intersection data is not an intersection, returns a 0 vector.
+        /// The calculation done is simply</summary>
+        /// <param name="a_RayData">\n • Description: A reference to the RayData struct used to construct the ray.</param>
+        /// <returns>Intersection in world-space if the intersection data is an intersection, else returns a 0 vector.</returns>
+        CPU_GPU INLINE float3 GetIntersectionPoint(const RayData& a_RayData) const
+        {
+            if (IsIntersection())
+            {
+                return a_RayData.m_Origin + m_IntersectionT * a_RayData.m_Direction;
+            }
+            else return make_float3(0.f);
+        }
+
 
 
         /// <summary>
@@ -691,7 +705,8 @@ namespace WaveFront
             RayBatch* a_SecondaryRays,
             ShadowRayBatch* a_ShadowRayBatch,
             const LightBuffer* a_Lights,
-            CDF* const a_CDF = nullptr)
+            CDF* const a_CDF = nullptr,
+            ResultBuffer* a_DEBUGResultBuffer = nullptr)
             :
         m_ResolutionAndDepth(a_ResolutionAndDepth),
         m_PrimaryRaysPrevFrame(a_PrimaryRaysPrevFrame),
@@ -701,7 +716,8 @@ namespace WaveFront
         m_LightBuffer(a_Lights),
         m_SecondaryRays(a_SecondaryRays),
         m_ShadowRaysBatch(a_ShadowRayBatch),
-		m_CDF(a_CDF)
+		m_CDF(a_CDF),
+        m_DEBUGResultBuffer(a_DEBUGResultBuffer)
         {}
 
         CPU_ONLY ~ShadingLaunchParameters() = default;
@@ -720,6 +736,8 @@ namespace WaveFront
         //Write
         RayBatch* const m_SecondaryRays;
         ShadowRayBatch* const m_ShadowRaysBatch;
+        //TEMP DEBUG STUFF
+        ResultBuffer* m_DEBUGResultBuffer;
 
     };
 

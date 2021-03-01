@@ -80,9 +80,16 @@ CPU_ON_GPU void ShadeSpecular();
  */
 CPU_ON_GPU void ShadeIndirect(
     const uint3 a_ResolutionAndDepth, 
+    const RayBatch* const a_PreviousRays, 
     const IntersectionBuffer* const a_Intersections, 
-    const RayBatch* const a_PrimaryRays, 
     RayBatch* const a_Output);
+
+
+CPU_ON_GPU void DEBUGShadePrimIntersections(
+    const uint3 a_ResolutionAndDepth,
+    const RayBatch* const a_PrimaryRays,
+    const IntersectionBuffer* const a_PrimaryIntersections,
+    ResultBuffer* const a_Output);
 
 //Called during post-processing.
 

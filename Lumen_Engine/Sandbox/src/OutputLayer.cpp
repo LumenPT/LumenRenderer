@@ -62,7 +62,7 @@ OutputLayer::OutputLayer()
 #ifdef WAVEFRONT
 	init.m_RenderResolution = { 800, 600 };
 	init.m_OutputResolution = { 800, 600 };
-	init.m_MaxDepth = 3;
+	init.m_MaxDepth = 1;
 	init.m_RaysPerPixel = 1;
 	init.m_ShadowRaysPerPixel = 1;
 #else
