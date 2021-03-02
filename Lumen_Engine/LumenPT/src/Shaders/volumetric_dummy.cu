@@ -10,6 +10,8 @@
 #include <nanovdb/util/Ray.h>
 #include <nanovdb/util/HDDA.h>
 
+#include "VolumeStructs.h"
+
 extern "C"
 __global__ void __closesthit__VolumetricHitShader()
 {
@@ -35,10 +37,6 @@ __global__ void __anyhit__VolumetricHitShader()
 extern "C"
 __global__ void __intersection__VolumetricHitShader()
 {
-	
-    make_float3(0.f, 0.f, 0.f);
-
-    optixReportIntersection(1.f, 0);
 	
     return;
 }

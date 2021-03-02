@@ -163,7 +163,7 @@ void OptiXRenderer::CreatePipeline()
     pipelineLinkOptions.maxTraceDepth = 3; //TODO: potentially add this as a init param.
 
     //volumetric_bookmark
-    OptixModule volumetricShaderModule = CreateModule(LumenPTConsts::gs_ShaderPathBase + "volumetric_dummy.ptx");
+    OptixModule volumetricShaderModule = CreateModule(LumenPTConsts::gs_ShaderPathBase + "volumetric.ptx");
 
     assert(volumetricShaderModule);
 
