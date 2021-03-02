@@ -10,6 +10,7 @@
 #include "ShaderBindingTableRecord.h"
 #include "../../src/Shaders/CppCommon/VolumeStructs.h"
 #include "../../Lumen/src/Lumen/Renderer/ILumenResources.h"
+#include "ModelLoading/ILumenScene.h"
 
 class AccelerationStructure;
 struct PTServiceLocator;
@@ -20,6 +21,7 @@ public:
 	PTVolume(PTServiceLocator& a_ServiceLocator);
 	PTVolume(std::string a_FilePath, PTServiceLocator& a_ServiceLocator);
 	~PTVolume();
+
 
 	void Load(std::string a_FilePath);
 

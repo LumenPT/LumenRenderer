@@ -92,23 +92,47 @@ void OutputLayer::OnUpdate(){
 
 void OutputLayer::OnImGuiRender()
 {
+    if (!m_LumenPT->m_Scene->m_MeshInstances.empty())
+    {
+		auto& tarTransform = m_LumenPT->m_Scene->m_MeshInstances[0]->m_Transform;
 
+		glm::vec3 pos, scale, rot;
+		pos = tarTransform.GetPosition();
+		scale = tarTransform.GetScale();
+		rot = tarTransform.GetRotationEuler();
 
-	/*auto& tarTransform = m_LumenPT->m_Scene->m_MeshInstances[0]->m_Transform;
+		ImGui::Begin("ModelBoi 3000");
+		ImGui::DragFloat3("Position", &pos[0]);
+		ImGui::DragFloat3("Scale", &scale[0]);
+		ImGui::DragFloat3("Rotation", &rot[0]);
 
-	glm::vec3 pos, scale;
-	pos = tarTransform.GetPosition();
-	scale = tarTransform.GetScale();
-	auto rot = tarTransform.GetRotationEuler();
+		ImGui::End();
+		tarTransform.SetPosition(pos);
+		tarTransform.SetScale(scale);
+		tarTransform.SetRotation(rot);
 
-	ImGui::Begin("ModelBoi 3000");
-	ImGui::DragFloat3("Position", &pos[0]);
-	ImGui::DragFloat3("Scale", &scale[0]);
-	ImGui::DragFloat3("Rotation", &rot[0]);
-	ImGui::End();
-	tarTransform.SetPosition(pos);
-	tarTransform.SetScale(scale);
-	tarTransform.SetRotation(rot);*/
+    }
+
+	if (!m_LumenPT->m_Scene->m_VolumeInstances.empty())
+	{
+		auto& tarTransform = m_LumenPT->m_Scene->m_VolumeInstances[0]->m_Transform;
+
+		glm::vec3 pos, scale, rot;
+		pos = tarTransform.GetPosition();
+		scale = tarTransform.GetScale();
+		rot = tarTransform.GetRotationEuler();
+
+		ImGui::Begin("VolumeBoi 5000");
+		ImGui::DragFloat3("Position", &pos[0]);
+		ImGui::DragFloat3("Scale", &scale[0]);
+		ImGui::DragFloat3("Rotation", &rot[0]);
+
+		ImGui::End();
+		tarTransform.SetPosition(pos);
+		tarTransform.SetScale(scale);
+		tarTransform.SetRotation(rot);
+
+	}
 }
 
 void OutputLayer::HandleCameraInput(Camera& a_Camera)

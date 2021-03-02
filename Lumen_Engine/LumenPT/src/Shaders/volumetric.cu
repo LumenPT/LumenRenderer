@@ -45,8 +45,8 @@ __global__ void __intersection__VolumetricHitShader()
 
     //printf("%s \n", grid.gridName());
 
-    const float3 ray_orig = optixGetWorldRayOrigin();
-    const float3 ray_dir = optixGetWorldRayDirection();
+    const float3 ray_orig = optixGetObjectRayOrigin();
+    const float3 ray_dir = optixGetObjectRayDirection();
     const float  ray_tmin = optixGetRayTmin();
     const float  ray_tmax = optixGetRayTmax();
 

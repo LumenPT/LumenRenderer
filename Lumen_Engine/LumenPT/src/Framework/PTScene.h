@@ -18,8 +18,9 @@ public:
     ~PTScene(){};
 
     Lumen::MeshInstance* AddMesh() override;
+    Lumen::VolumeInstance* AddVolume() override;
 
-    void AddMeshInstanceForUpdate(PTMeshInstance& a_Handle);
+    void MarkSceneForUpdate();
 
     OptixTraversableHandle GetSceneAccelerationStructure();
 
@@ -27,11 +28,10 @@ public:
 
     std::unique_ptr<class AccelerationStructure> m_SceneAccelerationStructure;
 
-    std::set<PTMeshInstance*> m_TransformedAccelerationStructures;
+    bool m_AccelerationStructureDirty;
 
 private:
     PTServiceLocator& m_Services;
 
 
-    //std::vector
 };

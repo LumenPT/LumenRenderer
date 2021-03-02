@@ -443,12 +443,12 @@ GLuint OptiXRenderer::TraceFrame()
     LaunchParameters params = {};
     OptixShaderBindingTable sbt = m_ShaderBindingTableGenerator->GetTableDesc();
 
-    //auto str = static_cast<PTScene*>(m_Scene.get())->GetSceneAccelerationStructure();
-    auto str = BuildGeometryAccelerationStructure(vert);
+    auto str = static_cast<PTScene*>(m_Scene.get())->GetSceneAccelerationStructure();
+    //auto str = BuildGeometryAccelerationStructure(vert);
 
     params.m_Image = m_OutputBuffer->GetDevicePointer();
-    //params.m_Handle = str->m_TraversableHandle;
-    params.m_Handle = m_testVolumeGAS->m_TraversableHandle;
+    params.m_Handle = str;
+    //params.m_Handle = m_testVolumeGAS->m_TraversableHandle;
 	
     params.m_ImageWidth = gs_ImageWidth;
     params.m_ImageHeight = gs_ImageHeight;
