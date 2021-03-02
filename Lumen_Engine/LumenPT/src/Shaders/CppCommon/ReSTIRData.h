@@ -20,43 +20,44 @@ constexpr float MINFLOAT = std::numeric_limits<float>::min();
 struct ReSTIRSettings
 {
     //Screen width in pixels.
-    std::uint32_t width = 0;
+    static constexpr std::uint32_t width = 0;
 
     //Screen height in pixels.
-    std::uint32_t height = 0;
+    static constexpr std::uint32_t height = 0;
 
     //The amount of reservoirs used per pixel.
-    std::uint32_t numReservoirsPerPixel = 5;
+    static constexpr std::uint32_t numReservoirsPerPixel = 5;
 
     //The amount of lights per light bag.
-    std::uint32_t numLightsPerBag = 1000;
+    static constexpr std::uint32_t numLightsPerBag = 1000;
 
     //The total amount of light bags to generate.
-    std::uint32_t numLightBags = 50;
+    static constexpr std::uint32_t numLightBags = 50;
 
     //The amount of initial samples to take each frame.
-    std::uint32_t numPrimarySamples = 32;
+    static constexpr std::uint32_t numPrimarySamples = 32;
 
     //The amount of spatial neighbours to consider.
-    std::uint32_t numSpatialSamples = 5;
+    static constexpr std::uint32_t numSpatialSamples = 5;
 
     //The maximum distance for spatial samples.
-    std::uint32_t spatialSampleRadius = 30;
+    static constexpr std::uint32_t spatialSampleRadius = 30;
 
     //The x and y size of the pixel grid per light bag. This indirectly determines the amount of light bags.
-    std::uint32_t pixelGridSize = 16;
+    static constexpr std::uint32_t pixelGridSize = 16;
 
     //The amount of spatial iterations to perform. Previous output becomes current input.
-    std::uint32_t numSpatialIterations = 2;
+    //This has to be an even number so that the final results end up in the right buffer.
+    static constexpr std::uint32_t numSpatialIterations = 2;
 
     //Use the biased algorithm or not. When false, the unbiased algorithm is used instead.
-    bool enableBiased = true;
+    static constexpr bool enableBiased = true;
 
     //Enable spatial sampling.
-    bool enableSpatial = true;
+    static constexpr bool enableSpatial = true;
 
     //Enable temporal sampling.
-    bool enableTemporal = true;
+    static constexpr bool enableTemporal = true;
 };
 
 //Data about a pixels world position.
@@ -69,6 +70,7 @@ struct PixelData
     float3 diffuse;                 //The diffuse color of this pixels material.
     float metallic;                 //The metallic factor of this pixel.
     float roughness;                //The roughness factor of this pixel.
+    float depth;                    //The depth along the incoming ray at which the intersection happened.
 };
 
 /*

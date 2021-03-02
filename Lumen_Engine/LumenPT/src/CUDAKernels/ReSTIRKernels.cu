@@ -31,7 +31,6 @@ __host__ void FillCDF(CDF* a_Cdf, TriangleLight* a_Lights, unsigned a_LightCount
 {
     //TODO: This is not efficient single threaded.
     //TODO: Use this: https://developer.nvidia.com/gpugems/gpugems3/part-vi-gpu-computing/chapter-39-parallel-prefix-sum-scan-cuda
-    //TODO: Interpret the array as a binary tree, then sum parts of it in sweeps. Then combine after. 
 
     //First reset the CDF on the GPU.
     ResetCDF<<<1,1>>>(a_Cdf);
@@ -82,7 +81,7 @@ __global__ void FillLightBagsInternal(unsigned a_NumLightBags, CDF* a_Cdf, Light
     }
 }
 
-__host__ void PickPrimarySamples(const WaveFront::RayData* const a_RayData, const WaveFront::IntersectionData* const a_IntersectionData, const LightBagEntry* const a_LightBags, Reservoir* a_Reservoirs, const ReSTIRSettings& a_Settings)
+__host__ void PickPrimarySamples(const WaveFront::RayData* const a_RayData, const WaveFront::IntersectionData* const a_IntersectionData, const LightBagEntry* const a_LightBags, Reservoir* a_Reservoirs, const ReSTIRSettings& a_Settings, PixelData* a_PixelData)
 {
     //TODO ensure that each pixel grid operates within a single block, and that the L1 cache is not overwritten for each value. Optimize for cache hits.
     //TODO correctly assign a light bag per grid through some random generation.
@@ -90,11 +89,11 @@ __host__ void PickPrimarySamples(const WaveFront::RayData* const a_RayData, cons
     const auto numReservoirs = (a_Settings.width * a_Settings.height * a_Settings.numReservoirsPerPixel);
     const int blockSize = 256;
     const int numBlocks = (numReservoirs + blockSize - 1) / blockSize;
-    PickPrimarySamplesInternal<<<numBlocks, blockSize>>>(a_RayData, a_IntersectionData, a_LightBags, a_Reservoirs, a_Settings);
+    PickPrimarySamplesInternal<<<numBlocks, blockSize>>>(a_RayData, a_IntersectionData, a_LightBags, a_Reservoirs, a_Settings, a_PixelData);
     cudaDeviceSynchronize();
 }
 
-__global__ void PickPrimarySamplesInternal(const WaveFront::RayData* const a_RayData, const WaveFront::IntersectionData* const a_IntersectionData, const LightBagEntry* const a_LightBags, Reservoir* a_Reservoirs, const ReSTIRSettings& a_Settings)
+__global__ void PickPrimarySamplesInternal(const WaveFront::RayData* const a_RayData, const WaveFront::IntersectionData* const a_IntersectionData, const LightBagEntry* const a_LightBags, Reservoir* a_Reservoirs, const ReSTIRSettings& a_Settings, PixelData* a_PixelData)
 {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     int stride = blockDim.x * gridDim.x;
@@ -111,23 +110,28 @@ __global__ void PickPrimarySamplesInternal(const WaveFront::RayData* const a_Ray
         //Get the intersection data for this pixel.
         auto* intersectionData = &a_IntersectionData[i];
 
+        //Extract the pixel data from the right buffers, and store them for this pixel index.
+        PixelData* pixel = &a_PixelData[i];
+
         //If no intersection exists at this pixel, do nothing.
         if(intersectionData->m_IntersectionT <= 0.f)
         {
+            //Set pixel depth to 0 to be able to identify unused pixels easily.
+            pixel->depth = -1;
             continue;
         }
 
         //The ray that resulted in this intersection.
         auto* ray = &a_RayData[intersectionData->m_RayArrayIndex];
 
-        //Extract the pixel data from the right buffers.
-        PixelData pixel;
-        pixel.worldPosition = ray->m_Origin + ray->m_Direction * intersectionData->m_IntersectionT;
-        pixel.directionIncoming = ray->m_Direction;
-        pixel.worldNormal;   //TODO get surface normal from the intersection buffer.
-        pixel.diffuse;      //TODO get diffuse color from intersection buffer.
-        pixel.roughness;    //TODO get rougghness from intersection.
-        pixel.metallic;     //TODO get metallic factor from intersection.
+        //Extract the pixel features from all the different buffers. Store them in the pixel.
+        pixel->worldPosition = ray->m_Origin + ray->m_Direction * intersectionData->m_IntersectionT;
+        pixel->directionIncoming = ray->m_Direction;
+        pixel->worldNormal;   //TODO get surface normal from the intersection buffer.
+        pixel->diffuse;      //TODO get diffuse color from intersection buffer.
+        pixel->roughness;    //TODO get rougghness from intersection.
+        pixel->metallic;     //TODO get metallic factor from intersection.
+        pixel->depth = intersectionData->m_IntersectionT;
 
         //For every pixel, update each reservoir.
         for (int reservoirIndex = 0; reservoirIndex < a_Settings.numReservoirsPerPixel; ++reservoirIndex)
@@ -164,7 +168,7 @@ __global__ void PickPrimarySamplesInternal(const WaveFront::RayData* const a_Ray
                     lightSample.position = (light.p0 + light.p1 + light.p2) / 3.f;
 
                     //Calculate the PDF for this pixel and light.
-                    Resample(&lightSample, &pixel, &lightSample);
+                    Resample(&lightSample, pixel, &lightSample);
                 }
 
                 //The final PDF for the light in this reservoir is the solid angle divided by the original PDF of the light being chosen based on radiance.
@@ -177,47 +181,46 @@ __global__ void PickPrimarySamplesInternal(const WaveFront::RayData* const a_Ray
     }
 }
 
-__host__ void VisibilityPass(MemoryBuffer* a_Atomic, Reservoir* a_Reservoirs, const WaveFront::IntersectionData* a_IntersectionData, const WaveFront::RayData* const a_RayData, unsigned a_NumReservoirsPerPixel, const std::uint32_t a_NumPixels, RestirShadowRay* a_ShadowRays)
+__host__ void VisibilityPass(MemoryBuffer* a_AtomicCounter, Reservoir* a_Reservoirs, RestirShadowRay* a_ShadowRays, PixelData* a_PixelData)
 {
     //Counter that is atomically incremented. Copy it to the GPU.
     int atomic = 0;
-    a_Atomic->Write(atomic);
-    auto devicePtr = a_Atomic->GetDevicePtr<int>();
+    a_AtomicCounter->Write(atomic);
+    auto devicePtr = a_AtomicCounter->GetDevicePtr<int>();
+    const auto numPixels = ReSTIRSettings::width * ReSTIRSettings::height;
 
     //Call in parallel.
     const int blockSize = 256;
-    const int numBlocks = (a_NumPixels + blockSize - 1) / blockSize;
-    GenerateShadowRay<<<numBlocks, blockSize>>> (devicePtr, a_NumPixels, a_NumReservoirsPerPixel, a_RayData, a_Reservoirs, a_IntersectionData, a_ShadowRays);
+    const int numBlocks = (numPixels + blockSize - 1) / blockSize;
+    GenerateShadowRay<<<numBlocks, blockSize>>> (devicePtr, a_Reservoirs, a_ShadowRays, a_PixelData);
     cudaDeviceSynchronize();
 
     //Copy value back to the CPU.
-    a_Atomic->Read(&atomic, sizeof(int), 0);
+    a_AtomicCounter->Read(&atomic, sizeof(int), 0);
 
-    //TODO: optix launch. Set reservoir at index of occluded rays to 0 weight.
+    //TODO: optix launch. Set reservoir at index of occluded rays to 0 weight. atomic is the amount of rays to resolve.
 }
 
-__global__ void GenerateShadowRay(int* a_AtomicCounter, const std::uint32_t a_NumPixels, std::uint32_t a_NumReservoirsPerPixel, const WaveFront::RayData* const a_RayData, Reservoir* a_Reservoirs, const WaveFront::IntersectionData* a_IntersectionData, RestirShadowRay* a_ShadowRays)
+__global__ void GenerateShadowRay(int* a_AtomicCounter, Reservoir* a_Reservoirs, RestirShadowRay* a_ShadowRays, PixelData* a_PixelData)
 {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     int stride = blockDim.x * gridDim.x;
+    const auto numPixels = ReSTIRSettings::width * ReSTIRSettings::height;
 
-    for (int pixel = index; pixel < a_NumPixels; pixel += stride)
+    for (int pixel = index; pixel < numPixels; pixel += stride)
     {
-        auto* intersectionData = &a_IntersectionData[pixel];
-        
+        PixelData* pixelData = &a_PixelData[pixel];        
 
         //Only run for valid intersections.
-        if(a_IntersectionData[pixel].m_IntersectionT > 0.f)
+        if(pixelData->depth > 0.f)
         {
-            //The ray 
-            auto* rayData = &a_RayData[intersectionData->m_RayArrayIndex];
-            float3 pixelPosition = rayData->m_Direction * intersectionData->m_IntersectionT + rayData->m_Origin;
+            float3 pixelPosition = pixelData->worldPosition;
 
             //Run for every reservoir for the pixel.
-            for(int depth = 0; depth < a_NumReservoirsPerPixel; ++depth)
+            for(int depth = 0; depth < ReSTIRSettings::numReservoirsPerPixel; ++depth)
             {
                 //If the reservoir has a weight, add a shadow ray.
-                Reservoir* reservoir = &a_Reservoirs[RESERVOIR_INDEX(pixel, depth, a_NumReservoirsPerPixel)];
+                Reservoir* reservoir = &a_Reservoirs[RESERVOIR_INDEX(pixel, depth, ReSTIRSettings::numReservoirsPerPixel)];
                 if(reservoir->weight > 0.f)
                 {
 
@@ -240,124 +243,205 @@ __global__ void GenerateShadowRay(int* a_AtomicCounter, const std::uint32_t a_Nu
     }
 }
 
-__host__ void SpatialNeighbourSampling(Reservoir* a_Reservoirs, Reservoir* a_ReservoirSwapBuffer,
-                                       const ReSTIRSettings& a_Settings)
-{
-    //TODO have a biased and unbiased implementation based on settings.
-    //TODO Use the swap buffer as intermediate output. Synchronize between each pass.
-}
-
-__host__ void TemporalNeighbourSampling(
-    Reservoir* a_CurrentReservoirs,
-    Reservoir* a_PreviousReservoirs,
-    const WaveFront::IntersectionData* a_CurrentIntersectionData,
-    const WaveFront::IntersectionData* a_PreviousIntersectionData,
-    const WaveFront::RayData* const a_CurrentRayData,
-    const WaveFront::RayData* const a_PreviousRayData,
-    const ReSTIRSettings& a_Settings)
-{
-    const int numPixels = (a_Settings.width * a_Settings.height);
+__host__ void SpatialNeighbourSampling(Reservoir* a_Reservoirs, Reservoir* a_SwapBuffer, PixelData* a_PixelData)
+{    
+    const auto numPixels = (ReSTIRSettings::width * ReSTIRSettings::height);
     const int blockSize = 256;
     const int numBlocks = (numPixels + blockSize - 1) / blockSize;
-
-    //TODO pass the motion vector information in here.
-
-    CombineTemporalSamplesInternal << <numBlocks, blockSize >> > (numPixels, a_CurrentReservoirs, a_PreviousReservoirs, a_CurrentIntersectionData, a_PreviousIntersectionData, a_CurrentRayData, a_PreviousRayData, a_Settings.enableBiased);
+    SpatialNeighbourSamplingInternal<<<numBlocks, blockSize >>>(a_Reservoirs, a_SwapBuffer, a_PixelData);
+    cudaDeviceSynchronize();
 }
 
+//TODO access settings struct statically instead of passing an instance.
 
-__global__ void CombineTemporalSamplesInternal(
-    int a_NumPixels,
-    int a_NumReservoirsPerPixel,
-    Reservoir* a_CurrentReservoirs,
-    Reservoir* a_PreviousReservoirs,
-    const WaveFront::IntersectionData* a_CurrentIntersectionData,
-    const WaveFront::IntersectionData* a_PreviousIntersectionData,
-    const WaveFront::RayData* const a_CurrentRayData,
-    const WaveFront::RayData* const a_PreviousRayData,
-    const bool a_Biased)
+__global__ void SpatialNeighbourSamplingInternal(Reservoir* a_Reservoirs, Reservoir* a_SwapBuffer,
+    PixelData* a_PixelData)
 {
+    Reservoir* fromBuffer = a_Reservoirs;
+    Reservoir* toBuffer = a_SwapBuffer;
+
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     int stride = blockDim.x * gridDim.x;
+    const auto numPixels = (ReSTIRSettings::width * ReSTIRSettings::height);
 
-    for (int i = index; i < a_NumPixels; i += stride)
+    //Storage for reservoirs and pixels to be combined.
+    PixelData* toCombinePixelData[ReSTIRSettings::numSpatialSamples + 1];
+    Reservoir* toCombineReservoirs[ReSTIRSettings::numSpatialSamples + 1];
+
+    //Loop over the pixels.
+    for (int i = index; i < numPixels; i += stride)
     {
-        auto* intersection = &a_CurrentIntersectionData[i];
+        toCombinePixelData[0] = &a_PixelData[i];
 
-        //Ensure that the pixel has a valid intersection.
-        if (intersection->m_IntersectionT <= 0.f)
+        //Only run when there's an intersection for this pixel.
+        if (toCombinePixelData[0]->depth > 0.f)
         {
-            continue;
-        }
+            //TODO maybe store this information inside the pixel. Could calculate it once at the start of the frame.
+            const int y = i / ReSTIRSettings::width;
+            const int x = i - (y * ReSTIRSettings::width);
 
-        //TODO instead look up the motion vector and use that to find the right pixel.
-        const int temporalIndex = i;
-
-        //Also continue if last frame wasn't valid.
-        auto* temporalIntersection = &a_PreviousIntersectionData[temporalIndex];
-        if (temporalIntersection->m_IntersectionT <= 0.f)
-        {
-            continue;;
-        }
-
-        //Pixel current intersection ray.
-        auto* ray = &a_CurrentRayData[i];
-        auto* temporalRay = &a_PreviousRayData[temporalIndex];
-
-        //For every reservoir at the current pixel.
-        for (int depth = 0; depth < a_NumReservoirsPerPixel; ++depth)
-        {
-            Reservoir* toCombine[2];
-            toCombine[0] = &a_PreviousReservoirs[RESERVOIR_INDEX(temporalIndex, depth, a_NumReservoirsPerPixel)];
-            toCombine[1] = &a_CurrentReservoirs[RESERVOIR_INDEX(i, depth, a_NumReservoirsPerPixel)];
-
-            //Create the pixel array of pixels and pointers to them.
-            //This is needed because the initial array doesn't have to be contiguous in memory.
-            PixelData pixels[2];
-            PixelData* pixelPointers[]{ &pixels[0], &pixels[1] };
-
-            //temporal intersection.
-            pixels[0].worldPosition = ray->m_Origin + ray->m_Direction * intersection->m_IntersectionT;
-            pixels[0].directionIncoming = ray->m_Direction;
-            pixels[0].worldNormal;   //TODO get surface normal from the intersection buffer.
-            pixels[0].diffuse;      //TODO get diffuse color from intersection buffer.
-            pixels[0].roughness;    //TODO get rougghness from intersection.
-            pixels[0].metallic;     //TODO get metallic factor from intersection.
-
-            //current intersection.
-            pixels[0].worldPosition = temporalRay->m_Origin + temporalRay->m_Direction * temporalIntersection->m_IntersectionT;
-            pixels[0].directionIncoming = ray->m_Direction;
-            pixels[0].worldNormal;   //TODO get surface normal from the intersection buffer.
-            pixels[0].diffuse;      //TODO get diffuse color from intersection buffer.
-            pixels[0].roughness;    //TODO get rougghness from intersection.
-            pixels[0].metallic;     //TODO get metallic factor from intersection.
-
-            //Cap sample count at 20x current to reduce temporal influence. Would grow infinitely large otherwise.
-            toCombine[0]->sampleCount = fminf(toCombine[0]->sampleCount, toCombine[1]->sampleCount * 20);
-
-            if (a_Biased)
+            for (int iteration = 0; iteration < ReSTIRSettings::numSpatialIterations; ++iteration)
             {
-                CombineBiased(i, 2, a_NumReservoirsPerPixel, toCombine, pixelPointers);
-            }
-            else
-            {
-                CombineUnbiased(i, 2, a_NumReservoirsPerPixel, toCombine, pixelPointers);
+                for (int depth = 0; depth < ReSTIRSettings::numReservoirsPerPixel; ++depth)
+                {
+                    toCombineReservoirs[0] = &a_Reservoirs[RESERVOIR_INDEX(i, depth, ReSTIRSettings::numReservoirsPerPixel)];
+
+                    int count = 1;
+
+                    //TODO move this loop up maybe? Use same neighbour for each depth since values are different anyways. I don't think that changes the
+                    //TODO average of the calculation.
+                    for (int neighbour = 1; neighbour <= ReSTIRSettings::numSpatialSamples; ++neighbour)
+                    {
+                        //TODO generate random coordinates within the radius defined in settings.
+                        const int neighbourY = (1) + y;
+                        const int neighbourX = (1) + x;
+                        const int neighbourIndex = PIXEL_INDEX(neighbourX, neighbourY, ReSTIRSettings::numReservoirsPerPixel);
+
+                        //Only run if within image bounds.
+                        if(neighbourX >= 0 && neighbourX <= ReSTIRSettings::width && neighbourY >= 0 && neighbourY <= ReSTIRSettings::height)
+                        {
+                            Reservoir* pickedReservoir = &a_Reservoirs[RESERVOIR_INDEX(neighbourIndex, depth, ReSTIRSettings::numReservoirsPerPixel)];
+                            PixelData* pickedPixel = &a_PixelData[neighbourIndex];
+
+                            //Only run for valid depths.
+                            if(pickedPixel->depth > 0)
+                            {
+                                //Gotta stay positive.
+                                assert(pickedReservoir->weight >= 0.f);
+
+                                //Discard samples that are too different.
+                                float depth1 = pickedPixel->depth;
+                                float depth2 = toCombinePixelData[0]->depth;
+                                float depthDifPct = fabs(depth1 - depth2) / ((depth1 + depth2) / 2.f);
+
+                                const float angleDif = dot(pickedPixel->worldNormal, toCombinePixelData[0]->worldNormal);	//Between 0 and 1 (0 to 90 degrees). 
+                                static constexpr float MAX_ANGLE_COS = 0.72222222223f;	//Dot product is cos of the angle. If higher than this value, it's within 25 degrees.
+
+                                if (depthDifPct < 0.10f && angleDif > MAX_ANGLE_COS)
+                                {
+                                    toCombineReservoirs[count] = pickedReservoir;
+                                    toCombinePixelData[count] = pickedPixel;
+                                    ++count;
+                                }
+                            }
+                        }
+                    }
+
+                    //If valid reservoirs to combine were found, combine them.
+                    if (count > 1)
+                    {
+                        if(ReSTIRSettings::enableBiased)
+                        {
+                            CombineBiased(i, count, toCombineReservoirs, toCombinePixelData);
+                        }
+                        else
+                        {
+                            CombineUnbiased(i, count, toCombineReservoirs, toCombinePixelData);
+                        }
+                    }
+                }
+
+                //Swap the pointers for in and output.
+                Reservoir* temp = fromBuffer;
+                fromBuffer = toBuffer;
+                toBuffer = temp;
             }
         }
     }
 }
 
-__device__ void CombineUnbiased(int a_PixelIndex, int a_Count, int a_MaxReservoirDepth, Reservoir** a_Reservoirs, PixelData** a_ToCombine)
+
+__host__ void TemporalNeighbourSampling(
+    Reservoir* a_CurrentReservoirs,
+    Reservoir* a_PreviousReservoirs,
+    PixelData* a_CurrentPixelData,
+    PixelData* a_PreviousPixelData
+)
+{
+    const int numPixels = (ReSTIRSettings::width * ReSTIRSettings::height);
+    const int blockSize = 256;
+    const int numBlocks = (numPixels + blockSize - 1) / blockSize;
+
+    //TODO pass the motion vector information in here.
+
+    CombineTemporalSamplesInternal << <numBlocks, blockSize >> > (a_CurrentReservoirs, a_PreviousReservoirs,
+                                                                  a_CurrentPixelData, a_PreviousPixelData);
+    cudaDeviceSynchronize();
+}
+
+
+__global__ void CombineTemporalSamplesInternal(
+    Reservoir* a_CurrentReservoirs,
+    Reservoir* a_PreviousReservoirs,
+    PixelData* a_CurrentPixelData,
+    PixelData* a_PreviousPixelData
+)
+{
+    const int numPixels = (ReSTIRSettings::width * ReSTIRSettings::height);
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    int stride = blockDim.x * gridDim.x;
+
+    Reservoir* toCombine[2];
+    PixelData* pixelPointers[2];
+
+    for (int i = index; i < numPixels; i += stride)
+    {
+        //TODO instead look up the motion vector and use that to find the right pixel. This assumes a static scene rn.
+        const int temporalIndex = i;
+
+        pixelPointers[0] = &a_PreviousPixelData[temporalIndex];
+        pixelPointers[1] = &a_CurrentPixelData[i];
+
+        //Ensure that the depth of both samples is valid, and then combine them at each depth.
+        if (pixelPointers[0]->depth > 0.f && pixelPointers[1]->depth > 0.f)
+        {
+            //For every reservoir at the current pixel.
+            for (int depth = 0; depth < ReSTIRSettings::numReservoirsPerPixel; ++depth)
+            {
+                toCombine[0] = &a_PreviousReservoirs[RESERVOIR_INDEX(temporalIndex, depth, ReSTIRSettings::numReservoirsPerPixel)];
+                toCombine[1] = &a_CurrentReservoirs[RESERVOIR_INDEX(i, depth, ReSTIRSettings::numReservoirsPerPixel)];
+
+                //Discard samples that are too different.
+                float depth1 = pixelPointers[0]->depth;
+                float depth2 = pixelPointers[1]->depth;
+                float depthDifPct = fabs(depth1 - depth2) / ((depth1 + depth2) / 2.f);
+
+                const float angleDif = dot(pixelPointers[0]->worldNormal, pixelPointers[1]->worldNormal);	//Between 0 and 1 (0 to 90 degrees). 
+                static constexpr float MAX_ANGLE_COS = 0.72222222223f;	//Dot product is cos of the angle. If higher than this value, it's within 25 degrees.
+
+                //Only do something if the samples are not vastly different.
+                if (depthDifPct < 0.10f && angleDif > MAX_ANGLE_COS)
+                {
+                    //Cap sample count at 20x current to reduce temporal influence. Would grow infinitely large otherwise.
+                    toCombine[0]->sampleCount = fminf(toCombine[0]->sampleCount, toCombine[1]->sampleCount * 20);
+
+                    if (ReSTIRSettings::enableBiased)
+                    {
+                        CombineBiased(i, 2, toCombine, pixelPointers);
+                    }
+                    else
+                    {
+                        CombineUnbiased(i, 2, toCombine, pixelPointers);
+                    }
+                }
+                
+            }
+        }
+    }
+}
+
+__device__ void CombineUnbiased(int a_PixelIndex, int a_Count, Reservoir** a_Reservoirs,
+                                PixelData** a_ToCombine)
 {
 
-    for (int depth = 0; depth < a_MaxReservoirDepth; ++depth)
+    for (int depth = 0; depth < ReSTIRSettings::numReservoirsPerPixel; ++depth)
     {
         Reservoir output;
         int sampleCountSum = 0;
 
         for (int index = 0; index < a_Count; ++index)
         {
-            auto* otherReservoir = a_Reservoirs[RESERVOIR_INDEX(index, depth, a_MaxReservoirDepth)];
+            auto* otherReservoir = a_Reservoirs[RESERVOIR_INDEX(index, depth, ReSTIRSettings::numReservoirsPerPixel)];
             LightSample resampled;
             Resample(&otherReservoir->sample, a_ToCombine[index], &resampled);
 
@@ -382,7 +466,7 @@ __device__ void CombineUnbiased(int a_PixelIndex, int a_Count, int a_MaxReservoi
 
             if (resampled.solidAnglePdf > 0)
             {
-                correction += a_Reservoirs[RESERVOIR_INDEX(otherPixel->index, depth, a_MaxReservoirDepth)]->sampleCount;
+                correction += a_Reservoirs[RESERVOIR_INDEX(otherPixel->index, depth, ReSTIRSettings::numReservoirsPerPixel)]->sampleCount;
             }
         }
 
@@ -394,14 +478,15 @@ __device__ void CombineUnbiased(int a_PixelIndex, int a_Count, int a_MaxReservoi
         output.weight = (1.f / fmaxf(output.sample.solidAnglePdf, MINFLOAT)) * (m * output.weightSum);
 
         //Store the output reservoir for the pixel.
-        a_Reservoirs[RESERVOIR_INDEX(a_PixelIndex, depth, a_MaxReservoirDepth)];
+        a_Reservoirs[RESERVOIR_INDEX(a_PixelIndex, depth, ReSTIRSettings::numReservoirsPerPixel)];
     }
 }
 
-__device__ void CombineBiased(int a_PixelIndex, int a_Count, int a_MaxReservoirDepth, Reservoir** a_Reservoirs, PixelData** a_ToCombine)
+__device__ void CombineBiased(int a_PixelIndex, int a_Count, Reservoir** a_Reservoirs,
+                              PixelData** a_ToCombine)
 {
     //Loop over every depth.
-    for (int depth = 0; depth < a_MaxReservoirDepth; ++depth)
+    for (int depth = 0; depth < ReSTIRSettings::numReservoirsPerPixel; ++depth)
     {
         Reservoir output;
         int sampleCountSum = 0;
@@ -410,7 +495,7 @@ __device__ void CombineBiased(int a_PixelIndex, int a_Count, int a_MaxReservoirD
         for (int i = 0; i < a_Count; ++i)
         {
             auto* pixel = a_ToCombine[i];
-            auto* reservoir = a_Reservoirs[RESERVOIR_INDEX(pixel->index, depth, a_MaxReservoirDepth)];
+            auto* reservoir = a_Reservoirs[RESERVOIR_INDEX(pixel->index, depth, ReSTIRSettings::numReservoirsPerPixel)];
 
             LightSample resampled;
             Resample(&reservoir->sample, pixel, &resampled);
@@ -432,7 +517,7 @@ __device__ void CombineBiased(int a_PixelIndex, int a_Count, int a_MaxReservoirD
         assert(output.weight >= 0.f && output.weightSum >= 0.f);
 
         //Override the reservoir for the output at this depth.
-        *a_Reservoirs[RESERVOIR_INDEX(a_PixelIndex, depth, a_MaxReservoirDepth)] = output;
+        *a_Reservoirs[RESERVOIR_INDEX(a_PixelIndex, depth, ReSTIRSettings::numReservoirsPerPixel)] = output;
     }
 }
 

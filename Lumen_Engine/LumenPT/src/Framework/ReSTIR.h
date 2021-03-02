@@ -30,8 +30,6 @@ public:
 	 */
 	CPU_ONLY void Run(const WaveFront::IntersectionData* const a_CurrentIntersections,
 		const WaveFront::RayData* const a_RayBuffer,
-		const WaveFront::IntersectionData* const a_PreviousIntersections,
-		const WaveFront::RayData* const a_PreviousRayBuffer,
 		const std::vector<TriangleLight>& a_Lights,
 	    const float3 a_CameraPosition
 	);
@@ -53,6 +51,7 @@ private:
 	bool m_SwapDirtyFlag;	//Dirty flag to assert if someone forgets to swap the buffers.
 
 	//Memory buffers only used in the current frame.
+	MemoryBuffer m_Pixels[2];	//Pixel data storage for access throughout the stages of ReSTIR. Also one for temporal samples.
 	MemoryBuffer m_Lights;		//All the triangle lights stored contiguously. Size of the amount of lights.
 	MemoryBuffer m_Cdf;			//The CDF which is the size of a CDF entry times the amount of lights.
 	MemoryBuffer m_LightBags;	//All light bags as a single array. Size of num light bags * size of light bag * light index or something.

@@ -3,9 +3,6 @@
 #include <cassert>
 #include <cuda_runtime.h>
 
-//TODO include this but it breaks because of redefinitions.
-//#include "../Shaders/CppCommon/WaveFrontDataStructs.h"
-
 
 CPU_ONLY void ReSTIR::Initialize(const ReSTIRSettings& a_Settings)
 {
@@ -35,6 +32,14 @@ CPU_ONLY void ReSTIR::Initialize(const ReSTIRSettings& a_Settings)
 		//TODO the shadow rays should contain the reservoir index (x y and z).
 	}
 
+	//Pixel data caching
+	{
+		const size_t numPixels = m_Settings.width * m_Settings.height;
+		const size_t size = numPixels * sizeof(PixelData);
+		m_Pixels[0].Resize(size);
+		m_Pixels[1].Resize(size);
+	}
+
 	//Reservoirs
 	{
 		//Reserve enough memory for both the front and back buffer to contain all reservoirs.
@@ -47,6 +52,7 @@ CPU_ONLY void ReSTIR::Initialize(const ReSTIRSettings& a_Settings)
 		ResetReservoirs(numReservoirs, static_cast<Reservoir*>(m_Reservoirs[0].GetDevicePtr()));
 		ResetReservoirs(numReservoirs, static_cast<Reservoir*>(m_Reservoirs[1].GetDevicePtr()));
 	}
+
 	//Light bag generation
 	{
 		const size_t size = sizeof(LightBagEntry) * m_Settings.numLightsPerBag * m_Settings.numLightBags;
@@ -66,8 +72,6 @@ CPU_ONLY void ReSTIR::Initialize(const ReSTIRSettings& a_Settings)
 CPU_ONLY void ReSTIR::Run(
 	const WaveFront::IntersectionData* const a_CurrentIntersections,
 	const WaveFront::RayData* const a_RayBuffer,
-    const WaveFront::IntersectionData* const a_PreviousIntersections,
-	const WaveFront::RayData* const a_PreviousRayBuffer,
 	const std::vector<TriangleLight>& a_Lights,
 	const float3 a_CameraPosition
 )
@@ -104,16 +108,20 @@ CPU_ONLY void ReSTIR::Run(
 		FillLightBags(m_Settings.numLightBags, static_cast<CDF*>(m_Cdf.GetDevicePtr()), static_cast<LightBagEntry*>(m_LightBags.GetDevicePtr()), static_cast<TriangleLight*>(m_Lights.GetDevicePtr()));
 	}
 
+	//Pointers to the pixel data buffers.
+	PixelData* currentPixelData = m_Pixels[currentIndex].GetDevicePtr<PixelData>();
+	PixelData* temporalPixelData = m_Pixels[temporalIndex].GetDevicePtr<PixelData>();
+
 	/*
 	 * Pick primary samples in parallel. Store the samples in the reservoirs.
 	 */
-	PickPrimarySamples(a_RayBuffer, a_CurrentIntersections, static_cast<LightBagEntry*>(m_LightBags.GetDevicePtr()), static_cast<Reservoir*>(m_Reservoirs->GetDevicePtr()), m_Settings);
+	PickPrimarySamples(a_RayBuffer, a_CurrentIntersections, static_cast<LightBagEntry*>(m_LightBags.GetDevicePtr()), static_cast<Reservoir*>(m_Reservoirs->GetDevicePtr()), m_Settings, currentPixelData);
 
 	/*
 	 * Generate shadow rays for each reservoir and resolve them.
 	 * If a shadow ray is occluded, the reservoirs weight is set to 0.
 	 */
-	VisibilityPass(&m_Atomics, static_cast<Reservoir*>(m_Reservoirs[m_SwapChainIndex].GetDevicePtr()), a_CurrentIntersections, a_RayBuffer, m_Settings.numReservoirsPerPixel, m_Settings.width * m_Settings.height, m_ShadowRays.GetDevicePtr<RestirShadowRay>());
+	VisibilityPass(&m_Atomics, static_cast<Reservoir*>(m_Reservoirs[m_SwapChainIndex].GetDevicePtr()), m_ShadowRays.GetDevicePtr<RestirShadowRay>(), currentPixelData);
 
 	/*
      * Temporal sampling where reservoirs are combined with those of the previous frame.
@@ -123,11 +131,8 @@ CPU_ONLY void ReSTIR::Run(
 		TemporalNeighbourSampling(
 			m_Reservoirs[currentIndex].GetDevicePtr<Reservoir>(),
 			m_Reservoirs[temporalIndex].GetDevicePtr<Reservoir>(),
-			a_CurrentIntersections,
-			a_PreviousIntersections,
-			a_RayBuffer,
-			a_PreviousRayBuffer,			
-			m_Settings
+			currentPixelData,
+			temporalPixelData
 		);
 	}
 
@@ -136,11 +141,16 @@ CPU_ONLY void ReSTIR::Run(
 	 */
 	if(m_Settings.enableSpatial)
 	{
-		SpatialNeighbourSampling(static_cast<Reservoir*>(m_Reservoirs[currentIndex].GetDevicePtr()), static_cast<Reservoir*>(m_Reservoirs[2].GetDevicePtr()), m_Settings);
+		SpatialNeighbourSampling(
+			static_cast<Reservoir*>(m_Reservoirs[currentIndex].GetDevicePtr()),
+			static_cast<Reservoir*>(m_Reservoirs[2].GetDevicePtr()), 
+			currentPixelData
+		);
 	}
 
-	//TODO: Extract the data from the reservoirs to generate shadow rays and store them in the wavefront shadow ray data struct.
-	//TODO: thought: Since earlier visibility pass might still be valid, is it worth remembering that? Or is it uncommon?
+	//TODO: Generate regular WaveFront shadow rays and put them in the buffer in WaveFront.
+	//TODO: This will require an atomic + the buffer to be passed.
+	//TODO: The contribution of the shadow rays will be scaled with the reservoir weight here.
 
 	 //Ensure that swap buffers is called.
 	m_SwapDirtyFlag = false;
