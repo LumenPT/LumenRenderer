@@ -1,6 +1,12 @@
 cmake_minimum_required (VERSION 3.16)
 enable_language(CUDA)
 
+if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+	set(CMAKE_CUDA_ARCHITECTURES 52)
+endif()
+
+set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} -G")
+
 # specify the C++ standard
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
@@ -44,7 +50,6 @@ file(GLOB_RECURSE CUDA_SOURCE_FILES
 #generate .ptx files from .cu files
 add_library(CudaPTX OBJECT ${CUDA_HEADER_FILES} ${CUDA_SOURCE_FILES})
 set_property(TARGET CudaPTX PROPERTY CUDA_PTX_COMPILATION ON)
-#set_property(TARGET CudaPTX PROPERTY CUDA_ARCHITECTURES 52)
 
 target_include_directories(CudaPTX PUBLIC
 	"vendor/Include"
