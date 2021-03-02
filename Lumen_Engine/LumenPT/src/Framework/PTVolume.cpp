@@ -22,9 +22,11 @@ PTVolume::PTVolume(std::string a_FilePath, PTServiceLocator& a_ServiceLocator)
 	//Load(a_FilePath);
 
 	//TODO: remove
-	m_Handle = nanovdb::createLevelSetSphere<float, nanovdb::CudaDeviceBuffer>(10.0f, nanovdb::Vec3d(0), 0.1);
+	//m_Handle = nanovdb::createLevelSetSphere<float, nanovdb::CudaDeviceBuffer>(10.0f, nanovdb::Vec3d(0), 0.1);
 	//m_Handle = nanovdb::create<float, nanovdb::CudaDeviceBuffer>(10.0f, nanovdb::Vec3d(0), 0.1);
-	
+	m_Handle = nanovdb::createLevelSetTorus<float, nanovdb::CudaDeviceBuffer>(10.0f, 5.0f, nanovdb::Vec3d(0), 0.1);
+	//m_Handle = nanovdb::createLevelSetOctahedron<float, nanovdb::CudaDeviceBuffer>(10.0f, nanovdb::Vec3d(0), 0.1);
+
 	m_Handle.deviceUpload();
 
 	auto* grid = m_Handle.grid<float>();
