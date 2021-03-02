@@ -148,11 +148,18 @@ CPU_ONLY void ReSTIR::Run(
 		);
 	}
 
-	//TODO: Generate regular WaveFront shadow rays and put them in the buffer in WaveFront.
-	//TODO: This will require an atomic + the buffer to be passed.
-	//TODO: The contribution of the shadow rays will be scaled with the reservoir weight here.
+	//TODO: Get the atomic index from WaveFront as well as the shadow ray buffer.
+	MemoryBuffer* atomic = nullptr;
+	WaveFront::ShadowRayData* wfShadowRays = nullptr;
 
-	 //Ensure that swap buffers is called.
+	GenerateWaveFrontShadowRays(
+		static_cast<Reservoir*>(m_Reservoirs[currentIndex].GetDevicePtr()),
+		currentPixelData,
+		atomic,
+		wfShadowRays
+	);
+
+	//Ensure that swap buffers is called.
 	m_SwapDirtyFlag = false;
 }
 

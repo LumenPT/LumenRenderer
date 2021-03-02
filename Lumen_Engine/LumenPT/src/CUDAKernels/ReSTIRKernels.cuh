@@ -7,6 +7,7 @@
 #include "../../vendor/Include/Cuda/cuda/helpers.h"
 #include "../Shaders/CppCommon/ReSTIRData.h"
 #include "../Framework/MemoryBuffer.h"
+#include "../Shaders/CppCommon/WaveFrontDataStructs.h"
 
 /*
  * Macros used to access elements at a certain index.
@@ -109,3 +110,11 @@ __device__ void CombineBiased(int a_PixelIndex, int a_Count, Reservoir** a_Reser
  *
  */
 __device__ void Resample(LightSample* a_Input, const PixelData* a_PixelData, LightSample* a_Output);
+
+/*
+ * Generate shadow rays from the reservoirs after ReSTIR runs.
+ * Add the shadow rays with scaled-by-weight payload to the wavefront buffer.
+ */
+__host__ void GenerateWaveFrontShadowRays(Reservoir* a_Reservoirs, PixelData* a_PixelData, MemoryBuffer* a_Atomic, WaveFront::ShadowRayData* a_ShadowRays);
+
+__global__ void GenerateWaveFrontShadowRaysInternal(Reservoir* a_Reservoirs, PixelData* a_PixelData, int* a_Atomic, WaveFront::ShadowRayData* a_ShadowRays);

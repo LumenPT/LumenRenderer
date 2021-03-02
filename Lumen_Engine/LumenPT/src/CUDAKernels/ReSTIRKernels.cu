@@ -561,3 +561,58 @@ __device__ void Resample(LightSample* a_Input, const PixelData* a_PixelData, Lig
     a_Output->solidAnglePdf = (unshadowedPathContribution.x + unshadowedPathContribution.y + unshadowedPathContribution.
         z) / 3.f;
 }
+
+__host__ void GenerateWaveFrontShadowRays(Reservoir* a_Reservoirs, PixelData* a_PixelData, MemoryBuffer* a_Atomic,
+    WaveFront::ShadowRayData* a_ShadowRays)
+{
+    const auto numPixels = ReSTIRSettings::width * ReSTIRSettings::height;
+    //Call in parallel.
+    const int blockSize = 256;
+    const int numBlocks = (numPixels + blockSize - 1) / blockSize;
+    GenerateWaveFrontShadowRaysInternal<<<numBlocks, blockSize>>>(a_Reservoirs, a_PixelData, a_Atomic->GetDevicePtr<int>(), a_ShadowRays);
+    cudaDeviceSynchronize();
+}
+
+__global__ void GenerateWaveFrontShadowRaysInternal(Reservoir* a_Reservoirs, PixelData* a_PixelData, int* a_Atomic, WaveFront::ShadowRayData* a_ShadowRays)
+{
+    const auto numPixels = ReSTIRSettings::width * ReSTIRSettings::height;
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    int stride = blockDim.x * gridDim.x;
+
+    //Temporary storage for the rays.
+    WaveFront::ShadowRayData rays[ReSTIRSettings::numReservoirsPerPixel];
+
+    for (int i = index; i < numPixels; i += stride)
+    {
+        PixelData* pixel = &a_PixelData[i];
+
+        //Only generate shadow rays for pixels that hit a surface.
+        if(pixel->depth > 0.f)
+        {
+            /*
+             * TODO
+             * Note: This currently divides the expected contribution per reservoir by the amount of reservoirs.
+             * It's essentially like scaling down so that the total adds up to 100% if all shadow rays pass.
+             * This does shoot one shadow ray per reservoir, but I think that's needed for accurate results.
+             * If we are really desperate we could average the reservoir results and then send a single shadow ray.
+             */
+
+            for (int depth = 0; depth < ReSTIRSettings::numReservoirsPerPixel; ++depth)
+            {
+                //Get the contribution and scale it down based on the number of reservoirs.
+                Reservoir* reservoir = &a_Reservoirs[RESERVOIR_INDEX(i, depth, ReSTIRSettings::numReservoirsPerPixel)];
+                float3 contribution = (reservoir->sample.unshadowedPathContribution * (reservoir->weight / static_cast<float>(ReSTIRSettings::numReservoirsPerPixel)));
+
+                //Generate a ray for this particular reservoir.
+                int rayIndex = atomicAdd(a_Atomic, 1);
+                float3 toLightDir = reservoir->sample.position - pixel->worldPosition;
+                const float l = length(toLightDir);
+                toLightDir /= l;
+
+                //TODO ensure no shadow acne.
+                a_ShadowRays[rayIndex] = WaveFront::ShadowRayData{pixel->worldPosition, toLightDir, l - 0.005f, contribution, WaveFront::ResultBuffer::OutputChannel::DIRECT};
+            }
+        }
+    }
+}
+
