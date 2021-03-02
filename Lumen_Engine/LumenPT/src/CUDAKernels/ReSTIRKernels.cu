@@ -5,10 +5,12 @@
 #include <cuda_runtime_api.h>
 #include <cuda/device_atomic_functions.h>
 
+#define CUDA_BLOCK_SIZE 256
+
 __host__ void ResetReservoirs(int a_NumReservoirs, Reservoir* a_ReservoirPointer)
 {
     //Call in parallel.
-    const int blockSize = 256;
+    const int blockSize = CUDA_BLOCK_SIZE;
     const int numBlocks = (a_NumReservoirs + blockSize - 1) / blockSize;
     ResetReservoirInternal<<<numBlocks, blockSize>>>(a_NumReservoirs, a_ReservoirPointer);
 
@@ -55,23 +57,24 @@ __global__ void FillCDFInternal(CDF* a_Cdf, TriangleLight* a_Lights, unsigned a_
     }
 }
 
-__host__ void FillLightBags(unsigned a_NumLightBags, CDF* a_Cdf, LightBagEntry* a_LightBagPtr, TriangleLight* a_Lights)
+__host__ void FillLightBags(unsigned a_NumLightBags, CDF* a_Cdf, LightBagEntry* a_LightBagPtr, TriangleLight* a_Lights, const std::uint32_t a_Seed)
 {
-    const int blockSize = 256;
+    const int blockSize = CUDA_BLOCK_SIZE;
     const int numBlocks = (a_NumLightBags + blockSize - 1) / blockSize;
-    FillLightBagsInternal <<<numBlocks, blockSize >>>(a_NumLightBags, a_Cdf, a_LightBagPtr, a_Lights);
+    FillLightBagsInternal <<<numBlocks, blockSize >>>(a_NumLightBags, a_Cdf, a_LightBagPtr, a_Lights, a_Seed);
     cudaDeviceSynchronize();
 }
 
-__global__ void FillLightBagsInternal(unsigned a_NumLightBags, CDF* a_Cdf, LightBagEntry* a_LightBagPtr, TriangleLight* a_Lights)
+__global__ void FillLightBagsInternal(unsigned a_NumLightBags, CDF* a_Cdf, LightBagEntry* a_LightBagPtr, TriangleLight* a_Lights, const std::uint32_t a_Seed)
 {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     int stride = blockDim.x * gridDim.x;
 
     for (int i = index; i < a_NumLightBags; i += stride)
     {
-        //TODO generate random float between 0 and 1.
-        float random = 1.f;
+        //Generate a random float between 0 and 1.
+        auto seed = a_Seed + i;
+        float random = RandomFloat(seed);
 
         //Store the pdf and light in the light bag.
         unsigned lIndex;
@@ -81,28 +84,32 @@ __global__ void FillLightBagsInternal(unsigned a_NumLightBags, CDF* a_Cdf, Light
     }
 }
 
-__host__ void PickPrimarySamples(const WaveFront::RayData* const a_RayData, const WaveFront::IntersectionData* const a_IntersectionData, const LightBagEntry* const a_LightBags, Reservoir* a_Reservoirs, const ReSTIRSettings& a_Settings, PixelData* a_PixelData)
+__host__ void PickPrimarySamples(const WaveFront::RayData* const a_RayData, const WaveFront::IntersectionData* const a_IntersectionData, const LightBagEntry* const a_LightBags, Reservoir* a_Reservoirs, const ReSTIRSettings& a_Settings, PixelData* a_PixelData, const std::uint32_t a_Seed)
 {
     //TODO ensure that each pixel grid operates within a single block, and that the L1 cache is not overwritten for each value. Optimize for cache hits.
     //TODO correctly assign a light bag per grid through some random generation.
 
     const auto numReservoirs = (a_Settings.width * a_Settings.height * a_Settings.numReservoirsPerPixel);
-    const int blockSize = 256;
+    const int blockSize = CUDA_BLOCK_SIZE;
     const int numBlocks = (numReservoirs + blockSize - 1) / blockSize;
-    PickPrimarySamplesInternal<<<numBlocks, blockSize>>>(a_RayData, a_IntersectionData, a_LightBags, a_Reservoirs, a_Settings, a_PixelData);
+    PickPrimarySamplesInternal<<<numBlocks, blockSize>>>(a_RayData, a_IntersectionData, a_LightBags, a_Reservoirs, a_Settings, a_PixelData, a_Seed);
     cudaDeviceSynchronize();
 }
 
-__global__ void PickPrimarySamplesInternal(const WaveFront::RayData* const a_RayData, const WaveFront::IntersectionData* const a_IntersectionData, const LightBagEntry* const a_LightBags, Reservoir* a_Reservoirs, const ReSTIRSettings& a_Settings, PixelData* a_PixelData)
+__global__ void PickPrimarySamplesInternal(const WaveFront::RayData* const a_RayData, const WaveFront::IntersectionData* const a_IntersectionData, const LightBagEntry* const a_LightBags, Reservoir* a_Reservoirs, const ReSTIRSettings& a_Settings, PixelData* a_PixelData, const std::uint32_t a_Seed)
 {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     int stride = blockDim.x * gridDim.x;
     const auto numPixels = a_Settings.width * a_Settings.height;
 
-    //Pick a light bag index based on max indices.
-    const int lightBagIndex = 0;  //TODO use actual light bag
-    auto* pickedLightBag = &a_LightBags[lightBagIndex * a_Settings.numLightsPerBag];
+    //Seed for this thread index.
+    auto lightBagSeed = a_Seed + blockIdx.x;    //Seed is the same for each block so that they all get the same light bag.
+    float random = RandomFloat(lightBagSeed);
 
+    //Generate between 0 and 1, then round and pick a light bag index based on the total light bag amount.
+    int lightBagIndex = static_cast<int>(round(static_cast<float>(a_Settings.numLightBags - 1) * random));
+
+    auto* pickedLightBag = &a_LightBags[lightBagIndex * a_Settings.numLightsPerBag];
 
     //Loop over the pixels
     for (int i = index; i < numPixels; i += stride)
@@ -148,14 +155,18 @@ __global__ void PickPrimarySamplesInternal(const WaveFront::RayData* const a_Ray
             //Generate the amount of samples specified per reservoir.
             for (int sample = 0; sample < a_Settings.numPrimarySamples; ++sample)
             {
-                const int pickedLightIndex = 0;//TODO use an actual random index within thhe light size.
+                //Random number using the pixel id.
+                auto seed = a_Seed + i;
+                float r = RandomFloat(seed);
+
+                const int pickedLightIndex = static_cast<int>(round(static_cast<float>(a_Settings.numLightsPerBag - 1) * r));
                 const LightBagEntry pickedEntry = pickedLightBag[pickedLightIndex];
                 const TriangleLight light = pickedEntry.light;
                 const float initialPdf = pickedEntry.pdf;
 
                 //Generate random UV coordinates. Between 0 and 1.
-                const float u = 0.f;    //TODO generate random float between 0 and 1.
-                const float v = 0.f;    //TODO generate random float between 0 and 1.
+                const float u = RandomFloat(seed);  //Seed is altered after each shift, which makes it work with the same uint.
+                const float v = RandomFloat(seed);
 
                 //Generate a sample with solid angle PDF for this specific pixel.
                 LightSample lightSample;
@@ -164,6 +175,7 @@ __global__ void PickPrimarySamplesInternal(const WaveFront::RayData* const a_Ray
                     lightSample.radiance = light.radiance;
                     lightSample.normal = light.normal;
                     lightSample.area = light.area;
+
                     //TODO generate random point according to UV coordinates. This is taking the center for now.
                     lightSample.position = (light.p0 + light.p1 + light.p2) / 3.f;
 
@@ -173,7 +185,7 @@ __global__ void PickPrimarySamplesInternal(const WaveFront::RayData* const a_Ray
 
                 //The final PDF for the light in this reservoir is the solid angle divided by the original PDF of the light being chosen based on radiance.
                 const auto pdf = lightSample.solidAnglePdf / initialPdf;
-                reservoir->Update(lightSample, pdf);
+                reservoir->Update(lightSample, pdf, a_Seed);
             }
 
             reservoir->UpdateWeight();
@@ -190,7 +202,7 @@ __host__ void VisibilityPass(MemoryBuffer* a_AtomicCounter, Reservoir* a_Reservo
     const auto numPixels = ReSTIRSettings::width * ReSTIRSettings::height;
 
     //Call in parallel.
-    const int blockSize = 256;
+    const int blockSize = CUDA_BLOCK_SIZE;
     const int numBlocks = (numPixels + blockSize - 1) / blockSize;
     GenerateShadowRay<<<numBlocks, blockSize>>> (devicePtr, a_Reservoirs, a_ShadowRays, a_PixelData);
     cudaDeviceSynchronize();
@@ -243,19 +255,19 @@ __global__ void GenerateShadowRay(int* a_AtomicCounter, Reservoir* a_Reservoirs,
     }
 }
 
-__host__ void SpatialNeighbourSampling(Reservoir* a_Reservoirs, Reservoir* a_SwapBuffer, PixelData* a_PixelData)
+__host__ void SpatialNeighbourSampling(Reservoir* a_Reservoirs, Reservoir* a_SwapBuffer, PixelData* a_PixelData, const std::uint32_t a_Seed)
 {    
     const auto numPixels = (ReSTIRSettings::width * ReSTIRSettings::height);
-    const int blockSize = 256;
+    const int blockSize = CUDA_BLOCK_SIZE;
     const int numBlocks = (numPixels + blockSize - 1) / blockSize;
-    SpatialNeighbourSamplingInternal<<<numBlocks, blockSize >>>(a_Reservoirs, a_SwapBuffer, a_PixelData);
+    SpatialNeighbourSamplingInternal<<<numBlocks, blockSize >>>(a_Reservoirs, a_SwapBuffer, a_PixelData, a_Seed);
     cudaDeviceSynchronize();
 }
 
 //TODO access settings struct statically instead of passing an instance.
 
 __global__ void SpatialNeighbourSamplingInternal(Reservoir* a_Reservoirs, Reservoir* a_SwapBuffer,
-    PixelData* a_PixelData)
+    PixelData* a_PixelData, const std::uint32_t a_Seed)
 {
     Reservoir* fromBuffer = a_Reservoirs;
     Reservoir* toBuffer = a_SwapBuffer;
@@ -271,6 +283,9 @@ __global__ void SpatialNeighbourSamplingInternal(Reservoir* a_Reservoirs, Reserv
     //Loop over the pixels.
     for (int i = index; i < numPixels; i += stride)
     {
+        //The seed unique to this pixel.
+        auto seed = a_Seed + i;
+
         toCombinePixelData[0] = &a_PixelData[i];
 
         //Only run when there's an intersection for this pixel.
@@ -292,9 +307,9 @@ __global__ void SpatialNeighbourSamplingInternal(Reservoir* a_Reservoirs, Reserv
                     //TODO average of the calculation.
                     for (int neighbour = 1; neighbour <= ReSTIRSettings::numSpatialSamples; ++neighbour)
                     {
-                        //TODO generate random coordinates within the radius defined in settings.
-                        const int neighbourY = (1) + y;
-                        const int neighbourX = (1) + x;
+                        //TODO This generates a square rn. Make it within a circle.
+                        const int neighbourY = round((RandomFloat(seed) * 2.f - 1.f) * static_cast<float>(ReSTIRSettings::spatialSampleRadius)) + y;
+                        const int neighbourX = round((RandomFloat(seed) * 2.f - 1.f) * static_cast<float>(ReSTIRSettings::spatialSampleRadius)) + x;
                         const int neighbourIndex = PIXEL_INDEX(neighbourX, neighbourY, ReSTIRSettings::numReservoirsPerPixel);
 
                         //Only run if within image bounds.
@@ -332,11 +347,11 @@ __global__ void SpatialNeighbourSamplingInternal(Reservoir* a_Reservoirs, Reserv
                     {
                         if(ReSTIRSettings::enableBiased)
                         {
-                            CombineBiased(i, count, toCombineReservoirs, toCombinePixelData);
+                            CombineBiased(i, count, toCombineReservoirs, toCombinePixelData, seed);
                         }
                         else
                         {
-                            CombineUnbiased(i, count, toCombineReservoirs, toCombinePixelData);
+                            CombineUnbiased(i, count, toCombineReservoirs, toCombinePixelData, seed);
                         }
                     }
                 }
@@ -355,17 +370,18 @@ __host__ void TemporalNeighbourSampling(
     Reservoir* a_CurrentReservoirs,
     Reservoir* a_PreviousReservoirs,
     PixelData* a_CurrentPixelData,
-    PixelData* a_PreviousPixelData
+    PixelData* a_PreviousPixelData,
+    const std::uint32_t a_Seed
 )
 {
     const int numPixels = (ReSTIRSettings::width * ReSTIRSettings::height);
-    const int blockSize = 256;
+    const int blockSize = CUDA_BLOCK_SIZE;
     const int numBlocks = (numPixels + blockSize - 1) / blockSize;
 
     //TODO pass the motion vector information in here.
 
     CombineTemporalSamplesInternal << <numBlocks, blockSize >> > (a_CurrentReservoirs, a_PreviousReservoirs,
-                                                                  a_CurrentPixelData, a_PreviousPixelData);
+                                                                  a_CurrentPixelData, a_PreviousPixelData, a_Seed);
     cudaDeviceSynchronize();
 }
 
@@ -374,7 +390,8 @@ __global__ void CombineTemporalSamplesInternal(
     Reservoir* a_CurrentReservoirs,
     Reservoir* a_PreviousReservoirs,
     PixelData* a_CurrentPixelData,
-    PixelData* a_PreviousPixelData
+    PixelData* a_PreviousPixelData,
+    const std::uint32_t a_Seed
 )
 {
     const int numPixels = (ReSTIRSettings::width * ReSTIRSettings::height);
@@ -417,11 +434,11 @@ __global__ void CombineTemporalSamplesInternal(
 
                     if (ReSTIRSettings::enableBiased)
                     {
-                        CombineBiased(i, 2, toCombine, pixelPointers);
+                        CombineBiased(i, 2, toCombine, pixelPointers, a_Seed + i);
                     }
                     else
                     {
-                        CombineUnbiased(i, 2, toCombine, pixelPointers);
+                        CombineUnbiased(i, 2, toCombine, pixelPointers, a_Seed + i);
                     }
                 }
                 
@@ -431,7 +448,7 @@ __global__ void CombineTemporalSamplesInternal(
 }
 
 __device__ void CombineUnbiased(int a_PixelIndex, int a_Count, Reservoir** a_Reservoirs,
-                                PixelData** a_ToCombine)
+                                PixelData** a_ToCombine, const std::uint32_t a_Seed)
 {
 
     for (int depth = 0; depth < ReSTIRSettings::numReservoirsPerPixel; ++depth)
@@ -448,7 +465,7 @@ __device__ void CombineUnbiased(int a_PixelIndex, int a_Count, Reservoir** a_Res
             const float weight = static_cast<float>(otherReservoir->sampleCount) * otherReservoir->weight * resampled.
                 solidAnglePdf;
 
-            output.Update(resampled, weight);
+            output.Update(resampled, weight, a_Seed);
 
             sampleCountSum += otherReservoir->sampleCount;
         }
@@ -483,7 +500,7 @@ __device__ void CombineUnbiased(int a_PixelIndex, int a_Count, Reservoir** a_Res
 }
 
 __device__ void CombineBiased(int a_PixelIndex, int a_Count, Reservoir** a_Reservoirs,
-                              PixelData** a_ToCombine)
+                              PixelData** a_ToCombine, const std::uint32_t a_Seed)
 {
     //Loop over every depth.
     for (int depth = 0; depth < ReSTIRSettings::numReservoirsPerPixel; ++depth)
@@ -505,7 +522,7 @@ __device__ void CombineBiased(int a_PixelIndex, int a_Count, Reservoir** a_Reser
 
             assert(resampled.solidAnglePdf >= 0.f);
 
-            output.Update(resampled, weight);
+            output.Update(resampled, weight, a_Seed);
 
             sampleCountSum += reservoir->sampleCount;
         }
@@ -567,7 +584,7 @@ __host__ void GenerateWaveFrontShadowRays(Reservoir* a_Reservoirs, PixelData* a_
 {
     const auto numPixels = ReSTIRSettings::width * ReSTIRSettings::height;
     //Call in parallel.
-    const int blockSize = 256;
+    const int blockSize = CUDA_BLOCK_SIZE;
     const int numBlocks = (numPixels + blockSize - 1) / blockSize;
     GenerateWaveFrontShadowRaysInternal<<<numBlocks, blockSize>>>(a_Reservoirs, a_PixelData, a_Atomic->GetDevicePtr<int>(), a_ShadowRays);
     cudaDeviceSynchronize();

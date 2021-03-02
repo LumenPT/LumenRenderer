@@ -11,6 +11,8 @@
 #include <limits>
 #include <cinttypes>
 
+#include "../../CUDAKernels/RandomUtilities.cuh"
+
 constexpr float MINFLOAT = std::numeric_limits<float>::min();
 
 /*
@@ -124,7 +126,7 @@ struct Reservoir
     /*
      * Update this reservoir with a light and a weight for that light relative to the total set.
      */
-    GPU_ONLY INLINE bool Update(const LightSample& a_Sample, float a_Weight)
+    GPU_ONLY INLINE bool Update(const LightSample& a_Sample, float a_Weight, std::uint32_t a_Seed)
     {
         assert(a_Weight >= 0.f);
 
@@ -133,8 +135,7 @@ struct Reservoir
         ++sampleCount;
 
         //Generate a random float between 0 and 1 and then overwrite the sample based on the probability of this sample being chosen.
-        //TODO generate random float between 0 and 1. both inclusive.
-        const float r = 0;// static_cast<float>(rand()) / static_cast <float> (RAND_MAX);
+        const float r = RandomFloat(a_Seed);
 
         //In this case R is inclusive with 0.0 and 1.0. This means that the first sample is always chosen.
         //If weight is 0, then a division by 0 would happen. Also it'd be impossible to pick this sample.
