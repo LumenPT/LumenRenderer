@@ -1,10 +1,6 @@
 cmake_minimum_required (VERSION 3.16)
 enable_language(CUDA)
 
-if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
-	set(CMAKE_CUDA_ARCHITECTURES 52)
-endif()
-
 set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} -G")
 
 # specify the C++ standard
