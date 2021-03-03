@@ -326,7 +326,7 @@ CPU_ON_GPU void DEBUGShadePrimIntersections(
             // Get ray used to calculate intersection.
             const unsigned int rayArrayIndex = currIntersection.m_RayArrayIndex;
 
-            const unsigned int vertexIndex = currIntersection.m_PrimitiveIndex;
+            const unsigned int vertexIndex = 3 * currIntersection.m_PrimitiveIndex;
             const DevicePrimitive* primitive = currIntersection.m_Primitive;
 
             if( primitive == nullptr || 
@@ -365,11 +365,27 @@ CPU_ON_GPU void DEBUGShadePrimIntersections(
 
             const float2 texCoords = A->m_UVCoord * W + B->m_UVCoord * U + C->m_UVCoord * V;
 
+            if(U + V + W != 1.f || texCoords.x > 1.f || texCoords.y > 1.f)
+            {
+
+                if(U + V + W != 1.f)
+                {
+                    printf("U: %f, V: %f, W: %f \n", U, V, W);
+                    a_Output->SetPixel(make_float3(1.f, 1.f, 0.f), rayArrayIndex, ResultBuffer::OutputChannel::DIRECT);
+                }
+                else
+                {
+                    printf("X: %f, Y: %f \n", texCoords.x, texCoords.y);
+                    a_Output->SetPixel(make_float3(0.f, 1.f, 1.f), rayArrayIndex, ResultBuffer::OutputChannel::DIRECT);
+                }
+                return;
+                
+            }
+
             const DeviceMaterial* material = primitive->m_Material;
 
             const float4 textureColor = tex2D<float4>(material->m_DiffuseTexture, texCoords.x, texCoords.y);
             const float3 finalColor = make_float3(textureColor * material->m_DiffuseColor);
-            //float3 finalColor = make_float3(material->m_DiffuseColor);
 
             a_Output->SetPixel(finalColor, rayArrayIndex, ResultBuffer::OutputChannel::DIRECT);
 
