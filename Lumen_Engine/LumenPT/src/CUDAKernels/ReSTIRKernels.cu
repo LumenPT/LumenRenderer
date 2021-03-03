@@ -134,10 +134,31 @@ __global__ void PickPrimarySamplesInternal(const WaveFront::RayData* const a_Ray
         //Extract the pixel features from all the different buffers. Store them in the pixel.
         pixel->worldPosition = ray->m_Origin + ray->m_Direction * intersectionData->m_IntersectionT;
         pixel->directionIncoming = ray->m_Direction;
-        pixel->worldNormal;   //TODO get surface normal from the intersection buffer.
-        pixel->diffuse;      //TODO get diffuse color from intersection buffer.
-        pixel->roughness;    //TODO get rougghness from intersection.
-        pixel->metallic;     //TODO get metallic factor from intersection.
+
+        const unsigned int vertexIndex = 3 * intersectionData->m_PrimitiveIndex;
+        const DevicePrimitive* primitive = intersectionData->m_Primitive;
+        const unsigned int vertexIndexA = primitive->m_IndexBuffer[vertexIndex + 0];
+        const unsigned int vertexIndexB = primitive->m_IndexBuffer[vertexIndex + 1];
+        const unsigned int vertexIndexC = primitive->m_IndexBuffer[vertexIndex + 2];
+
+        const Vertex* A = &primitive->m_VertexBuffer[vertexIndexA];
+        const Vertex* B = &primitive->m_VertexBuffer[vertexIndexB];
+        const Vertex* C = &primitive->m_VertexBuffer[vertexIndexC];
+
+        const float U = intersectionData->m_UVs.x;
+        const float V = intersectionData->m_UVs.y;
+        const float W = 1.f - (U + V);
+
+        const float2 texCoords = A->m_UVCoord * W + B->m_UVCoord * U + C->m_UVCoord * V;
+        const float4 texColor = tex2D<float4>(primitive->m_Material->m_DiffuseTexture, texCoords.x, texCoords.y);
+        const float4 triangleColor = primitive->m_Material->m_DiffuseColor;
+
+        pixel->worldNormal = normalize(A->m_Normal + B->m_Normal + C->m_Normal);
+        pixel->diffuse = float3{texColor.x * triangleColor.x, texColor.y * triangleColor.y, texColor.z * triangleColor.z};
+        pixel->roughness = 1.f; //intersectionData->m_Primitive->m_Material->m_Roughness; //TODO
+        pixel->metallic = 0.f;  //intersectionData->m_Primitive->m_Material->m_Metallic; //TODO
+
+
         pixel->depth = intersectionData->m_IntersectionT;
 
         //For every pixel, update each reservoir.
