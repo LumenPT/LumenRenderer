@@ -17,7 +17,7 @@ endif()
 
 ###### OpenVDB Core Options
 
-option(OPENVDB_CORE_SHARED "Build dynamically linked version of the core library." ON)
+option(OPENVDB_CORE_SHARED "Build dynamically linked version of the core library." OFF)
 option(OPENVDB_CORE_STATIC "Build statically linked version of the core library." ON)
 
 set(OPENVDB_SHARED_LIBRARY_NAME "openvdb" CACHE STRING
