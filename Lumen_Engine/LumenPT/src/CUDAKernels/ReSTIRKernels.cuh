@@ -8,6 +8,7 @@
 #include "../Shaders/CppCommon/ReSTIRData.h"
 #include "../Framework/MemoryBuffer.h"
 #include "../Shaders/CppCommon/WaveFrontDataStructs.h"
+#include "../CUDAKernels/RandomUtilities.cuh"
 
 /*
  * Macros used to access elements at a certain index.
@@ -32,16 +33,16 @@ __global__ void ResetCDF(CDF* a_Cdf);
 
 __global__ void FillCDFInternal(CDF* a_Cdf, TriangleLight* a_Lights, unsigned a_LightCount);
 
-__host__ void FillLightBags(unsigned a_NumLightBags, CDF* a_Cdf, LightBagEntry* a_LightBagPtr, TriangleLight* a_Lights);
+__host__ void FillLightBags(unsigned a_NumLightBags, CDF* a_Cdf, LightBagEntry* a_LightBagPtr, TriangleLight* a_Lights, const std::uint32_t a_Seed);
 
-__global__ void FillLightBagsInternal(unsigned a_NumLightBags, CDF* a_Cdf, LightBagEntry* a_LightBagPtr, TriangleLight* a_Lights);
+__global__ void FillLightBagsInternal(unsigned a_NumLightBags, CDF* a_Cdf, LightBagEntry* a_LightBagPtr, TriangleLight* a_Lights, const std::uint32_t a_Seed);
 
 /*
  * Prick primary lights and apply reservoir sampling.
  */
-__host__ void PickPrimarySamples(const WaveFront::RayData* const a_RayData, const WaveFront::IntersectionData* const a_IntersectionData, const LightBagEntry* const a_LightBags, Reservoir* a_Reservoirs, const ReSTIRSettings& a_Settings, PixelData* a_PixelData);
+__host__ void PickPrimarySamples(const WaveFront::RayData* const a_RayData, const WaveFront::IntersectionData* const a_IntersectionData, const LightBagEntry* const a_LightBags, Reservoir* a_Reservoirs, const ReSTIRSettings& a_Settings, PixelData* a_PixelData, const std::uint32_t a_Seed);
 
-__global__ void PickPrimarySamplesInternal(const WaveFront::RayData* const a_RayData, const WaveFront::IntersectionData* const a_IntersectionData, const LightBagEntry* const a_LightBags, Reservoir* a_Reservoirs, const ReSTIRSettings& a_Settings, PixelData* a_PixelData);
+__global__ void PickPrimarySamplesInternal(const WaveFront::RayData* const a_RayData, const WaveFront::IntersectionData* const a_IntersectionData, const LightBagEntry* const a_LightBags, Reservoir* a_Reservoirs, const ReSTIRSettings& a_Settings, PixelData* a_PixelData, const std::uint32_t a_Seed);
 
 /*
  * Generate shadow rays for the given reservoirs.
@@ -59,13 +60,15 @@ __global__ void GenerateShadowRay(int* a_AtomicCounter, Reservoir* a_Reservoirs,
 __host__ void SpatialNeighbourSampling(
     Reservoir* a_Reservoirs,
     Reservoir* a_SwapBuffer,
-    PixelData* a_PixelData
+    PixelData* a_PixelData,
+    const std::uint32_t a_Seed
 );
 
 __global__ void SpatialNeighbourSamplingInternal(
     Reservoir* a_Reservoirs,
     Reservoir* a_SwapBuffer,
-    PixelData* a_PixelData
+    PixelData* a_PixelData,
+    const std::uint32_t a_Seed
 );
 
 /*
@@ -75,14 +78,16 @@ __host__ void TemporalNeighbourSampling(
     Reservoir* a_CurrentReservoirs,
     Reservoir* a_PreviousReservoirs,
     PixelData* a_CurrentPixelData,
-    PixelData* a_PreviousPixelData
+    PixelData* a_PreviousPixelData,
+    const std::uint32_t a_Seed
 );
 
 __global__ void CombineTemporalSamplesInternal(
     Reservoir* a_CurrentReservoirs,
     Reservoir* a_PreviousReservoirs,
     PixelData* a_CurrentPixelData,
-    PixelData* a_PreviousPixelData
+    PixelData* a_PreviousPixelData,
+    const std::uint32_t a_Seed
 );
 
 /*
@@ -92,7 +97,7 @@ __global__ void CombineTemporalSamplesInternal(
  * a_Count indicates the amount of pixels to process in a_ToCombine.
  * This runs for every reservoir at a_PixelIndex.
  */
-__device__ void CombineUnbiased(int a_PixelIndex, int a_Count, Reservoir** a_Reservoirs, PixelData** a_ToCombine);
+__device__ void CombineUnbiased(int a_PixelIndex, int a_Count, Reservoir** a_Reservoirs, PixelData** a_ToCombine, const std::uint32_t a_Seed);
 
 /*
  * Combine multiple reservoirs biased.
@@ -101,7 +106,7 @@ __device__ void CombineUnbiased(int a_PixelIndex, int a_Count, Reservoir** a_Res
  * a_Count indicates the amount of indices to process in a_ToCombineIndices.
  * This runs for every reservoir depth.
  */
-__device__ void CombineBiased(int a_PixelIndex, int a_Count, Reservoir** a_Reservoirs, PixelData** a_ToCombine);
+__device__ void CombineBiased(int a_PixelIndex, int a_Count, Reservoir** a_Reservoirs, PixelData** a_ToCombine, const std::uint32_t a_Seed);
 
 /*
  * Resample an old light sample.

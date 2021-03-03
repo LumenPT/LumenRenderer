@@ -3,6 +3,8 @@
 #include <cassert>
 #include <cuda_runtime.h>
 
+#include "../CUDAKernels/RandomUtilities.cuh"
+
 
 CPU_ONLY void ReSTIR::Initialize(const ReSTIRSettings& a_Settings)
 {
@@ -73,7 +75,8 @@ CPU_ONLY void ReSTIR::Run(
 	const WaveFront::IntersectionData* const a_CurrentIntersections,
 	const WaveFront::RayData* const a_RayBuffer,
 	const std::vector<TriangleLight>& a_Lights,
-	const float3 a_CameraPosition
+	const float3 a_CameraPosition,
+	const std::uint32_t a_Seed
 )
 {
 	assert(m_SwapDirtyFlag && "SwapBuffers has to be called once per frame for ReSTIR to properly work.");
@@ -81,6 +84,9 @@ CPU_ONLY void ReSTIR::Run(
 	//Index of the reservoir buffers (current and temporal).
 	auto currentIndex = m_SwapChainIndex;
 	auto temporalIndex = currentIndex == 1 ? 0 : 1;
+
+	//The seed will be modified over time.
+	auto seed = a_Seed;
 
 	/*
 	 * Resize buffers based on the amount of lights and update data.
@@ -105,7 +111,8 @@ CPU_ONLY void ReSTIR::Run(
 	}
 	//Fill light bags with values from the CDF.
 	{
-		FillLightBags(m_Settings.numLightBags, static_cast<CDF*>(m_Cdf.GetDevicePtr()), static_cast<LightBagEntry*>(m_LightBags.GetDevicePtr()), static_cast<TriangleLight*>(m_Lights.GetDevicePtr()));
+		seed = WangHash(seed);
+		FillLightBags(m_Settings.numLightBags, static_cast<CDF*>(m_Cdf.GetDevicePtr()), static_cast<LightBagEntry*>(m_LightBags.GetDevicePtr()), static_cast<TriangleLight*>(m_Lights.GetDevicePtr()), seed);
 	}
 
 	//Pointers to the pixel data buffers.
@@ -115,7 +122,8 @@ CPU_ONLY void ReSTIR::Run(
 	/*
 	 * Pick primary samples in parallel. Store the samples in the reservoirs.
 	 */
-	PickPrimarySamples(a_RayBuffer, a_CurrentIntersections, static_cast<LightBagEntry*>(m_LightBags.GetDevicePtr()), static_cast<Reservoir*>(m_Reservoirs->GetDevicePtr()), m_Settings, currentPixelData);
+	seed = WangHash(seed);
+	PickPrimarySamples(a_RayBuffer, a_CurrentIntersections, static_cast<LightBagEntry*>(m_LightBags.GetDevicePtr()), static_cast<Reservoir*>(m_Reservoirs->GetDevicePtr()), m_Settings, currentPixelData, seed);
 
 	/*
 	 * Generate shadow rays for each reservoir and resolve them.
@@ -128,11 +136,13 @@ CPU_ONLY void ReSTIR::Run(
      */
 	if (m_Settings.enableTemporal)
 	{
+		seed = WangHash(seed);
 		TemporalNeighbourSampling(
 			m_Reservoirs[currentIndex].GetDevicePtr<Reservoir>(),
 			m_Reservoirs[temporalIndex].GetDevicePtr<Reservoir>(),
 			currentPixelData,
-			temporalPixelData
+			temporalPixelData,
+			seed
 		);
 	}
 
@@ -141,10 +151,12 @@ CPU_ONLY void ReSTIR::Run(
 	 */
 	if(m_Settings.enableSpatial)
 	{
+		seed = WangHash(seed);
 		SpatialNeighbourSampling(
 			static_cast<Reservoir*>(m_Reservoirs[currentIndex].GetDevicePtr()),
 			static_cast<Reservoir*>(m_Reservoirs[2].GetDevicePtr()), 
-			currentPixelData
+			currentPixelData,
+			seed
 		);
 	}
 
