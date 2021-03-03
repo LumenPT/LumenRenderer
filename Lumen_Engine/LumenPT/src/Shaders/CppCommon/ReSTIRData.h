@@ -276,3 +276,15 @@ struct LightBagEntry
     TriangleLight light;
     float pdf;
 };
+
+/*
+ * Data required by Optix to resolve shadow rays.
+ */
+struct ReSTIROptixParameters
+{
+    OptixTraversableHandle optixSceneHandle;
+    std::uint32_t numRays;
+
+    RestirShadowRay* shadowRays;
+    Reservoir* reservoirs;
+};

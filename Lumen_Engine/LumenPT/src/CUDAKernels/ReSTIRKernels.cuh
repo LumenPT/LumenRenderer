@@ -47,8 +47,10 @@ __global__ void PickPrimarySamplesInternal(const WaveFront::RayData* const a_Ray
 /*
  * Generate shadow rays for the given reservoirs.
  * These shadow rays are then resolved with Optix, and reservoirs weights are updated to reflect mutual visibility.
+ *
+ * The amount of shadow rays that was generated will be returned as an int.
  */
-__host__ void VisibilityPass(MemoryBuffer* a_AtomicCounter, Reservoir* a_Reservoirs, RestirShadowRay* a_ShadowRays, PixelData* a_PixelData);
+__host__ int GenerateReSTIRShadowRays(MemoryBuffer* a_AtomicCounter, Reservoir* a_Reservoirs, RestirShadowRay* a_ShadowRays, PixelData* a_PixelData);
 
 //Generate a shadow ray based on the thread ID.
 __global__ void GenerateShadowRay(int* a_AtomicCounter, Reservoir* a_Reservoirs, RestirShadowRay* a_ShadowRays, PixelData* a_PixelData);
