@@ -126,6 +126,9 @@ private:
     std::unique_ptr<MemoryBuffer> m_SBTBuffer;
 
     std::vector<std::unique_ptr<MemoryBuffer>> m_TempBuffers;
+
+	//volumetric_bookmark
+    AccelerationStructure* m_testVolumeGAS = nullptr;
 };
 
 template <typename VertexType, typename IndexType>

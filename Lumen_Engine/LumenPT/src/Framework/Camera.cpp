@@ -52,6 +52,13 @@ void Camera::IncrementYaw(float AngleInRadians)
 	m_DirtyFlag = true;
 }
 
+void Camera::IncrementPitch(float AngleInRadians)
+{
+	UpdateCameraVectors();
+	
+	m_Rotation = glm::angleAxis(AngleInRadians, glm::vec3(m_Right)) * m_Rotation;
+	m_DirtyFlag = true;
+}
 
 void Camera::GetVectorData(glm::vec3& a_Eye, glm::vec3& a_U, glm::vec3& a_V, glm::vec3& a_W)
 {

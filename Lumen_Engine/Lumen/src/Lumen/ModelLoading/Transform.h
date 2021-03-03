@@ -12,7 +12,11 @@ namespace Lumen // BYOUTIFUL KARTOSHKA
     class DependentBase
     {
     public:
+        DependentBase(void* a_InstancePointer)
+            : m_InstancePointer(a_InstancePointer){}
         virtual void UpdateDependent() = 0;
+        // Need a pointer to the instance when removing a dependent from a vector.
+        const void* m_InstancePointer; 
     };
 
     template<typename Type>
@@ -20,7 +24,8 @@ namespace Lumen // BYOUTIFUL KARTOSHKA
     {
     public:
         Dependent(Type& a_Instance)
-            : m_Instance(a_Instance){};
+            : DependentBase(&a_Instance)
+            , m_Instance(a_Instance){}
         void UpdateDependent() override
         {
             m_Instance.DependencyCallback();
@@ -75,6 +80,24 @@ namespace Lumen // BYOUTIFUL KARTOSHKA
         {
             m_Dependents.push_back(std::make_unique<Dependent<Type>>(a_Dependent));
         };
+
+        template<typename Type>
+        void RemoveDependent(Type& a_Dependent)
+        {
+            // Find the instance by its address in memory
+            void* ptr = &a_Dependent;
+            auto iter = std::find_if(m_Dependents.begin(), m_Dependents.end(), [ptr](std::unique_ptr<DependentBase>& a_Member)
+                {
+                    return a_Member->m_InstancePointer == ptr;
+                });
+            if (iter != m_Dependents.end())
+            {
+                // In the case that m_Dependents is a big vector,
+                // swapping the target to the back of the vector will make deleting it from the vector faster
+                std::iter_swap(iter, m_Dependents.end() - 1);
+                m_Dependents.pop_back();                
+            }
+        }
 
     private:
         void MakeDirty();
