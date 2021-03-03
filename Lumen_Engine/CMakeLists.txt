@@ -18,6 +18,32 @@ add_subdirectory("Lumen/vendor/GLFW")
 add_subdirectory ("Lumen/vendor/Glad")
 	#ImGui
 add_subdirectory ("Lumen/vendor/ImGui")
+
+#set(SYSTEM_LIBRARY_PATHS CACHE "C:/Users/alexa/vcpkg/installed/x64-windows/include" "C:/Users/alexa/vcpkg/installed/x64-windows/lib")
+#
+#set(OPENVDB_DEPENDENCIES_INCLUDE CACHE FILEPATH "C:/Users/alexa/vcpkg/installed/x64-windows/include")
+#set(OPENVDB_DEPENDENCIES_LIB CACHE FILEPATH "C:/Users/alexa/vcpkg/installed/x64-windows/lib")
+#
+#set(IlmBase_Half_LIBRARY "C:/Users/alexa/vcpkg/installed/x64-windows/include" CACHE FILEPATH "Temp" FORCE)
+#set(IlmBase_INCLUDE_DIR "C:/Users/alexa/vcpkg/installed/x64-windows/lib" CACHE FILEPATH "Temp" FORCE)
+#
+#set(Tbb_INCLUDE_DIR "C:/Users/alexa/vcpkg/installed/x64-windows/include" CACHE FILEPATH "Temp" FORCE)
+#set(Tbb_tbb_LIBRARY "C:/Users/alexa/vcpkg/installed/x64-windows/lib" CACHE FILEPATH "Temp" FORCE)
+#set(Tbb_tbbmalloc_LIBRARY "C:/Users/alexa/vcpkg/installed/x64-windows/lib" CACHE FILEPATH "Temp" FORCE)
+#
+#set(Blosc_INCLUDE_DIR "C:/Users/alexa/vcpkg/installed/x64-windows/include" CACHE FILEPATH "Temp" FORCE)
+#set(Blosc_LIBRARY "C:/Users/alexa/vcpkg/installed/x64-windows/lib" CACHE FILEPATH "Temp" FORCE)
+#
+#set(ZLIB_INCLUDE_DIR "C:/Users/alexa/vcpkg/installed/x64-windows/include" CACHE FILEPATH "Temp" FORCE)
+#set(ZLIB_LIBRARY_DEBUG "C:/Users/alexa/vcpkg/installed/x64-windows/lib" CACHE FILEPATH "Temp" FORCE)
+#set(ZLIB_LIBRARY_RELEASE "C:/Users/alexa/vcpkg/installed/x64-windows/lib" CACHE FILEPATH "Temp" FORCE)
+#
+#set(Boost_INCLUDE_DIR "C:/Users/alexa/vcpkg/installed/x64-windows/include" CACHE FILEPATH "Temp" FORCE)
+#set(Boost_LIBRARY_DIR_DEBUG "C:/Users/alexa/vcpkg/installed/x64-windows/lib" CACHE FILEPATH "Temp" FORCE)
+#set(Boost_LIBRARY_DIR_RELEASE "C:/Users/alexa/vcpkg/installed/x64-windows/lib" CACHE FILEPATH "Temp" FORCE)
+#
+#	#OpenVDB
+#add_subdirectory ("LumenPT/vendor/openvdb")
 	#NanoVDB
 add_subdirectory ("LumenPT/vendor/openvdb/nanovdb")
 	#Lumen

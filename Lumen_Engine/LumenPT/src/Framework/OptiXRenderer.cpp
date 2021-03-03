@@ -46,12 +46,14 @@ void CheckOptixRes(const OptixResult & a_res)
     }
 }
 
-#if defined(OPTIX_NOCHECK)
-#define CHECKOPTIXRESULT(x)
-#elif defined(OPTIX_CHECK) || defined(_DEBUG)
+//#if defined(OPTIX_NOCHECK)
+//#define CHECKOPTIXRESULT(x)
+//#elif defined(OPTIX_CHECK) || defined(_DEBUG)
+//#define CHECKOPTIXRESULT(x)\
+//    CheckOptixRes(x);
+//#endif
 #define CHECKOPTIXRESULT(x)\
     CheckOptixRes(x);
-#endif
 
 OptiXRenderer::OptiXRenderer(const InitializationData& a_InitializationData)
     :
