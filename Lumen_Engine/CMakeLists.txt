@@ -19,11 +19,11 @@ add_subdirectory ("Lumen/vendor/Glad")
 	#ImGui
 add_subdirectory ("Lumen/vendor/ImGui")
 
-#set(SYSTEM_LIBRARY_PATHS CACHE "C:/Users/alexa/vcpkg/installed/x64-windows/include" "C:/Users/alexa/vcpkg/installed/x64-windows/lib")
-#
+#set(SYSTEM_LIBRARY_PATHS "C:/Users/alexa/vcpkg/installed/x64-windows/include" "C:/Users/alexa/vcpkg/installed/x64-windows/lib" CACHE FILEPATH "Temp" FORCE)
+
 #set(OPENVDB_DEPENDENCIES_INCLUDE CACHE FILEPATH "C:/Users/alexa/vcpkg/installed/x64-windows/include")
 #set(OPENVDB_DEPENDENCIES_LIB CACHE FILEPATH "C:/Users/alexa/vcpkg/installed/x64-windows/lib")
-#
+
 #set(IlmBase_Half_LIBRARY "C:/Users/alexa/vcpkg/installed/x64-windows/include" CACHE FILEPATH "Temp" FORCE)
 #set(IlmBase_INCLUDE_DIR "C:/Users/alexa/vcpkg/installed/x64-windows/lib" CACHE FILEPATH "Temp" FORCE)
 #
@@ -41,8 +41,8 @@ add_subdirectory ("Lumen/vendor/ImGui")
 #set(Boost_INCLUDE_DIR "C:/Users/alexa/vcpkg/installed/x64-windows/include" CACHE FILEPATH "Temp" FORCE)
 #set(Boost_LIBRARY_DIR_DEBUG "C:/Users/alexa/vcpkg/installed/x64-windows/lib" CACHE FILEPATH "Temp" FORCE)
 #set(Boost_LIBRARY_DIR_RELEASE "C:/Users/alexa/vcpkg/installed/x64-windows/lib" CACHE FILEPATH "Temp" FORCE)
-#
-#	#OpenVDB
+
+	#OpenVDB
 #add_subdirectory ("LumenPT/vendor/openvdb")
 	#NanoVDB
 add_subdirectory ("LumenPT/vendor/openvdb/nanovdb")
