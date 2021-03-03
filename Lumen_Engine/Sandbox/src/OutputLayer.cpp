@@ -2,15 +2,18 @@
 
 #include "LumenPT.h"
 #include "Framework/Camera.h"
+
 #include "Lumen/Input.h"
+#include "Lumen/ModelLoading/SceneManager.h"
+#include "Lumen/KeyCodes.h"
 
 #include "Glad/glad.h"
 
 #include "imgui/imgui.h"
 
-#include <iostream>
 
-#include "Lumen/KeyCodes.h"
+#include "filesystem"
+#include <iostream>
 
 OutputLayer::OutputLayer()
 {
@@ -82,6 +85,8 @@ OutputLayer::~OutputLayer()
 void OutputLayer::OnUpdate(){
 
 	HandleCameraInput(m_LumenPT->m_Camera);
+
+
 	auto texture = m_LumenPT->TraceFrame(); // TRACE SUM
 
 
@@ -133,6 +138,29 @@ void OutputLayer::OnImGuiRender()
 		tarTransform.SetRotation(rot);
 
 	}
+}
+
+void OutputLayer::InitializeScenePresets()
+{
+	ScenePreset pres = {};
+
+	auto& scene = m_LumenPT->m_Scene;
+	auto assetManager = m_LayerServices->m_SceneManager;
+
+	// Sample scene loading preset
+	pres.m_Key = LMN_KEY_1;
+	pres.m_Function = [scene, assetManager]()
+	{
+		//temporary stuff to avoid absolute paths to gltf cube
+		std::filesystem::path p = std::filesystem::current_path();
+		std::string p_string{ p.string() };
+		std::replace(p_string.begin(), p_string.end(), '\\', '/');
+		p_string.append("/Sandbox/assets/models/Lantern.gltf");
+
+		auto res = assetManager->LoadGLTF(p_string);
+
+
+	};
 }
 
 void OutputLayer::HandleCameraInput(Camera& a_Camera)
@@ -200,4 +228,16 @@ void OutputLayer::HandleCameraInput(Camera& a_Camera)
 	a_Camera.IncrementYaw(glm::radians(yawRotation));
 	a_Camera.IncrementPitch(glm::radians(pitchRotation));
 	//a_Camera.SetYaw(a_Camera.GetYaw() + yawRotation);
+}
+
+void OutputLayer::HandleSceneInput()
+{
+    for (auto preset : m_ScenePresets)
+    {
+        if (Lumen::Input::IsKeyPressed(preset.m_Key))
+        {
+			preset.m_Function();
+			break;
+        }   
+    }
 }

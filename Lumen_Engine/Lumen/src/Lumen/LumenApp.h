@@ -6,14 +6,22 @@
 #include "Lumen/Events/ApplicationEvent.h"
 #include "Lumen/Renderer/LumenRenderer.h"
 
-#include "Lumen/ImGui/ImGuiLayer.h"
+//#include "Lumen/ImGui/ImGuiLayer.h"
 
 namespace Lumen
 {
-
+	class SceneManager;
+	class ImGuiLayer;
 	class LumenApp
 	{
 	public:
+
+		// Struct used to provide application layers with specific services
+		struct LayerServices
+		{
+			SceneManager* m_SceneManager;
+		};
+
 		LumenApp();
 		virtual ~LumenApp();
 
@@ -34,6 +42,10 @@ namespace Lumen
 		ImGuiLayer* m_ImGuiLayer;
 		bool m_Running = true;
 		LayerStack m_LayerStack;
+
+		LayerServices m_LayerServices;
+
+		std::unique_ptr<SceneManager> m_SceneManager;
 
 		static LumenApp* s_Instance;
 	};

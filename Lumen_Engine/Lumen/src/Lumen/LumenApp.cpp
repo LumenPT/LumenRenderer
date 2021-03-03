@@ -1,5 +1,9 @@
 #include "lmnpch.h"
 #include "LumenApp.h"
+#include "Layer.h"
+#include "ImGui/ImGuiLayer.h"
+
+#include "ModelLoading/SceneManager.h"
 
 #include "Lumen/Log.h"
 
@@ -26,6 +30,11 @@ namespace Lumen
 
 		m_ImGuiLayer = new ImGuiLayer();
 		PushOverlay(m_ImGuiLayer);
+
+		m_SceneManager = std::make_unique<SceneManager>();
+
+		// Fill out the service locator for the layers
+		m_LayerServices.m_SceneManager = m_SceneManager.get();
 	}
 
 	LumenApp::~LumenApp()
@@ -80,6 +89,7 @@ namespace Lumen
 
 	void LumenApp::PushLayer(Layer* layer)
 	{
+		layer->SetLayerServices(&m_LayerServices);
 		m_LayerStack.PushLayer(layer);
 		layer->OnAttach();
 	}
