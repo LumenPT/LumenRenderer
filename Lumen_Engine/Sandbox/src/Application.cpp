@@ -81,14 +81,13 @@ public:
 		std::replace(p_string.begin(), p_string.end(), '\\', '/');
 		p_string.append("/Sandbox/assets/models/Lantern.gltf");
 		LMN_TRACE(p_string);
-		
-		Lumen::SceneManager manager = Lumen::SceneManager();
-		manager.SetPipeline(*m_ContextLayer->GetPipeline());
-		auto res = manager.LoadGLTF(p_string);
+
+	    m_SceneManager->SetPipeline(*m_ContextLayer->GetPipeline());
+		auto res = m_SceneManager->LoadGLTF(p_string);
 
 		std::string vndbFilePath = { p.string() };
 		vndbFilePath.append("/Sandbox/assets/volume/Sphere.vndb");
-		auto volumeRes = manager.m_VolumeManager.LoadVDB(vndbFilePath);
+		auto volumeRes = m_SceneManager->m_VolumeManager.LoadVDB(vndbFilePath);
 		
 		auto lumenPT = m_ContextLayer->GetPipeline();
 

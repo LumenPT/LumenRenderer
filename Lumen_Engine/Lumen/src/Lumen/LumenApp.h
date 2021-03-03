@@ -34,7 +34,10 @@ namespace Lumen
 
 		inline Window& GetWindow() { return *m_Window; }
 		inline static LumenApp& Get() { return *s_Instance; }
-		
+
+	protected:
+		std::unique_ptr<SceneManager> m_SceneManager;
+
 	private:
 		bool OnWindowClosed(WindowCloseEvent& e);
 		
@@ -45,7 +48,6 @@ namespace Lumen
 
 		LayerServices m_LayerServices;
 
-		std::unique_ptr<SceneManager> m_SceneManager;
 
 		static LumenApp* s_Instance;
 	};

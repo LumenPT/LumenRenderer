@@ -34,6 +34,14 @@ Lumen::VolumeInstance* PTScene::AddVolume()
     return m_VolumeInstances.back().get();
 }
 
+void PTScene::Clear()
+{
+    // Do the same as the parent class
+    // and mark the acceleration structure as dirty and waiting for an update
+    ILumenScene::Clear();
+    m_AccelerationStructureDirty = true;
+}
+
 void PTScene::MarkSceneForUpdate()
 {
     m_AccelerationStructureDirty = true;

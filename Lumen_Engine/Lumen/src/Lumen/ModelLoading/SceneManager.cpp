@@ -238,8 +238,6 @@ void Lumen::SceneManager::LoadMaterials(fx::gltf::Document& a_Doc, GLTFResource&
 			));
 		}
 
-
-		materials.push_back(mat);
 	}
 
 	a_Res.m_MaterialPool = materials;

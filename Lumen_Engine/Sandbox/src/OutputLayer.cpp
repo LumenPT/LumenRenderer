@@ -72,9 +72,6 @@ OutputLayer::OutputLayer()
 #endif
 
 	m_LumenPT = std::make_unique<LumenPT>(init);
-
-
-
 }
 
 OutputLayer::~OutputLayer()
@@ -85,7 +82,7 @@ OutputLayer::~OutputLayer()
 void OutputLayer::OnUpdate(){
 
 	HandleCameraInput(m_LumenPT->m_Camera);
-
+	HandleSceneInput();
 
 	auto texture = m_LumenPT->TraceFrame(); // TRACE SUM
 
@@ -144,23 +141,48 @@ void OutputLayer::InitializeScenePresets()
 {
 	ScenePreset pres = {};
 
+
+	//temporary stuff to avoid absolute paths to gltf file
+	std::filesystem::path p = std::filesystem::current_path();
+	std::string assetPath{ p.string() };
+	std::replace(assetPath.begin(), assetPath.end(), '\\', '/');
+
 	auto& scene = m_LumenPT->m_Scene;
 	auto assetManager = m_LayerServices->m_SceneManager;
 
 	// Sample scene loading preset
 	pres.m_Key = LMN_KEY_1;
-	pres.m_Function = [scene, assetManager]()
+	pres.m_Function = [this, assetManager, assetPath]()
 	{
-		//temporary stuff to avoid absolute paths to gltf cube
-		std::filesystem::path p = std::filesystem::current_path();
-		std::string p_string{ p.string() };
-		std::replace(p_string.begin(), p_string.end(), '\\', '/');
-		p_string.append("/Sandbox/assets/models/Lantern.gltf");
+	    auto filePath = assetPath + "/Sandbox/assets/models/Lantern.gltf";
+		auto scene = m_LumenPT->m_Scene;
+		// I suggest doing a scene clear so that we don't end up with scenes with duplicate meshes
+		scene->Clear();	
 
-		auto res = assetManager->LoadGLTF(p_string);
+		auto res = assetManager->LoadGLTF(filePath);
 
-
+		auto mesh = scene->AddMesh();
+		auto meshLight = scene->AddMesh();
+		mesh->SetMesh(res->m_MeshPool[0]);
+		meshLight->SetMesh(res->m_MeshPool[0]);
 	};
+	m_ScenePresets.push_back(pres);
+
+	pres.m_Key = LMN_KEY_2;
+	pres.m_Function = [this, assetManager, assetPath]()
+	{
+		auto filePath = assetPath + "/Sandbox/assets/models/Sponza/Sponza.gltf";
+		auto scene = m_LumenPT->m_Scene;
+		// I suggest doing a scene clear so that we don't end up with scenes with duplicate meshes
+		scene->Clear();
+
+		auto res = assetManager->LoadGLTF(filePath);
+
+		auto mesh = scene->AddMesh();
+		mesh->SetMesh(res->m_MeshPool[0]);
+		mesh->m_Transform.SetScale(glm::vec3(0.1f));
+	};
+	m_ScenePresets.push_back(pres);
 }
 
 void OutputLayer::HandleCameraInput(Camera& a_Camera)
@@ -232,12 +254,25 @@ void OutputLayer::HandleCameraInput(Camera& a_Camera)
 
 void OutputLayer::HandleSceneInput()
 {
-    for (auto preset : m_ScenePresets)
+	static uint16_t keyDown = 0;
+
+    if (!keyDown)
     {
-        if (Lumen::Input::IsKeyPressed(preset.m_Key))
-        {
-			preset.m_Function();
-			break;
-        }   
+		for (auto preset : m_ScenePresets)
+		{
+		    if (Lumen::Input::IsKeyPressed(preset.m_Key))
+		    {
+				preset.m_Function();
+				keyDown = preset.m_Key;
+
+				break;
+		    }   
+		}        
     }
+	else
+	{
+		if (!Lumen::Input::IsKeyPressed(keyDown))
+			keyDown = 0;
+	}
+
 }

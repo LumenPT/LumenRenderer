@@ -32,6 +32,8 @@ public:
     OutputLayer();
     ~OutputLayer();
 
+    void OnAttach() override { InitializeScenePresets(); };
+
     void OnUpdate() override;
 
     void OnImGuiRender() override;
