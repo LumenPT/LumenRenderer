@@ -19,9 +19,12 @@ __global__ void __closesthit__VolumetricHitShader()
 
     //auto& grid = *tempGrid;
 
-    optixSetPayload_0(float_as_int(1.0f));
-    optixSetPayload_1(float_as_int(0.0f));
-    optixSetPayload_2(float_as_int(1.0f));
+    //optixSetPayload_0(float_as_int(1.0f));
+    //optixSetPayload_1(float_as_int(0.0f));
+    //optixSetPayload_2(float_as_int(1.0f));
+	optixSetPayload_0(optixGetAttribute_0());
+	optixSetPayload_1(optixGetAttribute_1());
+	optixSetPayload_2(optixGetAttribute_2());
     optixSetPayload_3(1);
 
 
@@ -75,9 +78,21 @@ __global__ void __intersection__VolumetricHitShader()
     nanovdb::Coord ijk;
     float v;
 
+	//calculate voxel grid dimensions
+	auto minGrid = grid.indexBBox().min();
+	auto maxGrid = grid.indexBBox().max();
+	float gridWidth = maxGrid.x() - minGrid.x();
+	float gridHeight = maxGrid.y() - minGrid.y();
+	float gridDepth = maxGrid.z() - minGrid.z();
+
+
     if (nanovdb::ZeroCrossing(iRay, acc, ijk, v, iT0))
     {
-        optixReportIntersection(1.f, 0);
+        optixReportIntersection(1.f, 0,
+			float_as_int(ijk.x() / gridWidth + 0.5f),
+			float_as_int(ijk.y() / gridHeight + 0.5f),
+			float_as_int(ijk.z() / gridDepth + 0.5f));
+		//optixReportIntersection(1.0f, 0);
     }
 
 
