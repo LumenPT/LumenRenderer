@@ -921,7 +921,7 @@ void WaveFrontRenderer::CreateOutputBuffer()
 void WaveFrontRenderer::CreateDataBuffers()
 {
 
-    const unsigned numPixels = static_cast<unsigned>(m_RenderResolution.x) * static_cast<unsigned>(m_RenderResolution.y);
+    const unsigned numPixels = m_RenderResolution.x * m_RenderResolution.y;
     const unsigned numOutputChannels = ResultBuffer::s_NumOutputChannels;
 
     //const unsigned int lightBuffer = LightBuffer::
@@ -1130,6 +1130,12 @@ GLuint WaveFrontRenderer::TraceFrame()
     static unsigned int frameCount = 0;
     const std::string frameSaveFilePath = cDebugOutputRunPath + "Frame" + std::to_string(frameCount) + "/";
 
+    //Clear Pixel buffer
+    PixelBuffer* pixelBufferMultiChannelDevPtr = m_PixelBufferMultiChannel->GetDevicePtr<PixelBuffer>();
+    const unsigned numPixels = m_RenderResolution.x * m_RenderResolution.y;
+    const unsigned channelsPerPixel = static_cast<unsigned>(ResultBuffer::s_NumOutputChannels);
+    ResetPixelBuffer(pixelBufferMultiChannelDevPtr, numPixels, channelsPerPixel);
+
     //Generate Camera rays using CUDA kernel.
     float3 eye, u, v, w;
     m_Camera.GetVectorData(eye, u, v, w);
@@ -1164,6 +1170,10 @@ GLuint WaveFrontRenderer::TraceFrame()
     optixRaysLaunchParams.m_Common.m_Traversable = dynamic_cast<PTScene&>(*m_Scene).GetSceneAccelerationStructure();
 
     uint3 resolutionAndDepth = make_uint3(m_RenderResolution.x, m_RenderResolution.y, 0);
+
+    OptixShaderBindingTable raysSBT = m_RaysSBTGenerator->GetTableDesc();
+    cudaDeviceSynchronize();
+    CHECKLASTCUDAERROR;
 
     //Loop
     //Trace buffer of rays using Optix ResolveRays pipeline
@@ -1223,8 +1233,6 @@ GLuint WaveFrontRenderer::TraceFrame()
 
         m_PipelineRaysLaunchParams->Write(optixRaysLaunchParams);
 
-        OptixShaderBindingTable SBT = m_RaysSBTGenerator->GetTableDesc();
-
         cudaDeviceSynchronize();
         CHECKLASTCUDAERROR;
 
@@ -1232,9 +1240,9 @@ GLuint WaveFrontRenderer::TraceFrame()
         CHECKOPTIXRESULT(optixLaunch(
             m_PipelineRays,
             0,
-            *(*m_PipelineRaysLaunchParams),
+            **m_PipelineRaysLaunchParams,
             m_PipelineRaysLaunchParams->GetSize(),
-            &SBT,
+            &raysSBT,
             m_RenderResolution.x,
             m_RenderResolution.y,
             m_RaysPerPixel)); //Number of rays per pixel, number of samples per pixel.

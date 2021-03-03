@@ -244,6 +244,7 @@ namespace WaveFront
             :
         m_RayArrayIndex(0),
         m_IntersectionT(-1.f),
+        m_UVs({0.f, 0.f}),
         m_PrimitiveIndex(0),
         m_Primitive(0)
         {}
@@ -251,11 +252,13 @@ namespace WaveFront
         CPU_GPU IntersectionData(
             unsigned int a_RayArrayIndex,
             float a_IntersectionT,
+            float2 a_UVs,
             unsigned int a_PrimitiveIndex,
             DevicePrimitive* a_Primitive)
             :
         m_RayArrayIndex(a_RayArrayIndex),
         m_IntersectionT(a_IntersectionT),
+        m_UVs(a_UVs),
         m_PrimitiveIndex(a_PrimitiveIndex),
         m_Primitive(a_Primitive)
         {}
@@ -297,6 +300,9 @@ namespace WaveFront
         /// </summary>
         float m_IntersectionT;
 
+        
+        float2 m_UVs;
+
         /// <summary>
         /// <b>Description</b> \n The index of the primitive of the mesh that the ray intersected with. \n
         /// <b>Default</b>: 0
@@ -308,7 +314,7 @@ namespace WaveFront
         /// <b>Default</b>: 0
         /// </summary>
         DevicePrimitive* m_Primitive; //TODO: Might need to change to pointer to a DeviceMesh.
-
+  
     };
 
     struct IntersectionBuffer

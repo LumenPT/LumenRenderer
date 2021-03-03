@@ -114,6 +114,7 @@ __global__ void __closesthit__ResolveRaysClosestHit()
     WaveFront::IntersectionData* intersection = UnpackPointer<WaveFront::IntersectionData>(intersectionPtr_Up, intersectionPtr_Low);
     
     intersection->m_IntersectionT = optixGetRayTmax();
+    intersection->m_UVs = optixGetTriangleBarycentrics();
     intersection->m_PrimitiveIndex = optixGetPrimitiveIndex();
     intersection->m_Primitive = hitPrimitive;
 

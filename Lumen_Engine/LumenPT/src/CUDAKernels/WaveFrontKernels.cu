@@ -314,8 +314,6 @@ CPU_ON_GPU void DEBUGShadePrimIntersections(
     const unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
     const unsigned int stride = blockDim.x * gridDim.x;
 
-    float3 potRadiance = { 0.f, 0.f, 0.f };
-
     for (unsigned int i = index; i < numPixels; i += stride)
     {
 
@@ -328,11 +326,52 @@ CPU_ON_GPU void DEBUGShadePrimIntersections(
             // Get ray used to calculate intersection.
             const unsigned int rayArrayIndex = currIntersection.m_RayArrayIndex;
 
-            const RayData& currRay = a_PrimaryRays->GetRay(rayArrayIndex);
+            const unsigned int vertexIndex = currIntersection.m_PrimitiveIndex;
+            const DevicePrimitive* primitive = currIntersection.m_Primitive;
 
-            potRadiance = make_float3(1.f);
+            if( primitive == nullptr || 
+                primitive->m_IndexBuffer == nullptr || 
+                primitive->m_VertexBuffer == nullptr ||
+                primitive->m_Material == nullptr)
+            {
 
-            a_Output->SetPixel(potRadiance, rayArrayIndex, ResultBuffer::OutputChannel::DIRECT);
+                if(!primitive)
+                {
+                    printf("Error, primitive: %p \n", primitive);
+                }
+                else
+                {
+                    printf("Error, found nullptr in primitive variables: \n\tm_IndexBuffer: %p \n\tm_VertexBuffer: %p \n\tm_Material: %p\n",
+                        primitive->m_IndexBuffer,
+                        primitive->m_VertexBuffer,
+                        primitive->m_Material);
+                }
+                
+                a_Output->SetPixel(make_float3(1.f, 0.f, 1.f), rayArrayIndex, ResultBuffer::OutputChannel::DIRECT);
+                return;
+            }
+
+            const unsigned int vertexIndexA = primitive->m_IndexBuffer[vertexIndex + 0];
+            const unsigned int vertexIndexB = primitive->m_IndexBuffer[vertexIndex + 1];
+            const unsigned int vertexIndexC = primitive->m_IndexBuffer[vertexIndex + 2];
+
+            const Vertex* A = &primitive->m_VertexBuffer[vertexIndexA];
+            const Vertex* B = &primitive->m_VertexBuffer[vertexIndexB];
+            const Vertex* C = &primitive->m_VertexBuffer[vertexIndexC];
+
+            const float U = currIntersection.m_UVs.x;
+            const float V = currIntersection.m_UVs.y;
+            const float W = 1.f - (U + V);
+
+            const float2 texCoords = A->m_UVCoord * W + B->m_UVCoord * U + C->m_UVCoord * V;
+
+            const DeviceMaterial* material = primitive->m_Material;
+
+            const float4 textureColor = tex2D<float4>(material->m_DiffuseTexture, texCoords.x, texCoords.y);
+            const float3 finalColor = make_float3(textureColor * material->m_DiffuseColor);
+            //float3 finalColor = make_float3(material->m_DiffuseColor);
+
+            a_Output->SetPixel(finalColor, rayArrayIndex, ResultBuffer::OutputChannel::DIRECT);
 
         }
 
@@ -427,29 +466,7 @@ GPU_ONLY INLINE float RandomFloat(unsigned int& a_S)
 
 //Data buffer helper functions
 
-CPU_ON_GPU void ResetRayBatchMembers(
-    RayBatch* const a_RayBatch, 
-    unsigned int a_NumPixels, 
-    unsigned int a_RaysPerPixel)
-{
-    *const_cast<unsigned*>(&a_RayBatch->m_NumPixels) = a_NumPixels;
-    *const_cast<unsigned*>(&a_RayBatch->m_RaysPerPixel) = a_RaysPerPixel;
-
-}
-
-CPU_ON_GPU void ResetRayBatchBuffer(RayBatch* const a_RayBatch)
-{
-
-    const unsigned int bufferSize = a_RayBatch->GetSize();
-    const unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
-    const unsigned int stride = blockDim.x * gridDim.x;
-
-    for (unsigned int i = index; i < bufferSize; i+=stride)
-    {
-        a_RayBatch->m_Rays[i] = RayData{};
-    }
-
-}
+//Reset ray batch
 
 CPU_ONLY void ResetRayBatch(
     RayBatch* const a_RayBatchDevPtr, 
@@ -463,7 +480,50 @@ CPU_ONLY void ResetRayBatch(
     const int blockSize = 256;
     const int numBlocks = (numRays + blockSize - 1) / blockSize;
 
-    ResetRayBatchBuffer<<<numBlocks,blockSize>>>(a_RayBatchDevPtr);
+    ResetRayBatchData<<<numBlocks,blockSize>>>(a_RayBatchDevPtr);
+
+}
+
+CPU_ON_GPU void ResetRayBatchMembers(
+    RayBatch* const a_RayBatch, 
+    unsigned int a_NumPixels, 
+    unsigned int a_RaysPerPixel)
+{
+    *const_cast<unsigned*>(&a_RayBatch->m_NumPixels) = a_NumPixels;
+    *const_cast<unsigned*>(&a_RayBatch->m_RaysPerPixel) = a_RaysPerPixel;
+
+}
+
+CPU_ON_GPU void ResetRayBatchData(RayBatch* const a_RayBatch)
+{
+
+    const unsigned int bufferSize = a_RayBatch->GetSize();
+    const unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
+    const unsigned int stride = blockDim.x * gridDim.x;
+
+    for (unsigned int i = index; i < bufferSize; i+=stride)
+    {
+        a_RayBatch->m_Rays[i] = RayData{};
+    }
+
+}
+
+//Reset shadow ray batch
+
+CPU_ONLY void ResetShadowRayBatch(
+    ShadowRayBatch* a_ShadowRayBatchDevPtr,
+    unsigned int a_MaxDepth,
+    unsigned int a_NumPixels,
+    unsigned int a_RaysPerPixel)
+{
+
+    ResetShadowRayBatchMembers<<<1,1>>>(a_ShadowRayBatchDevPtr, a_MaxDepth, a_NumPixels, a_RaysPerPixel);
+
+    const int numRays = a_MaxDepth * a_NumPixels * a_RaysPerPixel;
+    const int blockSize = 256;
+    const int numBlocks = (numRays + blockSize - 1) / blockSize;
+
+    ResetShadowRayBatchData<<<numBlocks, blockSize>>>(a_ShadowRayBatchDevPtr);
 
 }
 
@@ -480,7 +540,7 @@ CPU_ON_GPU void ResetShadowRayBatchMembers(
 
 }
 
-CPU_ON_GPU void ResetShadowRayBatchBuffer(ShadowRayBatch* const a_ShadowRayBatch)
+CPU_ON_GPU void ResetShadowRayBatchData(ShadowRayBatch* const a_ShadowRayBatch)
 {
 
     const unsigned int bufferSize = a_ShadowRayBatch->GetSize();
@@ -495,20 +555,46 @@ CPU_ON_GPU void ResetShadowRayBatchBuffer(ShadowRayBatch* const a_ShadowRayBatch
 
 }
 
-CPU_ONLY void ResetShadowRayBatch(
-    ShadowRayBatch* a_ShadowRayBatchDevPtr,
-    unsigned int a_MaxDepth,
-    unsigned int a_NumPixels,
-    unsigned int a_RaysPerPixel)
+//Reset pixel buffer
+
+CPU_ONLY void ResetPixelBuffer(
+    PixelBuffer* a_PixelBufferDevPtr, 
+    unsigned a_NumPixels, 
+    unsigned a_ChannelsPerPixel)
 {
 
-    ResetShadowRayBatchMembers<<<1,1>>>(a_ShadowRayBatchDevPtr, a_MaxDepth, a_NumPixels, a_RaysPerPixel);
+    ResetPixelBufferMembers<<<1, 1>>>(a_PixelBufferDevPtr, a_NumPixels, a_ChannelsPerPixel);
 
-    const int numRays = a_MaxDepth * a_NumPixels * a_RaysPerPixel;
+    const int totalPixels = a_NumPixels * a_ChannelsPerPixel;
     const int blockSize = 256;
-    const int numBlocks = (numRays + blockSize - 1) / blockSize;
+    const int numBlocks = (totalPixels + blockSize - 1) / blockSize;
 
-    ResetShadowRayBatchBuffer<<<numBlocks, blockSize>>>(a_ShadowRayBatchDevPtr);
+    ResetPixelBufferData <<<numBlocks, blockSize>>>(a_PixelBufferDevPtr);
 
 }
 
+CPU_ON_GPU void ResetPixelBufferMembers(
+    PixelBuffer* const a_PixelBuffer, 
+    unsigned a_NumPixels, 
+    unsigned a_ChannelsPerPixel)
+{
+
+    *const_cast<unsigned*>(&a_PixelBuffer->m_NumPixels) = a_NumPixels;
+    *const_cast<unsigned*>(&a_PixelBuffer->m_ChannelsPerPixel) = a_ChannelsPerPixel;
+
+}
+
+CPU_ON_GPU void ResetPixelBufferData(PixelBuffer* const a_PixelBuffer)
+{
+
+    const unsigned int bufferSize = a_PixelBuffer->GetSize();
+    const unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
+    const unsigned int stride = blockDim.x * gridDim.x;
+
+    for (unsigned int i = index; i < bufferSize; i += stride)
+    {
+
+        a_PixelBuffer->m_Pixels[i] = { 0.f, 0.f, 0.f };
+    }
+
+}
