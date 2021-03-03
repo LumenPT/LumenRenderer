@@ -20,10 +20,10 @@ add_subdirectory ("Lumen/vendor/Glad")
 add_subdirectory ("Lumen/vendor/ImGui")
 
 #set(SYSTEM_LIBRARY_PATHS "C:/Users/alexa/vcpkg/installed/x64-windows/include" "C:/Users/alexa/vcpkg/installed/x64-windows/lib" CACHE FILEPATH "Temp" FORCE)
-
+#
 #set(OPENVDB_DEPENDENCIES_INCLUDE CACHE FILEPATH "C:/Users/alexa/vcpkg/installed/x64-windows/include")
 #set(OPENVDB_DEPENDENCIES_LIB CACHE FILEPATH "C:/Users/alexa/vcpkg/installed/x64-windows/lib")
-
+#
 #set(IlmBase_Half_LIBRARY "C:/Users/alexa/vcpkg/installed/x64-windows/include" CACHE FILEPATH "Temp" FORCE)
 #set(IlmBase_INCLUDE_DIR "C:/Users/alexa/vcpkg/installed/x64-windows/lib" CACHE FILEPATH "Temp" FORCE)
 #
@@ -42,7 +42,30 @@ add_subdirectory ("Lumen/vendor/ImGui")
 #set(Boost_LIBRARY_DIR_DEBUG "C:/Users/alexa/vcpkg/installed/x64-windows/lib" CACHE FILEPATH "Temp" FORCE)
 #set(Boost_LIBRARY_DIR_RELEASE "C:/Users/alexa/vcpkg/installed/x64-windows/lib" CACHE FILEPATH "Temp" FORCE)
 
-	#OpenVDB
+#set(SYSTEM_LIBRARY_PATHS "C:/Users/alexa/vcpkg/installed/x64-windows/include" "C:/Users/alexa/vcpkg/installed/x64-windows/lib" CACHE FILEPATH "Temp" FORCE)
+
+#set(OPENVDB_DEPENDENCIES_INCLUDE CACHE FILEPATH "C:/Users/alexa/vcpkg/installed/x64-windows/include")
+#set(OPENVDB_DEPENDENCIES_LIB CACHE FILEPATH "C:/Users/alexa/vcpkg/installed/x64-windows/lib")
+
+#set(IlmBase_Half_LIBRARY "D:/Media/Documents (D)/Game Development/Projects/LumenRenderer/Lumen_Engine/LumenPT/vendor/Include" CACHE STRING "Temp" FORCE)
+#set(IlmBase_INCLUDE_DIR "D:/Media/Documents (D)/Game Development/Projects/LumenRenderer/Lumen_Engine/LumenPT/vendor/Libs/OpenEXR" CACHE STRING "Temp" FORCE)
+#
+#set(Tbb_INCLUDE_DIR "D:/Media/Documents (D)/Game Development/Projects/LumenRenderer/Lumen_Engine/LumenPT/vendor/Include" CACHE FILEPATH "Temp" FORCE)
+#set(Tbb_tbb_LIBRARY "D:/Media/Documents (D)/Game Development/Projects/LumenRenderer/Lumen_Engine/LumenPT/vendor/Libs/tbb" CACHE FILEPATH "Temp" FORCE)
+#set(Tbb_tbbmalloc_LIBRARY "D:/Media/Documents (D)/Game Development/Projects/LumenRenderer/Lumen_Engine/LumenPT/vendor/Libs/tbb" CACHE FILEPATH "Temp" FORCE)
+#
+#set(Blosc_INCLUDE_DIR "D:/Media/Documents (D)/Game Development/Projects/LumenRenderer/Lumen_Engine/LumenPT/vendor/Include/blosc" CACHE FILEPATH "Temp" FORCE)
+#set(Blosc_LIBRARY "D:/Media/Documents (D)/Game Development/Projects/LumenRenderer/Lumen_Engine/LumenPT/vendor/Libs" CACHE FILEPATH "Temp" FORCE)
+#
+#set(ZLIB_INCLUDE_DIR "D:/Media/Documents (D)/Game Development/Projects/LumenRenderer/Lumen_Engine/LumenPT/vendor/Include/zlib" CACHE FILEPATH "Temp" FORCE)
+#set(ZLIB_LIBRARY_DEBUG "D:/Media/Documents (D)/Game Development/Projects/LumenRenderer/Lumen_Engine/LumenPT/vendor/Libs" CACHE FILEPATH "Temp" FORCE)
+#set(ZLIB_LIBRARY_RELEASE "D:/Media/Documents (D)/Game Development/Projects/LumenRenderer/Lumen_Engine/LumenPT/vendor/Libs" CACHE FILEPATH "Temp" FORCE)
+#
+#set(Boost_INCLUDE_DIR "D:/Media/Documents (D)/Game Development/Projects/LumenRenderer/Lumen_Engine/LumenPT/vendor/Include" CACHE FILEPATH "Temp" FORCE)
+#set(Boost_LIBRARY_DIR_DEBUG "D:/Media/Documents (D)/Game Development/Projects/LumenRenderer/Lumen_Engine/LumenPT/vendor/Libs/boost" CACHE FILEPATH "Temp" FORCE)
+#set(Boost_LIBRARY_DIR_RELEASE "D:/Media/Documents (D)/Game Development/Projects/LumenRenderer/Lumen_Engine/LumenPT/vendor/Libs/boost" CACHE FILEPATH "Temp" FORCE)
+#
+#	#OpenVDB
 #add_subdirectory ("LumenPT/vendor/openvdb")
 	#NanoVDB
 add_subdirectory ("LumenPT/vendor/openvdb/nanovdb")

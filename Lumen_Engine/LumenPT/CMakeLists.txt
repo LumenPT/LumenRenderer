@@ -118,6 +118,7 @@ set(LIBS
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Libs/Cuda/cudadevrt.lib"
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Libs/glad.lib"
 	libnanovdb
+	#openvdb_static
 )
 
 set(INCLUDES
