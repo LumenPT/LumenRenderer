@@ -29,9 +29,6 @@ CPU_ONLY void ReSTIR::Initialize(const ReSTIRSettings& a_Settings)
 		const size_t shadowRaySize = sizeof(RestirShadowRay);
 		const size_t size = static_cast<size_t>(m_Settings.width) * static_cast<size_t>(m_Settings.height) * m_Settings.numReservoirsPerPixel * shadowRaySize;
 		m_ShadowRays.Resize(size);
-
-		//TODO ensure that these rays are initialized every time for every frame so that invalid rays are not traced.
-		//TODO the shadow rays should contain the reservoir index (x y and z).
 	}
 
 	//Pixel data caching
@@ -76,7 +73,8 @@ CPU_ONLY void ReSTIR::Run(
 	const WaveFront::RayData* const a_RayBuffer,
 	const std::vector<TriangleLight>& a_Lights,
 	const float3 a_CameraPosition,
-	const std::uint32_t a_Seed
+	const std::uint32_t a_Seed,
+	const OptixTraversableHandle a_OptixSceneHandle
 )
 {
 	assert(m_SwapDirtyFlag && "SwapBuffers has to be called once per frame for ReSTIR to properly work.");
@@ -129,7 +127,18 @@ CPU_ONLY void ReSTIR::Run(
 	 * Generate shadow rays for each reservoir and resolve them.
 	 * If a shadow ray is occluded, the reservoirs weight is set to 0.
 	 */
-	VisibilityPass(&m_Atomics, static_cast<Reservoir*>(m_Reservoirs[m_SwapChainIndex].GetDevicePtr()), m_ShadowRays.GetDevicePtr<RestirShadowRay>(), currentPixelData);
+	const int numRaysGenerated = GenerateReSTIRShadowRays(&m_Atomics, static_cast<Reservoir*>(m_Reservoirs[m_SwapChainIndex].GetDevicePtr()), m_ShadowRays.GetDevicePtr<RestirShadowRay>(), currentPixelData);
+
+	//Parameters for optix launch.
+	ReSTIROptixParameters params;
+	params.numRays = numRaysGenerated;
+	params.optixSceneHandle = a_OptixSceneHandle;
+	params.reservoirs = static_cast<Reservoir*>(m_Reservoirs[m_SwapChainIndex].GetDevicePtr());
+	params.shadowRays = m_ShadowRays.GetDevicePtr<RestirShadowRay>();
+
+	//TODO: Bind shaders defined in ReSTIRVisibilityShader.cu and then do the optix launch with the above parameters.
+	//Launch optix.
+	//optixLaunch();
 
 	/*
      * Temporal sampling where reservoirs are combined with those of the previous frame.

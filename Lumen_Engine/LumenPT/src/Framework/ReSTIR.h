@@ -32,7 +32,8 @@ public:
 		const WaveFront::RayData* const a_RayBuffer,
 		const std::vector<TriangleLight>& a_Lights,
 	    const float3 a_CameraPosition,
-		const std::uint32_t a_Seed
+		const std::uint32_t a_Seed,
+		const OptixTraversableHandle a_OptixSceneHandle
 	);
 
 	/*

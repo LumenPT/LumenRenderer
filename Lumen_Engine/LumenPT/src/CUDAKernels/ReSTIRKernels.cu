@@ -193,7 +193,7 @@ __global__ void PickPrimarySamplesInternal(const WaveFront::RayData* const a_Ray
     }
 }
 
-__host__ void VisibilityPass(MemoryBuffer* a_AtomicCounter, Reservoir* a_Reservoirs, RestirShadowRay* a_ShadowRays, PixelData* a_PixelData)
+__host__ int GenerateReSTIRShadowRays(MemoryBuffer* a_AtomicCounter, Reservoir* a_Reservoirs, RestirShadowRay* a_ShadowRays, PixelData* a_PixelData)
 {
     //Counter that is atomically incremented. Copy it to the GPU.
     int atomic = 0;
@@ -210,7 +210,8 @@ __host__ void VisibilityPass(MemoryBuffer* a_AtomicCounter, Reservoir* a_Reservo
     //Copy value back to the CPU.
     a_AtomicCounter->Read(&atomic, sizeof(int), 0);
 
-    //TODO: optix launch. Set reservoir at index of occluded rays to 0 weight. atomic is the amount of rays to resolve.
+    //Return the amount of rays that have been generated.
+    return atomic;
 }
 
 __global__ void GenerateShadowRay(int* a_AtomicCounter, Reservoir* a_Reservoirs, RestirShadowRay* a_ShadowRays, PixelData* a_PixelData)
