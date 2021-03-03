@@ -80,13 +80,19 @@ public:
 		std::string p_string{ p.string() };
 		std::replace(p_string.begin(), p_string.end(), '\\', '/');
 		//p_string.append("/Sandbox/assets/models/Lantern.gltf");
-		p_string.append("/Sandbox/assets/models/BoomBoxWithAxes/glTF/BoomBoxWithAxes.gltf");
+
+		//Base path for meshes.
+		const std::string meshPath = p_string.append("/Sandbox/assets/models/BoomBoxWithAxes/glTF/");
+
+		//Mesh name
+		const std::string meshName = "BoomBoxWithAxes.gltf";
+
 		//p_string.append("/Sandbox/assets/models/Sponza/Sponza.gltf");
 		LMN_TRACE(p_string);
 		
 		Lumen::SceneManager manager = Lumen::SceneManager();
 		manager.SetPipeline(*m_ContextLayer->GetPipeline());
-		auto res = manager.LoadGLTF(p_string);
+		auto res = manager.LoadGLTF(meshName, meshPath);
 
 		std::string vndbFilePath = { p.string() };
 		vndbFilePath.append("/Sandbox/assets/volume/Sphere.vndb");

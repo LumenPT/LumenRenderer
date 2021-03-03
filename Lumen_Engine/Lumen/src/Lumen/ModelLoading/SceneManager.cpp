@@ -9,22 +9,37 @@
 //#include <string>
 #include <memory>
 
-Lumen::SceneManager::GLTFResource* Lumen::SceneManager::LoadGLTF(std::string a_Path, glm::mat4& a_TransformMat)
+Lumen::SceneManager::GLTFResource* Lumen::SceneManager::LoadGLTF(std::string a_FileName, std::string a_Path, glm::mat4& a_TransformMat)
 {
-	auto findIter = m_LoadedScenes.find(a_Path);
+	const auto fullPath = a_Path + a_FileName;
+	auto findIter = m_LoadedScenes.find(fullPath);
 
 	if (findIter != m_LoadedScenes.end())
 	{
 		return &(*findIter).second;
 	}
 
-	auto& res = m_LoadedScenes[a_Path];		// create new scene at path key
-	auto doc = fx::gltf::LoadFromText(a_Path);
+	auto& res = m_LoadedScenes[fullPath];		// create new scene at path key
 
-	res.m_Path = a_Path;
+	//Check for glb or gltf
+	const std::string binarySuffix = ".glb";
+	bool isBinary = (a_FileName.length() >= binarySuffix.length()) && (0 == a_FileName.compare(a_FileName.length() - binarySuffix.length(), binarySuffix.length(), binarySuffix));
+
+	//NOTE: No quotas specified and no check for .gltf suffix. Might fail to load with large files and wrongly specified suffix.
+	fx::gltf::Document doc;
+	if(!isBinary)
+	{
+		doc = fx::gltf::LoadFromText(fullPath);
+	}
+	else
+	{
+		doc = fx::gltf::LoadFromBinary((fullPath));
+	}
+
+	res.m_Path = fullPath;
 
 
-	LoadMaterials(doc, res);
+	LoadMaterials(doc, res, a_Path);
 
 	LoadMeshes(doc, res);
 	LoadNodes(doc, res, a_TransformMat);
@@ -170,6 +185,41 @@ void Lumen::SceneManager::LoadMeshes(fx::gltf::Document& a_Doc, GLTFResource& a_
 
 }
 
+Lumen::LoadedImageInformation Lumen::SceneManager::LoadTexture(fx::gltf::Document& a_File, int a_TextureId,
+    const std::string& a_Path, int a_NumChannels)
+{
+	assert(a_TextureId >= 0);
+
+	std::uint8_t* imgData = nullptr;
+	int w = 0;
+	int h = 0;
+	int channels = 0;
+
+
+	ImageData data(a_File, a_TextureId, a_Path);
+	auto info = data.Info();
+
+	stbi_set_flip_vertically_on_load(false);
+	if (info.IsBinary())
+	{
+		//Load from raw
+		imgData = stbi_load_from_memory(info.BinaryData, info.BinarySize, &w, &h, &channels, a_NumChannels);
+	}
+	else
+	{
+		//Load from file.
+		imgData = stbi_load(info.FileName.c_str(), &w, &h, &channels, a_NumChannels);
+	}
+	assert(imgData != nullptr && "Could not load and decode image for some reason.");
+
+	//If a specific number of channels was requested, overwrite the "would have been" channels count.
+	if (a_NumChannels != 0)
+	{
+		channels = a_NumChannels;
+	}
+	return LoadedImageInformation{ imgData, w, h, channels };
+}
+
 std::vector<uint8_t> Lumen::SceneManager::LoadBinary(fx::gltf::Document& a_Doc, uint32_t a_AccessorIndx)
 {
 	std::vector<unsigned char> data;
@@ -198,7 +248,7 @@ std::vector<uint8_t> Lumen::SceneManager::LoadBinary(fx::gltf::Document& a_Doc, 
 	return data;
 }
 
-void Lumen::SceneManager::LoadMaterials(fx::gltf::Document& a_Doc, GLTFResource& a_Res)
+void Lumen::SceneManager::LoadMaterials(fx::gltf::Document& a_Doc, GLTFResource& a_Res, const std::string& a_Path)
 {
 	std::vector<std::shared_ptr<ILumenMaterial>> materials;	// Get these iLumenMats from OptiXRenderer
 	//needs to be a more specific material implementation
@@ -209,6 +259,7 @@ void Lumen::SceneManager::LoadMaterials(fx::gltf::Document& a_Doc, GLTFResource&
 		LumenRenderer::MaterialData matData;
 		auto& mat = materials.emplace_back(m_RenderPipeline->CreateMaterial(matData));
 
+		//Load the diffuse color if not empty.
 		if (!fxMat.pbrMetallicRoughness.baseColorFactor.empty()) {
 			auto& arr = fxMat.pbrMetallicRoughness.baseColorFactor;
 			mat->SetDiffuseColor(glm::vec4(
@@ -221,12 +272,21 @@ void Lumen::SceneManager::LoadMaterials(fx::gltf::Document& a_Doc, GLTFResource&
 
 		if (fxMat.pbrMetallicRoughness.baseColorTexture.index != -1)
 		{
-			auto& fxTex = a_Doc.images.at(fxMat.pbrMetallicRoughness.baseColorTexture.index);
-			int x, y, c;
-			auto stbTex = stbi_load((a_Res.m_Path + "/../" + fxTex.uri).c_str(), &x, &y, &c, 4);
-			auto& tex = m_RenderPipeline->CreateTexture(stbTex, x, y);
+			//auto& fxTex = a_Doc.images.at(fxMat.pbrMetallicRoughness.baseColorTexture.index);
+			//int x, y, c;
+			//const auto file = (a_Res.m_Path + "/../" + fxTex.uri);
+			//const auto stbTex = stbi_load(file.c_str(), &x, &y, &c, 4);
+			//const auto tex = m_RenderPipeline->CreateTexture(stbTex, x, y);
+			
 
+			//Load the texture either from file or binary. Then create the engine texture object.
+			auto info = LoadTexture(a_Doc, fxMat.pbrMetallicRoughness.baseColorTexture.index, a_Path, 4);
+
+			const auto tex = m_RenderPipeline->CreateTexture(info.data, info.w, info.h);
 			mat->SetDiffuseTexture(tex);
+
+			//Free the memory after it's uploaded.
+			stbi_image_free(info.data);
 		}
 
 		if (fxMat.emissiveFactor != std::array<float, 3>{0.0f, 0.0f, 0.0f})
