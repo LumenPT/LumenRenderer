@@ -75,7 +75,7 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
         a_ShadingParams.m_LightBuffer, 
         a_ShadingParams.m_CDF);*/
 
-    DEBUGShadePrimIntersections <<<numBlocks, blockSize >> > (
+    DEBUGShadePrimIntersections <<<numBlocks, blockSize>> > (
         a_ShadingParams.m_ResolutionAndDepth,
         a_ShadingParams.m_CurrentRays,
         a_ShadingParams.m_CurrentIntersections,
@@ -320,6 +320,8 @@ CPU_ON_GPU void DEBUGShadePrimIntersections(
         // Get intersection.
         const IntersectionData& currIntersection = a_PrimaryIntersections->GetIntersection(i, 0 /*There is only one ray per pixel, only one intersection per pixel (for now)*/);
 
+    	//printf("Pixel Index: %i, Total Pixels: %i \n", i, numPixels);
+
         if (currIntersection.IsIntersection())
         {
 
@@ -329,6 +331,8 @@ CPU_ON_GPU void DEBUGShadePrimIntersections(
             const unsigned int vertexIndex = 3 * currIntersection.m_PrimitiveIndex;
             const DevicePrimitive* primitive = currIntersection.m_Primitive;
 
+            //printf("vertex Index %i \n", vertexIndex);
+        	
             if( primitive == nullptr || 
                 primitive->m_IndexBuffer == nullptr || 
                 primitive->m_VertexBuffer == nullptr ||
@@ -360,48 +364,44 @@ CPU_ON_GPU void DEBUGShadePrimIntersections(
             const unsigned int vertexIndexA = primitive->m_IndexBuffer[vertexIndex + 0];
             const unsigned int vertexIndexB = primitive->m_IndexBuffer[vertexIndex + 1];
             const unsigned int vertexIndexC = primitive->m_IndexBuffer[vertexIndex + 2];
-
+        	
+            //printf("VertexA Index: %i\n", vertexIndexA);
+            //printf("VertexB Index: %i\n", vertexIndexB);
+            //printf("VertexC Index: %i\n", vertexIndexC);
+        	
             const Vertex* A = &primitive->m_VertexBuffer[vertexIndexA];
             const Vertex* B = &primitive->m_VertexBuffer[vertexIndexB];
             const Vertex* C = &primitive->m_VertexBuffer[vertexIndexC];
-
+        	
             const float U = currIntersection.m_UVs.x;
             const float V = currIntersection.m_UVs.y;
             const float W = 1.f - (U + V);
 
-            const float2 texCoords = A->m_UVCoord * W + B->m_UVCoord * U + C->m_UVCoord * V;
+        	const float2 texCoords = A->m_UVCoord * W + B->m_UVCoord * U + C->m_UVCoord * V;
 
-            if(U + V + W != 1.f || texCoords.x > 1.f || texCoords.y > 1.f)
+            if (U + V + W != 1.f)
             {
-
-                if(U + V + W != 1.f)
-                {
-                    printf("U: %f, V: %f, W: %f \n", U, V, W);
-                    a_Output->SetPixel(make_float3(1.f, 1.f, 0.f), rayArrayIndex, ResultBuffer::OutputChannel::DIRECT);
-                }
-                else
-                {
-                    //printf("X: %f, Y: %f \n", texCoords.x, texCoords.y);
-                    a_Output->SetPixel(make_float3(0.f, 1.f, 1.f), rayArrayIndex, ResultBuffer::OutputChannel::DIRECT);
-                }
+                printf("U: %f, V: %f, W: %f \n", U, V, W);
+                a_Output->SetPixel(make_float3(1.f, 1.f, 0.f), rayArrayIndex, ResultBuffer::OutputChannel::DIRECT);
                 return;
-                
             }
-
+           
+            if(texCoords.x > 1.f || texCoords.y > 1.f)
+            {
+                //printf("X: %f, Y: %f \n", texCoords.x, texCoords.y);
+                a_Output->SetPixel(make_float3(0.f, 1.f, 1.f), rayArrayIndex, ResultBuffer::OutputChannel::DIRECT);
+				return;
+            }
+         
             const DeviceMaterial* material = primitive->m_Material;
 
             const float4 textureColor = tex2D<float4>(material->m_DiffuseTexture, texCoords.x, texCoords.y);
-            const float3 finalColor = make_float3(textureColor * material->m_DiffuseColor);
+			const float3 finalColor = make_float3(textureColor * material->m_DiffuseColor);
 
             a_Output->SetPixel(finalColor, rayArrayIndex, ResultBuffer::OutputChannel::DIRECT);
-
         }
-
     }
-
 }
-
-
 
 CPU_ON_GPU void Denoise()
 {

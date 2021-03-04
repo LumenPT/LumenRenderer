@@ -113,7 +113,7 @@ void OutputLayer::OnImGuiRender()
 
 void OutputLayer::HandleCameraInput(Camera& a_Camera)
 {
-	constexpr float movementSpeed = (1.0f / 60.f) * 5.0f;
+	constexpr float movementSpeed = (1.0f / 60.f) * 500.0f;
 	glm::vec3 movementDirection = glm::vec3(0.f, 0.f, 0.f);
 	glm::vec3 eye, U, V, W;
 	a_Camera.GetVectorData(eye, U, V, W);
@@ -148,7 +148,7 @@ void OutputLayer::HandleCameraInput(Camera& a_Camera)
 		a_Camera.SetPosition(eye + glm::normalize(movementDirection) * movementSpeed);
 	}
 
-	constexpr float rotationSpeed = 30.f * (1.0f / 60.f);
+	constexpr float rotationSpeed = 100.f * (1.0f / 60.f);
 	float yawRotation = 0.f;
 	if (Lumen::Input::IsKeyPressed(LMN_KEY_Q))
 	{

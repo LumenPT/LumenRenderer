@@ -69,6 +69,7 @@ public:
 	{
 		glfwMakeContextCurrent(reinterpret_cast<GLFWwindow*>(GetWindow().GetNativeWindow()));
 		//PushOverlay(new Lumen::ImGuiLayer());
+		
 
 		OutputLayer* m_ContextLayer = new OutputLayer;
 		PushLayer(new ExampleLayer());
@@ -81,11 +82,11 @@ public:
 		std::replace(p_string.begin(), p_string.end(), '\\', '/');
 		//p_string.append("/Sandbox/assets/models/Lantern.gltf");
 
+		const std::string meshPath = p_string.append("/Sandbox/assets/models/Sponza/");
 		//Base path for meshes.
-		const std::string meshPath = p_string.append("/Sandbox/assets/models/BoomBoxWithAxes/glTF/");
 
 		//Mesh name
-		const std::string meshName = "BoomBoxWithAxes.gltf";
+		const std::string meshName = "Sponza.gltf";
 
 		//p_string.append("/Sandbox/assets/models/Sponza/Sponza.gltf");
 		LMN_TRACE(p_string);
@@ -104,13 +105,26 @@ public:
 		
 		lumenPT->m_Scene = lumenPT->CreateScene(scData);
 
-		auto mesh = lumenPT->m_Scene->AddMesh();
 		//auto meshLight = lumenPT->m_Scene->AddMesh();
-		mesh->SetMesh(res->m_MeshPool[0]);
 		//meshLight->SetMesh(res->m_MeshPool[0]);
+		auto mesh = lumenPT->m_Scene->AddMesh();
+		mesh->SetMesh(res->m_MeshPool[0]);
+
+		//auto mesh1 = lumenPT->m_Scene->AddMesh();
+		//mesh1->SetMesh(res->m_MeshPool[1]);
+
+		//auto mesh2 = lumenPT->m_Scene->AddMesh();
+		//mesh2->SetMesh(res->m_MeshPool[2]); 
 
 		mesh->m_Transform.SetPosition(glm::vec3(0.f, 0.f, 15.0f));
 		mesh->m_Transform.SetScale(glm::vec3(1.0f));
+		
+		// For boombox with axes model
+		//mesh1->m_Transform.SetPosition(glm::vec3(10.f, 15.f, 15.0f));
+		//mesh1->m_Transform.SetScale(glm::vec3(1.0f));
+
+		//mesh2->m_Transform.SetPosition(glm::vec3(0.f, 0.f, 15.0f));
+		//mesh2->m_Transform.SetScale(glm::vec3(1.0f));
 
 		//meshLight->m_Transform.SetPosition(glm::vec3(0.f, 0.f, 15.0f));
 		//meshLight->m_Transform.SetScale(glm::vec3(1.0f));
