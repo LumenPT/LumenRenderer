@@ -351,6 +351,12 @@ CPU_ON_GPU void DEBUGShadePrimIntersections(
                 return;
             }
 
+            /*printf("VertexIndex: %i, Primitive: %p, m_IndexBuffer: %p, m_VertexBuffer: %p \n", 
+                vertexIndex, 
+                primitive, 
+                primitive->m_IndexBuffer, 
+                primitive->m_VertexBuffer);*/
+
             const unsigned int vertexIndexA = primitive->m_IndexBuffer[vertexIndex + 0];
             const unsigned int vertexIndexB = primitive->m_IndexBuffer[vertexIndex + 1];
             const unsigned int vertexIndexC = primitive->m_IndexBuffer[vertexIndex + 2];
@@ -375,7 +381,7 @@ CPU_ON_GPU void DEBUGShadePrimIntersections(
                 }
                 else
                 {
-                    printf("X: %f, Y: %f \n", texCoords.x, texCoords.y);
+                    //printf("X: %f, Y: %f \n", texCoords.x, texCoords.y);
                     a_Output->SetPixel(make_float3(0.f, 1.f, 1.f), rayArrayIndex, ResultBuffer::OutputChannel::DIRECT);
                 }
                 return;

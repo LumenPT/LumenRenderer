@@ -118,6 +118,11 @@ __global__ void __closesthit__ResolveRaysClosestHit()
     intersection->m_PrimitiveIndex = optixGetPrimitiveIndex();
     intersection->m_Primitive = hitPrimitive;
 
+    /*printf("Shader - Primitive: %p, m_IndexBuffer: %p, m_VertexBuffer: %p \n",
+        hitPrimitive,
+        hitPrimitive->m_IndexBuffer,
+        hitPrimitive->m_VertexBuffer);*/
+
     return;
 
 }
