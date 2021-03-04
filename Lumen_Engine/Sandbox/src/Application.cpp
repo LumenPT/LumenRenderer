@@ -6,6 +6,7 @@
 #include "OutputLayer.h"
 
 #include "imgui/imgui.h"
+#include "ModelLoading/Node.h"
 
 #include "GLFW/include/GLFW/glfw3.h"
 #include "Lumen/ModelLoading/SceneManager.h"
@@ -69,6 +70,7 @@ public:
 	{
 		glfwMakeContextCurrent(reinterpret_cast<GLFWwindow*>(GetWindow().GetNativeWindow()));
 		//PushOverlay(new Lumen::ImGuiLayer());
+		
 
 		OutputLayer* m_ContextLayer = new OutputLayer;
 		PushLayer(new ExampleLayer());
@@ -81,8 +83,8 @@ public:
 		std::replace(p_string.begin(), p_string.end(), '\\', '/');
 		//p_string.append("/Sandbox/assets/models/Lantern.gltf");
 
-		//Base path for meshes.
 		const std::string meshPath = p_string.append("/Sandbox/assets/models/Sponza/");
+		//Base path for meshes.
 
 		//Mesh name
 		const std::string meshName = "Sponza.gltf";
@@ -104,13 +106,31 @@ public:
 		
 		lumenPT->m_Scene = lumenPT->CreateScene(scData);
 
-		auto mesh = lumenPT->m_Scene->AddMesh();
-		//auto meshLight = lumenPT->m_Scene->AddMesh();
-		mesh->SetMesh(res->m_MeshPool[0]);
-		//meshLight->SetMesh(res->m_MeshPool[0]);
+		//Loop over the nodes in the scene, and add their meshes if they have one.
+		for(auto& node: res->m_NodePool)
+		{
+			auto meshId = node->m_MeshID;
+			if(meshId >= 0)
+			{
+				auto mesh = lumenPT->m_Scene->AddMesh();
+				mesh->SetMesh(res->m_MeshPool[meshId]);
+				mesh->m_Transform.CopyTransform(*node->m_LocalTransform);
+			}
+		}
 
-		mesh->m_Transform.SetPosition(glm::vec3(0.f, 0.f, 15.0f));
-		mesh->m_Transform.SetScale(glm::vec3(1.0f));
+		//auto meshLight = lumenPT->m_Scene->AddMesh();
+		//meshLight->SetMesh(res->m_MeshPool[0]);
+		auto mesh = lumenPT->m_Scene->AddMesh();
+		mesh->SetMesh(res->m_MeshPool[0]);
+
+		//auto mesh1 = lumenPT->m_Scene->AddMesh();
+		//mesh1->SetMesh(res->m_MeshPool[1]);
+
+		//auto mesh2 = lumenPT->m_Scene->AddMesh();
+		//mesh2->SetMesh(res->m_MeshPool[2]); 
+
+		//mesh->m_Transform.SetPosition(glm::vec3(0.f, 0.f, 15.0f));
+		//mesh->m_Transform.SetScale(glm::vec3(1.0f));
 
 		//meshLight->m_Transform.SetPosition(glm::vec3(0.f, 0.f, 15.0f));
 		//meshLight->m_Transform.SetScale(glm::vec3(1.0f));

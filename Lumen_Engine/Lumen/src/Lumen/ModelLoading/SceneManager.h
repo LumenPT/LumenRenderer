@@ -130,7 +130,7 @@ namespace Lumen
 		 * Example path: /models/
 		 * Example file: duck.gltf
 		 */
-		GLTFResource* LoadGLTF(std::string a_FileName, std::string a_Path, glm::mat4& a_TransformMat = glm::mat4(0));	//Load & add to loadedScenes
+		GLTFResource* LoadGLTF(std::string a_FileName, std::string a_Path, const glm::mat4& a_TransformMat = glm::mat4(1));	//Load & add to loadedScenes
 
 		void SetPipeline(LumenRenderer& a_Renderer);
 
@@ -148,8 +148,8 @@ namespace Lumen
 
 		//std::vector<std::shared_ptr<GLTFResource>> LoadScenes(fx::gltf::Document& a_Doc, std::string a_Filepath);
 
-		void LoadNodes(fx::gltf::Document& a_Doc, GLTFResource& a_Res, glm::mat4& a_TransformMat = glm::mat4(0));
-		void LoadMeshes(fx::gltf::Document& a_Doc, GLTFResource& a_Res, glm::mat4& a_TransformMat = glm::mat4(0));
+		void LoadNodes(fx::gltf::Document& a_Doc, GLTFResource& a_Res, int a_NodeId, bool a_Root, const glm::mat4& a_TransformMat = glm::mat4(1));
+		void LoadMeshes(fx::gltf::Document& a_Doc, GLTFResource& a_Res);
 
 		//Load a texture from the given file.
 		LoadedImageInformation LoadTexture(fx::gltf::Document& a_File, int a_TextureId, const std::string& a_Path, int a_NumChannels);

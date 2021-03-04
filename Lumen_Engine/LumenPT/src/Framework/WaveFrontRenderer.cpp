@@ -1586,8 +1586,10 @@ std::unique_ptr<Lumen::ILumenPrimitive> WaveFrontRenderer::CreatePrimitive(Primi
         {
             correctedIndices.push_back(indexView[i]);
         }
+
     }
 
+	//printf("Index buffer Size %i \n", static_cast<int>(correctedIndices.size()));
     std::unique_ptr<MemoryBuffer> indexBuffer = std::make_unique<MemoryBuffer>(correctedIndices);
 
     unsigned int geomFlags = OPTIX_GEOMETRY_FLAG_NONE;
