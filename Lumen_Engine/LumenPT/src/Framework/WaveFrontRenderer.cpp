@@ -882,7 +882,7 @@ void WaveFrontRenderer::CreateShaderBindingTables()
     //Do these need a data struct if there is no data needed per "shader"??
     
     m_RaysRayGenRecord = m_RaysSBTGenerator->SetRayGen<ResolveRaysRayGenData>();
-    m_RaysHitRecord = m_RaysSBTGenerator->AddHitGroup<ResolveRaysHitData>();
+    //m_RaysHitRecord = m_RaysSBTGenerator->AddHitGroup<ResolveRaysHitData>();
     m_RaysMissRecord = m_RaysSBTGenerator->AddMiss<ResolveRaysMissData>();
 
     auto& raysRayGenRecord = m_RaysRayGenRecord.GetRecord();
@@ -890,8 +890,8 @@ void WaveFrontRenderer::CreateShaderBindingTables()
     raysRayGenRecord.m_Data.m_MinDistance = s_MinTraceDistance;
     raysRayGenRecord.m_Data.m_MaxDistance = s_MaxTraceDistance;
 
-    auto& raysHitRecord = m_RaysHitRecord.GetRecord();
-    raysHitRecord.m_Header = GetProgramGroupHeader(s_RaysHitPGName);
+    //auto& raysHitRecord = m_RaysHitRecord.GetRecord();
+    //raysHitRecord.m_Header = GetProgramGroupHeader(s_RaysHitPGName);
 
     auto& raysMissRecord = m_RaysMissRecord.GetRecord();
     raysMissRecord.m_Header = GetProgramGroupHeader(s_RaysMissPGName);
@@ -1165,13 +1165,14 @@ GLuint WaveFrontRenderer::TraceFrame()
         frameSaveFilePath + "RayBatches/", 
         "PrimaryRays");*/
 
+    OptixShaderBindingTable raysSBT = m_RaysSBTGenerator->GetTableDesc();
+
     //Initialize resolveRaysLaunchParameters with common variables between different waves.
     ResolveRaysLaunchParameters optixRaysLaunchParams{};
     optixRaysLaunchParams.m_Common.m_Traversable = dynamic_cast<PTScene&>(*m_Scene).GetSceneAccelerationStructure();
 
     uint3 resolutionAndDepth = make_uint3(m_RenderResolution.x, m_RenderResolution.y, 0);
-
-    OptixShaderBindingTable raysSBT = m_RaysSBTGenerator->GetTableDesc();
+    
     cudaDeviceSynchronize();
     CHECKLASTCUDAERROR;
 
@@ -1585,8 +1586,10 @@ std::unique_ptr<Lumen::ILumenPrimitive> WaveFrontRenderer::CreatePrimitive(Primi
         {
             correctedIndices.push_back(indexView[i]);
         }
+
     }
 
+	//printf("Index buffer Size %i \n", static_cast<int>(correctedIndices.size()));
     std::unique_ptr<MemoryBuffer> indexBuffer = std::make_unique<MemoryBuffer>(correctedIndices);
 
     unsigned int geomFlags = OPTIX_GEOMETRY_FLAG_NONE;
@@ -1621,6 +1624,11 @@ std::unique_ptr<Lumen::ILumenPrimitive> WaveFrontRenderer::CreatePrimitive(Primi
     rec.m_Data.m_VertexBuffer = prim->m_VertBuffer->GetDevicePtr<Vertex>();
     rec.m_Data.m_IndexBuffer = prim->m_IndexBuffer->GetDevicePtr<unsigned int>();
     rec.m_Data.m_Material = reinterpret_cast<Material*>(prim->m_Material.get())->GetDeviceMaterial();
+
+    /*printf("Primitive: Material: %p, VertexBuffer: %p, IndexBufferPtr: %p \n",
+        rec.m_Data.m_Material, 
+        rec.m_Data.m_VertexBuffer, 
+        rec.m_Data.m_IndexBuffer);*/
 
     return prim;
 }

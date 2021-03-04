@@ -27,6 +27,7 @@
 //
 
 
+#include <cstdio>
 #include <cuda/helpers.h>
 
 
@@ -132,6 +133,8 @@ __global__ void __closesthit__HitShader()
 
     float2 texCoords = A->m_UVCoord * W + B->m_UVCoord * U + C->m_UVCoord * V;
 
+    printf("UV coords in UVw: %f %f %f \n", U, V, W);
+	
     //texCoords.x = 1.0f - texCoords.x;
 
     if (texCoords.x > 1.0f || texCoords.y > 1.0f)
@@ -155,3 +158,4 @@ __global__ void __closesthit__HitShader()
 
     optixSetPayload_3(1);
 }
+
