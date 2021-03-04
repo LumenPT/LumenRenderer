@@ -31,6 +31,7 @@
 
 
 #include "../../vendor/Include/sutil/vec_math.h"
+#include "../../vendor/Include/Optix/optix_device.h"
 #include "Optix/optix.h"
 #include "CppCommon/LaunchParameters.h"
 #include "CppCommon/RenderingUtility.h"

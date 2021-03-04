@@ -82,10 +82,10 @@ public:
 		//p_string.append("/Sandbox/assets/models/Lantern.gltf");
 
 		//Base path for meshes.
-		const std::string meshPath = p_string.append("/Sandbox/assets/models/BoomBoxWithAxes/glTF/");
+		const std::string meshPath = p_string.append("/Sandbox/assets/models/Sponza/");
 
 		//Mesh name
-		const std::string meshName = "BoomBoxWithAxes.gltf";
+		const std::string meshName = "Sponza.gltf";
 
 		//p_string.append("/Sandbox/assets/models/Sponza/Sponza.gltf");
 		LMN_TRACE(p_string);

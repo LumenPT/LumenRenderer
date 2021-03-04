@@ -371,21 +371,11 @@ CPU_ON_GPU void DEBUGShadePrimIntersections(
 
             const float2 texCoords = A->m_UVCoord * W + B->m_UVCoord * U + C->m_UVCoord * V;
 
-            if(U + V + W != 1.f || texCoords.x > 1.f || texCoords.y > 1.f)
+            if(U + V + W != 1.f)
             {
-
-                if(U + V + W != 1.f)
-                {
-                    printf("U: %f, V: %f, W: %f \n", U, V, W);
-                    a_Output->SetPixel(make_float3(1.f, 1.f, 0.f), rayArrayIndex, ResultBuffer::OutputChannel::DIRECT);
-                }
-                else
-                {
-                    //printf("X: %f, Y: %f \n", texCoords.x, texCoords.y);
-                    a_Output->SetPixel(make_float3(0.f, 1.f, 1.f), rayArrayIndex, ResultBuffer::OutputChannel::DIRECT);
-                }
+                printf("U: %f, V: %f, W: %f \n", U, V, W);
+                a_Output->SetPixel(make_float3(1.f, 1.f, 0.f), rayArrayIndex, ResultBuffer::OutputChannel::DIRECT);
                 return;
-                
             }
 
             const DeviceMaterial* material = primitive->m_Material;
