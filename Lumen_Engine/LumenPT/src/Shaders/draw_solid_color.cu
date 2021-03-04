@@ -27,10 +27,12 @@
 //
 
 
+#include <cstdio>
 #include <cuda/helpers.h>
 
 
 #include "../../vendor/Include/sutil/vec_math.h"
+#include "../../vendor/Include/Optix/optix_device.h"
 #include "Optix/optix.h"
 #include "CppCommon/LaunchParameters.h"
 #include "CppCommon/RenderingUtility.h"
@@ -131,7 +133,7 @@ __global__ void __closesthit__HitShader()
     }
 
     float2 texCoords = A->m_UVCoord * W + B->m_UVCoord * U + C->m_UVCoord * V;
-
+	
     //texCoords.x = 1.0f - texCoords.x;
 
     if (texCoords.x > 1.0f || texCoords.y > 1.0f)
@@ -155,3 +157,4 @@ __global__ void __closesthit__HitShader()
 
     optixSetPayload_3(1);
 }
+

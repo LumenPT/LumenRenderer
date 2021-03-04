@@ -62,7 +62,7 @@ OutputLayer::OutputLayer()
 #ifdef WAVEFRONT
 	init.m_RenderResolution = { 800, 600 };
 	init.m_OutputResolution = { 800, 600 };
-	init.m_MaxDepth = 3;
+	init.m_MaxDepth = 1;
 	init.m_RaysPerPixel = 1;
 	init.m_ShadowRaysPerPixel = 1;
 #else
@@ -140,14 +140,14 @@ void OutputLayer::HandleCameraInput(Camera& a_Camera)
 	float movementSpeed = 1.0f / 60.f;
 	if(Lumen::Input::IsKeyPressed(LMN_KEY_SPACE))
 	{
-		movementSpeed *= 15.f;
+		movementSpeed *= 150.f;
 	}
 	
 	glm::vec3 movementDirection = glm::vec3(0.f, 0.f, 0.f);
 	glm::vec3 eye, U, V, W;
 	a_Camera.GetVectorData(eye, U, V, W);
 	
-	if (Lumen::Input::IsKeyPressed(LMN_KEY_W))
+	if (Lumen::Input::IsKeyPressed(LMN_KEY_UP) || Lumen::Input::IsKeyPressed(LMN_KEY_W))
 	{
 		movementDirection += glm::normalize(W) * movementSpeed;
 	}
@@ -177,7 +177,7 @@ void OutputLayer::HandleCameraInput(Camera& a_Camera)
 		a_Camera.SetPosition(eye + glm::normalize(movementDirection) * movementSpeed);
 	}
 
-	constexpr float rotationSpeed = 30.f * (1.0f / 60.f);
+	constexpr float rotationSpeed = 100.f * (1.0f / 60.f);
 	float yawRotation = 0.f;
 	float pitchRotation = 0.f;
 	if (Lumen::Input::IsKeyPressed(LMN_KEY_LEFT))

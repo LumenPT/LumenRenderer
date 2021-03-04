@@ -30,9 +30,11 @@ public:
 	 */
 	CPU_ONLY void Run(const WaveFront::IntersectionData* const a_CurrentIntersections,
 		const WaveFront::RayData* const a_RayBuffer,
-		const WaveFront::IntersectionData* const a_PreviousIntersections,
-		const WaveFront::RayData* const a_PreviousRayBuffer,
-		const std::vector<TriangleLight>& a_Lights);
+		const std::vector<TriangleLight>& a_Lights,
+	    const float3 a_CameraPosition,
+		const std::uint32_t a_Seed,
+		const OptixTraversableHandle a_OptixSceneHandle
+	);
 
 	/*
 	 * Swap the front and back buffer. This has to be called once per frame.
@@ -51,10 +53,12 @@ private:
 	bool m_SwapDirtyFlag;	//Dirty flag to assert if someone forgets to swap the buffers.
 
 	//Memory buffers only used in the current frame.
+	MemoryBuffer m_Pixels[2];	//Pixel data storage for access throughout the stages of ReSTIR. Also one for temporal samples.
 	MemoryBuffer m_Lights;		//All the triangle lights stored contiguously. Size of the amount of lights.
 	MemoryBuffer m_Cdf;			//The CDF which is the size of a CDF entry times the amount of lights.
 	MemoryBuffer m_LightBags;	//All light bags as a single array. Size of num light bags * size of light bag * light index or something.
 	MemoryBuffer m_ShadowRays;	//Buffer for each shadow ray in a frame. Size of screen dimensions * ray size.
+	MemoryBuffer m_Atomics;		//Buffer to store atomic counters in.
 
 	//Memory buffers that need to be temporally available.
 	MemoryBuffer m_Reservoirs[3];	//Reservoir buffers per frame. 0, 1 = swap chain of reservoir buffers. 2 = spatial swap buffer.

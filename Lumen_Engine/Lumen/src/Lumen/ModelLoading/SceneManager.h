@@ -25,6 +25,75 @@ namespace Lumen
 
 namespace Lumen
 {
+	//Information about a loaded image.
+	struct LoadedImageInformation
+	{
+		std::uint8_t* data = nullptr;
+		int w = 0;
+		int h = 0;
+		int channels = 0;
+	};
+
+	//Data about an image in a GLTF file. Could be binary or external.
+	class ImageData
+	{
+	public:
+		struct ImageInfo
+		{
+			std::string FileName{};
+
+			uint32_t BinarySize{};
+			uint8_t const* BinaryData{};
+
+			bool IsBinary() const noexcept
+			{
+				return BinaryData != nullptr;
+			}
+		};
+
+		explicit ImageData(std::string const& texture)
+		{
+			m_info.FileName = texture;
+		}
+
+		ImageData(fx::gltf::Document const& doc, std::size_t textureIndex, std::string const& modelPath)
+		{
+			fx::gltf::Image const& image = doc.images[doc.textures[textureIndex].source];
+
+			const bool isEmbedded = image.IsEmbeddedResource();
+			if (!image.uri.empty() && !isEmbedded)
+			{
+				m_info.FileName = fx::gltf::detail::GetDocumentRootPath(modelPath) + "/" + image.uri;
+			}
+			else
+			{
+				if (isEmbedded)
+				{
+					image.MaterializeData(m_embeddedData);
+					m_info.BinaryData = &m_embeddedData[0];
+					m_info.BinarySize = static_cast<uint32_t>(m_embeddedData.size());
+				}
+				else
+				{
+					fx::gltf::BufferView const& bufferView = doc.bufferViews[image.bufferView];
+					fx::gltf::Buffer const& buffer = doc.buffers[bufferView.buffer];
+
+					m_info.BinaryData = &buffer.data[bufferView.byteOffset];
+					m_info.BinarySize = bufferView.byteLength;
+				}
+			}
+		}
+
+		ImageInfo const& Info() const noexcept
+		{
+			return m_info;
+		}
+
+	private:
+		ImageInfo m_info{};
+
+		std::vector<uint8_t> m_embeddedData{};
+	};
 
 	class SceneManager
 	{
@@ -56,7 +125,12 @@ namespace Lumen
 		SceneManager& operator=(SceneManager&) = delete;
 		SceneManager& operator=(SceneManager&&) = delete;
 
-		GLTFResource* LoadGLTF(std::string a_Path, glm::mat4& a_TransformMat = glm::mat4(0));	//Load & add to loadedScenes
+		/*
+		 * Note: Provide filename and path separately.
+		 * Example path: /models/
+		 * Example file: duck.gltf
+		 */
+		GLTFResource* LoadGLTF(std::string a_FileName, std::string a_Path, const glm::mat4& a_TransformMat = glm::mat4(1));	//Load & add to loadedScenes
 
 		void SetPipeline(LumenRenderer& a_Renderer);
 
@@ -74,9 +148,13 @@ namespace Lumen
 
 		//std::vector<std::shared_ptr<GLTFResource>> LoadScenes(fx::gltf::Document& a_Doc, std::string a_Filepath);
 
-		void LoadNodes(fx::gltf::Document& a_Doc, GLTFResource& a_Res, glm::mat4& a_TransformMat = glm::mat4(0));
-		void LoadMeshes(fx::gltf::Document& a_Doc, GLTFResource& a_Res, glm::mat4& a_TransformMat = glm::mat4(0));
-		void LoadMaterials(fx::gltf::Document& a_Doc, GLTFResource& a_Res);
+		void LoadNodes(fx::gltf::Document& a_Doc, GLTFResource& a_Res, int a_NodeId, bool a_Root, const glm::mat4& a_TransformMat = glm::mat4(1));
+		void LoadMeshes(fx::gltf::Document& a_Doc, GLTFResource& a_Res);
+
+		//Load a texture from the given file.
+		LoadedImageInformation LoadTexture(fx::gltf::Document& a_File, int a_TextureId, const std::string& a_Path, int a_NumChannels);
+
+		void LoadMaterials(fx::gltf::Document& a_Doc, GLTFResource& a_Res, const std::string& a_Path);
 		std::vector<uint8_t> LoadBinary(fx::gltf::Document& a_Doc, uint32_t a_AccessorIndx);
 		uint32_t GetComponentCount(fx::gltf::Accessor& a_Accessor);
 		uint32_t GetComponentSize(fx::gltf::Accessor& a_Accessor);

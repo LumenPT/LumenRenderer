@@ -472,4 +472,5 @@ Lumen_Engine/LumenPT/Assets/PrecompiledShaders/
 *.ptx
 *.ptx
 Lumen_Engine/LumenPT/Assets/PrecompiledShaders/Debug/draw_solid_color.ptx
+*.bmp
 *.ptx

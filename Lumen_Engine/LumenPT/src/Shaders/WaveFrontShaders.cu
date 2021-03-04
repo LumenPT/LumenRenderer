@@ -114,8 +114,14 @@ __global__ void __closesthit__ResolveRaysClosestHit()
     WaveFront::IntersectionData* intersection = UnpackPointer<WaveFront::IntersectionData>(intersectionPtr_Up, intersectionPtr_Low);
     
     intersection->m_IntersectionT = optixGetRayTmax();
+    intersection->m_UVs = optixGetTriangleBarycentrics();
     intersection->m_PrimitiveIndex = optixGetPrimitiveIndex();
     intersection->m_Primitive = hitPrimitive;
+
+    /*printf("Shader - Primitive: %p, m_IndexBuffer: %p, m_VertexBuffer: %p \n",
+        hitPrimitive,
+        hitPrimitive->m_IndexBuffer,
+        hitPrimitive->m_VertexBuffer);*/
 
     return;
 
@@ -154,9 +160,17 @@ __global__ void __raygen__ResolveShadowRaysRayGen()
     const unsigned int maxDepth = resolveShadowRaysParams.m_ShadowRays->m_MaxDepth;
 
     const uint3 launchIndex = optixGetLaunchIndex();
-    const unsigned int pixelIndex = launchIndex.x * launchIndex.y;
+    const uint3 launchDim = optixGetLaunchDimensions();
+
+    const unsigned int pixelIndex = launchDim.x * launchIndex.y + launchIndex.x;
     const unsigned int depthIndex = launchIndex.z;
     const unsigned int rayIndex = 0;
+
+    /*printf("LaunchIndex: (%i, %i, %i) LaunchDim: (%i, %i, %i) PixelIndex: %i, DepthIndex: %i \n",
+        launchIndex.x, launchIndex.y, launchIndex.z,
+        launchDim.x, launchDim.y, launchDim.z,
+        pixelIndex,
+        depthIndex);*/
 
     const unsigned int rayArrayIndex = resolveShadowRaysParams.m_ShadowRays->GetShadowRayArrayIndex(depthIndex, pixelIndex, rayIndex);
     const WaveFront::ShadowRayData& rayData = resolveShadowRaysParams.m_ShadowRays->GetShadowRayData(rayArrayIndex);
@@ -194,9 +208,12 @@ __global__ void __raygen__ResolveShadowRaysRayGen()
 
     ////3. If no hit, accumulate result in buffer;
 
+    float3 red = make_float3(1.f, 0.f, 1.f);
+    float3 blue = make_float3(0.f, 0.f, 1.f);
+
     if(!occlusion.m_Occluded)
     {
-        resolveShadowRaysParams.m_Results->SetPixel(rayData.m_PotentialRadiance, pixelIndex, rayData.m_OutputChannelIndex);
+        /*resolveShadowRaysParams.m_Results->SetPixel(rayData.m_PotentialRadiance, pixelIndex, rayData.m_OutputChannelIndex);
 
         float3 setColor = resolveShadowRaysParams.m_Results->m_PixelBuffer->GetPixel(pixelIndex, static_cast<unsigned>(rayData.m_OutputChannelIndex));
 
@@ -207,8 +224,14 @@ __global__ void __raygen__ResolveShadowRaysRayGen()
         if(setColor.x != 0.f || setColor.y != 0.f || setColor.z != 0.f)
         {
             printf("PixelIndex:%i PixelPtr: %p ColorSet: %f, %f, %f \n", pixelIndex, pixelPtr, setColor.x, setColor.y, setColor.z);
-        }
+        }*/
 
+        resolveShadowRaysParams.m_Results->SetPixel(red, pixelIndex, WaveFront::ResultBuffer::OutputChannel::DIRECT);
+
+    }
+    else
+    {
+        resolveShadowRaysParams.m_Results->SetPixel(blue, pixelIndex, WaveFront::ResultBuffer::OutputChannel::DIRECT);
     }
 
     return;
