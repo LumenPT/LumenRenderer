@@ -122,7 +122,7 @@ private:
     static constexpr unsigned s_NumRayBatchTypes = static_cast<unsigned>(RayBatchTypeIndex::NUM_RAY_BATCH_TYPES);
     static constexpr unsigned s_NumHitBufferTypes = static_cast<unsigned>(HitBufferTypeIndex::NUM_HIT_BUFFER_TYPES);
     static constexpr float s_MinTraceDistance = 0.1f;
-    static constexpr float s_MaxTraceDistance = 1000.f;
+    static constexpr float s_MaxTraceDistance = 5000.f;
 
 
 
