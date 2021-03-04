@@ -92,53 +92,82 @@ void OutputLayer::OnUpdate(){
 
 void OutputLayer::OnImGuiRender()
 {
+    if (!m_LumenPT->m_Scene->m_MeshInstances.empty())
+    {
+		auto& tarTransform = m_LumenPT->m_Scene->m_MeshInstances[0]->m_Transform;
 
+		glm::vec3 pos, scale, rot;
+		pos = tarTransform.GetPosition();
+		scale = tarTransform.GetScale();
+		rot = tarTransform.GetRotationEuler();
 
-	auto& tarTransform = m_LumenPT->m_Scene->m_MeshInstances[0]->m_Transform;
+		ImGui::Begin("ModelBoi 3000");
+		ImGui::DragFloat3("Position", &pos[0]);
+		ImGui::DragFloat3("Scale", &scale[0]);
+		ImGui::DragFloat3("Rotation", &rot[0]);
 
-	glm::vec3 pos, scale;
-	pos = tarTransform.GetPosition();
-	scale = tarTransform.GetScale();
-	auto rot = tarTransform.GetRotationEuler();
+		ImGui::End();
+		tarTransform.SetPosition(pos);
+		tarTransform.SetScale(scale);
+		tarTransform.SetRotation(rot);
 
-	ImGui::Begin("ModelBoi 3000");
-	ImGui::DragFloat3("Position", &pos[0]);
-	ImGui::DragFloat3("Scale", &scale[0]);
-	ImGui::DragFloat3("Rotation", &rot[0]);
-	ImGui::End();
-	tarTransform.SetPosition(pos);
-	tarTransform.SetScale(scale);
-	tarTransform.SetRotation(rot);
+    }
+
+	if (!m_LumenPT->m_Scene->m_VolumeInstances.empty())
+	{
+		auto& tarTransform = m_LumenPT->m_Scene->m_VolumeInstances[0]->m_Transform;
+
+		glm::vec3 pos, scale, rot;
+		pos = tarTransform.GetPosition();
+		scale = tarTransform.GetScale();
+		rot = tarTransform.GetRotationEuler();
+
+		ImGui::Begin("VolumeBoi 5000");
+		ImGui::DragFloat3("Position", &pos[0]);
+		ImGui::DragFloat3("Scale", &scale[0]);
+		ImGui::DragFloat3("Rotation", &rot[0]);
+
+		ImGui::End();
+		tarTransform.SetPosition(pos);
+		tarTransform.SetScale(scale);
+		tarTransform.SetRotation(rot);
+
+	}
 }
 
 void OutputLayer::HandleCameraInput(Camera& a_Camera)
 {
-	constexpr float movementSpeed = (1.0f / 60.f) * 500.0f;
+	float movementSpeed = 1.0f / 60.f;
+	if(Lumen::Input::IsKeyPressed(LMN_KEY_SPACE))
+	{
+		movementSpeed *= 150.f;
+	}
+	
 	glm::vec3 movementDirection = glm::vec3(0.f, 0.f, 0.f);
 	glm::vec3 eye, U, V, W;
 	a_Camera.GetVectorData(eye, U, V, W);
-
+	
 	if (Lumen::Input::IsKeyPressed(LMN_KEY_UP) || Lumen::Input::IsKeyPressed(LMN_KEY_W))
 	{
 		movementDirection += glm::normalize(W) * movementSpeed;
 	}
-	if (Lumen::Input::IsKeyPressed(LMN_KEY_DOWN) || Lumen::Input::IsKeyPressed(LMN_KEY_S))
+	if (Lumen::Input::IsKeyPressed(LMN_KEY_S))
 	{
 		movementDirection -= glm::normalize(W) * movementSpeed;
 	}
-	if (Lumen::Input::IsKeyPressed(LMN_KEY_LEFT) || Lumen::Input::IsKeyPressed(LMN_KEY_A))
+	if (Lumen::Input::IsKeyPressed(LMN_KEY_A))
 	{
 		movementDirection += glm::normalize(U) * movementSpeed;
 	}
-	if (Lumen::Input::IsKeyPressed(LMN_KEY_RIGHT) || Lumen::Input::IsKeyPressed(LMN_KEY_D))
+	if (Lumen::Input::IsKeyPressed(LMN_KEY_D))
 	{
 		movementDirection -= glm::normalize(U) * movementSpeed;
 	}
-	if (Lumen::Input::IsKeyPressed(LMN_KEY_LEFT_SHIFT) || Lumen::Input::IsKeyPressed(LMN_KEY_LEFT_CONTROL))
+	if (Lumen::Input::IsKeyPressed(LMN_KEY_Q))
 	{
 		movementDirection -= glm::normalize(V) * movementSpeed;
 	}
-	if (Lumen::Input::IsKeyPressed(LMN_KEY_SPACE))
+	if (Lumen::Input::IsKeyPressed(LMN_KEY_E))
 	{
 		movementDirection += glm::normalize(V) * movementSpeed;
 	}
@@ -150,15 +179,25 @@ void OutputLayer::HandleCameraInput(Camera& a_Camera)
 
 	constexpr float rotationSpeed = 100.f * (1.0f / 60.f);
 	float yawRotation = 0.f;
-	if (Lumen::Input::IsKeyPressed(LMN_KEY_Q))
+	float pitchRotation = 0.f;
+	if (Lumen::Input::IsKeyPressed(LMN_KEY_LEFT))
 	{
 		yawRotation += rotationSpeed;
 	}
-	if(Lumen::Input::IsKeyPressed(LMN_KEY_E))
+	if(Lumen::Input::IsKeyPressed(LMN_KEY_RIGHT))
 	{
 		yawRotation -= rotationSpeed;
 	}
+	if (Lumen::Input::IsKeyPressed(LMN_KEY_UP))
+	{
+		pitchRotation -= rotationSpeed;
+	}
+	if (Lumen::Input::IsKeyPressed(LMN_KEY_DOWN))
+	{
+		pitchRotation += rotationSpeed;
+	}
 
 	a_Camera.IncrementYaw(glm::radians(yawRotation));
+	a_Camera.IncrementPitch(glm::radians(pitchRotation));
 	//a_Camera.SetYaw(a_Camera.GetYaw() + yawRotation);
 }

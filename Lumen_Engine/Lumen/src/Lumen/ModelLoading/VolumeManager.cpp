@@ -1,7 +1,6 @@
 #include "VolumeManager.h"
 
 #include <filesystem>
-#include "../../LumenPT/src/Framework/PTVolume.h"
 
 namespace Lumen
 {

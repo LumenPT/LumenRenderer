@@ -96,9 +96,9 @@ public:
 		manager.SetPipeline(*m_ContextLayer->GetPipeline());
 		auto res = manager.LoadGLTF(meshName, meshPath);
 
-		/*std::string vndbFilePath = { p.string() };
-		vndbFilePath.append("/Sandbox/assets/volume/Sphere.vndb");
-		auto volumeRes = manager.m_VolumeManager.LoadVDB(vndbFilePath);*/
+		//std::string vndbFilePath = { p.string() };
+		//vndbFilePath.append("/Sandbox/assets/volume/Sphere.vndb");
+		//auto volumeRes = manager.m_VolumeManager.LoadVDB(vndbFilePath);
 		
 		auto lumenPT = m_ContextLayer->GetPipeline();
 
@@ -118,25 +118,18 @@ public:
 			}
 		}
 
-		//auto meshLight = lumenPT->m_Scene->AddMesh();
-		//meshLight->SetMesh(res->m_MeshPool[0]);
+		lumenPT->m_Scene = lumenPT->CreateScene(scData);
 		auto mesh = lumenPT->m_Scene->AddMesh();
 		mesh->SetMesh(res->m_MeshPool[0]);
 
-		//auto mesh1 = lumenPT->m_Scene->AddMesh();
-		//mesh1->SetMesh(res->m_MeshPool[1]);
-
-		//auto mesh2 = lumenPT->m_Scene->AddMesh();
-		//mesh2->SetMesh(res->m_MeshPool[2]); 
-
-		//mesh->m_Transform.SetPosition(glm::vec3(0.f, 0.f, 15.0f));
-		//mesh->m_Transform.SetScale(glm::vec3(1.0f));
+		mesh->m_Transform.SetPosition(glm::vec3(0.f, 0.f, 15.0f));
+		mesh->m_Transform.SetScale(glm::vec3(1.0f));
 
 		//meshLight->m_Transform.SetPosition(glm::vec3(0.f, 0.f, 15.0f));
 		//meshLight->m_Transform.SetScale(glm::vec3(1.0f));
 
-		/*auto volume = lumenPT->m_Scene->AddVolume();
-		volume->SetVolume(volumeRes->m_Volume);*/
+		//auto volume = lumenPT->m_Scene->AddVolume();
+		//volume->SetVolume(volumeRes->m_Volume);
 	}
 
 	~Sandbox()

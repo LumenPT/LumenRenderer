@@ -25,6 +25,8 @@ public:
 
 	void IncrementYaw(float AngleInRadians);
 
+	void IncrementPitch(float AngleInRadians);
+
 	void SetAspectRatio(float a_AspectRatio) { m_AspectRatio = a_AspectRatio; m_DirtyFlag = true; }
 	float GetAspectRatio() { return m_AspectRatio; }
 	

@@ -463,20 +463,20 @@ CPU_ON_GPU void WriteToOutput(
 //Reset ray batch
 
 CPU_ONLY void ResetRayBatch(
-    RayBatch* const a_RayBatchDevPtr, 
-    unsigned int a_NumPixels, 
+    RayBatch* const a_RayBatchDevPtr,
+    unsigned int a_NumPixels,
     unsigned int a_RaysPerPixel)
 {
 
-    ResetRayBatchMembers <<<1,1>>> (a_RayBatchDevPtr, a_NumPixels, a_RaysPerPixel);
+    ResetRayBatchMembers << <1, 1 >> > (a_RayBatchDevPtr, a_NumPixels, a_RaysPerPixel);
 
     const int numRays = a_NumPixels * a_RaysPerPixel;
     const int blockSize = 256;
     const int numBlocks = (numRays + blockSize - 1) / blockSize;
-
-    ResetRayBatchData<<<numBlocks,blockSize>>>(a_RayBatchDevPtr);
-
 }
+
+
+//Data buffer helper functions
 
 CPU_ON_GPU void ResetRayBatchMembers(
     RayBatch* const a_RayBatch, 

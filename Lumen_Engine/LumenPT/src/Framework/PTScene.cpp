@@ -3,6 +3,8 @@
 #include "PTMesh.h"
 #include "PTMeshInstance.h"
 #include "PTServiceLocator.h"
+#include "PTVolume.h"
+#include "PTVolumeInstance.h"
 #include "RendererDefinition.h"
 
 PTScene::PTScene(LumenRenderer::SceneData& a_SceneData, PTServiceLocator& a_ServiceLocator)
@@ -24,9 +26,17 @@ Lumen::MeshInstance* PTScene::AddMesh()
     return m_MeshInstances.back().get();
 }
 
-void PTScene::AddMeshInstanceForUpdate(PTMeshInstance& a_Handle)
+Lumen::VolumeInstance* PTScene::AddVolume()
 {
-    m_TransformedAccelerationStructures.emplace(&a_Handle);
+    auto ptVolInst = std::make_unique<PTVolumeInstance>(m_Services);
+    ptVolInst->m_SceneRef = this;
+    m_VolumeInstances.push_back(std::move(ptVolInst));
+    return m_VolumeInstances.back().get();
+}
+
+void PTScene::MarkSceneForUpdate()
+{
+    m_AccelerationStructureDirty = true;
 }
 
 OptixTraversableHandle PTScene::GetSceneAccelerationStructure()
@@ -41,32 +51,56 @@ void PTScene::UpdateSceneAccelerationStructure()
     bool sbtMatchStructs = true;
     for (auto& meshInstance : m_MeshInstances)
     {
-        sbtMatchStructs &= static_cast<PTMesh*>(meshInstance->GetMesh().get())->VerifyStructCorrectness();
+        if (meshInstance->GetMesh())
+        {
+            sbtMatchStructs &= static_cast<PTMesh*>(meshInstance->GetMesh().get())->VerifyStructCorrectness();            
+        }
     }
 
     // If there has been a mismatch between the SBT and the acceleration structs, some of the structs have been rebuilt and thus have new handles
     // which invalidates them in the scene struct
-    if (!m_TransformedAccelerationStructures.empty() || sbtMatchStructs)
+    if (m_AccelerationStructureDirty || sbtMatchStructs)
     {
         uint32_t instanceID = 0;
         std::vector<OptixInstance> instances;
 
         for (auto& meshInstance : m_MeshInstances)
         {
+            if (!meshInstance->GetMesh())
+                continue;
             auto& ptmi = static_cast<PTMeshInstance&>(*meshInstance);
             auto ptMesh = static_cast<PTMesh*>(meshInstance->GetMesh().get());
 
-            auto transformMat = glm::transpose(ptmi.m_Transform.GetTransformationMatrix());
             auto& inst = instances.emplace_back();
             inst.traversableHandle = ptMesh->m_AccelerationStructure->m_TraversableHandle;
             inst.sbtOffset = 0;
             inst.visibilityMask = 255;
-            inst.instanceId = ++instanceID;
+            inst.instanceId = instanceID++;
             inst.flags = OPTIX_INSTANCE_FLAG_NONE;
 
+            auto transformMat = glm::transpose(ptmi.m_Transform.GetTransformationMatrix());
             memcpy(inst.transform, &transformMat, sizeof(inst.transform));
         }
-        m_TransformedAccelerationStructures.clear();
+
+        for (auto& volumeInstance : m_VolumeInstances)
+        {
+            if (!volumeInstance->GetVolume())
+                continue;
+            auto& ptvi = static_cast<PTVolumeInstance&>(*volumeInstance);
+            auto ptVolume = static_cast<PTVolume*>(ptvi.GetVolume().get());
+
+            auto& inst = instances.emplace_back();
+            inst.traversableHandle = ptVolume->m_AccelerationStructure->m_TraversableHandle;
+            inst.sbtOffset = ptVolume->m_RecordHandle.m_TableIndex;
+            inst.visibilityMask = 255;
+            inst.instanceId = instanceID++;
+            inst.flags = OPTIX_INSTANCE_FLAG_NONE;
+
+            auto transformMat = glm::transpose(ptvi.m_Transform.GetTransformationMatrix());
+            memcpy(inst.transform, &transformMat, sizeof(inst.transform));
+        }
+
+        m_AccelerationStructureDirty = false;
         m_SceneAccelerationStructure = m_Services.m_Renderer->BuildInstanceAccelerationStructure(instances);
     }
 

@@ -15,6 +15,7 @@
 #include <cstdio>
 #include <fstream>
 #include <sstream>
+#include <filesystem>
 #include "Cuda/cuda.h"
 #include "Cuda/cuda_runtime.h"
 #include "Optix/optix_stubs.h"
@@ -28,6 +29,7 @@ const uint32_t gs_ImageHeight = 600;
 
 #include "PTMesh.h"
 #include "PTPrimitive.h"
+#include "PTVolume.h"
 
 void CheckOptixRes(const OptixResult & a_res)
 {
@@ -81,7 +83,7 @@ OptiXRenderer::OptiXRenderer(const InitializationData& a_InitializationData)
 
     CreateShaderBindingTable();
 
-
+    m_Camera.SetPosition(glm::vec3(0.f, 0.f, -25.f));
 }
 
 OptiXRenderer::~OptiXRenderer()
@@ -105,7 +107,7 @@ void OptiXRenderer::InitializePipelineOptions()
 
     m_PipelineCompileOptions = {};
     m_PipelineCompileOptions.traversableGraphFlags = OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_ANY;
-    m_PipelineCompileOptions.numAttributeValues = 2;
+    m_PipelineCompileOptions.numAttributeValues = 3;
     // Defines how many 32-bit values can be output by a miss or hit shader
     m_PipelineCompileOptions.numPayloadValues = 4;
     // What exceptions can the pipeline throw.
@@ -160,7 +162,24 @@ void OptiXRenderer::CreatePipeline()
     pipelineLinkOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_FULL;
     pipelineLinkOptions.maxTraceDepth = 3; //TODO: potentially add this as a init param.
 
-    OptixProgramGroup programGroups[] = { rayGenProgram, missProgram, hitProgram };
+    //volumetric_bookmark
+    OptixModule volumetricShaderModule = CreateModule(LumenPTConsts::gs_ShaderPathBase + "volumetric.ptx");
+
+    assert(volumetricShaderModule);
+
+    OptixProgramGroupDesc volumetric_htGroupdesc = {};
+    volumetric_htGroupdesc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
+    volumetric_htGroupdesc.hitgroup.moduleCH = volumetricShaderModule;
+    volumetric_htGroupdesc.hitgroup.entryFunctionNameCH = "__closesthit__VolumetricHitShader";
+    volumetric_htGroupdesc.hitgroup.moduleAH = volumetricShaderModule;
+    volumetric_htGroupdesc.hitgroup.entryFunctionNameAH = "__anyhit__VolumetricHitShader";
+    volumetric_htGroupdesc.hitgroup.moduleIS = volumetricShaderModule;
+    volumetric_htGroupdesc.hitgroup.entryFunctionNameIS = "__intersection__VolumetricHitShader";
+
+    OptixProgramGroup volumetrichitProgram = CreateProgramGroup(volumetric_htGroupdesc, "VolumetricHit");
+
+    //volumetric_bookmark
+    OptixProgramGroup programGroups[] = { rayGenProgram, missProgram, hitProgram, volumetrichitProgram };
 
     char log[2048];
     auto logSize = sizeof(log);
@@ -195,7 +214,8 @@ void OptiXRenderer::CreatePipeline()
 
 OptixModule OptiXRenderer::CreateModule(const std::string& a_PtxPath)
 {
-
+    assert(std::filesystem::exists(a_PtxPath));
+	
     OptixModuleCompileOptions moduleOptions = {};
     moduleOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_LINEINFO;
     moduleOptions.maxRegisterCount = OPTIX_COMPILE_DEFAULT_MAX_REGISTER_COUNT;
@@ -379,11 +399,12 @@ void OptiXRenderer::CreateShaderBindingTable()
     missRecord.m_Data.m_Num = 2;
     missRecord.m_Data.m_Color = { 0.f, 0.f, 1.f };
 
-    m_HitRecord = m_ShaderBindingTableGenerator->AddHitGroup<HitData>();
+	//bookmark
+    /*m_HitRecord = m_ShaderBindingTableGenerator->AddHitGroup<HitData>();
     
     auto& hitRecord = m_HitRecord.GetRecord();
     hitRecord.m_Header = GetProgramGroupHeader("Hit");
-    hitRecord.m_Data.m_TextureObject = **m_Texture;
+    hitRecord.m_Data.m_TextureObject = **m_Texture;*/
 
 }
 
@@ -423,10 +444,12 @@ GLuint OptiXRenderer::TraceFrame()
     OptixShaderBindingTable sbt = m_ShaderBindingTableGenerator->GetTableDesc();
 
     auto str = static_cast<PTScene*>(m_Scene.get())->GetSceneAccelerationStructure();
+    //auto str = BuildGeometryAccelerationStructure(vert);
 
     params.m_Image = m_OutputBuffer->GetDevicePointer();
     params.m_Handle = str;
-
+    //params.m_Handle = m_testVolumeGAS->m_TraversableHandle;
+	
     params.m_ImageWidth = gs_ImageWidth;
     params.m_ImageHeight = gs_ImageHeight;
     params.m_VertexBuffer = vertexBuffer.GetDevicePtr<Vertex>();
@@ -442,6 +465,8 @@ GLuint OptiXRenderer::TraceFrame()
     MemoryBuffer devBuffer(sizeof(params));
     devBuffer.Write(params);
 
+
+	
     auto res = optixLaunch(
         m_Pipeline,
         0,
@@ -451,7 +476,6 @@ GLuint OptiXRenderer::TraceFrame()
         gs_ImageWidth,
         gs_ImageHeight,
         1);
-
     return m_OutputBuffer->GetTexture();
 
 }
@@ -583,7 +607,49 @@ std::shared_ptr<Lumen::ILumenScene> OptiXRenderer::CreateScene(SceneData a_Scene
 
 std::shared_ptr<Lumen::ILumenVolume> OptiXRenderer::CreateVolume(const std::string& a_FilePath)
 {
-    std::shared_ptr<Lumen::ILumenVolume> volume = std::make_shared<PTVolume>(a_FilePath, m_ServiceLocator);
+    std::shared_ptr<PTVolume> volume = std::make_shared<PTVolume>(a_FilePath, m_ServiceLocator);
+
+    //volumetric_bookmark
+    volume->m_RecordHandle = m_ShaderBindingTableGenerator->AddHitGroup<DeviceVolume>();
+    auto& rec = volume->m_RecordHandle.GetRecord();
+    rec.m_Header = GetProgramGroupHeader("VolumetricHit");
+    rec.m_Data.m_Grid = volume->m_Handle.grid<float>();
+	
+    uint32_t geomFlags[1] = { OPTIX_GEOMETRY_FLAG_NONE };
+
+    OptixAccelBuildOptions buildOptions = {};
+    buildOptions.buildFlags = OPTIX_BUILD_FLAG_PREFER_FAST_TRACE;
+    buildOptions.operation = OPTIX_BUILD_OPERATION_BUILD;
+    buildOptions.motionOptions = {};
+
+    OptixAabb aabb = { -1.5f, -1.5f, -1.5f, 1.5f, 1.5f, 1.5f };
+
+    auto grid = volume->GetHandle()->grid<float>();
+    auto bbox = grid->worldBBox();
+	
+    nanovdb::Vec3<double> temp = bbox.min();
+    float bboxMinX = bbox.min()[0];
+    float bboxMinY = bbox.min()[1];
+    float bboxMinZ = bbox.min()[2];
+    float bboxMaxX = bbox.max()[0];
+    float bboxMaxY = bbox.max()[1];
+    float bboxMaxZ = bbox.max()[2];
+	
+    aabb = { bboxMinX, bboxMinY, bboxMinZ, bboxMaxX, bboxMaxY, bboxMaxZ };
+	
+    MemoryBuffer aabb_buffer(sizeof(OptixAabb));
+    aabb_buffer.Write(aabb);
+	
+    OptixBuildInput buildInput = {};
+    buildInput.type = OPTIX_BUILD_INPUT_TYPE_CUSTOM_PRIMITIVES;
+    buildInput.customPrimitiveArray.aabbBuffers = &*aabb_buffer;
+    buildInput.customPrimitiveArray.numPrimitives = 1;
+    buildInput.customPrimitiveArray.flags = geomFlags;
+    buildInput.customPrimitiveArray.numSbtRecords = 1;
+
+    volume->m_AccelerationStructure = BuildGeometryAccelerationStructure(buildOptions, buildInput);
+    m_testVolumeGAS = volume->m_AccelerationStructure.get();
+
 
     return volume;
 }

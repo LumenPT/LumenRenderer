@@ -7,8 +7,6 @@
 
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/util/IO.h>
-#include "../../LumenPT/src/Framework/MemoryBuffer.h"
-#include "../../LumenPT/src/Framework/PTVolume.h"
 #include "nanovdb/util/CudaDeviceBuffer.h"
 #include "Lumen/Renderer/ILumenResources.h"
 #include "Lumen/Renderer/LumenRenderer.h"
