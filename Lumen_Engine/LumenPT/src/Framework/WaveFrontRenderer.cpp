@@ -1169,6 +1169,11 @@ GLuint WaveFrontRenderer::TraceFrame()
 
     //Initialize resolveRaysLaunchParameters with common variables between different waves.
     ResolveRaysLaunchParameters optixRaysLaunchParams{};
+
+
+    /// <summary> /////////////////////////////
+    /// IMPORTANT THIS GETS RAN AFTER SHADER BINDING TABLE GETS GENERATED!!
+    /// </summary> ////////////////////////////
     optixRaysLaunchParams.m_Common.m_Traversable = dynamic_cast<PTScene&>(*m_Scene).GetSceneAccelerationStructure();
 
     uint3 resolutionAndDepth = make_uint3(m_RenderResolution.x, m_RenderResolution.y, 0);
