@@ -117,10 +117,32 @@ set(LIBS
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Libs/Cuda/cudart.lib"
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Libs/Cuda/cudadevrt.lib"
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Libs/glad.lib"
-	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Libs/tbb/tbb.lib"
 	libnanovdb
 	openvdb_static
+
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Libs/tbb/tbb.lib"
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Libs/tbb/tbbmalloc.lib"
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Libs/tbb/tbbmalloc_proxy.lib"
+
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Libs/blosc.lib"
+
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Libs/zlib.lib"
+
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Libs/OpenEXR/Half-2_5.lib"
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Libs/OpenEXR/Iex-2_5.lib"
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Libs/OpenEXR/IexMath-2_5.lib"
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Libs/OpenEXR/IlmImf-2_5.lib"
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Libs/OpenEXR/IlmImfUtil-2_5.lib"
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Libs/OpenEXR/IlmThread-2_5.lib"
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Libs/OpenEXR/Imath-2_5.lib"
+
+
 )
+
+#include(${CMAKE_CURRENT_SOURCE_DIR}/vendor/openvdb/openvdb/openvdb/CMakeLists.txt)
+#get_cmake_property(_variableNames OPENVDB_CORE_DEPENDENT_LIBS)
+#message(test)
+#message("${OPENVDB_CORE_DEPENDENT_LIBS}")
 
 set(INCLUDES
 	"vendor/Include"

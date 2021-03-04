@@ -21,7 +21,7 @@ PTVolume::PTVolume(std::string a_FilePath, PTServiceLocator& a_ServiceLocator)
 	: PTVolume(a_ServiceLocator)
 {
 	//TODO: reinstate
-	//Load(a_FilePath);
+	Load(a_FilePath);
 
 	//TODO: remove
 	//m_Handle = nanovdb::createLevelSetSphere<float, nanovdb::CudaDeviceBuffer>(10.0f, nanovdb::Vec3d(0), 0.1);
@@ -46,6 +46,23 @@ PTVolume::~PTVolume()
 
 void PTVolume::Load(std::string a_FilePath)
 {
+
+	openvdb::initialize();
+	
+	openvdb::FloatGrid::Ptr grid =
+		openvdb::FloatGrid::create(/*background value=*/2.0);
+
+	// Associate some metadata with the grid.
+	grid->insertMeta("radius", openvdb::FloatMetadata(50.0));
+	// Associate a scaling transform with the grid that sets the voxel size
+	// to 0.5 units in world space.
+	grid->setTransform(
+		openvdb::math::Transform::createLinearTransform(/*voxel size=*/0.5));
+	// Identify the grid as a level set.
+	grid->setGridClass(openvdb::GRID_LEVEL_SET);
+	// Name the grid "LevelSetSphere".
+	grid->setName("LevelSetSphere");
+	
 	if (!std::filesystem::exists(a_FilePath))
 	{
 		assert(false); //File for VDB loading not found
