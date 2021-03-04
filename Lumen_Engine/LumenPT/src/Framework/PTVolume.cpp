@@ -5,6 +5,8 @@
 
 #include <nanovdb/util/IO.h>
 #include <nanovdb/util/Primitives.h>
+#include <openvdb/openvdb.h>
+#include <openvdb/io/io.h>
 
 #include "MemoryBuffer.h"
 #include "AccelerationStructure.h"
@@ -47,11 +49,15 @@ void PTVolume::Load(std::string a_FilePath)
 	if (!std::filesystem::exists(a_FilePath))
 	{
 		assert(false); //File for VDB loading not found
+
+		openvdb::io::File file(a_FilePath);
 	}
 
 	auto filenameExtension = std::filesystem::path(a_FilePath).extension();
 	if (filenameExtension == ".vdb")
 	{
+		//auto handle = openvdb::io::lo
+		
 		assert(false); //Loading of .vdb file not yet supported
 	}
 
