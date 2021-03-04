@@ -6,10 +6,12 @@
 #include "stb_image.h"
 //#include "../../LumenPT/src/Framework/OptiXRenderer.h"
 
+#include <glm/gtc/type_ptr.hpp>
+
 //#include <string>
 #include <memory>
 
-Lumen::SceneManager::GLTFResource* Lumen::SceneManager::LoadGLTF(std::string a_FileName, std::string a_Path, glm::mat4& a_TransformMat)
+Lumen::SceneManager::GLTFResource* Lumen::SceneManager::LoadGLTF(std::string a_FileName, std::string a_Path, const glm::mat4& a_TransformMat)
 {
 	const auto fullPath = a_Path + a_FileName;
 	auto findIter = m_LoadedScenes.find(fullPath);
@@ -42,7 +44,16 @@ Lumen::SceneManager::GLTFResource* Lumen::SceneManager::LoadGLTF(std::string a_F
 	LoadMaterials(doc, res, a_Path);
 
 	LoadMeshes(doc, res);
-	LoadNodes(doc, res, a_TransformMat);
+
+	//Loop over the root nodes in every scene in this GLTF file, and then add them as instances.
+	for (int sceneId = 0; sceneId < doc.scenes.size(); ++sceneId)
+	{
+		auto& scene = doc.scenes[sceneId];
+		for (auto& rootNodeId : scene.nodes)
+		{
+			LoadNodes(doc, res, rootNodeId, true, a_TransformMat);
+		}
+	}
 
 	return &res;
 }
@@ -53,67 +64,132 @@ void Lumen::SceneManager::SetPipeline(LumenRenderer& a_Renderer)
 	m_VolumeManager.SetPipeline(a_Renderer);
 }
 
-void Lumen::SceneManager::LoadNodes(fx::gltf::Document& a_Doc, GLTFResource& a_Res, glm::mat4& a_TransformMat)
+void Lumen::SceneManager::LoadNodes(fx::gltf::Document& a_Doc, GLTFResource& a_Res, int a_NodeId, bool a_Root, const glm::mat4& a_TransformMat)
 {
-	//store offsets in the case there is somehow already data loaded in the scene object
-	const int nodeOffset = static_cast<int>(a_Res.m_NodePool.size()) + 1;
-	const int meshOffset = static_cast<int>(a_Res.m_MeshPool.size());
+	const static glm::mat4 IDENTITY = glm::identity<glm::mat4>();
 
-	std::vector<std::shared_ptr<Node>> nodes;	//only supporting one scene per file. Seems to work fine 99% of the time
+	auto& node = a_Doc.nodes[a_NodeId];
+	glm::mat4 transform = glm::make_mat4(&node.matrix[0]);
 
-	std::shared_ptr<Node> baseNode = std::make_shared<Node>();
-	baseNode->m_NodeID = nodeOffset - 1;
-	baseNode->m_LocalTransform = std::make_unique<Transform>(a_TransformMat);
-	nodes.push_back(baseNode);
-
-	for (auto& fxNodeIdx : a_Doc.scenes.at(0).nodes)
+	//If the matrix is not defined, load from the other settings.
+	if(IDENTITY == transform)
 	{
-		const fx::gltf::Node& fxNode = a_Doc.nodes.at(fxNodeIdx);
+		auto translation = glm::vec3(
+			node.translation[0],
+			node.translation[1],
+			node.translation[2]
+		);
 
-		std::shared_ptr<Node> newNode = std::make_shared<Node>();
-		newNode->m_MeshID = -1 ? -1 : (fxNode.mesh + meshOffset);
-		newNode->m_Name = fxNode.name;
-		newNode->m_NodeID = static_cast<int>(nodes.size());
-		newNode->m_LocalTransform = std::make_unique<Transform>();
+		auto rotation = glm::quat(
+			node.rotation[0],
+			node.rotation[1],
+			node.rotation[2],
+			node.rotation[3]
+		);
 
-		for (int i = 0; i < static_cast<int>(fxNode.children.size()); i++)
-		{
-			newNode->m_ChilIndices.push_back(fxNode.children.at(i) + nodeOffset);
-		}
+		auto scale = glm::vec3(
+			node.scale[0],
+			node.scale[1],
+			node.scale[2]
+		);
 
-		if (fxNode.translation.size() == 3)
-		{
-			newNode->m_LocalTransform->SetPosition(glm::vec3(
-				fxNode.translation[0],
-				fxNode.translation[1],
-				fxNode.translation[2]
-			));
-		}
+		Transform t;
+		t.SetPosition(translation);
+		t.SetRotation(rotation);
+		t.SetScale(scale);
 
-		if (fxNode.rotation.size() == 4)
-		{
-			newNode->m_LocalTransform->SetRotation(glm::quat(
-				fxNode.rotation[0],
-				fxNode.rotation[1],
-				fxNode.rotation[2],
-				fxNode.rotation[3]
-			));
-		}
-
-		if (fxNode.scale.size() == 3)
-		{
-			newNode->m_LocalTransform->SetScale(glm::vec3(
-				fxNode.scale[0],
-				fxNode.scale[1],
-				fxNode.scale[2]
-			));
-		}
-
-		a_Res.m_NodePool.push_back(newNode);
+		transform = t.GetTransformationMatrix();
 	}
+
+	const glm::mat4 chainedTransform = a_TransformMat * transform;
+
+	if(a_Root)
+	{
+        a_Res.m_RootNodeIndices.push_back(a_NodeId);
+	}
+
+	std::shared_ptr<Node> newNode = std::make_shared<Node>();
+	newNode->m_MeshID = node.mesh;
+	newNode->m_Name = node.name;
+	newNode->m_NodeID = static_cast<int>(a_NodeId);
+	newNode->m_LocalTransform = std::make_unique<Transform>(chainedTransform);
+
+	for (int i = 0; i < static_cast<int>(node.children.size()); i++)
+	{
+		newNode->m_ChilIndices.push_back(node.children.at(i));
+	}
+
+	a_Res.m_NodePool.push_back(newNode);
+
+	//If there is child meshes, recursively call.
+	if (!node.children.empty())
+	{
+		for (auto& id : node.children)
+		{
+			LoadNodes(a_Doc, a_Res, id, false, chainedTransform);
+		}
+	}
+
+	////store offsets in the case there is somehow already data loaded in the scene object
+	//const int nodeOffset = static_cast<int>(a_Res.m_NodePool.size()) + 1;
+	//const int meshOffset = static_cast<int>(a_Res.m_MeshPool.size());
+
+	//std::vector<std::shared_ptr<Node>> nodes;	//only supporting one scene per file. Seems to work fine 99% of the time
+
+	//std::shared_ptr<Node> baseNode = std::make_shared<Node>();
+	//baseNode->m_NodeID = nodeOffset - 1;
+	//baseNode->m_LocalTransform = std::make_unique<Transform>(a_TransformMat);
+	//nodes.push_back(baseNode);
+
+	//for (auto& fxNodeIdx : a_Doc.scenes.at(a_SceneId).nodes)
+	//{
+	//	const fx::gltf::Node& fxNode = a_Doc.nodes.at(fxNodeIdx);
+
+	//	std::shared_ptr<Node> newNode = std::make_shared<Node>();
+	//	newNode->m_MeshID = -1 ? -1 : (fxNode.mesh + meshOffset);
+	//	newNode->m_Name = fxNode.name;
+	//	newNode->m_NodeID = static_cast<int>(nodes.size());
+	//	newNode->m_LocalTransform = std::make_unique<Transform>();
+
+	//	for (int i = 0; i < static_cast<int>(fxNode.children.size()); i++)
+	//	{
+	//		newNode->m_ChilIndices.push_back(fxNode.children.at(i) + nodeOffset);
+	//	}
+
+	//NOTE: .size() returns the amount of elements (templated) at compile time. It's not the amount of valid values!
+	//	if (fxNode.translation.size() == 3)
+	//	{
+	//		newNode->m_LocalTransform->SetPosition(glm::vec3(
+	//			fxNode.translation[0],
+	//			fxNode.translation[1],
+	//			fxNode.translation[2]
+	//		));
+	//	}
+
+	//	if (fxNode.rotation.size() == 4)
+	//	{
+	//		newNode->m_LocalTransform->SetRotation(glm::quat(
+	//			fxNode.rotation[0],
+	//			fxNode.rotation[1],
+	//			fxNode.rotation[2],
+	//			fxNode.rotation[3]
+	//		));
+	//	}
+
+	//	if (fxNode.scale.size() == 3)
+	//	{
+	//		newNode->m_LocalTransform->SetScale(glm::vec3(
+	//			fxNode.scale[0],
+	//			fxNode.scale[1],
+	//			fxNode.scale[2]
+	//		));
+	//	}
+
+	//	a_Res.m_NodePool.push_back(newNode);
+	//}
 }
 
-void Lumen::SceneManager::LoadMeshes(fx::gltf::Document& a_Doc, GLTFResource& a_Res, glm::mat4& a_TransformMat)
+void Lumen::SceneManager::LoadMeshes(fx::gltf::Document& a_Doc, GLTFResource& a_Res)
 {
 	const int meshOffset = static_cast<int>(a_Res.m_MeshPool.size());
 

@@ -6,6 +6,7 @@
 #include "OutputLayer.h"
 
 #include "imgui/imgui.h"
+#include "ModelLoading/Node.h"
 
 #include "GLFW/include/GLFW/glfw3.h"
 #include "Lumen/ModelLoading/SceneManager.h"
@@ -104,13 +105,23 @@ public:
 		
 		lumenPT->m_Scene = lumenPT->CreateScene(scData);
 
-		auto mesh = lumenPT->m_Scene->AddMesh();
+		//Loop over the nodes in the scene, and add their meshes if they have one.
+		for(auto& node: res->m_NodePool)
+		{
+			auto meshId = node->m_MeshID;
+			if(meshId >= 0)
+			{
+				auto mesh = lumenPT->m_Scene->AddMesh();
+				mesh->SetMesh(res->m_MeshPool[meshId]);
+				mesh->m_Transform.CopyTransform(*node->m_LocalTransform);
+			}
+		}
+
 		//auto meshLight = lumenPT->m_Scene->AddMesh();
-		mesh->SetMesh(res->m_MeshPool[0]);
 		//meshLight->SetMesh(res->m_MeshPool[0]);
 
-		mesh->m_Transform.SetPosition(glm::vec3(0.f, 0.f, 15.0f));
-		mesh->m_Transform.SetScale(glm::vec3(1.0f));
+		//mesh->m_Transform.SetPosition(glm::vec3(0.f, 0.f, 15.0f));
+		//mesh->m_Transform.SetScale(glm::vec3(1.0f));
 
 		//meshLight->m_Transform.SetPosition(glm::vec3(0.f, 0.f, 15.0f));
 		//meshLight->m_Transform.SetScale(glm::vec3(1.0f));
