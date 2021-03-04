@@ -71,7 +71,10 @@ set(CUDA_FILES_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/Assets/PrecompiledShaders)
 include(${CMAKE_SOURCE_DIR}/cmake/functions.cmake)
 changePath("(.*\\/)([A-Za-z0-9_\\.]+\\.)cu\\;?$" "${CUDA_FILES_OUTPUT_DIR}/\\2ptx" CUDA_FILES_OUTPUT "${CUDA_SOURCE_FILES}")
 
-message("CUDA_FILES_OUTPUT: ${CUDA_FILES_OUTPUT}")
+message("----------[COPIED CUDA FILES OUTPUT]----------")
+printList(${CUDA_FILES_OUTPUT})
+message("----------------------------------------------")
+
 add_custom_command(
 	OUTPUT ${CUDA_FILES_OUTPUT}
 	COMMAND ${CMAKE_COMMAND} -E make_directory ${CUDA_FILES_OUTPUT_DIR}
