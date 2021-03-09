@@ -28,6 +28,7 @@ struct DeviceMaterial
     cudaTextureObject_t m_DiffuseTexture;
 };
 
+//TODO: change this naming because it is confusing, it could be name DevicePrimitiveArray or DeviceMesh
 struct DevicePrimitive
 {
     Vertex*         m_VertexBuffer;

@@ -3,8 +3,7 @@
 #include <cassert>
 #include <cuda_runtime.h>
 
-//TODO include this but it breaks because of redefinitions.
-//#include "../Shaders/CppCommon/WaveFrontDataStructs.h"
+#include "../CUDAKernels/RandomUtilities.cuh"
 
 
 CPU_ONLY void ReSTIR::Initialize(const ReSTIRSettings& a_Settings)
@@ -27,12 +26,17 @@ CPU_ONLY void ReSTIR::Initialize(const ReSTIRSettings& a_Settings)
 	//Shadow rays.
 	{
 		//At most one shadow ray per reservoir. Always resize even when big enough already, because this is initialization so it should not happen often.
-		const size_t shadowRaySize = 1;//sizeof(WaveFront::ShadowRayData);//TODO enable
+		const size_t shadowRaySize = sizeof(RestirShadowRay);
 		const size_t size = static_cast<size_t>(m_Settings.width) * static_cast<size_t>(m_Settings.height) * m_Settings.numReservoirsPerPixel * shadowRaySize;
 		m_ShadowRays.Resize(size);
+	}
 
-		//TODO ensure that these rays are initialized every time for every frame so that invalid rays are not traced.
-		//TODO the shadow rays should contain the reservoir index (x y and z).
+	//Pixel data caching
+	{
+		const size_t numPixels = m_Settings.width * m_Settings.height;
+		const size_t size = numPixels * sizeof(PixelData);
+		m_Pixels[0].Resize(size);
+		m_Pixels[1].Resize(size);
 	}
 
 	//Reservoirs
@@ -47,6 +51,7 @@ CPU_ONLY void ReSTIR::Initialize(const ReSTIRSettings& a_Settings)
 		ResetReservoirs(numReservoirs, static_cast<Reservoir*>(m_Reservoirs[0].GetDevicePtr()));
 		ResetReservoirs(numReservoirs, static_cast<Reservoir*>(m_Reservoirs[1].GetDevicePtr()));
 	}
+
 	//Light bag generation
 	{
 		const size_t size = sizeof(LightBagEntry) * m_Settings.numLightsPerBag * m_Settings.numLightBags;
@@ -56,6 +61,9 @@ CPU_ONLY void ReSTIR::Initialize(const ReSTIRSettings& a_Settings)
 		}
 	}
 
+	//Atomic counter buffer
+	m_Atomics.Resize(sizeof(int) * 1);
+
 	//Wait for CUDA to finish executing.
 	cudaDeviceSynchronize();
 }
@@ -63,9 +71,10 @@ CPU_ONLY void ReSTIR::Initialize(const ReSTIRSettings& a_Settings)
 CPU_ONLY void ReSTIR::Run(
 	const WaveFront::IntersectionData* const a_CurrentIntersections,
 	const WaveFront::RayData* const a_RayBuffer,
-    const WaveFront::IntersectionData* const a_PreviousIntersections,
-	const WaveFront::RayData* const a_PreviousRayBuffer,
-	const std::vector<TriangleLight>& a_Lights
+	const std::vector<TriangleLight>& a_Lights,
+	const float3 a_CameraPosition,
+	const std::uint32_t a_Seed,
+	const OptixTraversableHandle a_OptixSceneHandle
 )
 {
 	assert(m_SwapDirtyFlag && "SwapBuffers has to be called once per frame for ReSTIR to properly work.");
@@ -74,8 +83,12 @@ CPU_ONLY void ReSTIR::Run(
 	auto currentIndex = m_SwapChainIndex;
 	auto temporalIndex = currentIndex == 1 ? 0 : 1;
 
+	//The seed will be modified over time.
+	auto seed = a_Seed;
+
 	/*
 	 * Resize buffers based on the amount of lights and update data.
+	 * This uploads all triangle lights. May want to move this to the wavefront pipeline class and instead take the pointer from it.
 	 */
 	{
 		//Light buffer
@@ -96,26 +109,50 @@ CPU_ONLY void ReSTIR::Run(
 	}
 	//Fill light bags with values from the CDF.
 	{
-		FillLightBags(m_Settings.numLightBags, static_cast<CDF*>(m_Cdf.GetDevicePtr()), static_cast<LightBagEntry*>(m_LightBags.GetDevicePtr()), static_cast<TriangleLight*>(m_Lights.GetDevicePtr()));
+		seed = WangHash(seed);
+		FillLightBags(m_Settings.numLightBags, static_cast<CDF*>(m_Cdf.GetDevicePtr()), static_cast<LightBagEntry*>(m_LightBags.GetDevicePtr()), static_cast<TriangleLight*>(m_Lights.GetDevicePtr()), seed);
 	}
+
+	//Pointers to the pixel data buffers.
+	PixelData* currentPixelData = m_Pixels[currentIndex].GetDevicePtr<PixelData>();
+	PixelData* temporalPixelData = m_Pixels[temporalIndex].GetDevicePtr<PixelData>();
 
 	/*
 	 * Pick primary samples in parallel. Store the samples in the reservoirs.
 	 */
-	PickPrimarySamples(a_RayBuffer, a_CurrentIntersections, static_cast<LightBagEntry*>(m_LightBags.GetDevicePtr()), static_cast<Reservoir*>(m_Reservoirs->GetDevicePtr()), m_Settings);
+	seed = WangHash(seed);
+	PickPrimarySamples(a_RayBuffer, a_CurrentIntersections, static_cast<LightBagEntry*>(m_LightBags.GetDevicePtr()), static_cast<Reservoir*>(m_Reservoirs->GetDevicePtr()), m_Settings, currentPixelData, seed);
 
 	/*
 	 * Generate shadow rays for each reservoir and resolve them.
 	 * If a shadow ray is occluded, the reservoirs weight is set to 0.
 	 */
-	VisibilityPass(static_cast<Reservoir*>(m_Reservoirs[m_SwapChainIndex].GetDevicePtr()), m_Settings.width * m_Settings.height * m_Settings.numReservoirsPerPixel);
+	const int numRaysGenerated = GenerateReSTIRShadowRays(&m_Atomics, static_cast<Reservoir*>(m_Reservoirs[m_SwapChainIndex].GetDevicePtr()), m_ShadowRays.GetDevicePtr<RestirShadowRay>(), currentPixelData);
+
+	//Parameters for optix launch.
+	ReSTIROptixParameters params;
+	params.numRays = numRaysGenerated;
+	params.optixSceneHandle = a_OptixSceneHandle;
+	params.reservoirs = static_cast<Reservoir*>(m_Reservoirs[m_SwapChainIndex].GetDevicePtr());
+	params.shadowRays = m_ShadowRays.GetDevicePtr<RestirShadowRay>();
+
+	//TODO: Bind shaders defined in ReSTIRVisibilityShader.cu and then do the optix launch with the above parameters.
+	//Launch optix.
+	//optixLaunch();
 
 	/*
-	 * Temporal sampling where reservoirs are combined with those of the previous frame.
-	 */
-	if(m_Settings.enableTemporal)
+     * Temporal sampling where reservoirs are combined with those of the previous frame.
+     */
+	if (m_Settings.enableTemporal)
 	{
-		SpatialNeighbourSampling(static_cast<Reservoir*>(m_Reservoirs[currentIndex].GetDevicePtr()), static_cast<Reservoir*>(m_Reservoirs[2].GetDevicePtr()), m_Settings);
+		seed = WangHash(seed);
+		TemporalNeighbourSampling(
+			m_Reservoirs[currentIndex].GetDevicePtr<Reservoir>(),
+			m_Reservoirs[temporalIndex].GetDevicePtr<Reservoir>(),
+			currentPixelData,
+			temporalPixelData,
+			seed
+		);
 	}
 
 	/*
@@ -123,13 +160,27 @@ CPU_ONLY void ReSTIR::Run(
 	 */
 	if(m_Settings.enableSpatial)
 	{
-		TemporalNeighbourSampling(static_cast<Reservoir*>(m_Reservoirs[currentIndex].GetDevicePtr()), static_cast<Reservoir*>(m_Reservoirs[temporalIndex].GetDevicePtr()), m_Settings);
+		seed = WangHash(seed);
+		SpatialNeighbourSampling(
+			static_cast<Reservoir*>(m_Reservoirs[currentIndex].GetDevicePtr()),
+			static_cast<Reservoir*>(m_Reservoirs[2].GetDevicePtr()), 
+			currentPixelData,
+			seed
+		);
 	}
 
-	//TODO: Extract the data from the reservoirs to generate shadow rays and store them in the wavefront shadow ray data struct.
-	//TODO: thought: Since earlier visibility pass might still be valid, is it worth remembering that? Or is it uncommon?
+	//TODO: Get the atomic index from WaveFront as well as the shadow ray buffer.
+	MemoryBuffer* atomic = nullptr;
+	WaveFront::ShadowRayData* wfShadowRays = nullptr;
 
-	 //Ensure that swap buffers is called.
+	GenerateWaveFrontShadowRays(
+		static_cast<Reservoir*>(m_Reservoirs[currentIndex].GetDevicePtr()),
+		currentPixelData,
+		atomic,
+		wfShadowRays
+	);
+
+	//Ensure that swap buffers is called.
 	m_SwapDirtyFlag = false;
 }
 

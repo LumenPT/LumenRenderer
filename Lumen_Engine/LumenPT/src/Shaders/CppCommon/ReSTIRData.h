@@ -11,6 +11,8 @@
 #include <limits>
 #include <cinttypes>
 
+#include "../../CUDAKernels/RandomUtilities.cuh"
+
 constexpr float MINFLOAT = std::numeric_limits<float>::min();
 
 /*
@@ -20,43 +22,57 @@ constexpr float MINFLOAT = std::numeric_limits<float>::min();
 struct ReSTIRSettings
 {
     //Screen width in pixels.
-    std::uint32_t width = 0;
+    static constexpr std::uint32_t width = 0;
 
     //Screen height in pixels.
-    std::uint32_t height = 0;
+    static constexpr std::uint32_t height = 0;
 
     //The amount of reservoirs used per pixel.
-    std::uint32_t numReservoirsPerPixel = 5;
+    static constexpr std::uint32_t numReservoirsPerPixel = 5;
 
     //The amount of lights per light bag.
-    std::uint32_t numLightsPerBag = 1000;
+    static constexpr std::uint32_t numLightsPerBag = 1000;
 
     //The total amount of light bags to generate.
-    std::uint32_t numLightBags = 50;
+    static constexpr std::uint32_t numLightBags = 50;
 
     //The amount of initial samples to take each frame.
-    std::uint32_t numPrimarySamples = 32;
+    static constexpr std::uint32_t numPrimarySamples = 32;
 
     //The amount of spatial neighbours to consider.
-    std::uint32_t numSpatialSamples = 5;
+    static constexpr std::uint32_t numSpatialSamples = 5;
 
     //The maximum distance for spatial samples.
-    std::uint32_t spatialSampleRadius = 30;
+    static constexpr std::uint32_t spatialSampleRadius = 30;
 
     //The x and y size of the pixel grid per light bag. This indirectly determines the amount of light bags.
-    std::uint32_t pixelGridSize = 16;
+    static constexpr std::uint32_t pixelGridSize = 16;
 
     //The amount of spatial iterations to perform. Previous output becomes current input.
-    std::uint32_t numSpatialIterations = 2;
+    //This has to be an even number so that the final results end up in the right buffer.
+    static constexpr std::uint32_t numSpatialIterations = 2;
 
     //Use the biased algorithm or not. When false, the unbiased algorithm is used instead.
-    bool enableBiased = true;
+    static constexpr bool enableBiased = true;
 
     //Enable spatial sampling.
-    bool enableSpatial = true;
+    static constexpr bool enableSpatial = true;
 
     //Enable temporal sampling.
-    bool enableTemporal = true;
+    static constexpr bool enableTemporal = true;
+};
+
+//Data about a pixels world position.
+struct PixelData
+{
+    int index;                      //The index of this pixel.
+    float3 directionIncoming;       //The direction from which this pixel was hit.
+    float3 worldPosition;           //The world position of this pixel.
+    float3 worldNormal;             //The surface normal of this pixel.
+    float3 diffuse;                 //The diffuse color of this pixels material.
+    float metallic;                 //The metallic factor of this pixel.
+    float roughness;                //The roughness factor of this pixel.
+    float depth;                    //The depth along the incoming ray at which the intersection happened.
 };
 
 /*
@@ -75,12 +91,14 @@ struct RestirShadowRay
   */
 struct LightSample
 {
-    __host__ __device__ LightSample() : radiance({0.f, 0.f, 0.f}), normal({ 0.f, 0.f, 0.f }), position({ 0.f, 0.f, 0.f }), solidAnglePdf(0.f) {}
+    __host__ __device__ LightSample() : radiance({0.f, 0.f, 0.f}), normal({ 0.f, 0.f, 0.f }), position({ 0.f, 0.f, 0.f }), area(0.f), solidAnglePdf(0.f) {}
 
     float3 radiance;
     float3 normal;
     float3 position;
-    float solidAnglePdf;
+    float area;
+    float3 unshadowedPathContribution;       //Contribution with geometry and BSDF taken into account.
+    float solidAnglePdf;                    //solid angle PDF which is used to weight this samples importance.
 };
 
 /*
@@ -91,6 +109,7 @@ struct TriangleLight
     float3 p0, p1, p2;
     float3 normal;
     float3 radiance;    //Radiance has the texture color baked into it. Probably average texture color.
+    float area;         //The area of the triangle. This is required to project the light onto a hemisphere.
 };
 
 /*
@@ -107,7 +126,7 @@ struct Reservoir
     /*
      * Update this reservoir with a light and a weight for that light relative to the total set.
      */
-    GPU_ONLY INLINE bool Update(const LightSample& a_Sample, float a_Weight)
+    GPU_ONLY INLINE bool Update(const LightSample& a_Sample, float a_Weight, std::uint32_t a_Seed)
     {
         assert(a_Weight >= 0.f);
 
@@ -116,8 +135,7 @@ struct Reservoir
         ++sampleCount;
 
         //Generate a random float between 0 and 1 and then overwrite the sample based on the probability of this sample being chosen.
-        //TODO generate random float between 0 and 1. both inclusive.
-        const float r = 0;// static_cast<float>(rand()) / static_cast <float> (RAND_MAX);
+        const float r = RandomFloat(a_Seed);
 
         //In this case R is inclusive with 0.0 and 1.0. This means that the first sample is always chosen.
         //If weight is 0, then a division by 0 would happen. Also it'd be impossible to pick this sample.
@@ -212,7 +230,8 @@ struct CDF
     }
 
     /*
-     *
+     * Find the entry with the given value by doing a binary search.
+     * This is a recursive function.
      */
     GPU_ONLY int BinarySearch(int a_First, int a_Last, float a_Value) const
     {
@@ -256,4 +275,16 @@ struct LightBagEntry
 {
     TriangleLight light;
     float pdf;
+};
+
+/*
+ * Data required by Optix to resolve shadow rays.
+ */
+struct ReSTIROptixParameters
+{
+    OptixTraversableHandle optixSceneHandle;
+    std::uint32_t numRays;
+
+    RestirShadowRay* shadowRays;
+    Reservoir* reservoirs;
 };

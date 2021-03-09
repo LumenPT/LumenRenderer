@@ -29,6 +29,8 @@ CPU_ONLY void GenerateRays(const SetupLaunchParameters& a_SetupParams)
     cudaDeviceSynchronize();
     CHECKLASTCUDAERROR;
 
+    
+
 }
 
 CPU_ONLY void GenerateMotionVectors()
@@ -49,29 +51,35 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
 
      //Generate secondary rays.
 
-    ShadeIndirect<<<numBlocks,blockSize>>>(
+    /*ShadeIndirect<<<numBlocks,blockSize>>>(
         a_ShadingParams.m_ResolutionAndDepth, 
-        a_ShadingParams.m_CurrentIntersections, 
         a_ShadingParams.m_CurrentRays, 
-        a_ShadingParams.m_SecondaryRays);
+        a_ShadingParams.m_CurrentIntersections, 
+        a_ShadingParams.m_SecondaryRays);*/
 
-    cudaDeviceSynchronize();
-    CHECKLASTCUDAERROR;
+    /*cudaDeviceSynchronize();
+    CHECKLASTCUDAERROR;*/
 
      //Generate shadow rays for specular highlights.
-    ShadeSpecular<<<numBlocks, blockSize >>>();
+    /*ShadeSpecular<<<numBlocks, blockSize >>>();*/
 
-    cudaDeviceSynchronize();
-    CHECKLASTCUDAERROR;
+    /*cudaDeviceSynchronize();
+    CHECKLASTCUDAERROR;*/
 
     //Generate shadow rays for direct lights.
-    ShadeDirect<<<numBlocks, blockSize>>>(
+    /*ShadeDirect<<<numBlocks, blockSize>>>(
         a_ShadingParams.m_ResolutionAndDepth, 
         a_ShadingParams.m_CurrentRays, 
         a_ShadingParams.m_CurrentIntersections, 
         a_ShadingParams.m_ShadowRaysBatch, 
         a_ShadingParams.m_LightBuffer, 
-        a_ShadingParams.m_CDF);
+        a_ShadingParams.m_CDF);*/
+
+    DEBUGShadePrimIntersections <<<numBlocks, blockSize>> > (
+        a_ShadingParams.m_ResolutionAndDepth,
+        a_ShadingParams.m_CurrentRays,
+        a_ShadingParams.m_CurrentIntersections,
+        a_ShadingParams.m_DEBUGResultBuffer);
 
     cudaDeviceSynchronize();
     CHECKLASTCUDAERROR;
@@ -92,18 +100,18 @@ CPU_ONLY void PostProcess(const PostProcessLaunchParameters& a_PostProcessParams
     const int numBlocks = (numPixels + blockSize - 1) / blockSize;
 
     //TODO before merging.
-    Denoise<<<numBlocks, blockSize >>>();
+    //Denoise<<<numBlocks, blockSize >>>();
 
-    cudaDeviceSynchronize();
-    CHECKLASTCUDAERROR;
+    /*cudaDeviceSynchronize();
+    CHECKLASTCUDAERROR;*/
 
-    MergeLightChannels <<<1, 1>>> (
+    MergeLightChannels <<<numBlocks, blockSize>>> (
         a_PostProcessParams.m_Resolution, 
         a_PostProcessParams.m_WavefrontOutput,
         a_PostProcessParams.m_MergedResults);
 
-    cudaDeviceSynchronize();
-    CHECKLASTCUDAERROR;
+    /*cudaDeviceSynchronize();
+    CHECKLASTCUDAERROR;*/
 
     //TODO steal hidden Nvidia technology by breaking into their buildings
     //TODO copy merged results into image output after having run DLSS.
@@ -113,14 +121,14 @@ CPU_ONLY void PostProcess(const PostProcessLaunchParameters& a_PostProcessParams
     const int blockSizeUpscaled = 256;
     const int numBlocksUpscaled = (numPixelsUpscaled + blockSizeUpscaled - 1) / blockSizeUpscaled;
 
-    cudaDeviceSynchronize();
-    CHECKLASTCUDAERROR;
+    /*cudaDeviceSynchronize();
+    CHECKLASTCUDAERROR;*/
 
     //TODO
     PostProcessingEffects<<<numBlocksUpscaled, blockSizeUpscaled >>>();
 
-    cudaDeviceSynchronize();
-    CHECKLASTCUDAERROR;
+    /*cudaDeviceSynchronize();
+    CHECKLASTCUDAERROR;*/
 
     //TODO This is temporary till the post-processing is  in place. Let the last stage copy it directly to the output buffer.
     WriteToOutput<<<numBlocksUpscaled, blockSizeUpscaled >>>(
@@ -254,8 +262,8 @@ CPU_ON_GPU void ShadeSpecular()
 
 CPU_ON_GPU void ShadeIndirect(
     const uint3 a_ResolutionAndDepth, 
+    const RayBatch* const a_PrimaryRays,  //TODO: These need to be the rays of that the current wave intersected before calling this wave.
     const IntersectionBuffer* const a_Intersections, 
-    const RayBatch* const a_PrimaryRays, 
     RayBatch* const a_Output)
 {
 
@@ -295,7 +303,98 @@ CPU_ON_GPU void ShadeIndirect(
 
 }
 
+CPU_ON_GPU void DEBUGShadePrimIntersections(
+    const uint3 a_ResolutionAndDepth,
+    const RayBatch* const a_PrimaryRays,
+    const IntersectionBuffer* const a_PrimaryIntersections,
+    ResultBuffer* const a_Output)
+{
 
+    const unsigned int numPixels = a_ResolutionAndDepth.x * a_ResolutionAndDepth.y;
+    const unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
+    const unsigned int stride = blockDim.x * gridDim.x;
+
+    for (unsigned int i = index; i < numPixels; i += stride)
+    {
+
+        // Get intersection.
+        const IntersectionData& currIntersection = a_PrimaryIntersections->GetIntersection(i, 0 /*There is only one ray per pixel, only one intersection per pixel (for now)*/);
+
+    	//printf("Pixel Index: %i, Total Pixels: %i \n", i, numPixels);
+
+        if (currIntersection.IsIntersection())
+        {
+
+            // Get ray used to calculate intersection.
+            const unsigned int rayArrayIndex = currIntersection.m_RayArrayIndex;
+
+            const unsigned int vertexIndex = 3 * currIntersection.m_PrimitiveIndex;
+            const DevicePrimitive* primitive = currIntersection.m_Primitive;
+
+            //printf("vertex Index %i \n", vertexIndex);
+        	
+            if( primitive == nullptr || 
+                primitive->m_IndexBuffer == nullptr || 
+                primitive->m_VertexBuffer == nullptr ||
+                primitive->m_Material == nullptr)
+            {
+
+                if(!primitive)
+                {
+                    printf("Error, primitive: %p \n", primitive);
+                }
+                else
+                {
+                    printf("Error, found nullptr in primitive variables: \n\tm_IndexBuffer: %p \n\tm_VertexBuffer: %p \n\tm_Material: %p\n",
+                        primitive->m_IndexBuffer,
+                        primitive->m_VertexBuffer,
+                        primitive->m_Material);
+                }
+                
+                a_Output->SetPixel(make_float3(1.f, 0.f, 1.f), rayArrayIndex, ResultBuffer::OutputChannel::DIRECT);
+                return;
+            }
+
+            /*printf("VertexIndex: %i, Primitive: %p, m_IndexBuffer: %p, m_VertexBuffer: %p \n", 
+                vertexIndex, 
+                primitive, 
+                primitive->m_IndexBuffer, 
+                primitive->m_VertexBuffer);*/
+
+            const unsigned int vertexIndexA = primitive->m_IndexBuffer[vertexIndex + 0];
+            const unsigned int vertexIndexB = primitive->m_IndexBuffer[vertexIndex + 1];
+            const unsigned int vertexIndexC = primitive->m_IndexBuffer[vertexIndex + 2];
+        	
+            //printf("VertexA Index: %i\n", vertexIndexA);
+            //printf("VertexB Index: %i\n", vertexIndexB);
+            //printf("VertexC Index: %i\n", vertexIndexC);
+        	
+            const Vertex* A = &primitive->m_VertexBuffer[vertexIndexA];
+            const Vertex* B = &primitive->m_VertexBuffer[vertexIndexB];
+            const Vertex* C = &primitive->m_VertexBuffer[vertexIndexC];
+        	
+            const float U = currIntersection.m_UVs.x;
+            const float V = currIntersection.m_UVs.y;
+            const float W = 1.f - (U + V);
+
+        	const float2 texCoords = A->m_UVCoord * W + B->m_UVCoord * U + C->m_UVCoord * V;
+
+            if(U + V + W != 1.f)
+            {
+                printf("U: %f, V: %f, W: %f \n", U, V, W);
+                a_Output->SetPixel(make_float3(1.f, 1.f, 0.f), rayArrayIndex, ResultBuffer::OutputChannel::DIRECT);
+                return;
+            }
+         
+            const DeviceMaterial* material = primitive->m_Material;
+
+            const float4 textureColor = tex2D<float4>(material->m_DiffuseTexture, texCoords.x, texCoords.y);
+			const float3 finalColor = make_float3(textureColor * material->m_DiffuseColor);
+
+            a_Output->SetPixel(finalColor, rayArrayIndex, ResultBuffer::OutputChannel::DIRECT);
+        }
+    }
+}
 
 CPU_ON_GPU void Denoise()
 {
@@ -311,6 +410,12 @@ CPU_ON_GPU void MergeLightChannels(
     const unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
     const unsigned int stride = blockDim.x * gridDim.x;
     const float3* firstPixel = a_Input->m_PixelBuffer->m_Pixels;
+
+    const unsigned int numPixelsBuffer = a_Input->m_PixelBuffer->m_NumPixels;
+    const unsigned int numChannelsPixelsBuffer = a_Input->m_PixelBuffer->m_ChannelsPerPixel;
+
+    /*printf("NumPixelsBuffer: %i NumChannelsPixelsBuffer: %i FirstPixelPtr: %p PixelBufferPtr: %p \n", 
+        numPixelsBuffer, numChannelsPixelsBuffer, firstPixel, a_Input->m_PixelBuffer);*/
 
     for (int i = index; i < numPixels; i += stride)
     {
@@ -353,25 +458,22 @@ CPU_ON_GPU void WriteToOutput(
     }
 }
 
+//Data buffer helper functions
 
+//Reset ray batch
 
-//Helper functions
-
-GPU_ONLY INLINE unsigned int WangHash(unsigned int a_S)
+CPU_ONLY void ResetRayBatch(
+    RayBatch* const a_RayBatchDevPtr,
+    unsigned int a_NumPixels,
+    unsigned int a_RaysPerPixel)
 {
-    a_S = (a_S ^ 61) ^ (a_S >> 16), a_S *= 9, a_S = a_S ^ (a_S >> 4), a_S *= 0x27d4eb2d, a_S = a_S ^ (a_S >> 15); return a_S;
-}
 
-GPU_ONLY INLINE unsigned int RandomInt(unsigned int& a_S)
-{
-    a_S ^= a_S << 13, a_S ^= a_S >> 17, a_S ^= a_S << 5; return a_S;
-}
+    ResetRayBatchMembers << <1, 1 >> > (a_RayBatchDevPtr, a_NumPixels, a_RaysPerPixel);
 
-GPU_ONLY INLINE float RandomFloat(unsigned int& a_S)
-{
-    return RandomInt(a_S) * 2.3283064365387e-10f;
+    const int numRays = a_NumPixels * a_RaysPerPixel;
+    const int blockSize = 256;
+    const int numBlocks = (numRays + blockSize - 1) / blockSize;
 }
-
 
 
 //Data buffer helper functions
@@ -386,7 +488,7 @@ CPU_ON_GPU void ResetRayBatchMembers(
 
 }
 
-CPU_ON_GPU void ResetRayBatchBuffer(RayBatch* const a_RayBatch)
+CPU_ON_GPU void ResetRayBatchData(RayBatch* const a_RayBatch)
 {
 
     const unsigned int bufferSize = a_RayBatch->GetSize();
@@ -400,19 +502,22 @@ CPU_ON_GPU void ResetRayBatchBuffer(RayBatch* const a_RayBatch)
 
 }
 
-CPU_ONLY void ResetRayBatch(
-    RayBatch* const a_RayBatchDevPtr, 
-    unsigned int a_NumPixels, 
+//Reset shadow ray batch
+
+CPU_ONLY void ResetShadowRayBatch(
+    ShadowRayBatch* a_ShadowRayBatchDevPtr,
+    unsigned int a_MaxDepth,
+    unsigned int a_NumPixels,
     unsigned int a_RaysPerPixel)
 {
 
-    ResetRayBatchMembers <<<1,1>>> (a_RayBatchDevPtr, a_NumPixels, a_RaysPerPixel);
+    ResetShadowRayBatchMembers<<<1,1>>>(a_ShadowRayBatchDevPtr, a_MaxDepth, a_NumPixels, a_RaysPerPixel);
 
-    const int numRays = a_NumPixels * a_RaysPerPixel;
+    const int numRays = a_MaxDepth * a_NumPixels * a_RaysPerPixel;
     const int blockSize = 256;
     const int numBlocks = (numRays + blockSize - 1) / blockSize;
 
-    ResetRayBatchBuffer<<<numBlocks,blockSize>>>(a_RayBatchDevPtr);
+    ResetShadowRayBatchData<<<numBlocks, blockSize>>>(a_ShadowRayBatchDevPtr);
 
 }
 
@@ -429,7 +534,7 @@ CPU_ON_GPU void ResetShadowRayBatchMembers(
 
 }
 
-CPU_ON_GPU void ResetShadowRayBatchBuffer(ShadowRayBatch* const a_ShadowRayBatch)
+CPU_ON_GPU void ResetShadowRayBatchData(ShadowRayBatch* const a_ShadowRayBatch)
 {
 
     const unsigned int bufferSize = a_ShadowRayBatch->GetSize();
@@ -444,19 +549,46 @@ CPU_ON_GPU void ResetShadowRayBatchBuffer(ShadowRayBatch* const a_ShadowRayBatch
 
 }
 
-CPU_ONLY void ResetShadowRayBatch(
-    ShadowRayBatch* a_ShadowRayBatchDevPtr,
-    unsigned int a_MaxDepth,
-    unsigned int a_NumPixels,
-    unsigned int a_RaysPerPixel)
+//Reset pixel buffer
+
+CPU_ONLY void ResetPixelBuffer(
+    PixelBuffer* a_PixelBufferDevPtr, 
+    unsigned a_NumPixels, 
+    unsigned a_ChannelsPerPixel)
 {
 
-    ResetShadowRayBatchMembers<<<1,1>>>(a_ShadowRayBatchDevPtr, a_MaxDepth, a_NumPixels, a_RaysPerPixel);
+    ResetPixelBufferMembers<<<1, 1>>>(a_PixelBufferDevPtr, a_NumPixels, a_ChannelsPerPixel);
 
-    const int numRays = a_MaxDepth * a_NumPixels * a_RaysPerPixel;
+    const int totalPixels = a_NumPixels * a_ChannelsPerPixel;
     const int blockSize = 256;
-    const int numBlocks = (numRays + blockSize - 1) / blockSize;
+    const int numBlocks = (totalPixels + blockSize - 1) / blockSize;
 
-    ResetShadowRayBatchBuffer<<<numBlocks, blockSize>>>(a_ShadowRayBatchDevPtr);
+    ResetPixelBufferData <<<numBlocks, blockSize>>>(a_PixelBufferDevPtr);
+
+}
+
+CPU_ON_GPU void ResetPixelBufferMembers(
+    PixelBuffer* const a_PixelBuffer, 
+    unsigned a_NumPixels, 
+    unsigned a_ChannelsPerPixel)
+{
+
+    *const_cast<unsigned*>(&a_PixelBuffer->m_NumPixels) = a_NumPixels;
+    *const_cast<unsigned*>(&a_PixelBuffer->m_ChannelsPerPixel) = a_ChannelsPerPixel;
+
+}
+
+CPU_ON_GPU void ResetPixelBufferData(PixelBuffer* const a_PixelBuffer)
+{
+
+    const unsigned int bufferSize = a_PixelBuffer->GetSize();
+    const unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
+    const unsigned int stride = blockDim.x * gridDim.x;
+
+    for (unsigned int i = index; i < bufferSize; i += stride)
+    {
+
+        a_PixelBuffer->m_Pixels[i] = { 0.f, 0.f, 0.f };
+    }
 
 }
