@@ -108,7 +108,7 @@ option(USE_STATIC_DEPENDENCIES [=[
 Only search for and use static libraries. If OFF the shared versions of requried libraries are prioritised, falling
 back to static libraries. Forcing individual static dependencies can be enabled by setting XXX_USE_STATIC_LIBS
 to ON, where XXX is the package name. On Windows this behaviour is less strict, with any located libraries assumed
-to be static. ]=] ON)
+to be static. ]=] OFF)
 option(DISABLE_DEPENDENCY_VERSION_CHECKS [=[
 Disable minimum version checks for OpenVDB dependencies. It is strongly recommended that this remains disabled.
 Consider updating your dependencies where possible if encountering minimum requirement CMake errors.]=] OFF)
