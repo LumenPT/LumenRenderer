@@ -71,7 +71,6 @@ public:
 		//PushOverlay(new Lumen::ImGuiLayer());
 
 		OutputLayer* m_ContextLayer = new OutputLayer;
-		PushLayer(new ExampleLayer());
 		PushLayer(m_ContextLayer);
 
 

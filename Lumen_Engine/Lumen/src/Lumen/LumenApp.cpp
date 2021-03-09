@@ -50,6 +50,8 @@ namespace Lumen
 			glClearColor(1, 1, 0.5f, 1);
 			glClear(GL_COLOR_BUFFER_BIT);
 
+			Input::Update();
+
 			//Update loop
 			for (Layer* layer: m_LayerStack)
 			{
