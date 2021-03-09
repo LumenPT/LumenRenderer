@@ -55,7 +55,7 @@ option(NANOVDB_BUILD_TOOLS "Build command-line tools" OFF)
 option(NANOVDB_CUDA_KEEP_PTX "Keep CUDA PTX" OFF)
 
 option(NANOVDB_USE_INTRINSICS "Build with hardware intrinsics support" ON)
-option(NANOVDB_USE_OPENVDB "Build with OpenVDB support" OFF)
+option(NANOVDB_USE_OPENVDB "Build with OpenVDB support" ON)
 option(NANOVDB_USE_OPENGL "Build with OpenGL support" OFF)
 option(NANOVDB_USE_OPENCL "Build with OpenCL support" OFF)
 option(NANOVDB_USE_CUDA "Build with CUDA support" ON)

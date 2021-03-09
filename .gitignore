@@ -13,7 +13,7 @@
 #-----
 
 #Ignore project specific directories
-*.lib
+#*.lib
 *.tlog
 **/build/**
 **/out/**
@@ -63,7 +63,7 @@
 # Compiled Dynamic libraries
 *.so
 *.dylib
-*.dll
+#*.dll
 
 # Fortran module files
 *.mod

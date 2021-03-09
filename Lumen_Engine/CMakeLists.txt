@@ -18,6 +18,28 @@ add_subdirectory("Lumen/vendor/GLFW")
 add_subdirectory ("Lumen/vendor/Glad")
 	#ImGui
 add_subdirectory ("Lumen/vendor/ImGui")
+
+set(DISABLE_CMAKE_SEARCH_PATHS ON)
+
+set(ILMBASE_INCLUDEDIR "${CMAKE_CURRENT_SOURCE_DIR}/LumenPT/vendor/Include")
+set(ILMBASE_LIBRARYDIR "${CMAKE_CURRENT_SOURCE_DIR}/LumenPT/vendor/Libs/OpenEXR")
+
+set(TBB_INCLUDEDIR "${CMAKE_CURRENT_SOURCE_DIR}/LumenPT/vendor/Include")
+set(TBB_LIBRARYDIR "${CMAKE_CURRENT_SOURCE_DIR}/LumenPT/vendor/Libs/tbb")
+
+set(BLOSC_INCLUDEDIR "${CMAKE_CURRENT_SOURCE_DIR}/LumenPT/vendor/Include/blosc")
+set(BLOSC_LIBRARYDIR "${CMAKE_CURRENT_SOURCE_DIR}/LumenPT/vendor/Libs")
+
+set(ZLIB_ROOT 
+"${CMAKE_CURRENT_SOURCE_DIR}/LumenPT/vendor/Include/zlib"
+"${CMAKE_CURRENT_SOURCE_DIR}/LumenPT/vendor/Libs"
+)
+
+set(BOOST_INCLUDEDIR "${CMAKE_CURRENT_SOURCE_DIR}/LumenPT/vendor/Include")
+set(BOOST_LIBRARYDIR "${CMAKE_CURRENT_SOURCE_DIR}/LumenPT/vendor/Libs/boost")
+
+	#OpenVDB
+add_subdirectory ("LumenPT/vendor/openvdb")
 	#NanoVDB
 add_subdirectory ("LumenPT/vendor/openvdb/nanovdb")
 	#Lumen
