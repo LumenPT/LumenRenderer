@@ -185,6 +185,8 @@ void Lumen::Transform::Decompose()
     // Needed for glm::decompose
     glm::vec3 skew;
     glm::vec4 perspective;
+
+    glm::decompose(m_TransformationMatrix, m_Scale, m_Rotation, m_Position, skew, perspective);
 }
 
 void Lumen::Transform::UpdateDependents()

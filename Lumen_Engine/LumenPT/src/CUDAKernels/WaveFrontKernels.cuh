@@ -80,9 +80,16 @@ CPU_ON_GPU void ShadeSpecular();
  */
 CPU_ON_GPU void ShadeIndirect(
     const uint3 a_ResolutionAndDepth, 
+    const RayBatch* const a_PreviousRays, 
     const IntersectionBuffer* const a_Intersections, 
-    const RayBatch* const a_PrimaryRays, 
     RayBatch* const a_Output);
+
+
+CPU_ON_GPU void DEBUGShadePrimIntersections(
+    const uint3 a_ResolutionAndDepth,
+    const RayBatch* const a_PrimaryRays,
+    const IntersectionBuffer* const a_PrimaryIntersections,
+    ResultBuffer* const a_Output);
 
 //Called during post-processing.
 
@@ -129,16 +136,26 @@ GPU_ONLY INLINE float RandomFloat(unsigned int& a_S);
 
 //Data buffer helper functions.
 
+//Reset ray batch.
+
+CPU_ONLY void ResetRayBatch(
+    RayBatch* const a_RayBatchDevPtr,
+    unsigned int a_NumPixels,
+    unsigned int a_RaysPerPixel);
+
 CPU_ON_GPU void ResetRayBatchMembers(
     RayBatch* const a_RayBatch, 
     unsigned int a_NumPixels, 
     unsigned int a_RaysPerPixel);
 
-CPU_ON_GPU void ResetRayBatchBuffer(RayBatch* const a_RayBatch);
+CPU_ON_GPU void ResetRayBatchData(RayBatch* const a_RayBatch);
 
-CPU_ONLY void ResetRayBatch(
-    RayBatch* const a_RayBatchDevPtr, 
-    unsigned int a_NumPixels, 
+//Reset shadow ray batch.
+
+CPU_ONLY void ResetShadowRayBatch(
+    ShadowRayBatch* a_ShadowRayBatchDevPtr,
+    unsigned int a_MaxDepth,
+    unsigned int a_NumPixels,
     unsigned int a_RaysPerPixel);
 
 CPU_ON_GPU void ResetShadowRayBatchMembers(
@@ -147,10 +164,18 @@ CPU_ON_GPU void ResetShadowRayBatchMembers(
     unsigned int a_NumPixels, 
     unsigned int a_RaysPerPixel);
 
-CPU_ON_GPU void ResetShadowRayBatchBuffer(ShadowRayBatch* const a_ShadowRayBatch);
+CPU_ON_GPU void ResetShadowRayBatchData(ShadowRayBatch* const a_ShadowRayBatch);
 
-CPU_ONLY void ResetShadowRayBatch(
-    ShadowRayBatch* a_ShadowRayBatchDevPtr,
-    unsigned int a_MaxDepth,
+//Reset PixelBuffer.
+
+CPU_ONLY void ResetPixelBuffer(
+    PixelBuffer* a_PixelBufferDevPtr,
     unsigned int a_NumPixels,
-    unsigned int a_RaysPerPixel);
+    unsigned int a_ChannelsPerPixel);
+
+CPU_ON_GPU void ResetPixelBufferMembers(
+    PixelBuffer* const a_PixelBuffer,
+    unsigned int a_NumPixels,
+    unsigned int a_ChannelsPerPixel);
+
+CPU_ON_GPU void ResetPixelBufferData(PixelBuffer* const a_PixelBuffer);

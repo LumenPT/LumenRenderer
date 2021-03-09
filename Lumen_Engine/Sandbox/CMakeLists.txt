@@ -48,3 +48,8 @@ target_link_libraries(Sandbox
 	Lumen
 	LumenPT
 )
+
+add_custom_command(TARGET Sandbox POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_CURRENT_SOURCE_DIR}/../LumenPT/vendor/Dlls"
+        $<TARGET_FILE_DIR:Sandbox>)

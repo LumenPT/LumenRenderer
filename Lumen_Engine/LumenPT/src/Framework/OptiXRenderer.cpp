@@ -11,6 +11,7 @@
 #include "OutputBuffer.h"
 #include "ShaderBindingTableGen.h"
 #include "../Shaders/CppCommon/LumenPTConsts.h"
+#include "CudaUtilities.h"
 
 #include <cstdio>
 #include <fstream>
@@ -30,28 +31,6 @@ const uint32_t gs_ImageHeight = 600;
 #include "PTMesh.h"
 #include "PTPrimitive.h"
 #include "PTVolume.h"
-
-void CheckOptixRes(const OptixResult & a_res)
-{
-    if (a_res != OPTIX_SUCCESS)
-    {
-        std::string errorName = optixGetErrorName(a_res);
-        std::string errorMessage = optixGetErrorString(a_res);
-
-        std::fprintf(
-            stderr,
-            "Optix error occured: %s \n Description: %s",
-            errorName.c_str(),
-            errorMessage.c_str());
-    }
-}
-
-#if defined(OPTIX_NOCHECK)
-#define CHECKOPTIXRESULT(x)
-#elif defined(OPTIX_CHECK) || defined(_DEBUG)
-#define CHECKOPTIXRESULT(x)\
-    CheckOptixRes(x);
-#endif
 
 OptiXRenderer::OptiXRenderer(const InitializationData& a_InitializationData)
     :
@@ -83,7 +62,7 @@ OptiXRenderer::OptiXRenderer(const InitializationData& a_InitializationData)
 
     CreateShaderBindingTable();
 
-    m_Camera.SetPosition(glm::vec3(0.f, 0.f, -25.f));
+    m_Camera.SetPosition(glm::vec3(0.f, 0.f, -50.f));
 }
 
 OptiXRenderer::~OptiXRenderer()

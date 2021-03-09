@@ -59,14 +59,14 @@ inline void CheckCudaLastErr()
 }
 
 #if defined(OPTIX_NOCHECK)  || ! defined(_DEBUG)
-#define CHECKOPTIXRESULT(x)
+#define CHECKOPTIXRESULT
 #elif defined(OPTIX_CHECK) || defined(_DEBUG)
 #define CHECKOPTIXRESULT(x)\
     CheckOptixRes(x);
 #endif
 
 #if defined(CUDA_NOCHECK)  || ! defined(_DEBUG)
-#define CHECKCUDAERROR(x) 
+#define CHECKCUDAERROR 
 #elif defined(CUDA_CHECK) || defined(_DEBUG)
 #define CHECKCUDAERROR(x)\
     CheckCudaErr(x);

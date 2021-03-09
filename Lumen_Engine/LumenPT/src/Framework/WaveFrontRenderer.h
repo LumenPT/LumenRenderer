@@ -122,7 +122,7 @@ private:
     static constexpr unsigned s_NumRayBatchTypes = static_cast<unsigned>(RayBatchTypeIndex::NUM_RAY_BATCH_TYPES);
     static constexpr unsigned s_NumHitBufferTypes = static_cast<unsigned>(HitBufferTypeIndex::NUM_HIT_BUFFER_TYPES);
     static constexpr float s_MinTraceDistance = 0.1f;
-    static constexpr float s_MaxTraceDistance = 1000.f;
+    static constexpr float s_MaxTraceDistance = 5000.f;
 
 
 
@@ -220,7 +220,7 @@ private:
 
     //ResultBuffer storing the different PixelBuffers as different light channels;
     std::unique_ptr<MemoryBuffer> m_ResultBuffer;
-    //2 PixelBuffers 1 for the different channels in the ResultBuffer and 1 PixelBuffer for the merged results.
+    //2 PixelBuffers 1 for the different channels in the ResultBuffer and 1 PixelBuffer for the merged results (to allow for up-scaling the output).
     std::unique_ptr<MemoryBuffer> m_PixelBufferMultiChannel;
     std::unique_ptr<MemoryBuffer> m_PixelBufferSingleChannel;
     //2 ray batches, 1 for storing primary rays, other for overwriting secondary rays.

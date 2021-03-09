@@ -6,28 +6,78 @@
 #include "stb_image.h"
 //#include "../../LumenPT/src/Framework/OptiXRenderer.h"
 
+#include <glm/gtc/type_ptr.hpp>
+
 //#include <string>
 #include <memory>
 
-Lumen::SceneManager::GLTFResource* Lumen::SceneManager::LoadGLTF(std::string a_Path, glm::mat4& a_TransformMat)
+Lumen::SceneManager::~SceneManager()
 {
-	auto findIter = m_LoadedScenes.find(a_Path);
+    for (auto loadedScene : m_LoadedScenes)
+    {
+		// Release the meshes and materials from each GLTFResource manually
+		auto& res = loadedScene.second;
+
+        for (auto& mesh : res.m_MeshPool)
+			mesh.reset();
+
+        for (auto& material : res.m_MaterialPool)
+			material.reset();
+    }
+
+	// Release the meshes and materials which are no longer parts of GLTFResources
+	// due to being in use by the renderer
+
+    for (auto& inUseMesh : m_InUseMeshes)
+		inUseMesh.reset();
+
+    for (auto& inUseMaterial : m_InUseMaterials)
+		inUseMaterial.reset();
+}
+
+Lumen::SceneManager::GLTFResource* Lumen::SceneManager::LoadGLTF(std::string a_FileName, std::string a_Path, const glm::mat4& a_TransformMat)
+{
+	const auto fullPath = a_Path + a_FileName;
+	auto findIter = m_LoadedScenes.find(fullPath);
 
 	if (findIter != m_LoadedScenes.end())
 	{
 		return &(*findIter).second;
 	}
 
-	auto& res = m_LoadedScenes[a_Path];		// create new scene at path key
-	auto doc = fx::gltf::LoadFromText(a_Path);
+	auto& res = m_LoadedScenes[fullPath];		// create new scene at path key
 
-	res.m_Path = a_Path;
+	//Check for glb or gltf
+	const std::string binarySuffix = ".glb";
+	bool isBinary = (a_FileName.length() >= binarySuffix.length()) && (0 == a_FileName.compare(a_FileName.length() - binarySuffix.length(), binarySuffix.length(), binarySuffix));
+
+	//NOTE: No quotas specified and no check for .gltf suffix. Might fail to load with large files and wrongly specified suffix.
+	fx::gltf::Document doc;
+	if(!isBinary)
+	{
+		doc = fx::gltf::LoadFromText(fullPath);
+	}
+	else
+	{
+		doc = fx::gltf::LoadFromBinary((fullPath));
+	}
+
+	res.m_Path = fullPath;
 
 
-	LoadMaterials(doc, res);
+	LoadMaterials(doc, res, a_Path);
 
 	LoadMeshes(doc, res);
-	LoadNodes(doc, res, a_TransformMat);
+
+	//Loop over the root nodes in every scene in this GLTF file, and then add them as instances.
+	for (int sceneId = 0; sceneId < doc.scenes.size(); ++sceneId)
+	{
+		auto& scene = doc.scenes[sceneId];
+		for (auto& rootNodeId : scene.nodes)
+		{
+			LoadNodes(doc, res, rootNodeId, true, a_TransformMat);
+		}
+	}
 
 	return &res;
 }
@@ -38,67 +88,189 @@ void Lumen::SceneManager::SetPipeline(LumenRenderer& a_Renderer)
 	m_VolumeManager.SetPipeline(a_Renderer);
 }
 
-void Lumen::SceneManager::LoadNodes(fx::gltf::Document& a_Doc, GLTFResource& a_Res, glm::mat4& a_TransformMat)
+void Lumen::SceneManager::ClearUnusedAssets()
 {
-	//store offsets in the case there is somehow already data loaded in the scene object
-	const int nodeOffset = static_cast<int>(a_Res.m_NodePool.size()) + 1;
-	const int meshOffset = static_cast<int>(a_Res.m_MeshPool.size());
+    for (auto loadedScene : m_LoadedScenes)
+    {
+		auto& res = loadedScene.second;
 
-	std::vector<std::shared_ptr<Node>> nodes;	//only supporting one scene per file. Seems to work fine 99% of the time
+        for (auto& mesh : res.m_MeshPool)
+        {
+            if (mesh.use_count() > 1) // Are there other shared pointer instances to this mesh?
+            {
+                // If yes, store the mesh separately from the GLTF resource
+				m_InUseMeshes.push_back(mesh);
+            }
+			else
+			{
+			    // Otherwise, reset the pointer, thus destroying the mesh
+				mesh.reset();
+			}
+        }
 
-	std::shared_ptr<Node> baseNode = std::make_shared<Node>();
-	baseNode->m_NodeID = nodeOffset - 1;
-	baseNode->m_LocalTransform = std::make_unique<Transform>(a_TransformMat);
-	nodes.push_back(baseNode);
+        for (auto& material : res.m_MaterialPool)
+        {
+			if (material.use_count() > 1) // Are there other shared pointer instances to this material?
+			{
+				// If yes, store the material separately from the GLTF resource
+				m_InUseMaterials.push_back(material);
+			}
+			else
+			{
+				// Otherwise, reset the pointer, thus destroying the material
+				material.reset();
+			}
+        }
+    }
 
-	for (auto& fxNodeIdx : a_Doc.scenes.at(0).nodes)
+	// Verify that none of the meshes and materials that are stored separately
+    // have been left unused since the last call to this function
+
+	for (auto& mesh : m_InUseMeshes)
 	{
-		const fx::gltf::Node& fxNode = a_Doc.nodes.at(fxNodeIdx);
-
-		std::shared_ptr<Node> newNode = std::make_shared<Node>();
-		newNode->m_MeshID = -1 ? -1 : (fxNode.mesh + meshOffset);
-		newNode->m_Name = fxNode.name;
-		newNode->m_NodeID = static_cast<int>(nodes.size());
-		newNode->m_LocalTransform = std::make_unique<Transform>();
-
-		for (int i = 0; i < static_cast<int>(fxNode.children.size()); i++)
+		if (mesh.use_count() <= 1) // Are there no other shared pointer instances to this mesh?
 		{
-			newNode->m_ChilIndices.push_back(fxNode.children.at(i) + nodeOffset);
+			// If there are none, this mesh can be safely deleted.
+			mesh.reset();
 		}
+	}
 
-		if (fxNode.translation.size() == 3)
+	for (auto& material : m_InUseMaterials)
+	{
+		if (material.use_count() <= 1) // Are there no other shared pointer instances to this material?
 		{
-			newNode->m_LocalTransform->SetPosition(glm::vec3(
-				fxNode.translation[0],
-				fxNode.translation[1],
-				fxNode.translation[2]
-			));
+			// If there are none, this material can be safely deleted.
+			material.reset();
 		}
-
-		if (fxNode.rotation.size() == 4)
-		{
-			newNode->m_LocalTransform->SetRotation(glm::quat(
-				fxNode.rotation[0],
-				fxNode.rotation[1],
-				fxNode.rotation[2],
-				fxNode.rotation[3]
-			));
-		}
-
-		if (fxNode.scale.size() == 3)
-		{
-			newNode->m_LocalTransform->SetScale(glm::vec3(
-				fxNode.scale[0],
-				fxNode.scale[1],
-				fxNode.scale[2]
-			));
-		}
-
-		a_Res.m_NodePool.push_back(newNode);
 	}
 }
 
-void Lumen::SceneManager::LoadMeshes(fx::gltf::Document& a_Doc, GLTFResource& a_Res, glm::mat4& a_TransformMat)
+void Lumen::SceneManager::LoadNodes(fx::gltf::Document& a_Doc, GLTFResource& a_Res, int a_NodeId, bool a_Root, const glm::mat4& a_TransformMat)
+{
+	const static glm::mat4 IDENTITY = glm::identity<glm::mat4>();
+
+	auto& node = a_Doc.nodes[a_NodeId];
+	glm::mat4 transform = glm::make_mat4(&node.matrix[0]);
+
+	//If the matrix is not defined, load from the other settings.
+	if(IDENTITY == transform)
+	{
+		auto translation = glm::vec3(
+			node.translation[0],
+			node.translation[1],
+			node.translation[2]
+		);
+
+		auto rotation = glm::quat(
+			node.rotation[0],
+			node.rotation[1],
+			node.rotation[2],
+			node.rotation[3]
+		);
+
+		auto scale = glm::vec3(
+			node.scale[0],
+			node.scale[1],
+			node.scale[2]
+		);
+
+		Transform t;
+		t.SetPosition(translation);
+		t.SetRotation(rotation);
+		t.SetScale(scale);
+
+		transform = t.GetTransformationMatrix();
+	}
+
+	const glm::mat4 chainedTransform = a_TransformMat * transform;
+
+	if(a_Root)
+	{
+        a_Res.m_RootNodeIndices.push_back(a_NodeId);
+	}
+
+	std::shared_ptr<Node> newNode = std::make_shared<Node>();
+	newNode->m_MeshID = node.mesh;
+	newNode->m_Name = node.name;
+	newNode->m_NodeID = static_cast<int>(a_NodeId);
+	newNode->m_LocalTransform = std::make_unique<Transform>(chainedTransform);
+
+	for (int i = 0; i < static_cast<int>(node.children.size()); i++)
+	{
+		newNode->m_ChilIndices.push_back(node.children.at(i));
+	}
+
+	a_Res.m_NodePool.push_back(newNode);
+
+	//If there is child meshes, recursively call.
+	if (!node.children.empty())
+	{
+		for (auto& id : node.children)
+		{
+			LoadNodes(a_Doc, a_Res, id, false, chainedTransform);
+		}
+	}
+
+	////store offsets in the case there is somehow already data loaded in the scene object
+	//const int nodeOffset = static_cast<int>(a_Res.m_NodePool.size()) + 1;
+	//const int meshOffset = static_cast<int>(a_Res.m_MeshPool.size());
+
+	//std::vector<std::shared_ptr<Node>> nodes;	//only supporting one scene per file. Seems to work fine 99% of the time
+
+	//std::shared_ptr<Node> baseNode = std::make_shared<Node>();
+	//baseNode->m_NodeID = nodeOffset - 1;
+	//baseNode->m_LocalTransform = std::make_unique<Transform>(a_TransformMat);
+	//nodes.push_back(baseNode);
+
+	//for (auto& fxNodeIdx : a_Doc.scenes.at(a_SceneId).nodes)
+	//{
+	//	const fx::gltf::Node& fxNode = a_Doc.nodes.at(fxNodeIdx);
+
+	//	std::shared_ptr<Node> newNode = std::make_shared<Node>();
+	//	newNode->m_MeshID = -1 ? -1 : (fxNode.mesh + meshOffset);
+	//	newNode->m_Name = fxNode.name;
+	//	newNode->m_NodeID = static_cast<int>(nodes.size());
+	//	newNode->m_LocalTransform = std::make_unique<Transform>();
+
+	//	for (int i = 0; i < static_cast<int>(fxNode.children.size()); i++)
+	//	{
+	//		newNode->m_ChilIndices.push_back(fxNode.children.at(i) + nodeOffset);
+	//	}
+
+	//NOTE: .size() returns the amount of elements (templated) at compile time. It's not the amount of valid values!
+	//	if (fxNode.translation.size() == 3)
+	//	{
+	//		newNode->m_LocalTransform->SetPosition(glm::vec3(
+	//			fxNode.translation[0],
+	//			fxNode.translation[1],
+	//			fxNode.translation[2]
+	//		));
+	//	}
+
+	//	if (fxNode.rotation.size() == 4)
+	//	{
+	//		newNode->m_LocalTransform->SetRotation(glm::quat(
+	//			fxNode.rotation[0],
+	//			fxNode.rotation[1],
+	//			fxNode.rotation[2],
+	//			fxNode.rotation[3]
+	//		));
+	//	}
+
+	//	if (fxNode.scale.size() == 3)
+	//	{
+	//		newNode->m_LocalTransform->SetScale(glm::vec3(
+	//			fxNode.scale[0],
+	//			fxNode.scale[1],
+	//			fxNode.scale[2]
+	//		));
+	//	}
+
+	//	a_Res.m_NodePool.push_back(newNode);
+	//}
+}
+
+void Lumen::SceneManager::LoadMeshes(fx::gltf::Document& a_Doc, GLTFResource& a_Res)
 {
 	const int meshOffset = static_cast<int>(a_Res.m_MeshPool.size());
 
@@ -170,6 +342,41 @@ void Lumen::SceneManager::LoadMeshes(fx::gltf::Document& a_Doc, GLTFResource& a_
 
 }
 
+Lumen::LoadedImageInformation Lumen::SceneManager::LoadTexture(fx::gltf::Document& a_File, int a_TextureId,
+    const std::string& a_Path, int a_NumChannels)
+{
+	assert(a_TextureId >= 0);
+
+	std::uint8_t* imgData = nullptr;
+	int w = 0;
+	int h = 0;
+	int channels = 0;
+
+
+	ImageData data(a_File, a_TextureId, a_Path);
+	auto info = data.Info();
+
+	stbi_set_flip_vertically_on_load(false);
+	if (info.IsBinary())
+	{
+		//Load from raw
+		imgData = stbi_load_from_memory(info.BinaryData, info.BinarySize, &w, &h, &channels, a_NumChannels);
+	}
+	else
+	{
+		//Load from file.
+		imgData = stbi_load(info.FileName.c_str(), &w, &h, &channels, a_NumChannels);
+	}
+	assert(imgData != nullptr && "Could not load and decode image for some reason.");
+
+	//If a specific number of channels was requested, overwrite the "would have been" channels count.
+	if (a_NumChannels != 0)
+	{
+		channels = a_NumChannels;
+	}
+	return LoadedImageInformation{ imgData, w, h, channels };
+}
+
 std::vector<uint8_t> Lumen::SceneManager::LoadBinary(fx::gltf::Document& a_Doc, uint32_t a_AccessorIndx)
 {
 	std::vector<unsigned char> data;
@@ -198,7 +405,7 @@ std::vector<uint8_t> Lumen::SceneManager::LoadBinary(fx::gltf::Document& a_Doc, 
 	return data;
 }
 
-void Lumen::SceneManager::LoadMaterials(fx::gltf::Document& a_Doc, GLTFResource& a_Res)
+void Lumen::SceneManager::LoadMaterials(fx::gltf::Document& a_Doc, GLTFResource& a_Res, const std::string& a_Path)
 {
 	std::vector<std::shared_ptr<ILumenMaterial>> materials;	// Get these iLumenMats from OptiXRenderer
 	//needs to be a more specific material implementation
@@ -209,6 +416,7 @@ void Lumen::SceneManager::LoadMaterials(fx::gltf::Document& a_Doc, GLTFResource&
 		LumenRenderer::MaterialData matData;
 		auto& mat = materials.emplace_back(m_RenderPipeline->CreateMaterial(matData));
 
+		//Load the diffuse color if not empty.
 		if (!fxMat.pbrMetallicRoughness.baseColorFactor.empty()) {
 			auto& arr = fxMat.pbrMetallicRoughness.baseColorFactor;
 			mat->SetDiffuseColor(glm::vec4(
@@ -221,12 +429,21 @@ void Lumen::SceneManager::LoadMaterials(fx::gltf::Document& a_Doc, GLTFResource&
 
 		if (fxMat.pbrMetallicRoughness.baseColorTexture.index != -1)
 		{
-			auto& fxTex = a_Doc.images.at(fxMat.pbrMetallicRoughness.baseColorTexture.index);
-			int x, y, c;
-			auto stbTex = stbi_load((a_Res.m_Path + "/../" + fxTex.uri).c_str(), &x, &y, &c, 4);
-			auto& tex = m_RenderPipeline->CreateTexture(stbTex, x, y);
+			//auto& fxTex = a_Doc.images.at(fxMat.pbrMetallicRoughness.baseColorTexture.index);
+			//int x, y, c;
+			//const auto file = (a_Res.m_Path + "/../" + fxTex.uri);
+			//const auto stbTex = stbi_load(file.c_str(), &x, &y, &c, 4);
+			//const auto tex = m_RenderPipeline->CreateTexture(stbTex, x, y);
+			
 
+			//Load the texture either from file or binary. Then create the engine texture object.
+			auto info = LoadTexture(a_Doc, fxMat.pbrMetallicRoughness.baseColorTexture.index, a_Path, 4);
+
+			const auto tex = m_RenderPipeline->CreateTexture(info.data, info.w, info.h);
 			mat->SetDiffuseTexture(tex);
+
+			//Free the memory after it's uploaded.
+			stbi_image_free(info.data);
 		}
 
 		if (fxMat.emissiveFactor != std::array<float, 3>{0.0f, 0.0f, 0.0f})

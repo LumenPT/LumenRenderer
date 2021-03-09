@@ -68,7 +68,7 @@ OutputLayer::OutputLayer()
 #ifdef WAVEFRONT
 	init.m_RenderResolution = { 800, 600 };
 	init.m_OutputResolution = { 800, 600 };
-	init.m_MaxDepth = 3;
+	init.m_MaxDepth = 1;
 	init.m_RaysPerPixel = 1;
 	init.m_ShadowRaysPerPixel = 1;
 #else
@@ -151,6 +151,8 @@ void OutputLayer::InitializeScenePresets()
 	std::string assetPath{ p.string() };
 	std::replace(assetPath.begin(), assetPath.end(), '\\', '/');
 
+	assetPath += "/Sandbox/assets/models/";
+
 	auto& scene = m_LumenPT->m_Scene;
 	auto assetManager = m_LayerServices->m_SceneManager;
 
@@ -158,12 +160,13 @@ void OutputLayer::InitializeScenePresets()
 	pres.m_Key = LMN_KEY_1;
 	pres.m_Function = [this, assetManager, assetPath]()
 	{
-	    auto filePath = assetPath + "/Sandbox/assets/models/Lantern.gltf";
+	    auto fileName = "Lantern.gltf";
+
 		auto scene = m_LumenPT->m_Scene;
 		// I suggest doing a scene clear so that we don't end up with scenes with duplicate meshes
 		scene->Clear();	
 
-		auto res = assetManager->LoadGLTF(filePath);
+		auto res = assetManager->LoadGLTF(fileName, assetPath);
 
 		auto mesh = scene->AddMesh();
 		auto meshLight = scene->AddMesh();
@@ -175,11 +178,11 @@ void OutputLayer::InitializeScenePresets()
 	pres.m_Key = LMN_KEY_2;
 	pres.m_Function = [this, assetManager, assetPath]()
 	{
-		auto filePath = assetPath + "/Sandbox/assets/models/Sponza/Sponza.gltf";
+		auto fileName = "Sponza.gltf";
 		auto scene = m_LumenPT->m_Scene;
 		scene->Clear();
 
-		auto res = assetManager->LoadGLTF(filePath);
+		auto res = assetManager->LoadGLTF(fileName, assetPath);
 
 		auto mesh = scene->AddMesh();
 		mesh->SetMesh(res->m_MeshPool[0]); // The file has a single mesh, which is sponza itself
@@ -197,6 +200,7 @@ void OutputLayer::HandleCameraInput(Camera& a_Camera)
 
 		a_Camera.IncrementYaw(-glm::radians(delta.first * m_CameraMouseSensitivity));
 		a_Camera.IncrementPitch(glm::radians(delta.second * m_CameraMouseSensitivity));
+
 	}
 
 
@@ -207,7 +211,7 @@ void OutputLayer::HandleCameraInput(Camera& a_Camera)
 	a_Camera.GetVectorData(eye, U, V, W);
 
 
-	if (Lumen::Input::IsKeyPressed(LMN_KEY_W))
+	if (Lumen::Input::IsKeyPressed(LMN_KEY_W))	
 	{
 		movementDirection += glm::normalize(W) * movementSpeed;
 	}
@@ -237,7 +241,7 @@ void OutputLayer::HandleCameraInput(Camera& a_Camera)
 		a_Camera.SetPosition(eye + glm::normalize(movementDirection) * movementSpeed);
 	}
 
-	constexpr float rotationSpeed = 30.f * (1.0f / 60.f);
+	constexpr float rotationSpeed = 100.f * (1.0f / 60.f);
 	float yawRotation = 0.f;
 	float pitchRotation = 0.f;
 	if (Lumen::Input::IsKeyPressed(LMN_KEY_LEFT))
