@@ -5,6 +5,7 @@
 
 #include <nanovdb/util/IO.h>
 #include <nanovdb/util/Primitives.h>
+#include <nanovdb/util/OpenToNanoVDB.h> 
 #include <openvdb/openvdb.h>
 #include <openvdb/io/io.h>
 
@@ -26,10 +27,10 @@ PTVolume::PTVolume(std::string a_FilePath, PTServiceLocator& a_ServiceLocator)
 	//TODO: remove
 	//m_Handle = nanovdb::createLevelSetSphere<float, nanovdb::CudaDeviceBuffer>(10.0f, nanovdb::Vec3d(0), 0.1);
 	//m_Handle = nanovdb::create<float, nanovdb::CudaDeviceBuffer>(10.0f, nanovdb::Vec3d(0), 0.1);
-	m_Handle = nanovdb::createLevelSetTorus<float, nanovdb::CudaDeviceBuffer>(10.0f, 5.0f, nanovdb::Vec3d(0), 0.1);
+	//m_Handle = nanovdb::createLevelSetTorus<float, nanovdb::CudaDeviceBuffer>(10.0f, 5.0f, nanovdb::Vec3d(0), 0.1);
 	//m_Handle = nanovdb::createLevelSetOctahedron<float, nanovdb::CudaDeviceBuffer>(10.0f, nanovdb::Vec3d(0), 0.1);
 
-	m_Handle.deviceUpload();
+	//m_Handle.deviceUpload();
 
 	auto* grid = m_Handle.grid<float>();
 
@@ -46,7 +47,7 @@ PTVolume::~PTVolume()
 
 void PTVolume::Load(std::string a_FilePath)
 {
-
+	
 	openvdb::initialize();
 	
 	openvdb::FloatGrid::Ptr grid =
@@ -66,16 +67,31 @@ void PTVolume::Load(std::string a_FilePath)
 	if (!std::filesystem::exists(a_FilePath))
 	{
 		assert(false); //File for VDB loading not found
-
-		openvdb::io::File file(a_FilePath);
 	}
 
 	auto filenameExtension = std::filesystem::path(a_FilePath).extension();
 	if (filenameExtension == ".vdb")
-	{
-		//auto handle = openvdb::io::lo
+	{		
+		//assert(false); //Loading of .vdb file not yet supported
+
+		openvdb::io::File file(a_FilePath);
+
+		file.open();
+
+		openvdb::GridBase::Ptr baseGrid;
+		for (openvdb::io::File::NameIterator nameIter = file.beginName();
+			nameIter != file.endName(); ++nameIter)
+		{
+			baseGrid = file.readGrid(nameIter.gridName());
+			break;
+		}
 		
-		assert(false); //Loading of .vdb file not yet supported
+		file.close();
+
+		openvdb::FloatGrid::Ptr grid = openvdb::gridPtrCast<openvdb::FloatGrid>(baseGrid);
+		m_Handle = nanovdb::openToNanoVDB<nanovdb::CudaDeviceBuffer>(*grid);
+		m_Handle.deviceUpload();
+		
 	}
 
 	else if (filenameExtension == ".vndb")

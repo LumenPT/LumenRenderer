@@ -87,7 +87,8 @@ public:
 		auto res = manager.LoadGLTF(p_string);
 
 		std::string vndbFilePath = { p.string() };
-		vndbFilePath.append("/Sandbox/assets/volume/Sphere.vndb");
+		//vndbFilePath.append("/Sandbox/assets/volume/Sphere.vndb");
+		vndbFilePath.append("/Sandbox/assets/volume/bunny.vdb");
 		auto volumeRes = manager.m_VolumeManager.LoadVDB(vndbFilePath);
 		
 		auto lumenPT = m_ContextLayer->GetPipeline();

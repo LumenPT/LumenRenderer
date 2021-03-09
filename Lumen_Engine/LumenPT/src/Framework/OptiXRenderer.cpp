@@ -85,7 +85,7 @@ OptiXRenderer::OptiXRenderer(const InitializationData& a_InitializationData)
 
     CreateShaderBindingTable();
 
-    m_Camera.SetPosition(glm::vec3(0.f, 0.f, -25.f));
+    m_Camera.SetPosition(glm::vec3(0.f, 0.f, -50.f));
 }
 
 OptiXRenderer::~OptiXRenderer()
