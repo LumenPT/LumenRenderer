@@ -13,7 +13,7 @@
 #-----
 
 #Ignore project specific directories
-*.lib
+#*.lib
 *.tlog
 **/build/**
 **/out/**
