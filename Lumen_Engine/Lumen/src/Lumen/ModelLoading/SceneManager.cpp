@@ -11,6 +11,30 @@
 //#include <string>
 #include <memory>
 
+Lumen::SceneManager::~SceneManager()
+{
+    for (auto loadedScene : m_LoadedScenes)
+    {
+		// Release the meshes and materials from each GLTFResource manually
+		auto& res = loadedScene.second;
+
+        for (auto& mesh : res.m_MeshPool)
+			mesh.reset();
+
+        for (auto& material : res.m_MaterialPool)
+			material.reset();
+    }
+
+	// Release the meshes and materials which are no longer parts of GLTFResources
+	// due to being in use by the renderer
+
+    for (auto& inUseMesh : m_InUseMeshes)
+		inUseMesh.reset();
+
+    for (auto& inUseMaterial : m_InUseMaterials)
+		inUseMaterial.reset();
+}
+
 Lumen::SceneManager::GLTFResource* Lumen::SceneManager::LoadGLTF(std::string a_FileName, std::string a_Path, const glm::mat4& a_TransformMat)
 {
 	const auto fullPath = a_Path + a_FileName;
@@ -62,6 +86,63 @@ void Lumen::SceneManager::SetPipeline(LumenRenderer& a_Renderer)
 {
 	m_RenderPipeline = &a_Renderer;
 	m_VolumeManager.SetPipeline(a_Renderer);
+}
+
+void Lumen::SceneManager::ClearUnusedAssets()
+{
+    for (auto loadedScene : m_LoadedScenes)
+    {
+		auto& res = loadedScene.second;
+
+        for (auto& mesh : res.m_MeshPool)
+        {
+            if (mesh.use_count() > 1) // Are there other shared pointer instances to this mesh?
+            {
+                // If yes, store the mesh separately from the GLTF resource
+				m_InUseMeshes.push_back(mesh);
+            }
+			else
+			{
+			    // Otherwise, reset the pointer, thus destroying the mesh
+				mesh.reset();
+			}
+        }
+
+        for (auto& material : res.m_MaterialPool)
+        {
+			if (material.use_count() > 1) // Are there other shared pointer instances to this material?
+			{
+				// If yes, store the material separately from the GLTF resource
+				m_InUseMaterials.push_back(material);
+			}
+			else
+			{
+				// Otherwise, reset the pointer, thus destroying the material
+				material.reset();
+			}
+        }
+    }
+
+	// Verify that none of the meshes and materials that are stored separately
+    // have been left unused since the last call to this function
+
+	for (auto& mesh : m_InUseMeshes)
+	{
+		if (mesh.use_count() <= 1) // Are there no other shared pointer instances to this mesh?
+		{
+			// If there are none, this mesh can be safely deleted.
+			mesh.reset();
+		}
+	}
+
+	for (auto& material : m_InUseMaterials)
+	{
+		if (material.use_count() <= 1) // Are there no other shared pointer instances to this material?
+		{
+			// If there are none, this material can be safely deleted.
+			material.reset();
+		}
+	}
 }
 
 void Lumen::SceneManager::LoadNodes(fx::gltf::Document& a_Doc, GLTFResource& a_Res, int a_NodeId, bool a_Root, const glm::mat4& a_TransformMat)

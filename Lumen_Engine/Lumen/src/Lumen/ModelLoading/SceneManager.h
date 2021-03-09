@@ -118,7 +118,7 @@ namespace Lumen
 		};
 
 		SceneManager() {};
-		~SceneManager() {};
+		~SceneManager();
 
 		SceneManager(SceneManager&) = delete;
 		SceneManager(SceneManager&&) = delete;
@@ -133,6 +133,9 @@ namespace Lumen
 		GLTFResource* LoadGLTF(std::string a_FileName, std::string a_Path, const glm::mat4& a_TransformMat = glm::mat4(1));	//Load & add to loadedScenes
 
 		void SetPipeline(LumenRenderer& a_Renderer);
+
+		// Removes unused assets from GPU memory. An asset is unused if the no scene or mesh makes use of it.
+		void ClearUnusedAssets();
 
 		//TODO: public for testing, make this private later
 		VolumeManager m_VolumeManager;
@@ -161,6 +164,8 @@ namespace Lumen
 
 		LumenRenderer* m_RenderPipeline;
 
+		std::vector<std::shared_ptr<Lumen::ILumenMesh>>		m_InUseMeshes;
+		std::vector<std::shared_ptr<ILumenMaterial>>		m_InUseMaterials;
 	};
 
 
