@@ -1138,6 +1138,7 @@ GLuint WaveFrontRenderer::TraceFrame()
 
     //Generate Camera rays using CUDA kernel.
     float3 eye, u, v, w;
+    m_Camera.SetAspectRatio(static_cast<float>(m_RenderResolution.x) / static_cast<float>(m_RenderResolution.y));
     m_Camera.GetVectorData(eye, u, v, w);
     const WaveFront::DeviceCameraData cameraData(eye, u, v, w);
 

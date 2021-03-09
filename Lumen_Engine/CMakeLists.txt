@@ -19,6 +19,8 @@ add_subdirectory ("Lumen/vendor/Glad")
 	#ImGui
 add_subdirectory ("Lumen/vendor/ImGui")
 
+set(DISABLE_CMAKE_SEARCH_PATHS ON)
+
 set(ILMBASE_INCLUDEDIR "${CMAKE_CURRENT_SOURCE_DIR}/LumenPT/vendor/Include")
 set(ILMBASE_LIBRARYDIR "${CMAKE_CURRENT_SOURCE_DIR}/LumenPT/vendor/Libs/OpenEXR")
 
