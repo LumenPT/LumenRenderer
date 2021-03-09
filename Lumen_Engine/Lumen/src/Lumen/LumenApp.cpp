@@ -39,7 +39,7 @@ namespace Lumen
 
 	LumenApp::~LumenApp()
 	{
-		
+		m_SceneManager.reset();
 	}
 
 	void LumenApp::Run()

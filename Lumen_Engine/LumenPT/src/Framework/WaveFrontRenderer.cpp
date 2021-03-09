@@ -546,7 +546,9 @@ m_Initialized(false)
 }
 
 WaveFrontRenderer::~WaveFrontRenderer()
-{}
+{    
+    m_Scene.reset();
+}
 
 bool WaveFrontRenderer::Initialize(const InitializationData& a_InitializationData)
 {
