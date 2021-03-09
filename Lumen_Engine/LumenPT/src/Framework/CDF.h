@@ -1,7 +1,10 @@
 #pragma once
 #include "MemoryBuffer.h"
 
-struct TriangleLight;
+namespace WaveFront
+{
+	struct TriangleLight;
+}
 
 //TODO add CDFEntry struct in ReSTIRData.h  Add parallel CDF building if possible.
 
@@ -11,7 +14,7 @@ public:
 	/*
 	 * Rebuild this CDF for the given set of lights.
 	 */
-	void Build(int a_NumLights, TriangleLight* a_Lights);
+	void Build(int a_NumLights, WaveFront::TriangleLight* a_Lights);
 
 	/*
 	 * Fill a light bag buffer with lights from this CDF.

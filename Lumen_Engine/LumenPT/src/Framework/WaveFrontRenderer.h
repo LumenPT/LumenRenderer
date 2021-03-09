@@ -200,13 +200,12 @@ private:
     std::unique_ptr<ShaderBindingTableGenerator> m_RaysSBTGenerator;
     std::unique_ptr<ShaderBindingTableGenerator> m_ShadowRaysSBTGenerator;
 
-    RecordHandle<WaveFront::ResolveRaysRayGenData> m_RaysRayGenRecord;
-    RecordHandle<WaveFront::ResolveRaysHitData> m_RaysHitRecord;
-    RecordHandle<WaveFront::ResolveRaysMissData> m_RaysMissRecord;
+    RecordHandle<WaveFront::OptixRayGenData> m_RaysRayGenRecord;
+    RecordHandle<WaveFront::OptixEmptyRecord> m_RaysMissRecord;
 
-    RecordHandle<WaveFront::ResolveShadowRaysRayGenData> m_ShadowRaysRayGenRecord;
-    RecordHandle<WaveFront::ResolveShadowRaysHitData> m_ShadowRaysHitRecord;
-    RecordHandle<WaveFront::ResolveShadowRaysMissData> m_ShadowRaysMissRecord;
+    RecordHandle<WaveFront::OptixRayGenData> m_ShadowRaysRayGenRecord;
+    RecordHandle<WaveFront::OptixEmptyRecord> m_ShadowRaysHitRecord;
+    RecordHandle<WaveFront::OptixEmptyRecord> m_ShadowRaysMissRecord;
 
     std::map<std::string, OptixProgramGroup> m_ProgramGroups;
 
@@ -224,7 +223,7 @@ private:
     std::unique_ptr<MemoryBuffer> m_PixelBufferMultiChannel;
     std::unique_ptr<MemoryBuffer> m_PixelBufferSingleChannel;
     //2 ray batches, 1 for storing primary rays, other for overwriting secondary rays.
-    std::unique_ptr<MemoryBuffer> m_RayBatches[s_NumRayBatchTypes];
+    std::unique_ptr<MemoryBuffer> m_IntersectionRayBatches[s_NumRayBatchTypes];
     //2 intersection buffers, 1 for storing primary intersections, other for overwriting secondary intersections.
     std::unique_ptr<MemoryBuffer> m_IntersectionBuffers[s_NumHitBufferTypes];
     //1 shadow ray batch to overwrite with shadow rays.

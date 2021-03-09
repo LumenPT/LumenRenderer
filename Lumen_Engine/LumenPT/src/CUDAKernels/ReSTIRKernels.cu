@@ -29,7 +29,7 @@ __global__ void ResetReservoirInternal(int a_NumReservoirs, Reservoir* a_Reservo
     }
 }
 
-__host__ void FillCDF(CDF* a_Cdf, TriangleLight* a_Lights, unsigned a_LightCount)
+__host__ void FillCDF(CDF* a_Cdf, WaveFront::TriangleLight* a_Lights, unsigned a_LightCount)
 {
     //TODO: This is not efficient single threaded.
     //TODO: Use this: https://developer.nvidia.com/gpugems/gpugems3/part-vi-gpu-computing/chapter-39-parallel-prefix-sum-scan-cuda
@@ -47,7 +47,7 @@ __global__ void ResetCDF(CDF* a_Cdf)
     a_Cdf->Reset();
 }
 
-__global__ void FillCDFInternal(CDF* a_Cdf, TriangleLight* a_Lights, unsigned a_LightCount)
+__global__ void FillCDFInternal(CDF* a_Cdf, WaveFront::TriangleLight* a_Lights, unsigned a_LightCount)
 {
     for (int i = 0; i < a_LightCount; ++i)
     {
@@ -57,7 +57,7 @@ __global__ void FillCDFInternal(CDF* a_Cdf, TriangleLight* a_Lights, unsigned a_
     }
 }
 
-__host__ void FillLightBags(unsigned a_NumLightBags, CDF* a_Cdf, LightBagEntry* a_LightBagPtr, TriangleLight* a_Lights, const std::uint32_t a_Seed)
+__host__ void FillLightBags(unsigned a_NumLightBags, CDF* a_Cdf, LightBagEntry* a_LightBagPtr, WaveFront::TriangleLight* a_Lights, const std::uint32_t a_Seed)
 {
     const int blockSize = CUDA_BLOCK_SIZE;
     const int numBlocks = (a_NumLightBags + blockSize - 1) / blockSize;
@@ -65,7 +65,7 @@ __host__ void FillLightBags(unsigned a_NumLightBags, CDF* a_Cdf, LightBagEntry* 
     cudaDeviceSynchronize();
 }
 
-__global__ void FillLightBagsInternal(unsigned a_NumLightBags, CDF* a_Cdf, LightBagEntry* a_LightBagPtr, TriangleLight* a_Lights, const std::uint32_t a_Seed)
+__global__ void FillLightBagsInternal(unsigned a_NumLightBags, CDF* a_Cdf, LightBagEntry* a_LightBagPtr, WaveFront::TriangleLight* a_Lights, const std::uint32_t a_Seed)
 {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     int stride = blockDim.x * gridDim.x;
@@ -96,7 +96,7 @@ __host__ void PickPrimarySamples(const WaveFront::RayData* const a_RayData, cons
     cudaDeviceSynchronize();
 }
 
-__global__ void PickPrimarySamplesInternal(const WaveFront::RayData* const a_RayData, const WaveFront::IntersectionData* const a_IntersectionData, const LightBagEntry* const a_LightBags, Reservoir* a_Reservoirs, const ReSTIRSettings& a_Settings, PixelData* a_PixelData, const std::uint32_t a_Seed)
+__global__ void PickPrimarySamplesInternal(const WaveFront::IntersectionRayData* const a_RayData, const WaveFront::IntersectionData* const a_IntersectionData, const LightBagEntry* const a_LightBags, Reservoir* a_Reservoirs, const ReSTIRSettings& a_Settings, PixelData* a_PixelData, const std::uint32_t a_Seed)
 {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     int stride = blockDim.x * gridDim.x;
@@ -182,7 +182,7 @@ __global__ void PickPrimarySamplesInternal(const WaveFront::RayData* const a_Ray
 
                 const int pickedLightIndex = static_cast<int>(round(static_cast<float>(a_Settings.numLightsPerBag - 1) * r));
                 const LightBagEntry pickedEntry = pickedLightBag[pickedLightIndex];
-                const TriangleLight light = pickedEntry.light;
+                const WaveFront::TriangleLight light = pickedEntry.light;
                 const float initialPdf = pickedEntry.pdf;
 
                 //Generate random UV coordinates. Between 0 and 1.

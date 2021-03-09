@@ -71,7 +71,7 @@ CPU_ONLY void ReSTIR::Initialize(const ReSTIRSettings& a_Settings)
 CPU_ONLY void ReSTIR::Run(
 	const WaveFront::IntersectionData* const a_CurrentIntersections,
 	const WaveFront::RayData* const a_RayBuffer,
-	const std::vector<TriangleLight>& a_Lights,
+	const std::vector<WaveFront::TriangleLight>& a_Lights,
 	const float3 a_CameraPosition,
 	const std::uint32_t a_Seed,
 	const OptixTraversableHandle a_OptixSceneHandle
@@ -92,7 +92,7 @@ CPU_ONLY void ReSTIR::Run(
 	 */
 	{
 		//Light buffer
-		const size_t size = sizeof(TriangleLight) * a_Lights.size();
+		const size_t size = sizeof(WaveFront::TriangleLight) * a_Lights.size();
 		if (m_Lights.GetSize() < size)
 		{
 			m_Lights.Resize(size);
@@ -105,12 +105,12 @@ CPU_ONLY void ReSTIR::Run(
 		m_Cdf.Resize(sizeof(CDF) + (a_Lights.size() * sizeof(float)));
 
 		//Insert the light data in the CDF.
-		FillCDF(static_cast<CDF*>(m_Cdf.GetDevicePtr()), static_cast<TriangleLight*>(m_Lights.GetDevicePtr()), m_Lights.GetSize());
+		FillCDF(static_cast<CDF*>(m_Cdf.GetDevicePtr()), static_cast<WaveFront::TriangleLight*>(m_Lights.GetDevicePtr()), m_Lights.GetSize());
 	}
 	//Fill light bags with values from the CDF.
 	{
 		seed = WangHash(seed);
-		FillLightBags(m_Settings.numLightBags, static_cast<CDF*>(m_Cdf.GetDevicePtr()), static_cast<LightBagEntry*>(m_LightBags.GetDevicePtr()), static_cast<TriangleLight*>(m_Lights.GetDevicePtr()), seed);
+		FillLightBags(m_Settings.numLightBags, static_cast<CDF*>(m_Cdf.GetDevicePtr()), static_cast<LightBagEntry*>(m_LightBags.GetDevicePtr()), static_cast<WaveFront::TriangleLight*>(m_Lights.GetDevicePtr()), seed);
 	}
 
 	//Pointers to the pixel data buffers.

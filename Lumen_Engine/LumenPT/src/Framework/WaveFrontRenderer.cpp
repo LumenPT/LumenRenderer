@@ -262,13 +262,13 @@ void SaveRayBatchToBMP(
 
     const unsigned int totalRays = a_Width * a_Height * a_SamplesPerPixel;
     const unsigned int numRaysPerSample = a_Width * a_Height;
-    const unsigned int byteSize = sizeof(RayBatch) + totalRays * sizeof(RayData);
+    const unsigned int byteSize = sizeof(IntersectionRayBatch) + totalRays * sizeof(IntersectionRayData);
 
     void* cpuMemPtr = malloc(byteSize);
     cudaMemcpy(cpuMemPtr, a_GpuMemPtr, byteSize, cudaMemcpyDeviceToHost);
 
-    const RayBatch* rayBatch = reinterpret_cast<RayBatch*>(cpuMemPtr);
-    const RayData* rayDataBuffer = rayBatch->m_Rays;
+    const IntersectionRayBatch* rayBatch = reinterpret_cast<IntersectionRayBatch*>(cpuMemPtr);
+    const IntersectionRayData* rayDataBuffer = rayBatch->m_Rays;
 
 
     unsigned char* imageBuffer = reinterpret_cast<unsigned char*>(malloc(numRaysPerSample * 3));
@@ -297,7 +297,7 @@ void SaveRayBatchToBMP(
 
                 const unsigned rayIndex = row * a_Width + column;
                 const unsigned rayDataIndex = rayIndex * a_SamplesPerPixel + sampleIndex; //Same pattern as is used in PixelBuffer data struct.
-                const RayData& currentPixel = rayDataBuffer[rayDataIndex];
+                const IntersectionRayData& currentPixel = rayDataBuffer[rayDataIndex];
 
                 constexpr float maxColorChannelVal = static_cast<float>(0xFF);
 
@@ -512,7 +512,7 @@ m_HitBufferIndices({0}),
 m_ResultBuffer(nullptr),
 m_PixelBufferMultiChannel(nullptr),
 m_PixelBufferSingleChannel(nullptr),
-m_RayBatches(),
+m_IntersectionRayBatches(),
 m_IntersectionBuffers(),
 m_ShadowRayBatch(nullptr),
 m_LightBufferTemp(nullptr),
@@ -610,12 +610,12 @@ bool WaveFrontRenderer::CreatePipelines(const std::string& a_ShaderPath)
 
     bool success = true;
 
-    const std::string resolveRaysParams = "resolveRaysParams";
+    const std::string resolveRaysParams = "launchParams";
     const std::string resolveRaysRayGenFuncName = "__raygen__ResolveRaysRayGen";
     const std::string resolveRaysHitFuncName = "__closesthit__ResolveRaysClosestHit";
     const std::string resolveRaysMissFuncName = "__miss__ResolveRaysMiss";
 
-    const std::string resolveShadowRaysParams = "resolveShadowRaysParams";
+    const std::string resolveShadowRaysParams = "launchParams";
     const std::string resolveShadowRaysRayGenFuncName = "__raygen__ResolveShadowRaysRayGen";
     const std::string resolveShadowRaysHitFuncName = "__anyhit__ResolveShadowRaysAnyHit";
     const std::string resolveShadowRaysMissFuncName = "__miss__ResolveShadowRaysMiss";
@@ -788,8 +788,8 @@ bool WaveFrontRenderer::CreatePipeline(
 void WaveFrontRenderer::CreatePipelineBuffers()
 {
 
-    m_PipelineRaysLaunchParams = std::make_unique<MemoryBuffer>(sizeof(WaveFront::ResolveRaysLaunchParameters));
-    m_PipelineShadowRaysLaunchParams = std::make_unique<MemoryBuffer>(sizeof(WaveFront::ResolveShadowRaysLaunchParameters));
+    m_PipelineRaysLaunchParams = std::make_unique<MemoryBuffer>(sizeof(WaveFront::OptixLaunchParameters));
+    m_PipelineShadowRaysLaunchParams = std::make_unique<MemoryBuffer>(sizeof(WaveFront::OptixLaunchParameters));
 
 }
 
@@ -878,27 +878,21 @@ OptixProgramGroup WaveFrontRenderer::CreateProgramGroup(OptixProgramGroupDesc a_
 
 void WaveFrontRenderer::CreateShaderBindingTables()
 {
-
-    //Do these need a data struct if there is no data needed per "shader"??
     
-    m_RaysRayGenRecord = m_RaysSBTGenerator->SetRayGen<ResolveRaysRayGenData>();
-    //m_RaysHitRecord = m_RaysSBTGenerator->AddHitGroup<ResolveRaysHitData>();
-    m_RaysMissRecord = m_RaysSBTGenerator->AddMiss<ResolveRaysMissData>();
+    m_RaysRayGenRecord = m_RaysSBTGenerator->SetRayGen<OptixRayGenData>();
+    m_RaysMissRecord = m_RaysSBTGenerator->AddMiss<OptixEmptyRecord>();
 
     auto& raysRayGenRecord = m_RaysRayGenRecord.GetRecord();
     raysRayGenRecord.m_Header = GetProgramGroupHeader(s_RaysRayGenPGName);
     raysRayGenRecord.m_Data.m_MinDistance = s_MinTraceDistance;
     raysRayGenRecord.m_Data.m_MaxDistance = s_MaxTraceDistance;
 
-    //auto& raysHitRecord = m_RaysHitRecord.GetRecord();
-    //raysHitRecord.m_Header = GetProgramGroupHeader(s_RaysHitPGName);
-
     auto& raysMissRecord = m_RaysMissRecord.GetRecord();
     raysMissRecord.m_Header = GetProgramGroupHeader(s_RaysMissPGName);
 
-    m_ShadowRaysRayGenRecord = m_ShadowRaysSBTGenerator->SetRayGen<ResolveShadowRaysRayGenData>();
-    m_ShadowRaysHitRecord = m_ShadowRaysSBTGenerator->AddHitGroup<ResolveShadowRaysHitData>();
-    m_ShadowRaysMissRecord = m_ShadowRaysSBTGenerator->AddMiss<ResolveShadowRaysMissData>();
+    m_ShadowRaysRayGenRecord = m_ShadowRaysSBTGenerator->SetRayGen<OptixRayGenData>();
+    m_ShadowRaysHitRecord = m_ShadowRaysSBTGenerator->AddHitGroup<OptixEmptyRecord>();
+    m_ShadowRaysMissRecord = m_ShadowRaysSBTGenerator->AddMiss<OptixEmptyRecord>();
 
     auto& shadowRaysRayGenRecord = m_ShadowRaysRayGenRecord.GetRecord();
     shadowRaysRayGenRecord.m_Header = GetProgramGroupHeader(s_ShadowRaysRayGenPGName);
@@ -969,12 +963,12 @@ void WaveFrontRenderer::CreateDataBuffers()
     m_ResultBuffer = std::make_unique<MemoryBuffer>(sizeof(ResultBuffer));
     m_ResultBuffer->Write(&pixelBufferPtr, sizeof(ResultBuffer::m_PixelBuffer), 0);
 
-    const unsigned rayBatchEmptySize = sizeof(RayBatch);
-    const unsigned rayDataStructSize = sizeof(RayData);
+    const unsigned rayBatchEmptySize = sizeof(IntersectionRayBatch);
+    const unsigned rayDataStructSize = sizeof(IntersectionRayData);
 
     //Allocate and initialize ray batches.
     int batchIndex = 0;
-    for(auto& rayBatch : m_RayBatches)
+    for(auto& rayBatch : m_IntersectionRayBatches)
     {
         rayBatch = std::make_unique<MemoryBuffer>(
             static_cast<size_t>(rayBatchEmptySize) + 
@@ -984,7 +978,7 @@ void WaveFrontRenderer::CreateDataBuffers()
         //rayBatch->Write(numPixels, 0);
         //rayBatch->Write(m_RaysPerPixel, sizeof(RayBatch::m_NumPixels));
 
-        ResetRayBatch(rayBatch->GetDevicePtr<RayBatch>(), numPixels, m_RaysPerPixel);
+        ResetRayBatch(rayBatch->GetDevicePtr<IntersectionRayBatch>(), numPixels, m_RaysPerPixel);
 
         void* rayBatchCuPtr = rayBatch->GetDevicePtr();
         SaveRayBatchToBMP(
@@ -1059,11 +1053,14 @@ void WaveFrontRenderer::CreateDataBuffers()
         {{0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}},
         {{0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}},
         {{0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}} };
-    LightBuffer tempLightBuffer(3,lights);
 
+    LightBuffer* tempLightBuffer = reinterpret_cast<LightBuffer*>(malloc(sizeof(LightBuffer) + sizeof(lights)));
+    tempLightBuffer->m_Lights[0] = lights[0];
+    tempLightBuffer->m_Lights[1] = lights[1];
+    tempLightBuffer->m_Lights[2] = lights[2];
 
     m_LightBufferTemp->Write(
-        &tempLightBuffer, 
+        tempLightBuffer, 
         static_cast<size_t>(LightBufferEmptySize) +
         static_cast<size_t>(3) *
         static_cast<size_t>(LightDataStructSize));
@@ -1139,7 +1136,7 @@ GLuint WaveFrontRenderer::TraceFrame()
     //Generate Camera rays using CUDA kernel.
     float3 eye, u, v, w;
     m_Camera.GetVectorData(eye, u, v, w);
-    const WaveFront::DeviceCameraData cameraData(eye, u, v, w);
+    const WaveFront::PrimRayGenLaunchParameters::DeviceCameraData cameraData(eye, u, v, w);
 
     //Get new Ray Batch to fill with Primary Rays (Either first or last ray batch, opposite of current PrimRaysPrevFrame batch)
     //Get a new array of indices to temporarily update the current array of indices.
@@ -1148,11 +1145,11 @@ GLuint WaveFrontRenderer::TraceFrame()
 
     //Get index to use to get the ray batch to use for the current ray buffer.
     const unsigned currentRayBatchIndex = batchIndices[static_cast<unsigned>(RayBatchTypeIndex::CURRENT_RAYS)];
-    MemoryBuffer& currentRaysBatch = *m_RayBatches[currentRayBatchIndex];
+    MemoryBuffer& currentRaysBatch = *m_IntersectionRayBatches[currentRayBatchIndex];
 
     //Generate primary rays using the setup parameters
-    const SetupLaunchParameters setupParams(m_RenderResolution, cameraData, currentRaysBatch.GetDevicePtr<RayBatch>());
-    GenerateRays(setupParams);
+    const PrimRayGenLaunchParameters primaryRayGenParams(m_RenderResolution, cameraData, currentRaysBatch.GetDevicePtr<IntersectionRayBatch>());
+    GeneratePrimaryRays(primaryRayGenParams);
 
     
 
@@ -1168,13 +1165,13 @@ GLuint WaveFrontRenderer::TraceFrame()
     OptixShaderBindingTable raysSBT = m_RaysSBTGenerator->GetTableDesc();
 
     //Initialize resolveRaysLaunchParameters with common variables between different waves.
-    ResolveRaysLaunchParameters optixRaysLaunchParams{};
+    OptixLaunchParameters optixRaysLaunchParams{};
 
 
     /// <summary> /////////////////////////////
     /// IMPORTANT THIS GETS RAN AFTER SHADER BINDING TABLE GETS GENERATED!!
     /// </summary> ////////////////////////////
-    optixRaysLaunchParams.m_Common.m_Traversable = dynamic_cast<PTScene&>(*m_Scene).GetSceneAccelerationStructure();
+    optixRaysLaunchParams.m_TraversableHandle = dynamic_cast<PTScene&>(*m_Scene).GetSceneAccelerationStructure();
 
     uint3 resolutionAndDepth = make_uint3(m_RenderResolution.x, m_RenderResolution.y, 0);
     
@@ -1190,9 +1187,9 @@ GLuint WaveFrontRenderer::TraceFrame()
         GetRayBatchIndices(waveIndex, m_RayBatchIndices, m_RayBatchIndices);
         GetHitBufferIndices(waveIndex, m_HitBufferIndices, m_HitBufferIndices);
 
-        MemoryBuffer& primRaysPrevFrame =   *m_RayBatches[m_RayBatchIndices[static_cast<unsigned>(RayBatchTypeIndex::PRIM_RAYS_PREV_FRAME)]];
-        MemoryBuffer& currentRays =         *m_RayBatches[m_RayBatchIndices[static_cast<unsigned>(RayBatchTypeIndex::CURRENT_RAYS)]];
-        MemoryBuffer& secondaryRays =       *m_RayBatches[m_RayBatchIndices[static_cast<unsigned>(RayBatchTypeIndex::SECONDARY_RAYS)]];
+        MemoryBuffer& primRaysPrevFrame =   *m_IntersectionRayBatches[m_RayBatchIndices[static_cast<unsigned>(RayBatchTypeIndex::PRIM_RAYS_PREV_FRAME)]];
+        MemoryBuffer& currentRays =         *m_IntersectionRayBatches[m_RayBatchIndices[static_cast<unsigned>(RayBatchTypeIndex::CURRENT_RAYS)]];
+        MemoryBuffer& secondaryRays =       *m_IntersectionRayBatches[m_RayBatchIndices[static_cast<unsigned>(RayBatchTypeIndex::SECONDARY_RAYS)]];
 
         MemoryBuffer& primHitsPrevFrame =   *m_IntersectionBuffers[m_HitBufferIndices[static_cast<unsigned>(HitBufferTypeIndex::PRIM_HITS_PREV_FRAME)]];
         MemoryBuffer& currentHits =         *m_IntersectionBuffers[m_HitBufferIndices[static_cast<unsigned>(HitBufferTypeIndex::CURRENT_HITS)]];
@@ -1233,9 +1230,9 @@ GLuint WaveFrontRenderer::TraceFrame()
         //Resolution and current depth(, current depth = current wave index)
         resolutionAndDepth.z = waveIndex;
 
-        optixRaysLaunchParams.m_Common.m_ResolutionAndDepth = resolutionAndDepth;
-        optixRaysLaunchParams.m_Rays = currentRays.GetDevicePtr<RayBatch>();
-        optixRaysLaunchParams.m_Intersections = currentHits.GetDevicePtr<IntersectionBuffer>();
+        optixRaysLaunchParams.m_ResolutionAndDepth = resolutionAndDepth;
+        optixRaysLaunchParams.m_IntersectionRayBatch = currentRays.GetDevicePtr<IntersectionRayBatch>();
+        optixRaysLaunchParams.m_IntersectionBuffer = currentHits.GetDevicePtr<IntersectionBuffer>();
 
         m_PipelineRaysLaunchParams->Write(optixRaysLaunchParams);
 
@@ -1252,6 +1249,9 @@ GLuint WaveFrontRenderer::TraceFrame()
             m_RenderResolution.x,
             m_RenderResolution.y,
             m_RaysPerPixel)); //Number of rays per pixel, number of samples per pixel.
+
+        cudaDeviceSynchronize();
+        CHECKLASTCUDAERROR;
         
         //cudaStreamSynchronize(0);
         /*cudaDeviceSynchronize();
@@ -1269,11 +1269,11 @@ GLuint WaveFrontRenderer::TraceFrame()
 
         ShadingLaunchParameters shadingLaunchParams(
             resolutionAndDepth, 
-            primRaysPrevFrame.GetDevicePtr<RayBatch>(),
+            primRaysPrevFrame.GetDevicePtr<IntersectionRayBatch>(),
             primHitsPrevFrame.GetDevicePtr<IntersectionBuffer>(),
-            currentRays.GetDevicePtr<RayBatch>(),
+            currentRays.GetDevicePtr<IntersectionRayBatch>(),
             currentHits.GetDevicePtr<IntersectionBuffer>(),
-            secondaryRays.GetDevicePtr<RayBatch>(),
+            secondaryRays.GetDevicePtr<IntersectionRayBatch>(),
             m_ShadowRayBatch->GetDevicePtr<ShadowRayBatch>(),
             m_LightBufferTemp->GetDevicePtr<LightBuffer>(),
             nullptr, //TODO: REPLACE THIS WITH LIGHT BUFFER FROM SCENE.

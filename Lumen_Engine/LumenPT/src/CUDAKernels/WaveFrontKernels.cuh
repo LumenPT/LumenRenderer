@@ -19,7 +19,7 @@ using namespace WaveFront;
  * Generates the camera rays.
  * Synchronizes with device at the end of the function.
  */
-CPU_ONLY void GenerateRays(const SetupLaunchParameters& a_SetupParams);
+CPU_ONLY void GeneratePrimaryRays(const PrimRayGenLaunchParameters& a_PrimRayGenParams);
 
 /*
  * 
@@ -46,9 +46,9 @@ CPU_ONLY void PostProcess(const PostProcessLaunchParameters& a_PostProcessParams
 //The below functions are only called internally from the GPU_ONLY within the above defined functions.
 
 //Generate some rays based on the thread index.
-CPU_ON_GPU void GenerateRay(
+CPU_ON_GPU void GeneratePrimaryRay(
     int a_NumRays, 
-    RayBatch* const a_Buffer, 
+    IntersectionRayBatch* const a_Buffer, 
     float3 a_U, 
     float3 a_V, 
     float3 a_W, 
@@ -64,7 +64,7 @@ CPU_ON_GPU void GenerateRay(
  */
 CPU_ON_GPU void ShadeDirect(
     const uint3 a_ResolutionAndDepth, 
-    const RayBatch* const a_CurrentRays, 
+    const IntersectionRayBatch* const a_CurrentRays, 
     const IntersectionBuffer* const a_CurrentIntersections, 
     ShadowRayBatch* const a_ShadowRays, 
     const LightBuffer* const a_Lights, 
@@ -80,14 +80,14 @@ CPU_ON_GPU void ShadeSpecular();
  */
 CPU_ON_GPU void ShadeIndirect(
     const uint3 a_ResolutionAndDepth, 
-    const RayBatch* const a_PreviousRays, 
+    const IntersectionRayBatch* const a_PreviousRays, 
     const IntersectionBuffer* const a_Intersections, 
-    RayBatch* const a_Output);
+    IntersectionRayBatch* const a_Output);
 
 
 CPU_ON_GPU void DEBUGShadePrimIntersections(
     const uint3 a_ResolutionAndDepth,
-    const RayBatch* const a_PrimaryRays,
+    const IntersectionRayBatch* const a_PrimaryRays,
     const IntersectionBuffer* const a_PrimaryIntersections,
     ResultBuffer* const a_Output);
 
@@ -139,16 +139,16 @@ GPU_ONLY INLINE float RandomFloat(unsigned int& a_S);
 //Reset ray batch.
 
 CPU_ONLY void ResetRayBatch(
-    RayBatch* const a_RayBatchDevPtr,
+    IntersectionRayBatch* const a_RayBatchDevPtr,
     unsigned int a_NumPixels,
     unsigned int a_RaysPerPixel);
 
 CPU_ON_GPU void ResetRayBatchMembers(
-    RayBatch* const a_RayBatch, 
+    IntersectionRayBatch* const a_RayBatch, 
     unsigned int a_NumPixels, 
     unsigned int a_RaysPerPixel);
 
-CPU_ON_GPU void ResetRayBatchData(RayBatch* const a_RayBatch);
+CPU_ON_GPU void ResetRayBatchData(IntersectionRayBatch* const a_RayBatch);
 
 //Reset shadow ray batch.
 

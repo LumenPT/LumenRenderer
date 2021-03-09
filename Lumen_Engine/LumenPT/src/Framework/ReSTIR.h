@@ -30,7 +30,7 @@ public:
 	 */
 	CPU_ONLY void Run(const WaveFront::IntersectionData* const a_CurrentIntersections,
 		const WaveFront::RayData* const a_RayBuffer,
-		const std::vector<TriangleLight>& a_Lights,
+		const std::vector<WaveFront::TriangleLight>& a_Lights,
 	    const float3 a_CameraPosition,
 		const std::uint32_t a_Seed,
 		const OptixTraversableHandle a_OptixSceneHandle

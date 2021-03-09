@@ -4,8 +4,10 @@
  * This file contains data structures used by ReSTIR on the GPU.
  */
 
+#include "CudaDefines.h"
+#include "WaveFrontDataStructs/LightDataBuffer.h"
+
 #include <Optix/optix.h>
-#include "../Shaders/CppCommon/CudaDefines.h"
 #include <Cuda/cuda/helpers.h>
 #include <assert.h>
 #include <limits>
@@ -101,16 +103,7 @@ struct LightSample
     float solidAnglePdf;                    //solid angle PDF which is used to weight this samples importance.
 };
 
-/*
- * An emissive triangle.
- */
-struct TriangleLight
-{
-    float3 p0, p1, p2;
-    float3 normal;
-    float3 radiance;    //Radiance has the texture color baked into it. Probably average texture color.
-    float area;         //The area of the triangle. This is required to project the light onto a hemisphere.
-};
+
 
 /*
  * Reservoirs contain a weight and chosen sample.
@@ -273,7 +266,7 @@ struct CDF
 
 struct LightBagEntry
 {
-    TriangleLight light;
+    WaveFront::TriangleLight light;
     float pdf;
 };
 

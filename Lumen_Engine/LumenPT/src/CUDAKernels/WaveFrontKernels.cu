@@ -12,19 +12,19 @@ using namespace WaveFront;
 
 
 
-CPU_ONLY void GenerateRays(const SetupLaunchParameters& a_SetupParams)
+CPU_ONLY void GeneratePrimaryRays(const PrimRayGenLaunchParameters& a_PrimaryRayGenParams)
 {
-    const float3 u = a_SetupParams.m_Camera.m_Up;
-    const float3 v = a_SetupParams.m_Camera.m_Right;
-    const float3 w = a_SetupParams.m_Camera.m_Forward;
-    const float3 eye = a_SetupParams.m_Camera.m_Position;
-    const int2 dimensions = make_int2(a_SetupParams.m_Resolution.x, a_SetupParams.m_Resolution.y);
+    const float3 u = a_PrimaryRayGenParams.m_Camera.m_Up;
+    const float3 v = a_PrimaryRayGenParams.m_Camera.m_Right;
+    const float3 w = a_PrimaryRayGenParams.m_Camera.m_Forward;
+    const float3 eye = a_PrimaryRayGenParams.m_Camera.m_Position;
+    const int2 dimensions = make_int2(a_PrimaryRayGenParams.m_Resolution.x, a_PrimaryRayGenParams.m_Resolution.y);
     const int numRays = dimensions.x * dimensions.y;
 
     const int blockSize = 256;
     const int numBlocks = (numRays + blockSize - 1) / blockSize;
 
-    GenerateRay <<<numBlocks, blockSize>>> (numRays, a_SetupParams.m_PrimaryRays, u, v, w, eye, dimensions);
+    GeneratePrimaryRay <<<numBlocks, blockSize>>> (numRays, a_PrimaryRayGenParams.m_PrimaryRays, u, v, w, eye, dimensions);
 
     cudaDeviceSynchronize();
     CHECKLASTCUDAERROR;
@@ -95,7 +95,7 @@ CPU_ONLY void PostProcess(const PostProcessLaunchParameters& a_PostProcessParams
      */
 
      //The amount of pixels and threads/blocks needed to apply effects.
-    const int numPixels = a_PostProcessParams.m_Resolution.x * a_PostProcessParams.m_Resolution.y;
+    const int numPixels = a_PostProcessParams.m_RenderResolution.x * a_PostProcessParams.m_RenderResolution.y;
     const int blockSize = 256;
     const int numBlocks = (numPixels + blockSize - 1) / blockSize;
 
@@ -106,7 +106,7 @@ CPU_ONLY void PostProcess(const PostProcessLaunchParameters& a_PostProcessParams
     CHECKLASTCUDAERROR;*/
 
     MergeLightChannels <<<numBlocks, blockSize>>> (
-        a_PostProcessParams.m_Resolution, 
+        a_PostProcessParams.m_RenderResolution, 
         a_PostProcessParams.m_WavefrontOutput,
         a_PostProcessParams.m_MergedResults);
 
@@ -117,7 +117,7 @@ CPU_ONLY void PostProcess(const PostProcessLaunchParameters& a_PostProcessParams
     //TODO copy merged results into image output after having run DLSS.
     DLSS<<<numBlocks, blockSize>>>();
 
-    const int numPixelsUpscaled = a_PostProcessParams.m_UpscaledResolution.x * a_PostProcessParams.m_UpscaledResolution.y;
+    const int numPixelsUpscaled = a_PostProcessParams.m_OutputResolution.x * a_PostProcessParams.m_OutputResolution.y;
     const int blockSizeUpscaled = 256;
     const int numBlocksUpscaled = (numPixelsUpscaled + blockSizeUpscaled - 1) / blockSizeUpscaled;
 
@@ -132,7 +132,7 @@ CPU_ONLY void PostProcess(const PostProcessLaunchParameters& a_PostProcessParams
 
     //TODO This is temporary till the post-processing is  in place. Let the last stage copy it directly to the output buffer.
     WriteToOutput<<<numBlocksUpscaled, blockSizeUpscaled >>>(
-        a_PostProcessParams.m_UpscaledResolution, 
+        a_PostProcessParams.m_OutputResolution, 
         a_PostProcessParams.m_MergedResults, 
         a_PostProcessParams.m_ImageOutput);
 
@@ -143,9 +143,9 @@ CPU_ONLY void PostProcess(const PostProcessLaunchParameters& a_PostProcessParams
 
 
 
-CPU_ON_GPU void GenerateRay(
+CPU_ON_GPU void GeneratePrimaryRay(
     int a_NumRays,
-    RayBatch* const a_Buffer,
+    IntersectionRayBatch* const a_Buffer,
     float3 a_U,
     float3 a_V,
     float3 a_W,
@@ -170,7 +170,7 @@ CPU_ON_GPU void GenerateRay(
         direction.y = -(direction.y * 2.0f - 1.0f);
         direction = normalize(direction.x * a_U + direction.y * a_V + a_W);
 
-        RayData ray{ origin, direction, make_float3(1.f, 1.f, 1.f) };
+        IntersectionRayData ray{ origin, direction, make_float3(1.f, 1.f, 1.f) };
         a_Buffer->SetRay(ray, i, 0);
 
     }
@@ -178,7 +178,7 @@ CPU_ON_GPU void GenerateRay(
 
 CPU_ON_GPU void ShadeDirect(
     const uint3 a_ResolutionAndDepth, 
-	const RayBatch* const a_CurrentRays,
+	const IntersectionRayBatch* const a_CurrentRays,
     const IntersectionBuffer* const a_CurrentIntersections, 
     ShadowRayBatch* const a_ShadowRays,
     const LightBuffer* const a_Lights,
@@ -213,7 +213,7 @@ CPU_ON_GPU void ShadeDirect(
             // Get ray used to calculate intersection.
             const unsigned int rayArrayIndex = currIntersection.m_RayArrayIndex;
 
-            const RayData& currRay = a_CurrentRays->GetRay(rayArrayIndex);
+            const IntersectionRayData& currRay = a_CurrentRays->GetRay(rayArrayIndex);
             
             //unsigned int lightIndex = 0;
             //float lightPDF = 0;
@@ -262,9 +262,9 @@ CPU_ON_GPU void ShadeSpecular()
 
 CPU_ON_GPU void ShadeIndirect(
     const uint3 a_ResolutionAndDepth, 
-    const RayBatch* const a_PrimaryRays,  //TODO: These need to be the rays of that the current wave intersected before calling this wave.
+    const IntersectionRayBatch* const a_PrimaryRays,  //TODO: These need to be the rays of that the current wave intersected before calling this wave.
     const IntersectionBuffer* const a_Intersections, 
-    RayBatch* const a_Output)
+    IntersectionRayBatch* const a_Output)
 {
 
     const unsigned int numPixels = a_ResolutionAndDepth.x * a_ResolutionAndDepth.y;
@@ -279,7 +279,7 @@ CPU_ON_GPU void ShadeIndirect(
         const int screenX = i - (screenY * a_ResolutionAndDepth.x);
     
         const IntersectionData& intersection = a_Intersections->GetIntersection(i, 0);
-;       const RayData& ray = a_PrimaryRays->GetRay(i, 0);
+;       const IntersectionRayData& ray = a_PrimaryRays->GetRay(i, 0);
     
         //TODO russian roulette to terminate path (multiply weight with russian roulette outcome
         float russianRouletteWeight = 1.f;
@@ -305,7 +305,7 @@ CPU_ON_GPU void ShadeIndirect(
 
 CPU_ON_GPU void DEBUGShadePrimIntersections(
     const uint3 a_ResolutionAndDepth,
-    const RayBatch* const a_PrimaryRays,
+    const IntersectionRayBatch* const a_PrimaryRays,
     const IntersectionBuffer* const a_PrimaryIntersections,
     ResultBuffer* const a_Output)
 {
@@ -463,7 +463,7 @@ CPU_ON_GPU void WriteToOutput(
 //Reset ray batch
 
 CPU_ONLY void ResetRayBatch(
-    RayBatch* const a_RayBatchDevPtr,
+    IntersectionRayBatch* const a_RayBatchDevPtr,
     unsigned int a_NumPixels,
     unsigned int a_RaysPerPixel)
 {
@@ -479,7 +479,7 @@ CPU_ONLY void ResetRayBatch(
 //Data buffer helper functions
 
 CPU_ON_GPU void ResetRayBatchMembers(
-    RayBatch* const a_RayBatch, 
+    IntersectionRayBatch* const a_RayBatch, 
     unsigned int a_NumPixels, 
     unsigned int a_RaysPerPixel)
 {
@@ -488,7 +488,7 @@ CPU_ON_GPU void ResetRayBatchMembers(
 
 }
 
-CPU_ON_GPU void ResetRayBatchData(RayBatch* const a_RayBatch)
+CPU_ON_GPU void ResetRayBatchData(IntersectionRayBatch* const a_RayBatch)
 {
 
     const unsigned int bufferSize = a_RayBatch->GetSize();
@@ -497,7 +497,7 @@ CPU_ON_GPU void ResetRayBatchData(RayBatch* const a_RayBatch)
 
     for (unsigned int i = index; i < bufferSize; i+=stride)
     {
-        a_RayBatch->m_Rays[i] = RayData{};
+        a_RayBatch->m_Rays[i] = IntersectionRayData{};
     }
 
 }
