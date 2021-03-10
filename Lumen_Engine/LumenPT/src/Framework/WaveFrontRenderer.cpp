@@ -978,7 +978,7 @@ void WaveFrontRenderer::CreateDataBuffers()
         //rayBatch->Write(numPixels, 0);
         //rayBatch->Write(m_RaysPerPixel, sizeof(RayBatch::m_NumPixels));
 
-        ResetRayBatch(rayBatch->GetDevicePtr<IntersectionRayBatch>(), numPixels, m_RaysPerPixel);
+        ResetIntersectionRayBatch(rayBatch->GetDevicePtr<IntersectionRayBatch>(), numPixels, m_RaysPerPixel);
 
         void* rayBatchCuPtr = rayBatch->GetDevicePtr();
         SaveRayBatchToBMP(

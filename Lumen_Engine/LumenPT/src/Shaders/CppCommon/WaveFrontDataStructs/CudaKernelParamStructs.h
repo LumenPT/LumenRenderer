@@ -1,5 +1,6 @@
 #pragma once
 #include "../CudaDefines.h"
+#include "../WaveFrontDataStructs.h"
 
 #include <Optix/optix.h>
 #include <Cuda/cuda/helpers.h>

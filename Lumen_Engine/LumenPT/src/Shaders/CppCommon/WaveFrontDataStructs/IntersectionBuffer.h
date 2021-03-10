@@ -146,7 +146,7 @@ namespace WaveFront
         GPU_ONLY INLINE unsigned int GetIntersectionArrayIndex(unsigned int a_PixelIndex, unsigned int a_IntersectionIndex = 0) const
         {
 
-            assert(a_PixelIndex < m_NumPixels&& a_IntersectionIndex < m_IntersectionsPerPixel);
+            assert(a_PixelIndex < m_NumPixels && a_IntersectionIndex < m_IntersectionsPerPixel);
 
             return a_PixelIndex * m_IntersectionsPerPixel + a_IntersectionIndex;
 
