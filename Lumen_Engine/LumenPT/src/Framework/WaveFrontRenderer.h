@@ -241,6 +241,8 @@ private:
     uint8_t m_RaysPerPixel;
     uint8_t m_ShadowRaysPerPixel;
 
+    unsigned int m_FrameCount;
+
     bool m_Initialized;
 
 };

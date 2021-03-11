@@ -45,6 +45,11 @@ void Material::SetEmission(const glm::vec3& a_EmissiveVal)
     m_DeviceMaterialDirty = true;
 }
 
+void Material::SetEmissiveTexture(std::shared_ptr<Lumen::ILumenTexture> a_EmissiveTexture)
+{
+	
+}
+
 glm::vec4 Material::GetDiffuseColor() const
 {
     return glm::vec4(m_DiffuseColor.x, m_DiffuseColor.y, m_DiffuseColor.z, m_DiffuseColor.w);

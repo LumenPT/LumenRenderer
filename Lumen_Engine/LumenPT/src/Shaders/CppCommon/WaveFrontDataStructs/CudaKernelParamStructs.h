@@ -43,11 +43,13 @@ namespace WaveFront
         CPU_ONLY PrimRayGenLaunchParameters(
             const uint2& a_Resolution,
             const DeviceCameraData& a_Camera,
-            IntersectionRayBatch* const a_PrimaryRays)
+            IntersectionRayBatch* const a_PrimaryRays,
+            const unsigned int a_FrameCount)
             :
             m_Resolution(a_Resolution),
             m_Camera(a_Camera),
-            m_PrimaryRays(a_PrimaryRays)
+            m_PrimaryRays(a_PrimaryRays),
+    		m_FrameCount(a_FrameCount)
         {}
 
         CPU_ONLY ~PrimRayGenLaunchParameters() = default;
@@ -55,7 +57,7 @@ namespace WaveFront
         const uint2 m_Resolution;
         const DeviceCameraData m_Camera;
         IntersectionRayBatch* const m_PrimaryRays;
-
+        const unsigned int m_FrameCount;
     };
 
     struct ShadingLaunchParameters

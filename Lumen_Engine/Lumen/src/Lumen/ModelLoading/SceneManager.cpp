@@ -374,6 +374,18 @@ void Lumen::SceneManager::LoadMaterials(fx::gltf::Document& a_Doc, GLTFResource&
 			));
 		}
 
+		if (fxMat.emissiveTexture.index != -1)
+		{
+			auto info = LoadTexture(a_Doc, fxMat.emissiveTexture.index, a_Path, 4);
+			const auto tex = m_RenderPipeline->CreateTexture(info.data, info.w, info.h);
+			
+			mat->SetEmissiveTexture(tex);
+
+			//LMN_INFO("Emissive texture present");
+			
+			stbi_image_free(info.data);
+		}
+
 
 		//materials.push_back(mat);
 	}

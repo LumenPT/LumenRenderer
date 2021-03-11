@@ -4,6 +4,26 @@
 
 using namespace WaveFront;
 
+//CPU_GPU void HaltonSequence(
+//    int index,
+//    int base,
+//    float* result)
+//{
+//    ++index;
+//
+//    float f = 1.f;
+//    float r = 0.f;
+//
+//    while (index > 0)
+//    {
+//        f = f / base;
+//        r = r + f * (index % base);
+//        index = index / base;
+//    }
+//
+//    *result = r;
+//}
+
 CPU_ONLY void GeneratePrimaryRays(const PrimRayGenLaunchParameters& a_PrimaryRayGenParams)
 {
     const float3 u = a_PrimaryRayGenParams.m_Camera.m_Up;
@@ -12,11 +32,12 @@ CPU_ONLY void GeneratePrimaryRays(const PrimRayGenLaunchParameters& a_PrimaryRay
     const float3 eye = a_PrimaryRayGenParams.m_Camera.m_Position;
     const int2 dimensions = make_int2(a_PrimaryRayGenParams.m_Resolution.x, a_PrimaryRayGenParams.m_Resolution.y);
     const int numRays = dimensions.x * dimensions.y;
+    const unsigned int frameCount = a_PrimaryRayGenParams.m_FrameCount;
 
     const int blockSize = 256;
     const int numBlocks = (numRays + blockSize - 1) / blockSize;
 
-    GeneratePrimaryRay<<<numBlocks, blockSize>>>(numRays, a_PrimaryRayGenParams.m_PrimaryRays, u, v, w, eye, dimensions);
+    GeneratePrimaryRay<<<numBlocks, blockSize>>>(numRays, a_PrimaryRayGenParams.m_PrimaryRays, u, v, w, eye, dimensions, frameCount);
 
     cudaDeviceSynchronize();
     CHECKLASTCUDAERROR;
