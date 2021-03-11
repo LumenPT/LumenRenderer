@@ -4,6 +4,11 @@
 
 using namespace WaveFront;
 
+GPU_ONLY void HaltonSequence(
+    int index,
+    int base,
+    float* result);
+
 //Generate some rays based on the thread index.
 CPU_ON_GPU void GeneratePrimaryRay(
     int a_NumRays,

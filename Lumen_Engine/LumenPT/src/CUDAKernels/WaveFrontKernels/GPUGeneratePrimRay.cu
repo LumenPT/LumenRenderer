@@ -1,6 +1,26 @@
 #include "GPUShadingKernels.cuh"
 #include <device_launch_parameters.h>
 
+GPU_ONLY void HaltonSequence(
+    int index,
+    int base,
+    float* result)
+{
+    ++index;
+
+    float f = 1.f;
+    float r = 0.f;
+
+    while (index > 0)
+    {
+        f = f / base;
+        r = r + f * (index % base);
+        index = index / base;
+    }
+
+    *result = r;
+}
+
 CPU_ON_GPU void GeneratePrimaryRay(
     int a_NumRays,
     IntersectionRayBatch* const a_Buffer,

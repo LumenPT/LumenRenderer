@@ -4,6 +4,11 @@
 
 using namespace WaveFront;
 
+//CPU_GPU void HaltonSequence(
+//    int index,
+//    int base,
+//    float* result);
+
 /*
  * Called at start of frame.
  * Generates the camera rays.

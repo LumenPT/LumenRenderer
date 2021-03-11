@@ -4,6 +4,26 @@
 
 using namespace WaveFront;
 
+//CPU_GPU void HaltonSequence(
+//    int index,
+//    int base,
+//    float* result)
+//{
+//    ++index;
+//
+//    float f = 1.f;
+//    float r = 0.f;
+//
+//    while (index > 0)
+//    {
+//        f = f / base;
+//        r = r + f * (index % base);
+//        index = index / base;
+//    }
+//
+//    *result = r;
+//}
+
 CPU_ONLY void GeneratePrimaryRays(const PrimRayGenLaunchParameters& a_PrimaryRayGenParams)
 {
     const float3 u = a_PrimaryRayGenParams.m_Camera.m_Up;
