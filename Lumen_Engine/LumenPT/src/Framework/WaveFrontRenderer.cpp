@@ -586,7 +586,6 @@ void WaveFrontRenderer::DebugCallback(unsigned a_Level, const char* a_Tag, const
 
 void WaveFrontRenderer::AccumulateStackSizes(OptixProgramGroup a_ProgramGroup, OptixStackSizes& a_StackSizes)
 {
-
     OptixStackSizes localSizes;
     CHECKOPTIXRESULT(optixProgramGroupGetStackSize(a_ProgramGroup, &localSizes));
     a_StackSizes.cssRG = std::max(a_StackSizes.cssRG, localSizes.cssRG);
@@ -596,7 +595,6 @@ void WaveFrontRenderer::AccumulateStackSizes(OptixProgramGroup a_ProgramGroup, O
     a_StackSizes.cssCH = std::max(a_StackSizes.cssCH, localSizes.cssCH);
     a_StackSizes.cssCC = std::max(a_StackSizes.cssCC, localSizes.cssCC);
     a_StackSizes.dssDC = std::max(a_StackSizes.dssDC, localSizes.dssDC);
-
 }
 
 ProgramGroupHeader WaveFrontRenderer::GetProgramGroupHeader(const std::string& a_GroupName) const

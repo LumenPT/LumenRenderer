@@ -50,6 +50,14 @@ CPU_ONLY void GenerateMotionVectors()
 {
 }
 
+CPU_ONLY void ExtractSurfaceData(unsigned a_NumIntersections, AtomicBuffer < IntersectionData>* a_IntersectionData, AtomicBuffer < IntersectionRayData>* a_Rays, SurfaceData* a_OutPut, DeviceMaterial* a_Materials)
+{
+    const int blockSize = 256;
+    const int numBlocks = (a_NumIntersections + blockSize - 1) / blockSize;
+
+    ExtractSurfaceDataGpu<<<numBlocks, blockSize>>>(a_NumIntersections, a_IntersectionData, a_Rays, a_OutPut, a_Materials);
+}
+
 CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
 {
     //TODO
@@ -64,23 +72,23 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
 
     //Generate secondary rays.
 
-   /*ShadeIndirect<<<numBlocks,blockSize>>>(
+    /*ShadeIndirect<<<numBlocks,blockSize>>>(
        a_ShadingParams.m_ResolutionAndDepth,
        a_ShadingParams.m_CurrentRays,
        a_ShadingParams.m_CurrentIntersections,
        a_ShadingParams.m_SecondaryRays);*/
 
-       /*cudaDeviceSynchronize();
+    /*cudaDeviceSynchronize();
        CHECKLASTCUDAERROR;*/
 
-       //Generate shadow rays for specular highlights.
-      /*ShadeSpecular<<<numBlocks, blockSize >>>();*/
+    //Generate shadow rays for specular highlights.
+    /*ShadeSpecular<<<numBlocks, blockSize >>>();*/
 
-      /*cudaDeviceSynchronize();
+    /*cudaDeviceSynchronize();
       CHECKLASTCUDAERROR;*/
 
-      //Generate shadow rays for direct lights.
-      /*ShadeDirect<<<numBlocks, blockSize>>>(
+    //Generate shadow rays for direct lights.
+    /*ShadeDirect<<<numBlocks, blockSize>>>(
           a_ShadingParams.m_ResolutionAndDepth,
           a_ShadingParams.m_CurrentRays,
           a_ShadingParams.m_CurrentIntersections,
@@ -107,7 +115,7 @@ CPU_ONLY void PostProcess(const PostProcessLaunchParameters& a_PostProcessParams
      * For now just merge the final light contributions to get the final pixel color.
      */
 
-     //The amount of pixels and threads/blocks needed to apply effects.
+    //The amount of pixels and threads/blocks needed to apply effects.
     const int numPixels = a_PostProcessParams.m_RenderResolution.x * a_PostProcessParams.m_RenderResolution.y;
     const int blockSize = 256;
     const int numBlocks = (numPixels + blockSize - 1) / blockSize;

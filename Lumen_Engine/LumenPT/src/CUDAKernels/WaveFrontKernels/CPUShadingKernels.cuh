@@ -22,6 +22,12 @@ CPU_ONLY void GeneratePrimaryRays(const PrimRayGenLaunchParameters& a_PrimRayGen
 CPU_ONLY void GenerateMotionVectors();
 
 /*
+ * Extract the surface data for the current depth.
+ * Requires the rays and intersection buffers.
+ */
+CPU_ONLY void ExtractSurfaceData(unsigned a_NumIntersections, AtomicBuffer < IntersectionData>* a_IntersectionData, AtomicBuffer < IntersectionRayData>* a_Rays, SurfaceData* a_OutPut, DeviceMaterial* a_Materials);
+
+/*
  * Called each wave after resolving a RayBatch.
  * Shade the intersection points.
  * This does direct, indirect and specular shading.
