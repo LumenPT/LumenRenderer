@@ -36,12 +36,8 @@ namespace WaveFront
         CPU_ONLY PrimRayGenLaunchParameters(
             const uint2& a_Resolution,
             const DeviceCameraData& a_Camera,
-<<<<<<< Updated upstream
-            IntersectionRayBatch* const a_PrimaryRays,
+            AtomicBuffer < WaveFront::IntersectionRayData>* a_PrimaryRays,
             const unsigned int a_FrameCount)
-=======
-            AtomicBuffer < WaveFront::IntersectionRayData>* a_PrimaryRays)
->>>>>>> Stashed changes
             :
             m_Resolution(a_Resolution),
             m_Camera(a_Camera),
@@ -53,13 +49,8 @@ namespace WaveFront
 
         const uint2 m_Resolution;
         const DeviceCameraData m_Camera;
-<<<<<<< Updated upstream
-        IntersectionRayBatch* const m_PrimaryRays;
+        AtomicBuffer<IntersectionRayData> * m_PrimaryRays;
         const unsigned int m_FrameCount;
-=======
-        AtomicBuffer<IntersectionRayData>* m_PrimaryRays;
-
->>>>>>> Stashed changes
     };
 
     struct ShadingLaunchParameters
