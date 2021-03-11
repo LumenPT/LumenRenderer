@@ -2,8 +2,8 @@
 #include <device_launch_parameters.h>
 
 GPU_ONLY void HaltonSequence(
-    int index,
-    int base,
+    unsigned int index,
+    unsigned int base,
     float* result)
 {
     ++index;
@@ -28,7 +28,8 @@ CPU_ON_GPU void GeneratePrimaryRay(
     float3 a_V,
     float3 a_W,
     float3 a_Eye,
-    int2 a_Dimensions)
+    int2 a_Dimensions,
+    unsigned int a_FrameCount)
 {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     int stride = blockDim.x * gridDim.x;
@@ -40,8 +41,12 @@ CPU_ON_GPU void GeneratePrimaryRay(
         const int screenY = i / a_Dimensions.x;
         const int screenX = i - (screenY * a_Dimensions.x);
 
-        float3 direction = make_float3(static_cast<float>(screenX) / a_Dimensions.x,
-                                       static_cast<float>(screenY) / a_Dimensions.y, 0.f);
+    	float2 jitter;
+    	HaltonSequence(a_FrameCount + static_cast<unsigned int>(i), 2, &jitter.x);
+    	HaltonSequence(a_FrameCount + static_cast<unsigned int>(i), 3, &jitter.y);
+    	
+        float3 direction = make_float3(static_cast<float>(screenX + jitter.x) / a_Dimensions.x,
+                                       static_cast<float>(screenY + jitter.y) / a_Dimensions.y, 0.f);
         float3 origin = a_Eye;
 
         direction.x = -(direction.x * 2.0f - 1.0f);

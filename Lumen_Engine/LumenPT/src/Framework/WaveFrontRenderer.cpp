@@ -13,6 +13,7 @@
 #include "CudaUtilities.h"
 #include "../Shaders/CppCommon/LumenPTConsts.h"
 #include "../CUDAKernels/WaveFrontKernels.cuh"
+#include "../CUDAKernels/WaveFrontKernels/GPUShadingKernels.cuh"
 
 #include <cstdio>
 #include <fstream>
@@ -22,8 +23,6 @@
 #include "Cuda/cuda_runtime.h"
 #include "Optix/optix_stubs.h"
 #include <glm/gtx/compatibility.hpp>
-
-
 
 WaveFrontRenderer::WaveFrontRenderer(const InitializationData& a_InitializationData)
     :
@@ -53,6 +52,7 @@ m_OutputResolution(max(a_InitializationData.m_OutputResolution, s_minResolution)
 m_MaxDepth(max(a_InitializationData.m_MaxDepth, s_minDepth)),
 m_RaysPerPixel(max(a_InitializationData.m_RaysPerPixel, s_minRaysPerPixel)),
 m_ShadowRaysPerPixel(max(a_InitializationData.m_ShadowRaysPerPixel, s_minShadowRaysPerPixel)),
+m_FrameCount(0),
 m_Initialized(false)
 {
 
@@ -72,8 +72,7 @@ m_Initialized(false)
     m_ServiceLocator.m_Renderer = this;
 
     CreateShaderBindingTables();
-
-
+	
 }
 
 WaveFrontRenderer::~WaveFrontRenderer()
@@ -638,7 +637,7 @@ GLuint WaveFrontRenderer::TraceFrame()
     MemoryBuffer& currentRaysBatch = *m_IntersectionRayBatches[currentRayBatchIndex];
 
     //Generate primary rays using the setup parameters
-    const PrimRayGenLaunchParameters primaryRayGenParams(m_RenderResolution, cameraData, currentRaysBatch.GetDevicePtr<IntersectionRayBatch>());
+    const PrimRayGenLaunchParameters primaryRayGenParams(m_RenderResolution, cameraData, currentRaysBatch.GetDevicePtr<IntersectionRayBatch>(), m_FrameCount);
     GeneratePrimaryRays(primaryRayGenParams);
 
     
@@ -806,6 +805,8 @@ GLuint WaveFrontRenderer::TraceFrame()
     //Post processing using CUDA kernel.
     PostProcess(postProcessLaunchParams);
 
+    ++m_FrameCount;
+	
     //Return output image.
     return m_OutputBuffer->GetTexture();
 

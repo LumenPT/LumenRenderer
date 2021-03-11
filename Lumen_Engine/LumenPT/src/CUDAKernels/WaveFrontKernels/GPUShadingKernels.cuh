@@ -5,8 +5,8 @@
 using namespace WaveFront;
 
 GPU_ONLY void HaltonSequence(
-    int index,
-    int base,
+    unsigned int index,
+    unsigned int base,
     float* result);
 
 //Generate some rays based on the thread index.
@@ -17,7 +17,8 @@ CPU_ON_GPU void GeneratePrimaryRay(
     float3 a_V,
     float3 a_W,
     float3 a_Eye,
-    int2 a_Dimensions);
+    int2 a_Dimensions,
+    unsigned int a_FrameCount);
 
 //Called during shading
 
