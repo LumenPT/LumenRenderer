@@ -83,11 +83,11 @@ public:
 		std::replace(p_string.begin(), p_string.end(), '\\', '/');
 		//p_string.append("/Sandbox/assets/models/Lantern.gltf");
 
-		const std::string meshPath = p_string.append("/Sandbox/assets/models/Sponza/");
+		const std::string meshPath = p_string.append("/Sandbox/assets/models/BoomBoxWithAxes/glTF/");
 		//Base path for meshes.
 
 		//Mesh name
-		const std::string meshName = "Sponza.gltf";
+		const std::string meshName = "BoomBoxWithAxes.gltf";
 
 		//p_string.append("/Sandbox/assets/models/Sponza/Sponza.gltf");
 		LMN_TRACE(p_string);
@@ -125,6 +125,11 @@ public:
 		mesh->m_Transform.SetPosition(glm::vec3(0.f, 0.f, 15.0f));
 		mesh->m_Transform.SetScale(glm::vec3(1.0f));
 
+		for (size_t i = 0; i < 10; i++)
+		{
+			//load lantern yay
+		}
+		
 		//meshLight->m_Transform.SetPosition(glm::vec3(0.f, 0.f, 15.0f));
 		//meshLight->m_Transform.SetScale(glm::vec3(1.0f));
 

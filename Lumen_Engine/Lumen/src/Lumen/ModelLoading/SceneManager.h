@@ -139,6 +139,9 @@ namespace Lumen
 
 		// Load OpenVDB?
 
+		//Temporary for debugging
+		//std::map<std::string, GLTFResource>* GetResourceMap() { &m_LoadedScenes; };
+		
 	private:
 		std::map<std::string, GLTFResource> m_LoadedScenes;
 

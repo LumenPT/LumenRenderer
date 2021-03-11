@@ -139,14 +139,16 @@ bool WaveFrontRenderer::CreatePipelines(const std::string& a_ShaderPath)
     bool success = true;
 
     const std::string resolveRaysParams = "launchParams";
-    const std::string resolveRaysRayGenFuncName = "__raygen__ResolveRaysRayGen";
-    const std::string resolveRaysHitFuncName = "__closesthit__ResolveRaysClosestHit";
-    const std::string resolveRaysMissFuncName = "__miss__ResolveRaysMiss";
+    const std::string resolveRaysRayGenFuncName = "__raygen__UberGenShader";
+    //const std::string resolveRaysRayGenFuncName = "__raygen__ResolveRaysRayGen";
+    const std::string resolveRaysHitFuncName = "__closesthit__UberClosestHit";
+    const std::string resolveRaysMissFuncName = "__miss__UberMiss";
+    const std::string resolveRaysAnyhitFuncName = "__miss__UberAnyHit";
 
     const std::string resolveShadowRaysParams = "launchParams";
-    const std::string resolveShadowRaysRayGenFuncName = "__raygen__ResolveShadowRaysRayGen";
-    const std::string resolveShadowRaysHitFuncName = "__anyhit__ResolveShadowRaysAnyHit";
-    const std::string resolveShadowRaysMissFuncName = "__miss__ResolveShadowRaysMiss";
+    //const std::string resolveShadowRaysRayGenFuncName = "__raygen__ResolveShadowRaysRayGen";
+    //const std::string resolveShadowRaysHitFuncName = "__anyhit__ResolveShadowRaysAnyHit";
+    //const std::string resolveShadowRaysMissFuncName = "__miss__ResolveShadowRaysMiss";
 
     OptixPipelineCompileOptions compileOptions = CreatePipelineOptions(resolveRaysParams, 2, 2);
 
@@ -168,14 +170,14 @@ bool WaveFrontRenderer::CreatePipelines(const std::string& a_ShaderPath)
     shaderModule = CreateModule(a_ShaderPath, compileOptions);
     if (shaderModule == nullptr) { return false; }
 
-    success &= CreatePipeline(
-        shaderModule,
-        compileOptions,
-        PipelineType::RESOLVE_SHADOW_RAYS, 
-        resolveShadowRaysRayGenFuncName, 
-        resolveShadowRaysHitFuncName,
-        resolveShadowRaysMissFuncName,
-        m_PipelineShadowRays);
+    //success &= CreatePipeline(
+    //    shaderModule,
+    //    compileOptions,
+    //    PipelineType::RESOLVE_SHADOW_RAYS, 
+    //    resolveShadowRaysRayGenFuncName, 
+    //    resolveShadowRaysHitFuncName,
+    //    resolveShadowRaysMissFuncName,
+    //    m_PipelineShadowRays);
 
     //optixModuleDestroy(shaderModule);
 
