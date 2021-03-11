@@ -147,7 +147,7 @@ void OutputLayer::HandleCameraInput(Camera& a_Camera)
 	glm::vec3 eye, U, V, W;
 	a_Camera.GetVectorData(eye, U, V, W);
 	
-	if (Lumen::Input::IsKeyPressed(LMN_KEY_UP) || Lumen::Input::IsKeyPressed(LMN_KEY_W))
+	if (Lumen::Input::IsKeyPressed(LMN_KEY_W))
 	{
 		movementDirection += glm::normalize(W) * movementSpeed;
 	}
