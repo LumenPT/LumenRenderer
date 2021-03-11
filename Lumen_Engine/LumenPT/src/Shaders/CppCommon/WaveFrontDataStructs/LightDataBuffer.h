@@ -17,16 +17,16 @@ namespace WaveFront
         float area;         //The area of the triangle. This is required to project the light onto a hemisphere.
     };
 
-    struct LightBuffer
+    struct LightDataBuffer
     {
 
-        CPU_GPU LightBuffer()
+        CPU_GPU LightDataBuffer()
             :
         m_Size(0u),
         m_Lights()
         {}
 
-        CPU_GPU LightBuffer(unsigned int a_Size)
+        CPU_GPU LightDataBuffer(unsigned int a_Size)
             :
         m_Size(a_Size),
         m_Lights()
@@ -34,7 +34,7 @@ namespace WaveFront
 
 
 
-        const unsigned int m_Size;
+        unsigned int m_Size;
 
         TriangleLight m_Lights[];
 

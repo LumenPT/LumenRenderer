@@ -26,7 +26,7 @@ CPU_ON_GPU void ShadeDirect(
     const IntersectionRayBatch* const a_CurrentRays,
     const IntersectionBuffer* const a_CurrentIntersections,
     ShadowRayBatch* const a_ShadowRays,
-    const LightBuffer* const a_Lights,
+    const LightDataBuffer* const a_Lights,
     CDF* const a_CDF /*const CDF* a_CDF*/);
 
 /*
@@ -39,7 +39,7 @@ CPU_ON_GPU void ShadeSpecular();
  */
 CPU_ON_GPU void ShadeIndirect(
     const uint3 a_ResolutionAndDepth,
-    const IntersectionRayBatch* const a_PreviousRays,
+    const IntersectionRayBatch* const a_CurrentRays,
     const IntersectionBuffer* const a_Intersections,
     IntersectionRayBatch* const a_Output);
 

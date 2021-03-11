@@ -23,475 +23,6 @@
 #include "Optix/optix_stubs.h"
 #include <glm/gtx/compatibility.hpp>
 
-const unsigned BYTES_PER_PIXEL = 3;
-
-#pragma pack(push, 1)
-
-struct BitmapFileHeader
-{
-    char m_Signature[2];
-    unsigned int m_ImageFileSizeBytes;
-    const unsigned int m_Reserved;
-    unsigned int m_PixelArrayOffset;
-};
-
-struct BitmapInfoHeader
-{
-    const unsigned int m_HeaderSize = sizeof(BitmapInfoHeader);
-    unsigned int m_ImageWidth;
-    unsigned int m_ImageHeight;
-    uint16_t m_numColorPlanes;
-    uint16_t m_bitsPerPixel;
-    unsigned int m_Compression;
-    unsigned int m_ImageSize;
-    unsigned int m_HorizontalResolution;
-    unsigned int m_VerticalResolution;
-    unsigned int m_numColorsInTable;
-    unsigned int m_numImportantColors;
-};
-
-#pragma pack(pop)
-
-BitmapFileHeader createBitmapFileHeader(unsigned a_Height, unsigned a_Stride)
-{
-    
-    const unsigned int fileSize = static_cast<unsigned>(sizeof(BitmapFileHeader)) + static_cast<unsigned>(sizeof(BitmapInfoHeader)) + (a_Stride * a_Height);
-
-    BitmapFileHeader fileHeader{};
-    fileHeader.m_Signature[0] = 'B';
-    fileHeader.m_Signature[1] = 'M';
-    fileHeader.m_ImageFileSizeBytes = fileSize;
-    fileHeader.m_PixelArrayOffset = sizeof(BitmapFileHeader) + sizeof(BitmapInfoHeader);
-
-    return fileHeader;
-}
-
-BitmapInfoHeader createBitmapInfoHeader(unsigned a_Height, unsigned a_Width)
-{
-
-    BitmapInfoHeader infoHeader{};
-
-    infoHeader.m_ImageWidth = a_Width;
-    infoHeader.m_ImageHeight = a_Height;
-    infoHeader.m_numColorPlanes = 1;
-    infoHeader.m_bitsPerPixel = BYTES_PER_PIXEL * 8;
-
-    return infoHeader;
-}
-
-void CreateDirectoryIfNotExists(const std::filesystem::path& a_SaveFileDirectory)
-{
-
-    std::error_code error;
-    if (!exists(a_SaveFileDirectory))
-    {
-
-        create_directories(a_SaveFileDirectory, error);
-        if (error)
-        {
-            printf("Error: Could not create directory with given path (%s)\n\terror message: %s \n",
-                a_SaveFileDirectory.string().c_str(),
-                error.message().c_str());
-        }
-        error.clear();
-
-        return;
-
-    }
-
-    if (!is_directory(a_SaveFileDirectory, error))
-    {
-        printf("Error: Given path (%s) is not a directory\n\terror message: %s \n", a_SaveFileDirectory.string().c_str(), error.message().c_str());
-        return;
-    }
-
-}
-
-bool SaveToBMP(
-    const unsigned char* a_ImagePtr,
-    const unsigned a_Width, 
-    const unsigned a_Height,
-    const std::filesystem::path& a_SaveFilePath)
-{
-
-    const unsigned int widthInBytes = a_Width * BYTES_PER_PIXEL;
-    const unsigned int paddingSize = (4 - widthInBytes % 4) % 4;
-    const unsigned int stride = widthInBytes + paddingSize;
-    const unsigned char padding[3] = { 0 };
-
-    BitmapFileHeader fileHeader = createBitmapFileHeader(a_Height, stride);
-    BitmapInfoHeader infoHeader = createBitmapInfoHeader(a_Height, a_Width);
-
-    std::fstream fileStream{};
-
-    fileStream.open(a_SaveFilePath, std::ios::out | std::ios::binary);
-
-    fileStream.write(reinterpret_cast<const char*>(&fileHeader), sizeof(fileHeader));
-    fileStream.write(reinterpret_cast<const char*>(&infoHeader), sizeof(infoHeader));
-
-    if (!fileStream.is_open())
-    {
-        printf("Error: could not open/create file to write image - path: %s \n", a_SaveFilePath.string().c_str());
-        return false;
-    }
-
-    for(unsigned row = 0; row < a_Height; ++row)
-    {
-        const unsigned char* pixelDataPtr = &a_ImagePtr[((a_Height -1) - row) * widthInBytes];
-        fileStream.write(reinterpret_cast<const char*>(pixelDataPtr), widthInBytes);
-        fileStream.write(reinterpret_cast<const char*>(&padding), paddingSize);
-    }
-
-    fileStream.close();
-    return true;
-
-}
-
-
-void CreateTestBMP()
-{
-
-    const int height = 100;
-    const int width = 100;
-    unsigned char image[height][width][BYTES_PER_PIXEL];
-
-    int i, j;
-    for (i = 0; i < height; i++) {
-        for (j = 0; j < width; j++) {
-            image[i][j][2] = static_cast<unsigned char>(static_cast<float>(i) / static_cast<float>(height) * 255.f);
-            //image[i][j][2] = j < (width / 2) ? static_cast<unsigned char>(0) : static_cast<unsigned char>(255);
-            //image[i][j][2] = static_cast<unsigned char>(0);
-            image[i][j][1] = static_cast<unsigned char>(static_cast<float>(j) / static_cast<float>(width) * 255.f);
-            //image[i][j][1] = i < (height / 2) ? static_cast<unsigned char>(0) : static_cast<unsigned char>(255);
-            //image[i][j][1] = static_cast<unsigned char>(0);
-            image[i][j][0] = static_cast<unsigned char>(static_cast<float>(i + j) / static_cast<float>(height + width) * 255.f);
-            //image[i][j][0] = static_cast<unsigned char>(0);
-        }
-    }
-
-    SaveToBMP(reinterpret_cast<unsigned char*>(image), width, height, "./bitmapTest.bmp");
-
-}
-
-void SavePixelBufferToBMP(
-    void* a_GpuMemPtr,
-    const unsigned int a_Width,
-    const unsigned int a_Height,
-    const unsigned int a_NumChannels,
-    const std::filesystem::path& a_SaveFileDirectory,
-    const std::string& a_SaveFileName)
-{
-
-    CreateDirectoryIfNotExists(a_SaveFileDirectory);
-
-    const unsigned int totalPixels = a_Width * a_Height * a_NumChannels;
-    const unsigned int pixelsPerChannel = a_Width * a_Height;
-    const unsigned int byteSize = sizeof(WaveFront::PixelBuffer) + totalPixels * sizeof(float3);
-
-    void* cpuMemPtr = malloc(byteSize);
-    cudaMemcpy(cpuMemPtr, a_GpuMemPtr, byteSize, cudaMemcpyDeviceToHost);
-
-    const PixelBuffer* pixelBuffer = reinterpret_cast<PixelBuffer*>(cpuMemPtr);
-    const float3* pixelDataBuffer = pixelBuffer->m_Pixels;
-
-
-
-    unsigned char* imageBuffer = reinterpret_cast<unsigned char*>(malloc(pixelsPerChannel * 3));
-
-    for(unsigned int channelIndex = 0; channelIndex < a_NumChannels; ++ channelIndex)
-    {
-
-        //Get File path for current channel image.
-        std::filesystem::path finalPath = a_SaveFileDirectory;
-        finalPath /= a_SaveFileName + std::to_string(channelIndex);
-
-        if (finalPath.has_extension()){ finalPath.replace_extension(".bmp"); }
-        else { finalPath += ".bmp"; }
-
-        if (!(finalPath.has_filename() && finalPath.has_extension()))
-        {
-            printf("Error: could not construct valid file path: %s \n", finalPath.string().c_str());
-            return;
-        }
-
-        //Convert GPU memory layout to Image layout expected by SaveToBMP function.
-        
-        for (unsigned int row = 0; row < a_Height; ++row)
-        {
-
-            for (unsigned int column = 0; column < a_Width; ++column)
-            {
-
-                const unsigned pixelIndex = row * a_Width + column;
-                const unsigned pixelArrIndex = pixelIndex * a_NumChannels + channelIndex; //Same pattern as is used in PixelBuffer data struct.
-                const float3& currentPixel = pixelDataBuffer[pixelArrIndex];
-
-                constexpr float maxColorChannelVal = static_cast<float>(0xFF);
-
-                const unsigned int rowIndexOffset = row * a_Width * 3;
-                const unsigned int columnIndexOffset = column * 3;
-                imageBuffer[rowIndexOffset + columnIndexOffset + 0] = static_cast<unsigned char>(std::round(currentPixel.z * maxColorChannelVal));
-                imageBuffer[rowIndexOffset + columnIndexOffset + 1] = static_cast<unsigned char>(std::round(currentPixel.y * maxColorChannelVal));
-                imageBuffer[rowIndexOffset + columnIndexOffset + 2] = static_cast<unsigned char>(std::round(currentPixel.x * maxColorChannelVal));
-
-            }
-        }
-
-        if(SaveToBMP(imageBuffer, a_Width, a_Height, finalPath))
-        {
-            printf("Info: saved Pixel buffer to %s \n", finalPath.string().c_str());
-        }
-
-    }
-
-    if (cpuMemPtr != nullptr) { free(cpuMemPtr); }
-    if (imageBuffer != nullptr) { free(imageBuffer); }
-
-}
-
-void SaveRayBatchToBMP(
-    void* a_GpuMemPtr,
-    const unsigned int a_Width,
-    const unsigned int a_Height,
-    const unsigned int a_SamplesPerPixel,
-    const std::filesystem::path& a_SaveFileDirectory,
-    const std::string& a_SaveFileName)
-{
-
-    CreateDirectoryIfNotExists(a_SaveFileDirectory);
-
-    const unsigned int totalRays = a_Width * a_Height * a_SamplesPerPixel;
-    const unsigned int numRaysPerSample = a_Width * a_Height;
-    const unsigned int byteSize = sizeof(IntersectionRayBatch) + totalRays * sizeof(IntersectionRayData);
-
-    void* cpuMemPtr = malloc(byteSize);
-    cudaMemcpy(cpuMemPtr, a_GpuMemPtr, byteSize, cudaMemcpyDeviceToHost);
-
-    const IntersectionRayBatch* rayBatch = reinterpret_cast<IntersectionRayBatch*>(cpuMemPtr);
-    const IntersectionRayData* rayDataBuffer = rayBatch->m_Rays;
-
-
-    unsigned char* imageBuffer = reinterpret_cast<unsigned char*>(malloc(numRaysPerSample * 3));
-
-    for (unsigned int sampleIndex = 0; sampleIndex < a_SamplesPerPixel; ++sampleIndex)
-    {
-
-        //Get File path for current channel image.
-        std::filesystem::path finalPath = a_SaveFileDirectory;
-        finalPath /= a_SaveFileName + std::to_string(sampleIndex);
-
-        if (finalPath.has_extension()) { finalPath.replace_extension(".bmp"); }
-        else { finalPath += ".bmp"; }
-
-        if (!(finalPath.has_filename() && finalPath.has_extension()))
-        {
-            printf("Error: could not construct valid file path: %s \n", finalPath.string().c_str());
-            return;
-        }
-
-        for(unsigned row = 0; row < a_Height; ++row)
-        {
-
-            for(unsigned column = 0; column < a_Width; ++column)
-            {
-
-                const unsigned rayIndex = row * a_Width + column;
-                const unsigned rayDataIndex = rayIndex * a_SamplesPerPixel + sampleIndex; //Same pattern as is used in PixelBuffer data struct.
-                const IntersectionRayData& currentPixel = rayDataBuffer[rayDataIndex];
-
-                constexpr float maxColorChannelVal = static_cast<float>(0xFF);
-
-                const unsigned int rowIndexOffset = row * a_Width * 3;
-                const unsigned int columnIndexOffset = column * 3;
-                imageBuffer[rowIndexOffset + columnIndexOffset + 0] = 
-                    static_cast<unsigned char>(std::clamp((currentPixel.m_Direction.z + 1.f) / 2.f , 0.f, 1.f) * maxColorChannelVal);
-                imageBuffer[rowIndexOffset + columnIndexOffset + 1] =
-                    static_cast<unsigned char>(std::clamp((currentPixel.m_Direction.y + 1.f) / 2.f , 0.f, 1.f) * maxColorChannelVal);
-                imageBuffer[rowIndexOffset + columnIndexOffset + 2] =
-                    static_cast<unsigned char>(std::clamp((currentPixel.m_Direction.x + 1.f) / 2.f , 0.f, 1.f) * maxColorChannelVal);
-
-            }
-
-        }
-
-        if(SaveToBMP(imageBuffer, a_Width, a_Height, finalPath))
-        {
-            printf("Info: saved Ray Batch to %s \n", finalPath.string().c_str());
-        }
-
-    }
-
-    if (cpuMemPtr != nullptr) { free(cpuMemPtr); }
-    if (imageBuffer != nullptr) { free(imageBuffer); }
-
-}
-
-void SaveShadowRayBatchToBMP(
-    void* a_GpuMemPtr,
-    const unsigned int a_Width,
-    const unsigned int a_Height,
-    const unsigned int a_SamplesPerPixel,
-    const std::filesystem::path& a_SaveFileDirectory,
-    const std::string& a_SaveFileName)
-{
-
-    CreateDirectoryIfNotExists(a_SaveFileDirectory);
-
-    const unsigned int totalRays = a_Width * a_Height * a_SamplesPerPixel;
-    const unsigned int numRaysPerSample = a_Width * a_Height;
-    const unsigned int byteSize = sizeof(ShadowRayBatch) + totalRays * sizeof(ShadowRayData);
-
-    void* cpuMemPtr = malloc(byteSize);
-    cudaMemcpy(cpuMemPtr, a_GpuMemPtr, byteSize, cudaMemcpyDeviceToHost);
-
-    const ShadowRayBatch* rayBatch = reinterpret_cast<ShadowRayBatch*>(cpuMemPtr);
-    const ShadowRayData* rayDataBuffer = rayBatch->m_ShadowRays;
-
-
-    unsigned char* imageBuffer = reinterpret_cast<unsigned char*>(malloc(numRaysPerSample * 3));
-
-    for (unsigned int sampleIndex = 0; sampleIndex < a_SamplesPerPixel; ++sampleIndex)
-    {
-
-        //Get File path for current channel image.
-        std::filesystem::path finalPath = a_SaveFileDirectory;
-        finalPath /= a_SaveFileName + std::to_string(sampleIndex);
-
-        if (finalPath.has_extension()) { finalPath.replace_extension(".bmp"); }
-        else { finalPath += ".bmp"; }
-
-        if (!(finalPath.has_filename() && finalPath.has_extension()))
-        {
-            printf("Error: could not construct valid file path: %s \n", finalPath.string().c_str());
-            return;
-        }
-
-        for (unsigned row = 0; row < a_Height; ++row)
-        {
-
-            for (unsigned column = 0; column < a_Width; ++column)
-            {
-
-                const unsigned rayIndex = row * a_Width + column;
-                const unsigned rayDataIndex = rayIndex * a_SamplesPerPixel + sampleIndex; //Same pattern as is used in PixelBuffer data struct.
-                const ShadowRayData& currentPixel = rayDataBuffer[rayDataIndex];
-
-                constexpr float maxColorChannelVal = static_cast<float>(0xFF);
-
-                const unsigned int rowIndexOffset = row * a_Width * 3;
-                const unsigned int columnIndexOffset = column * 3;
-                imageBuffer[rowIndexOffset + columnIndexOffset + 0] =
-                    static_cast<unsigned char>(std::clamp((currentPixel.m_Direction.z + 1.f) / 2.f , 0.f, 1.f) * maxColorChannelVal);
-                imageBuffer[rowIndexOffset + columnIndexOffset + 1] =
-                    static_cast<unsigned char>(std::clamp((currentPixel.m_Direction.y + 1.f) / 2.f , 0.f, 1.f) * maxColorChannelVal);
-                imageBuffer[rowIndexOffset + columnIndexOffset + 2] =
-                    static_cast<unsigned char>(std::clamp((currentPixel.m_Direction.x + 1.f) / 2.f , 0.f, 1.f) * maxColorChannelVal);
-
-            }
-
-        }
-
-        if (SaveToBMP(imageBuffer, a_Width, a_Height, finalPath))
-        {
-            printf("Info: saved Ray Batch to %s \n", finalPath.string().c_str());
-        }
-
-    }
-
-    if (cpuMemPtr != nullptr) { free(cpuMemPtr); }
-    if (imageBuffer != nullptr) { free(imageBuffer); }
-
-}
-
-void SaveIntersectionBufferToBMP(
-    void* a_GpuMemPtr,
-    const unsigned int a_Width,
-    const unsigned int a_Height,
-    const unsigned int a_NumIntersectionsPerPixel,
-    const std::filesystem::path& a_SaveFileDirectory,
-    const std::string& a_SaveFileName)
-{
-
-    CreateDirectoryIfNotExists(a_SaveFileDirectory);
-
-    const unsigned int totalIntersections = a_Width * a_Height * a_NumIntersectionsPerPixel;
-    const unsigned int numPixels = a_Width * a_Height;
-    const unsigned int byteSize = sizeof(IntersectionBuffer) + numPixels * sizeof(IntersectionData);
-
-    void* cpuMemPtr = malloc(byteSize);
-    cudaMemcpy(cpuMemPtr, a_GpuMemPtr, byteSize, cudaMemcpyDeviceToHost);
-
-    const IntersectionBuffer* intersectionBuffer = reinterpret_cast<IntersectionBuffer*>(cpuMemPtr);
-    const IntersectionData* intersectionData = intersectionBuffer->m_Intersections;
-
-    unsigned char* imageBuffer = reinterpret_cast<unsigned char*>(malloc(numPixels * 3));
-
-    for (unsigned int sampleIndex = 0; sampleIndex < a_NumIntersectionsPerPixel; ++sampleIndex)
-    {
-
-        //Get File path for current channel image.
-        std::filesystem::path finalPath = a_SaveFileDirectory;
-        finalPath /= a_SaveFileName + std::to_string(sampleIndex);
-
-        if (finalPath.has_extension()) { finalPath.replace_extension(".bmp"); }
-        else { finalPath += ".bmp"; }
-
-        if (!(finalPath.has_filename() && finalPath.has_extension()))
-        {
-            printf("Error: could not construct valid file path: %s \n", finalPath.string().c_str());
-            return;
-        }
-
-        for (unsigned row = 0; row < a_Height; ++row)
-        {
-
-            for (unsigned column = 0; column < a_Width; ++column)
-            {
-
-                const unsigned intersectionIndex = row * a_Width + column;
-                const unsigned intersectionDataIndex = intersectionIndex * a_NumIntersectionsPerPixel + sampleIndex; //Same pattern as is used in PixelBuffer data struct.
-                const IntersectionData& currentIntersection = intersectionData[intersectionIndex];
-
-                constexpr float maxColorChannelVal = static_cast<float>(0xFF);
-                const float minDistance = 0.001f;
-                const float maxDistance = 1000.f;
-
-                const unsigned int rowIndexOffset = row * a_Width * 3;
-                const unsigned int columnIndexOffset = column * 3;
-
-                if(currentIntersection.IsIntersection())
-                {
-
-                    const float normalizedDistance = std::clamp((currentIntersection.m_IntersectionT - minDistance) / (maxDistance - minDistance), 0.f, 1.f);
-                    const unsigned char color = static_cast<unsigned char>(normalizedDistance * maxColorChannelVal);
-
-                    imageBuffer[rowIndexOffset + columnIndexOffset + 0] = color;
-                    imageBuffer[rowIndexOffset + columnIndexOffset + 1] = color;
-                    imageBuffer[rowIndexOffset + columnIndexOffset + 2] = color;
-
-                }
-                else
-                {
-                    imageBuffer[rowIndexOffset + columnIndexOffset + 0] = static_cast<unsigned char>(0);
-                    imageBuffer[rowIndexOffset + columnIndexOffset + 1] = static_cast<unsigned char>(0);
-                    imageBuffer[rowIndexOffset + columnIndexOffset + 2] = static_cast<unsigned char>(255);
-                }
-
-            }
-
-        }
-
-        if (SaveToBMP(imageBuffer, a_Width, a_Height, finalPath))
-        {
-            printf("Info: saved Ray Batch to %s \n", finalPath.string().c_str());
-        }
-
-    }
-}
-
-const std::string cDebugOutputInitPath = "./DebugOutputs/Initialization/";
-const std::string cDebugOutputRunPath = "./DebugOutputs/Run/";
-
 
 
 WaveFrontRenderer::WaveFrontRenderer(const InitializationData& a_InitializationData)
@@ -564,8 +95,6 @@ bool WaveFrontRenderer::Initialize(const InitializationData& a_InitializationDat
     cudaDeviceSynchronize();
 
     CHECKLASTCUDAERROR;
-
-    CreateTestBMP();
 
     return success;
 
@@ -932,15 +461,6 @@ void WaveFrontRenderer::CreateDataBuffers()
     m_PixelBufferMultiChannel->Write(numPixels, 0);
     m_PixelBufferMultiChannel->Write(numOutputChannels, sizeof(PixelBuffer::m_NumPixels));
 
-    void* pixelBuffMultiChannelCuPtr = reinterpret_cast<void*>(*(*m_PixelBufferMultiChannel));
-    SavePixelBufferToBMP(
-        pixelBuffMultiChannelCuPtr,
-        m_RenderResolution.x,
-        m_RenderResolution.y,
-        numOutputChannels,
-        cDebugOutputInitPath + "MultiPixelBuffer/",
-        "MultiChannelPixelBuffer-Initialized");
-
     m_PixelBufferSingleChannel = std::make_unique<MemoryBuffer>(
         static_cast<size_t>(pixelBufferEmptySize) + 
         static_cast<size_t>(numPixels)*
@@ -948,14 +468,6 @@ void WaveFrontRenderer::CreateDataBuffers()
     m_PixelBufferSingleChannel->Write(numPixels, 0);
     m_PixelBufferSingleChannel->Write(1, sizeof(PixelBuffer::m_NumPixels));
 
-    void* pixelBuffSingleChannelCuPtr = reinterpret_cast<void*>(*(*m_PixelBufferSingleChannel));
-    SavePixelBufferToBMP(
-        pixelBuffSingleChannelCuPtr,
-        m_RenderResolution.x,
-        m_RenderResolution.y,
-        1,
-        cDebugOutputInitPath + "SinglePixelBuffer/",
-        "SingleChannelPixelBuffer-Initialized");
 
     const PixelBuffer* pixelBufferPtr = m_PixelBufferMultiChannel->GetDevicePtr<PixelBuffer>();
 
@@ -980,16 +492,6 @@ void WaveFrontRenderer::CreateDataBuffers()
 
         ResetIntersectionRayBatch(rayBatch->GetDevicePtr<IntersectionRayBatch>(), numPixels, m_RaysPerPixel);
 
-        void* rayBatchCuPtr = rayBatch->GetDevicePtr();
-        SaveRayBatchToBMP(
-            rayBatchCuPtr,
-            m_RenderResolution.x,
-            m_RenderResolution.y,
-            m_RaysPerPixel,
-            cDebugOutputInitPath + "RayBatches/",
-            "RayBatch" + std::to_string(batchIndex) + "-Initialized");
-        batchIndex++;
-
     }
 
     cudaDeviceSynchronize();
@@ -1008,16 +510,6 @@ void WaveFrontRenderer::CreateDataBuffers()
            static_cast<size_t>(intersectionDataStructSize));
         intersectionBuffer->Write(numPixels, 0);
         intersectionBuffer->Write(m_RaysPerPixel, sizeof(IntersectionBuffer::m_NumPixels));
-
-        void* hitBufferCuPtr = intersectionBuffer->GetDevicePtr();
-        SaveIntersectionBufferToBMP(
-            hitBufferCuPtr,
-            m_RenderResolution.x,
-            m_RenderResolution.y,
-            m_RaysPerPixel,
-            cDebugOutputInitPath + "HitBuffers/",
-            "HitBuffer" + std::to_string(bufferIndex) + "-Initialized");
-        bufferIndex++;
     }
 
     const unsigned ShadowRayBatchEmptySize = sizeof(ShadowRayBatch);
@@ -1040,7 +532,7 @@ void WaveFrontRenderer::CreateDataBuffers()
 
 
 
-    const unsigned LightBufferEmptySize = sizeof(LightBuffer);
+    const unsigned LightBufferEmptySize = sizeof(LightDataBuffer);
     const unsigned LightDataStructSize = sizeof(TriangleLight);
 
     m_LightBufferTemp = std::make_unique<MemoryBuffer>(
@@ -1054,7 +546,7 @@ void WaveFrontRenderer::CreateDataBuffers()
         {{0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}},
         {{0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}} };
 
-    LightBuffer* tempLightBuffer = reinterpret_cast<LightBuffer*>(malloc(sizeof(LightBuffer) + sizeof(lights)));
+    LightDataBuffer* tempLightBuffer = reinterpret_cast<LightDataBuffer*>(malloc(sizeof(LightDataBuffer) + sizeof(lights)));
     tempLightBuffer->m_Lights[0] = lights[0];
     tempLightBuffer->m_Lights[1] = lights[1];
     tempLightBuffer->m_Lights[2] = lights[2];
@@ -1123,9 +615,6 @@ GLuint WaveFrontRenderer::TraceFrame()
 {
 
     CHECKLASTCUDAERROR;
-
-    static unsigned int frameCount = 0;
-    const std::string frameSaveFilePath = cDebugOutputRunPath + "Frame" + std::to_string(frameCount) + "/";
 
     //Clear Pixel buffer
     PixelBuffer* pixelBufferMultiChannelDevPtr = m_PixelBufferMultiChannel->GetDevicePtr<PixelBuffer>();
@@ -1199,35 +688,6 @@ GLuint WaveFrontRenderer::TraceFrame()
         void* currentRayBatchCuPtr = currentRays.GetDevicePtr();
         void* secondaryRayBatchCuPtr = secondaryRays.GetDevicePtr();
 
-
-        {   //Debug stuff
-            /*const std::string frameWaveSaveFilePath = frameSaveFilePath + "Wave" + std::to_string(waveIndex) + "/";*/
-
-            /*SaveRayBatchToBMP(
-                primRayPrevFrameBatchCuPtr,
-                m_RenderResolution.x,
-                m_RenderResolution.y,
-                m_RaysPerPixel,
-                frameWaveSaveFilePath + "RayBatches/",
-                "PrimaryRays-Previous-Frame");*/
-
-            /*SaveRayBatchToBMP(
-                currentRayBatchCuPtr,
-                m_RenderResolution.x,
-                m_RenderResolution.y,
-                m_RaysPerPixel,
-                frameWaveSaveFilePath + "RayBatches/",
-                "CurrentRays");*/
-
-            /*SaveRayBatchToBMP(
-                secondaryRayBatchCuPtr,
-                m_RenderResolution.x,
-                m_RenderResolution.y,
-                m_RaysPerPixel,
-                frameWaveSaveFilePath + "RayBatches/",
-                "SecondaryRays");*/
-        }
-
         //Resolution and current depth(, current depth = current wave index)
         resolutionAndDepth.z = waveIndex;
 
@@ -1276,7 +736,7 @@ GLuint WaveFrontRenderer::TraceFrame()
             currentHits.GetDevicePtr<IntersectionBuffer>(),
             secondaryRays.GetDevicePtr<IntersectionRayBatch>(),
             m_ShadowRayBatch->GetDevicePtr<ShadowRayBatch>(),
-            m_LightBufferTemp->GetDevicePtr<LightBuffer>(),
+            m_LightBufferTemp->GetDevicePtr<LightDataBuffer>(),
             nullptr, //TODO: REPLACE THIS WITH LIGHT BUFFER FROM SCENE.
             m_ResultBuffer->GetDevicePtr<ResultBuffer>()); 
 
@@ -1345,8 +805,6 @@ GLuint WaveFrontRenderer::TraceFrame()
 
     //Post processing using CUDA kernel.
     PostProcess(postProcessLaunchParams);
-
-    frameCount++;
 
     //Return output image.
     return m_OutputBuffer->GetTexture();

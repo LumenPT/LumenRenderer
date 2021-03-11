@@ -13,33 +13,50 @@ namespace WaveFront
 
         CPU_GPU SurfaceData(float3 a_Position, 
             float3 a_Normal,
-            float a_Depth,
-            float3 a_DiffuseColor,
+            float a_IntersectionT,
+            float3 a_Color,
             float a_Metallic,
             float a_Roughness,
-            float3 a_EmissiveColor,
-            float3 a_IncomingRay,
+            bool a_Emissive,
+            float3 a_IncomingRayDirection,
             float3 a_TransportFactor)
             :
         m_Position(a_Position),
         m_Normal(a_Normal),
-        m_Depth(a_Depth),
-        m_DiffuseColor(a_DiffuseColor),
+        m_IntersectionT(a_IntersectionT),
+        m_Color(a_Color),
         m_Metallic(a_Metallic),
         m_Roughness(a_Roughness),
-        m_EmissiveColor(a_EmissiveColor),
-        m_IncomingRay(a_IncomingRay),
+        m_Emissive(a_Emissive),
+        m_IncomingRayDirection(a_IncomingRayDirection),
         m_TransportFactor(a_TransportFactor)
         {}
 
+
+
+        GPU_ONLY float3 GetRayOrigin() const
+        {
+            
+        }
+
+
+        //Position of the intersection in world-space
         float3 m_Position;
+        //Normal at the point of intersection.
         float3 m_Normal;
-        float m_Depth;
-        float3 m_DiffuseColor;
+        //Distance along the ray at which the intersection occurs.
+        float m_IntersectionT;
+        //Direction of the ray that caused the intersection.
+        float3 m_IncomingRayDirection;
+        //Color at the point of intersection. If m_Emissive is false it is the diffuse color otherwise it is the emissive color.
+        float3 m_Color;
+        //Metallic factor at the point of intersection.
         float m_Metallic;
+        //Roughness factor at the point of intersection.
         float m_Roughness;
-        float3 m_EmissiveColor;
-        float3 m_IncomingRay;
+        //Defines if the color at the intersection is emissive or diffuse.
+        bool m_Emissive;
+        //The amount of light that is transported as a scalar-factor.
         float3 m_TransportFactor;
 
     };

@@ -69,7 +69,7 @@ namespace WaveFront
             const IntersectionBuffer* a_CurrentIntersections,
             IntersectionRayBatch* a_SecondaryRays,
             ShadowRayBatch* a_ShadowRayBatch,
-            const LightBuffer* a_Lights,
+            const LightDataBuffer* a_Lights,
             CDF* const a_CDF = nullptr,
             ResultBuffer* a_DEBUGResultBuffer = nullptr)
             :
@@ -95,7 +95,7 @@ namespace WaveFront
         const IntersectionBuffer* const m_CurrentIntersections;
         //TODO: Geometry buffer
         //TODO: Light buffer
-        const LightBuffer* const m_LightBuffer;
+        const LightDataBuffer* const m_LightBuffer;
         CDF* const m_CDF;
 
         //Write
