@@ -18,7 +18,7 @@ namespace WaveFront
 
     };
 
-    struct OptixRayGenData
+    struct OptixSBTRecordDataRayGen
     {
 
         float m_MinDistance;
@@ -26,7 +26,7 @@ namespace WaveFront
 
     };
 
-    struct OptixEmptyRecord
+    struct OptixSBTRecordDataMiss
     {
         float m_Dummy;
     };
