@@ -27,16 +27,7 @@
 WaveFrontRenderer::WaveFrontRenderer(const InitializationData& a_InitializationData)
     :
 m_ServiceLocator({}),
-m_DeviceContext(nullptr),
-m_PipelineRays(nullptr),
-m_PipelineShadowRays(nullptr),
-m_PipelineRaysLaunchParams(nullptr),
-m_PipelineShadowRaysLaunchParams(nullptr),
-m_RaysSBTGenerator(nullptr),
-m_ShadowRaysSBTGenerator(nullptr),
-m_ProgramGroups({}),
 m_OutputBuffer(nullptr),
-m_SBTBuffer(nullptr),
 m_RayBatchIndices({0}),
 m_HitBufferIndices({0}),
 m_ResultBuffer(nullptr),
@@ -59,19 +50,10 @@ m_Initialized(false)
     m_Initialized = Initialize(a_InitializationData);
     if(!m_Initialized)
     {
-        std::fprintf(stderr, "Initialization of wavefront renderer unsuccessful");
-        abort();
+        
     }
 
-    m_RaysSBTGenerator = std::make_unique<ShaderBindingTableGenerator>();
-    m_ShadowRaysSBTGenerator = std::make_unique<ShaderBindingTableGenerator>();
-
     m_Texture = std::make_unique<Texture>(LumenPTConsts::gs_AssetDirectory + "debugTex.jpg");
-
-    m_ServiceLocator.m_SBTGenerator = m_RaysSBTGenerator.get();
-    m_ServiceLocator.m_Renderer = this;
-
-    CreateShaderBindingTables();
 	
 }
 
@@ -84,9 +66,6 @@ bool WaveFrontRenderer::Initialize(const InitializationData& a_InitializationDat
     //Temporary(put into init data)
     const std::string shaderPath = LumenPTConsts::gs_ShaderPathBase + "WaveFrontShaders.ptx";
 
-    InitializeContext();
-    success &= CreatePipelines(shaderPath);
-    CreatePipelineBuffers();
     CreateOutputBuffer();
     CreateDataBuffers();
     SetupInitialBufferIndices();
@@ -99,341 +78,12 @@ bool WaveFrontRenderer::Initialize(const InitializationData& a_InitializationDat
 
 }
 
-void WaveFrontRenderer::InitializeContext()
-{
 
-    cudaFree(0);
-    CUcontext cu_ctx = 0;
-    CHECKOPTIXRESULT(optixInit());
-    OptixDeviceContextOptions options = {};
-    options.logCallbackFunction = &WaveFrontRenderer::DebugCallback;
-    options.logCallbackLevel = 4;
-    CHECKOPTIXRESULT(optixDeviceContextCreate(cu_ctx, &options, &m_DeviceContext));
 
-}
 
-OptixPipelineCompileOptions WaveFrontRenderer::CreatePipelineOptions(
-    const std::string& a_LaunchParamName,
-    unsigned int a_NumPayloadValues, 
-    unsigned int a_NumAttributes) const
-{
 
-    OptixPipelineCompileOptions pipelineOptions = {};
-    pipelineOptions.usesMotionBlur = false;
-    pipelineOptions.traversableGraphFlags = OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_ANY;
-    pipelineOptions.numPayloadValues = std::clamp(a_NumPayloadValues, 0u, 8u);
-    pipelineOptions.numAttributeValues = std::clamp(a_NumAttributes, 2u, 8u);
-    pipelineOptions.exceptionFlags = OPTIX_EXCEPTION_FLAG_DEBUG;
-    pipelineOptions.pipelineLaunchParamsVariableName = a_LaunchParamName.c_str();
-    pipelineOptions.usesPrimitiveTypeFlags = OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE & OPTIX_PRIMITIVE_TYPE_FLAGS_CUSTOM;
 
-    return pipelineOptions;
 
-}
-
-
-
-bool WaveFrontRenderer::CreatePipelines(const std::string& a_ShaderPath)
-{
-
-    bool success = true;
-
-    const std::string resolveRaysParams = "launchParams";
-    const std::string resolveRaysRayGenFuncName = "__raygen__UberGenShader";
-    //const std::string resolveRaysRayGenFuncName = "__raygen__ResolveRaysRayGen";
-    const std::string resolveRaysHitFuncName = "__closesthit__UberClosestHit";
-    const std::string resolveRaysMissFuncName = "__miss__UberMiss";
-    const std::string resolveRaysAnyhitFuncName = "__miss__UberAnyHit";
-
-    const std::string resolveShadowRaysParams = "launchParams";
-    //const std::string resolveShadowRaysRayGenFuncName = "__raygen__ResolveShadowRaysRayGen";
-    //const std::string resolveShadowRaysHitFuncName = "__anyhit__ResolveShadowRaysAnyHit";
-    //const std::string resolveShadowRaysMissFuncName = "__miss__ResolveShadowRaysMiss";
-
-    OptixPipelineCompileOptions compileOptions = CreatePipelineOptions(resolveRaysParams, 2, 2);
-
-    OptixModule shaderModule = CreateModule(a_ShaderPath, compileOptions);
-    if (shaderModule == nullptr) { return false; }
-
-    success &= CreatePipeline(
-        shaderModule,
-        compileOptions,
-        PipelineType::RESOLVE_RAYS, 
-        resolveRaysRayGenFuncName, 
-        resolveRaysHitFuncName,
-        resolveRaysMissFuncName,
-        m_PipelineRays);
-
-    //optixModuleDestroy(shaderModule);
-
-    compileOptions = CreatePipelineOptions(resolveShadowRaysParams, 2, 2);
-    shaderModule = CreateModule(a_ShaderPath, compileOptions);
-    if (shaderModule == nullptr) { return false; }
-
-    //success &= CreatePipeline(
-    //    shaderModule,
-    //    compileOptions,
-    //    PipelineType::RESOLVE_SHADOW_RAYS, 
-    //    resolveShadowRaysRayGenFuncName, 
-    //    resolveShadowRaysHitFuncName,
-    //    resolveShadowRaysMissFuncName,
-    //    m_PipelineShadowRays);
-
-    //optixModuleDestroy(shaderModule);
-
-    return success;
-
-}
-
-//TODO: implement necessary Optix shaders for wavefront algorithm
-//Shaders:
-// - RayGen: trace rays from ray definitions in ray batch, different methods for radiance or shadow.
-// - Miss: is this shader necessary, miss result by default in intersection buffer?
-// - ClosestHit: radiance trace, report intersection into intersection buffer.
-// - AnyHit: shadow trace, report if any hit in between certain max distance.
-bool WaveFrontRenderer::CreatePipeline(
-    const OptixModule& a_Module,
-    const OptixPipelineCompileOptions& a_PipelineOptions,
-    PipelineType a_Type, 
-    const std::string& a_RayGenFuncName, 
-    const std::string& a_HitFuncName,
-    const std::string& a_MissFuncName,
-    OptixPipeline& a_Pipeline)
-{
-
-    OptixProgramGroup rayGenProgram = nullptr;
-    OptixProgramGroup hitProgram = nullptr;
-    OptixProgramGroup missProgram = nullptr;
-
-    OptixProgramGroupDesc rgGroupDesc = {};
-    rgGroupDesc.kind = OPTIX_PROGRAM_GROUP_KIND_RAYGEN;
-    rgGroupDesc.raygen.entryFunctionName = a_RayGenFuncName.c_str();
-    rgGroupDesc.raygen.module = a_Module;
-
-    OptixProgramGroupDesc htGroupDesc = {};
-    htGroupDesc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-
-    OptixProgramGroupDesc msGroupDesc = {};
-    msGroupDesc.kind = OPTIX_PROGRAM_GROUP_KIND_MISS;
-
-    switch (a_Type)
-    {
-
-        case PipelineType::RESOLVE_RAYS:
-            {
-                htGroupDesc.hitgroup.entryFunctionNameCH = a_HitFuncName.c_str();
-                htGroupDesc.hitgroup.moduleCH = a_Module;
-
-                msGroupDesc.miss.entryFunctionName = a_MissFuncName.c_str();
-                msGroupDesc.miss.module = a_Module;
-
-                rayGenProgram = CreateProgramGroup(rgGroupDesc, s_RaysRayGenPGName);
-                hitProgram = CreateProgramGroup(htGroupDesc, s_RaysHitPGName);
-                missProgram = CreateProgramGroup(msGroupDesc, s_RaysMissPGName);
-
-                break;
-            }
-
-        case PipelineType::RESOLVE_SHADOW_RAYS:
-            {
-                htGroupDesc.hitgroup.entryFunctionNameAH = a_HitFuncName.c_str();
-                htGroupDesc.hitgroup.moduleAH = a_Module;
-
-                msGroupDesc.miss.entryFunctionName = a_MissFuncName.c_str();
-                msGroupDesc.miss.module = a_Module;
-
-                rayGenProgram = CreateProgramGroup(rgGroupDesc, s_ShadowRaysRayGenPGName);
-                hitProgram = CreateProgramGroup(htGroupDesc, s_ShadowRaysHitPGName);
-                missProgram = CreateProgramGroup(msGroupDesc, s_ShadowRaysMissPGName);
-
-                break;
-            }
-        default:
-            {
-                rayGenProgram = nullptr;
-                hitProgram = nullptr;
-                missProgram = nullptr;
-
-            }
-            break;
-    }
-
-    if( rayGenProgram == nullptr ||
-        hitProgram == nullptr || 
-        missProgram == nullptr)
-    {
-        printf("Could not create program groups for pipeline type: %i: (RayGenProgram: %p , HitProgram: %p, MissProgram: %p) \n",
-            a_Type,
-            rayGenProgram, 
-            hitProgram, 
-            missProgram);
-        return false;
-    }
-
-    OptixPipelineLinkOptions pipelineLinkOptions = {};
-    pipelineLinkOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_FULL;
-    pipelineLinkOptions.maxTraceDepth = 1;
-
-    OptixProgramGroup programGroups[] = { rayGenProgram, missProgram, hitProgram };
-
-    char log[2048];
-    auto logSize = sizeof(log);
-
-    OptixResult error{};
-
-    CHECKOPTIXRESULT(error = optixPipelineCreate(
-        m_DeviceContext,
-        &a_PipelineOptions,
-        &pipelineLinkOptions,
-        programGroups,
-        sizeof(programGroups) / sizeof(OptixProgramGroup),
-        log,
-        &logSize,
-        &a_Pipeline));
-
-    puts(log);
-
-    if (error) { return false; }
-
-    OptixStackSizes stackSizes = {};
-
-    AccumulateStackSizes(rayGenProgram, stackSizes);
-    AccumulateStackSizes(hitProgram, stackSizes);
-
-    auto finalSizes = ComputeStackSizes(stackSizes, 1, 0, 0);
-
-    CHECKOPTIXRESULT(error = optixPipelineSetStackSize(
-        a_Pipeline,
-        finalSizes.DirectSizeTrace,
-        finalSizes.DirectSizeState,
-        finalSizes.ContinuationSize,
-        3));
-
-    if (error) { return false; }
-
-    return true;
-
-}
-
-void WaveFrontRenderer::CreatePipelineBuffers()
-{
-
-    m_PipelineRaysLaunchParams = std::make_unique<MemoryBuffer>(sizeof(WaveFront::OptixLaunchParameters));
-    m_PipelineShadowRaysLaunchParams = std::make_unique<MemoryBuffer>(sizeof(WaveFront::OptixLaunchParameters));
-
-}
-
-OptixModule WaveFrontRenderer::CreateModule(const std::string& a_PtxPath, const OptixPipelineCompileOptions& a_PipelineOptions) const
-{
-
-    OptixModuleCompileOptions moduleOptions = {};
-    moduleOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_LINEINFO;
-    moduleOptions.maxRegisterCount = OPTIX_COMPILE_DEFAULT_MAX_REGISTER_COUNT;
-    moduleOptions.optLevel = OPTIX_COMPILE_OPTIMIZATION_LEVEL_0;
-
-    std::ifstream stream;
-    stream.open(a_PtxPath);
-
-    if(!stream.is_open())
-    {
-        return nullptr;
-    }
-
-    std::stringstream stringStream;
-    stringStream << stream.rdbuf();
-    std::string source = stringStream.str();
-
-    char log[2048];
-    auto logSize = sizeof(log);
-    OptixModule module{};
-
-
-
-    OptixResult error{};
-
-    CHECKOPTIXRESULT(error = optixModuleCreateFromPTX(
-        m_DeviceContext, 
-        &moduleOptions, 
-        &a_PipelineOptions, 
-        source.c_str(), 
-        source.size(), 
-        log, 
-        &logSize, 
-        &module));
-
-    if(error)
-    {
-        puts(log);
-        abort();
-    }
-
-    return module;
-
-}
-
-OptixProgramGroup WaveFrontRenderer::CreateProgramGroup(OptixProgramGroupDesc a_ProgramGroupDesc, const std::string& a_Name)
-{
-
-    OptixProgramGroupOptions programGroupOptions = {};
-
-    char log[2048];
-    auto logSize = sizeof(log);
-
-    OptixProgramGroup programGroup;
-
-
-
-    OptixResult error{};
-
-    CHECKOPTIXRESULT(error = optixProgramGroupCreate(
-        m_DeviceContext, 
-        &a_ProgramGroupDesc, 
-        1, 
-        &programGroupOptions, 
-        log, 
-        &logSize, 
-        &programGroup));
-
-    if(error)
-    {
-        puts(log);
-        abort();
-    }
-
-    m_ProgramGroups.emplace(a_Name, programGroup);
-
-    return programGroup;
-
-}
-
-void WaveFrontRenderer::CreateShaderBindingTables()
-{
-    
-    m_RaysRayGenRecord = m_RaysSBTGenerator->SetRayGen<OptixRayGenData>();
-    m_RaysMissRecord = m_RaysSBTGenerator->AddMiss<OptixEmptyRecord>();
-
-    auto& raysRayGenRecord = m_RaysRayGenRecord.GetRecord();
-    raysRayGenRecord.m_Header = GetProgramGroupHeader(s_RaysRayGenPGName);
-    raysRayGenRecord.m_Data.m_MinDistance = s_MinTraceDistance;
-    raysRayGenRecord.m_Data.m_MaxDistance = s_MaxTraceDistance;
-
-    auto& raysMissRecord = m_RaysMissRecord.GetRecord();
-    raysMissRecord.m_Header = GetProgramGroupHeader(s_RaysMissPGName);
-
-    m_ShadowRaysRayGenRecord = m_ShadowRaysSBTGenerator->SetRayGen<OptixRayGenData>();
-    m_ShadowRaysHitRecord = m_ShadowRaysSBTGenerator->AddHitGroup<OptixEmptyRecord>();
-    m_ShadowRaysMissRecord = m_ShadowRaysSBTGenerator->AddMiss<OptixEmptyRecord>();
-
-    auto& shadowRaysRayGenRecord = m_ShadowRaysRayGenRecord.GetRecord();
-    shadowRaysRayGenRecord.m_Header = GetProgramGroupHeader(s_ShadowRaysRayGenPGName);
-
-    auto& shadowRaysHitRecord = m_ShadowRaysHitRecord.GetRecord();
-    shadowRaysHitRecord.m_Header = GetProgramGroupHeader(s_ShadowRaysHitPGName);
-
-    auto& shadowRaysMissRecord = m_ShadowRaysMissRecord.GetRecord();
-    shadowRaysMissRecord.m_Header = GetProgramGroupHeader(s_ShadowRaysMissPGName);
-
-}
 
 void WaveFrontRenderer::CreateOutputBuffer()
 {
@@ -577,40 +227,9 @@ void WaveFrontRenderer::SetupInitialBufferIndices()
 
 
 
-void WaveFrontRenderer::DebugCallback(unsigned a_Level, const char* a_Tag, const char* a_Message, void*)
-{
 
-    std::printf("%u::%s:: %s\n\n", a_Level, a_Tag, a_Message);
 
-}
 
-void WaveFrontRenderer::AccumulateStackSizes(OptixProgramGroup a_ProgramGroup, OptixStackSizes& a_StackSizes)
-{
-
-    OptixStackSizes localSizes;
-    CHECKOPTIXRESULT(optixProgramGroupGetStackSize(a_ProgramGroup, &localSizes));
-    a_StackSizes.cssRG = std::max(a_StackSizes.cssRG, localSizes.cssRG);
-    a_StackSizes.cssMS = std::max(a_StackSizes.cssMS, localSizes.cssMS);
-    a_StackSizes.cssIS = std::max(a_StackSizes.cssIS, localSizes.cssIS);
-    a_StackSizes.cssAH = std::max(a_StackSizes.cssAH, localSizes.cssAH);
-    a_StackSizes.cssCH = std::max(a_StackSizes.cssCH, localSizes.cssCH);
-    a_StackSizes.cssCC = std::max(a_StackSizes.cssCC, localSizes.cssCC);
-    a_StackSizes.dssDC = std::max(a_StackSizes.dssDC, localSizes.dssDC);
-
-}
-
-ProgramGroupHeader WaveFrontRenderer::GetProgramGroupHeader(const std::string& a_GroupName) const
-{
-
-    assert(m_ProgramGroups.count(a_GroupName) != 0);
-
-    ProgramGroupHeader header{};
-
-    CHECKOPTIXRESULT(optixSbtRecordPackHeader(m_ProgramGroups.at(a_GroupName), &header));
-
-    return header;
-
-}
 
 GLuint WaveFrontRenderer::TraceFrame()
 {
@@ -814,29 +433,7 @@ GLuint WaveFrontRenderer::TraceFrame()
 
 }
 
-WaveFrontRenderer::ComputedStackSizes WaveFrontRenderer::ComputeStackSizes(
-    OptixStackSizes a_StackSizes, 
-    int a_TraceDepth, 
-    int a_DirectDepth, 
-    int a_ContinuationDepth)
-{
 
-    ComputedStackSizes sizes;
-    sizes.DirectSizeState = a_StackSizes.dssDC * a_DirectDepth;
-    sizes.DirectSizeTrace = a_StackSizes.dssDC * a_DirectDepth;
-
-    unsigned int cssCCTree = a_ContinuationDepth * a_StackSizes.cssCC;
-
-    unsigned int cssCHOrMSPlusCCTree = std::max(a_StackSizes.cssCH, a_StackSizes.cssMS) + cssCCTree;
-
-    sizes.ContinuationSize =
-        a_StackSizes.cssRG + cssCCTree +
-        (std::max(a_TraceDepth, 1) - 1) * cssCHOrMSPlusCCTree +
-        std::min(a_TraceDepth, 1) * std::max(cssCHOrMSPlusCCTree, a_StackSizes.cssIS + a_StackSizes.cssAH);
-
-    return sizes;
-
-}
 
 void WaveFrontRenderer::GetRayBatchIndices(
     unsigned a_WaveIndex, 
@@ -936,82 +533,9 @@ void WaveFrontRenderer::GetHitBufferIndices(
 
 
 
-std::unique_ptr<AccelerationStructure> WaveFrontRenderer::BuildGeometryAccelerationStructure(
-    const OptixAccelBuildOptions& a_BuildOptions,
-    const OptixBuildInput& a_BuildInput)
-{
-
-    // Let Optix compute how much memory the output buffer and the temporary buffer need to have, then create these buffers
-    OptixAccelBufferSizes sizes{};
-    CHECKOPTIXRESULT(optixAccelComputeMemoryUsage(m_DeviceContext, &a_BuildOptions, &a_BuildInput, 1, &sizes));
-    MemoryBuffer tempBuffer(sizes.tempSizeInBytes);
-    std::unique_ptr<MemoryBuffer> resultBuffer = std::make_unique<MemoryBuffer>(sizes.outputSizeInBytes);
-
-    OptixTraversableHandle handle;
-    // It is possible to have functionality similar to DX12 Command lists with cuda streams, though it is not required.
-    // Just worth mentioning if we want that functionality.
-    CHECKOPTIXRESULT(optixAccelBuild(m_DeviceContext, 0, &a_BuildOptions, &a_BuildInput, 1, *tempBuffer, sizes.tempSizeInBytes,
-        **resultBuffer, sizes.outputSizeInBytes, &handle, nullptr, 0));
-
-    // Needs to return the resulting memory buffer and the traversable handle
-    return std::make_unique<AccelerationStructure>(handle, std::move(resultBuffer));
-
-}
-
-std::unique_ptr<AccelerationStructure> WaveFrontRenderer::BuildInstanceAccelerationStructure(std::vector<OptixInstance> a_Instances)
-{
 
 
-    auto instanceBuffer = MemoryBuffer(a_Instances.size() * sizeof(OptixInstance));
-    instanceBuffer.Write(a_Instances.data(), a_Instances.size() * sizeof(OptixInstance), 0);
-    OptixBuildInput buildInput = {};
 
-    assert(*instanceBuffer % OPTIX_INSTANCE_BYTE_ALIGNMENT == 0);
-
-    buildInput.type = OPTIX_BUILD_INPUT_TYPE_INSTANCES;
-    buildInput.instanceArray.instances = *instanceBuffer;
-    buildInput.instanceArray.numInstances = static_cast<uint32_t>(a_Instances.size());
-    buildInput.instanceArray.aabbs = 0;
-    buildInput.instanceArray.numAabbs = 0;
-
-    OptixAccelBuildOptions buildOptions = {};
-    // Based on research, it is more efficient to continuously be rebuilding most instance acceleration structures rather than to update them
-    // This is because updating an acceleration structure reduces its quality, thus lowering the ray traversal speed through it
-    // while rebuilding will preserve this quality. Since instance acceleration structures are cheap to build, it is faster to rebuild them than deal
-    // with the lower traversal speed
-    buildOptions.buildFlags = OPTIX_BUILD_FLAG_PREFER_FAST_TRACE;
-    buildOptions.operation = OPTIX_BUILD_OPERATION_BUILD;
-    buildOptions.motionOptions.numKeys = 0; // No motion
-
-    OptixAccelBufferSizes sizes;
-    CHECKOPTIXRESULT(optixAccelComputeMemoryUsage(
-        m_DeviceContext,
-        &buildOptions,
-        &buildInput,
-        1,
-        &sizes));
-
-    auto tempBuffer = MemoryBuffer(sizes.tempSizeInBytes);
-    auto resultBuffer = std::make_unique<MemoryBuffer>(sizes.outputSizeInBytes);
-
-    OptixTraversableHandle handle;
-    CHECKOPTIXRESULT(optixAccelBuild(
-        m_DeviceContext,
-        0,
-        &buildOptions,
-        &buildInput,
-        1,
-        *tempBuffer,
-        sizes.tempSizeInBytes,
-        **resultBuffer,
-        sizes.outputSizeInBytes,
-        &handle,
-        nullptr,
-        0));
-
-    return std::make_unique<AccelerationStructure>(handle, std::move(resultBuffer));;
-
-}
 
 std::unique_ptr<MemoryBuffer> WaveFrontRenderer::InterleaveVertexData(const PrimitiveData& a_MeshData)
 {
