@@ -66,10 +66,91 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(unsigned a_NumIntersections, AtomicBuffer<
         //TODO: ensure that index is the same for the intersection data and ray.
         auto* intersection = a_IntersectionData->GetData(i);
         auto* ray = a_Rays->GetData(i);
+        unsigned int surfaceDataIndex = intersection->m_PixelIndex;
 
         //TODO get material pointer from intersection data.
         //TODO extract barycentric coordinates and all that.
         //TODO store in output buffer.
+
+        const IntersectionData* currIntersection = a_IntersectionData->GetData(i);
+
+        if (currIntersection->IsIntersection())
+        {
+            // Get ray used to calculate intersection.
+            const unsigned int rayArrayIndex = currIntersection->m_RayArrayIndex;
+            const unsigned int vertexIndex = 3 * currIntersection->m_PrimitiveIndex;
+            const DevicePrimitive* primitive = currIntersection->m_Primitive;
+
+            if (primitive == nullptr ||
+                primitive->m_IndexBuffer == nullptr ||
+                primitive->m_VertexBuffer == nullptr ||
+                primitive->m_Material == nullptr)
+            {
+
+                if (!primitive)
+                {
+                    printf("Error, primitive: %p \n", primitive);
+                }
+                else
+                {
+                    printf("Error, found nullptr in primitive variables: \n\tm_IndexBuffer: %p \n\tm_VertexBuffer: %p \n\tm_Material: %p\n",
+                           primitive->m_IndexBuffer,
+                           primitive->m_VertexBuffer,
+                           primitive->m_Material);
+                }
+
+                //Set to debug color purple.
+                a_OutPut[surfaceDataIndex].m_Color = make_float3(1.f, 0.f, 1.f);
+                return;
+            }
+
+            /*printf("VertexIndex: %i, Primitive: %p, m_IndexBuffer: %p, m_VertexBuffer: %p \n",
+                vertexIndex,
+                primitive,
+                primitive->m_IndexBuffer,
+                primitive->m_VertexBuffer);*/
+
+            const unsigned int vertexIndexA = primitive->m_IndexBuffer[vertexIndex + 0];
+            const unsigned int vertexIndexB = primitive->m_IndexBuffer[vertexIndex + 1];
+            const unsigned int vertexIndexC = primitive->m_IndexBuffer[vertexIndex + 2];
+
+            //printf("VertexA Index: %i\n", vertexIndexA);
+            //printf("VertexB Index: %i\n", vertexIndexB);
+            //printf("VertexC Index: %i\n", vertexIndexC);
+
+            const Vertex* A = &primitive->m_VertexBuffer[vertexIndexA];
+            const Vertex* B = &primitive->m_VertexBuffer[vertexIndexB];
+            const Vertex* C = &primitive->m_VertexBuffer[vertexIndexC];
+
+            const float U = currIntersection->m_UVs.x;
+            const float V = currIntersection->m_UVs.y;
+            const float W = 1.f - (U + V);
+
+            const float2 texCoords = A->m_UVCoord * W + B->m_UVCoord * U + C->m_UVCoord * V;
+
+            //TODO extract material using instance id.
+            const auto instanceId = 0;    //currIntersection->m_InstanceId
+            const DeviceMaterial* material = &a_Materials[instanceId];
+
+            //TODO extract different textures (emissive, diffuse, metallic, roughness).
+            const float4 textureColor = tex2D<float4>(material->m_DiffuseTexture, texCoords.x, texCoords.y);
+            const float3 finalColor = make_float3(textureColor * material->m_DiffuseColor);
+
+            //The surface data to write to.
+            auto* output = &a_OutPut[surfaceDataIndex];
+
+            //TODO set all these.
+            output->m_Index = currIntersection->m_PixelIndex;
+            output->m_Emissive;
+            output->m_Color = finalColor;
+            output->m_IntersectionT = currIntersection->m_IntersectionT;
+            output->m_Normal = normalize(A->m_Normal + B->m_Normal + C->m_Normal);  //TODO untested.
+            output->m_Position;
+            output->m_IncomingRayDirection;
+            output->m_Metallic;
+            output->m_Roughness;
+            output->m_TransportFactor;
+        }
     }
 
 }

@@ -90,6 +90,9 @@ namespace WaveFront
         //Triangle lights.
         MemoryBuffer m_TriangleLights;
 
+        //Buffer binding instance ID to material.
+        std::unique_ptr<MemoryBuffer> m_Materials;
+
         //Optix system
         std::unique_ptr<OptixWrapper> m_OptixSystem;
 

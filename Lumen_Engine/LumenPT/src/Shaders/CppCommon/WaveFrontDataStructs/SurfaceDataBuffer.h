@@ -39,7 +39,8 @@ namespace WaveFront
             
         }
 
-
+        //The index of the pixel that this surface data belongs to.
+        unsigned m_Index;
         //Position of the intersection in world-space
         float3 m_Position;
         //Normal at the point of intersection.

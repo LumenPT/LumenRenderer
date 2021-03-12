@@ -5,6 +5,8 @@
 #include "WaveFrontRenderer.h"
 #include "PTMesh.h"
 #include "PTScene.h"
+#include "Material.h"
+#include "Texture.h"
 #include "PTVolume.h"
 #include "Material.h"
 #include "MemoryBuffer.h"
@@ -61,8 +63,11 @@ namespace WaveFront
             {{0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}} };
         m_TriangleLights.Write(&lights[0], sizeof(TriangleLight) * numLights, 0);
 
+        //Set up material buffer. Initial space for 1024 meshes.
+        m_Materials = std::make_unique<MemoryBuffer>(1024 * sizeof(void*));
 
-        //TODO initialize optix system. This is currently private it seems.
+        //TODO: initialize optix system.
+        //TODO: I don't think wavefront should care about this data at all. 
         OptixWrapper::InitializationData optixInitData;
 
         m_OptixSystem = std::make_unique<OptixWrapper>(optixInitData);
@@ -70,29 +75,35 @@ namespace WaveFront
 
     std::unique_ptr<Lumen::ILumenPrimitive> WaveFrontRenderer2WithAVengeance::CreatePrimitive(PrimitiveData& a_MeshData)
     {
-
+        //TODO let optix build the acceleration structure and return the handle.
     }
 
     std::shared_ptr<Lumen::ILumenMesh> WaveFrontRenderer2WithAVengeance::CreateMesh(
         std::vector<std::unique_ptr<Lumen::ILumenPrimitive>>& a_Primitives)
     {
-
+        //TODO Let optix build the medium level acceleration structure and return the mesh handle for it.
     }
 
     std::shared_ptr<Lumen::ILumenTexture> WaveFrontRenderer2WithAVengeance::CreateTexture(void* a_PixelData,
         uint32_t a_Width, uint32_t a_Height)
     {
-
+        static cudaChannelFormatDesc formatDesc = cudaCreateChannelDesc<uchar4>();
+        return std::make_shared<Texture>(a_PixelData, formatDesc, a_Width, a_Height);
     }
 
     std::shared_ptr<Lumen::ILumenMaterial> WaveFrontRenderer2WithAVengeance::CreateMaterial(
         const MaterialData& a_MaterialData)
     {
+        auto mat = std::make_shared<Material>();
+        mat->SetDiffuseColor(a_MaterialData.m_DiffuseColor);
+        mat->SetDiffuseTexture(a_MaterialData.m_DiffuseTexture);
+        mat->SetEmission(a_MaterialData.m_EmssivionVal);
+        return mat;
     }
 
     std::shared_ptr<Lumen::ILumenVolume> WaveFrontRenderer2WithAVengeance::CreateVolume(const std::string& a_FilePath)
     {
-
+        //TODO tell optix to create a volume acceleration structure.
     }
 
     WaveFrontRenderer2WithAVengeance::WaveFrontRenderer2WithAVengeance() : m_FrameIndex(0)
@@ -205,7 +216,21 @@ namespace WaveFront
     void WaveFrontRenderer2WithAVengeance::SetInstanceMaterial(unsigned a_InstanceId,
         std::shared_ptr<Lumen::ILumenMaterial>& a_Material)
     {
-        //TODO set material in a buffer. Look up when extracting surface data.
+        //Current size in pointers.
+        const auto size = m_Materials->GetSize() / sizeof(void*);
+
+        //Allocate more memory if not enough is available.
+        if(size <= a_InstanceId)
+        {
+            std::unique_ptr<MemoryBuffer> temp = std::make_unique<MemoryBuffer>(m_Materials->GetSize() * 2);
+            temp->CopyFrom(*m_Materials, m_Materials->GetSize(), 0, 0);
+            m_Materials = std::move(temp);
+        }
+
+        auto asMaterial = std::static_pointer_cast<Material>(a_Material);
+
+        //Set the device material pointer for the ID.
+        m_Materials->Write(asMaterial->GetDeviceMaterial(), sizeof(void*), a_InstanceId * sizeof(void*));
     }
 }
 #endif
