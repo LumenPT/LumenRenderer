@@ -32,17 +32,16 @@ namespace WaveFront
 
         struct InitializationData
         {
-
             CUcontext m_CUDAContext;
 
             struct ProgramData
             {
-                const std::filesystem::path m_ProgramPath;
-                const std::string& m_ProgramLaunchParamName;
-                const std::string& m_ProgramRayGenFuncName;
-                const std::string& m_ProgramMissFuncName;
-                const std::string& m_ProgramAnyHitFuncName;
-                const std::string& m_ProgramClosestHitFuncName;
+                std::filesystem::path m_ProgramPath;
+                std::string& m_ProgramLaunchParamName;
+                std::string& m_ProgramRayGenFuncName;
+                std::string& m_ProgramMissFuncName;
+                std::string& m_ProgramAnyHitFuncName;
+                std::string& m_ProgramClosestHitFuncName;
                 uint8_t m_MaxNumPayloads = 2;
                 uint8_t m_MaxNumHitResultAttributes = 2;
             }m_ProgramData;

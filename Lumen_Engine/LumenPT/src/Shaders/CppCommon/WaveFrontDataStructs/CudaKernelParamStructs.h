@@ -1,6 +1,7 @@
 #pragma once
 #include "../WaveFrontDataStructs.h"
 #include "../CudaDefines.h"
+#include "SurfaceDataBuffer.h"
 
 namespace WaveFront
 {
@@ -58,47 +59,37 @@ namespace WaveFront
 
         CPU_ONLY ShadingLaunchParameters(
             const uint3& a_ResolutionAndDepth,
-            const IntersectionRayBatch* const a_PrimaryRaysPrevFrame,
-            const IntersectionBuffer* a_PrimaryIntersectionsPrevFrame,
-            const IntersectionRayBatch* const a_CurrentRays,
-            const IntersectionBuffer* a_CurrentIntersections,
-            IntersectionRayBatch* a_SecondaryRays,
-            ShadowRayBatch* a_ShadowRayBatch,
-            const LightDataBuffer* a_Lights,
-            CDF* const a_CDF = nullptr,
-            ResultBuffer* a_DEBUGResultBuffer = nullptr)
-            :
-            m_ResolutionAndDepth(a_ResolutionAndDepth),
-            m_PrimaryRaysPrevFrame(a_PrimaryRaysPrevFrame),
-            m_PrimaryIntersectionsPrevFrame(a_PrimaryIntersectionsPrevFrame),
-            m_CurrentRays(a_CurrentRays),
-            m_CurrentIntersections(a_CurrentIntersections),
-            m_LightBuffer(a_Lights),
-            m_SecondaryRays(a_SecondaryRays),
-            m_ShadowRaysBatch(a_ShadowRayBatch),
-            m_CDF(a_CDF),
-            m_DEBUGResultBuffer(a_DEBUGResultBuffer)
+            const SurfaceData* a_CurrentSurfaceData,
+            const SurfaceData* a_TemporalSurfaceData,
+            AtomicBuffer<ShadowRayData>* a_ShadowRays,
+            TriangleLight* a_TriangleLights,
+            std::uint32_t a_NumLights,
+            const CDF* const a_CDF = nullptr,
+            float3* a_Output = nullptr
+        ) :
+        m_ResolutionAndDepth(a_ResolutionAndDepth),
+        m_CurrentSurfaceData(a_CurrentSurfaceData),
+        m_TemporalSurfaceData(a_TemporalSurfaceData),
+        m_ShadowRays(a_ShadowRays),
+        m_TriangleLights(a_TriangleLights),
+        m_NumLights(a_NumLights),
+        m_CDF(a_CDF),
+        m_Output(a_Output)
         {}
+
 
         CPU_ONLY ~ShadingLaunchParameters() = default;
 
         //Read only
         const uint3 m_ResolutionAndDepth;
-        const IntersectionRayBatch* const m_PrimaryRaysPrevFrame;
-        const IntersectionBuffer* const m_PrimaryIntersectionsPrevFrame;
-        const IntersectionRayBatch* const m_CurrentRays;
-        const IntersectionBuffer* const m_CurrentIntersections;
-        //TODO: Geometry buffer
-        //TODO: Light buffer
-        const LightDataBuffer* const m_LightBuffer;
-        CDF* const m_CDF;
+        const SurfaceData* const m_CurrentSurfaceData;
+        const SurfaceData* const m_TemporalSurfaceData;
+        const TriangleLight* const m_TriangleLights;
+        const std::uint32_t m_NumLights;
+        const CDF* const m_CDF;
 
-        //Write
-        IntersectionRayBatch* const m_SecondaryRays;
-        ShadowRayBatch* const m_ShadowRaysBatch;
-        //TEMP DEBUG STUFF
-        ResultBuffer* m_DEBUGResultBuffer;
-
+        float3* m_Output;
+        AtomicBuffer<ShadowRayData>* m_ShadowRays;
     };
 
     struct PostProcessLaunchParameters
@@ -107,28 +98,24 @@ namespace WaveFront
         CPU_ONLY PostProcessLaunchParameters(
             const uint2& a_RenderResolution,
             const uint2& a_OutputResolution,
-            const ResultBuffer* const a_WavefrontOutput,
-            PixelBuffer* const a_MergedResults,
-            uchar4* const a_ImageOutput)
+            const float3* const a_WavefrontOutput,
+            float3* const a_ProcessedOutput,
+            uchar4* const a_FinalOutput)
             :
             m_RenderResolution(a_RenderResolution),
             m_OutputResolution(a_OutputResolution),
             m_WavefrontOutput(a_WavefrontOutput),
-            m_MergedResults(a_MergedResults),
-            m_ImageOutput(a_ImageOutput)
+            m_ProcessedOutput(a_ProcessedOutput),
+            m_FinalOutput(a_FinalOutput)
         {}
 
         CPU_ONLY ~PostProcessLaunchParameters() = default;
 
-        //Read only
-        const uint2 m_RenderResolution;
-        const uint2 m_OutputResolution;
-        const ResultBuffer* const m_WavefrontOutput;
-
-        //Read/Write
-        PixelBuffer* const m_MergedResults; //Used to merge results from multiple channels into one channel.
-        uchar4* const m_ImageOutput; //Used to display image after DLSS algorithm has run on merged results.
-
+        const uint2& m_RenderResolution;
+        const uint2& m_OutputResolution;
+        const float3* const m_WavefrontOutput;
+        float3* const m_ProcessedOutput;
+        uchar4* const m_FinalOutput;
     };
 
 }

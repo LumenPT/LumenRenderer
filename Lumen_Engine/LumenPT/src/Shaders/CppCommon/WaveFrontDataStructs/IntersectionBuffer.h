@@ -30,7 +30,8 @@ namespace WaveFront
             m_IntersectionT(-1.f),
             m_UVs({0.f, 0.f}),
             m_PrimitiveIndex(0),
-            m_Primitive(0)
+            m_Primitive(0),
+            m_PixelIndex(0)
         {}
 
         CPU_GPU IntersectionData(
@@ -38,13 +39,15 @@ namespace WaveFront
             float a_IntersectionT,
             float2 a_UVs,
             unsigned int a_PrimitiveIndex,
-            DevicePrimitive* a_Primitive)
+            DevicePrimitive* a_Primitive,
+            unsigned int a_PixelIndex)
             :
             m_RayArrayIndex(a_RayArrayIndex),
             m_IntersectionT(a_IntersectionT),
             m_UVs(a_UVs),
             m_PrimitiveIndex(a_PrimitiveIndex),
-            m_Primitive(a_Primitive)
+            m_Primitive(a_Primitive),
+            m_PixelIndex(a_PixelIndex)
         {}
 
 
@@ -77,6 +80,9 @@ namespace WaveFront
         /// <b>Default</b>: 0
         /// </summary>
         unsigned int m_RayArrayIndex;
+
+        //The index of the pixel/surface that this intersection affects.
+        unsigned int m_PixelIndex;
 
         /// <summary>
         /// <b>Description</b> \n Distance along the ray the intersection happened. \n

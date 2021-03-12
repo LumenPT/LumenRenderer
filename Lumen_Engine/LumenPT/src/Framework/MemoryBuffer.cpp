@@ -54,7 +54,7 @@ void MemoryBuffer::Read(void* a_Dst, size_t a_ReadSize, size_t a_SrcOffset) cons
     CudaCheck(cudaMemcpy(a_Dst, reinterpret_cast<void*>(reinterpret_cast<CUdeviceptr>(m_DevPtr) + a_SrcOffset), a_ReadSize, cudaMemcpyDeviceToHost));
 };
 
-void MemoryBuffer::CopyFrom(MemoryBuffer a_MemoryBuffer, size_t a_Size, size_t a_DstOffset, size_t a_SrcOffset)
+void MemoryBuffer::CopyFrom(MemoryBuffer& a_MemoryBuffer, size_t a_Size, size_t a_DstOffset, size_t a_SrcOffset)
 {
     assert(a_DstOffset + a_Size < m_Size);
     assert(a_SrcOffset + a_Size < a_MemoryBuffer.GetSize());

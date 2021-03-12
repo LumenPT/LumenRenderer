@@ -5,6 +5,8 @@
 #include "WaveFrontRenderer.h"
 #include "PTMesh.h"
 #include "PTScene.h"
+#include "Material.h"
+#include "Texture.h"
 #include "PTVolume.h"
 #include "Material.h"
 #include "MemoryBuffer.h"
@@ -25,7 +27,7 @@ namespace WaveFront
 
         //Set up buffers.
         const unsigned numPixels = m_Settings.renderResolution.x * m_Settings.renderResolution.y;
-        const unsigned numOutputChannels = 3;
+        const unsigned numOutputChannels = static_cast<unsigned>(LightChannel::NUM_CHANNELS);
 
         //Allocate pixel buffer.
         m_PixelBufferSeparate.Resize(sizeof(float3) * numPixels * numOutputChannels);
@@ -60,33 +62,48 @@ namespace WaveFront
             {{0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}},
             {{0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}} };
         m_TriangleLights.Write(&lights[0], sizeof(TriangleLight) * numLights, 0);
+
+        //Set up material buffer. Initial space for 1024 meshes.
+        m_Materials = std::make_unique<MemoryBuffer>(1024 * sizeof(void*));
+
+        //TODO: initialize optix system.
+        //TODO: I don't think wavefront should care about this data at all. 
+        OptixWrapper::InitializationData optixInitData;
+
+        m_OptixSystem = std::make_unique<OptixWrapper>(optixInitData);
     }
 
     std::unique_ptr<Lumen::ILumenPrimitive> WaveFrontRenderer2WithAVengeance::CreatePrimitive(PrimitiveData& a_MeshData)
     {
-
+        //TODO let optix build the acceleration structure and return the handle.
     }
 
     std::shared_ptr<Lumen::ILumenMesh> WaveFrontRenderer2WithAVengeance::CreateMesh(
         std::vector<std::unique_ptr<Lumen::ILumenPrimitive>>& a_Primitives)
     {
-
+        //TODO Let optix build the medium level acceleration structure and return the mesh handle for it.
     }
 
     std::shared_ptr<Lumen::ILumenTexture> WaveFrontRenderer2WithAVengeance::CreateTexture(void* a_PixelData,
         uint32_t a_Width, uint32_t a_Height)
     {
-
+        static cudaChannelFormatDesc formatDesc = cudaCreateChannelDesc<uchar4>();
+        return std::make_shared<Texture>(a_PixelData, formatDesc, a_Width, a_Height);
     }
 
     std::shared_ptr<Lumen::ILumenMaterial> WaveFrontRenderer2WithAVengeance::CreateMaterial(
         const MaterialData& a_MaterialData)
     {
+        auto mat = std::make_shared<Material>();
+        mat->SetDiffuseColor(a_MaterialData.m_DiffuseColor);
+        mat->SetDiffuseTexture(a_MaterialData.m_DiffuseTexture);
+        mat->SetEmission(a_MaterialData.m_EmssivionVal);
+        return mat;
     }
 
     std::shared_ptr<Lumen::ILumenVolume> WaveFrontRenderer2WithAVengeance::CreateVolume(const std::string& a_FilePath)
     {
-
+        //TODO tell optix to create a volume acceleration structure.
     }
 
     WaveFrontRenderer2WithAVengeance::WaveFrontRenderer2WithAVengeance() : m_FrameIndex(0)
@@ -113,7 +130,7 @@ namespace WaveFront
         m_Camera.GetVectorData(eye, u, v, w);
         const WaveFront::PrimRayGenLaunchParameters::DeviceCameraData cameraData(eye, u, v, w);
         auto rayPtr = m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>();
-        const PrimRayGenLaunchParameters primaryRayGenParams(uint2{m_Settings.renderResolution.x, m_Settings.renderResolution.y}, cameraData, rayPtr);
+        const PrimRayGenLaunchParameters primaryRayGenParams(uint2{m_Settings.renderResolution.x, m_Settings.renderResolution.y}, cameraData, rayPtr, 1);   //TODO what is framecount?
         GeneratePrimaryRays(primaryRayGenParams);
         m_Rays.Write(numPixels, 0); //Set the counter to be equal to the amount of rays being shot. This is manual because the atomic is not used yet.
 
@@ -124,13 +141,22 @@ namespace WaveFront
         const unsigned counterDefault = 0;
         m_ShadowRays.Write(&counterDefault, sizeof(unsigned), 0);
 
+        //Pass the buffers to the optix shader for shading.
+        OptixLaunchParameters rayLaunchParameters;
+        rayLaunchParameters.m_ResolutionAndDepth = uint3{ m_Settings.renderResolution.x, m_Settings.renderResolution.y, m_Settings.depth };
+        const float2 minMaxDistanceRay = { 0.005f, 99999999.f };
+        //TODO set the params (pass the buffers). Atomic so gotta change signature.
+
+        //The settings for shadow ray resolving.
+        OptixLaunchParameters shadowRayLaunchParameters;
+
         /*
          * Resolve rays and shade at every depth.
          */
         for(unsigned depth = 0; depth < m_Settings.depth; ++depth)
         {
             //Tell Optix to resolve the primary rays that have been generated.
-            //TODO resolve primary rays.
+            m_OptixSystem->TraceRays(RayType::INTERSECTION_RAY, rayLaunchParameters, minMaxDistanceRay);
 
             /*
              * Calculate the surface data for this depth.
@@ -141,23 +167,21 @@ namespace WaveFront
             const auto surfaceDataBufferIndex = depth == 0 ? currentIndex : 2;   //1 and 2 are used for the first intersection and remembered for temporal use.
             ExtractSurfaceData(numIntersections, m_IntersectionData.GetDevicePtr<AtomicBuffer<IntersectionData>>(), m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>(), m_SurfaceData[surfaceDataBufferIndex].GetDevicePtr<SurfaceData>(), nullptr);
 
-            //TODO add ReSTIR for first depth here.
+            //TODO add ReSTIR instance and run from shading kernel.
 
             /*
              * Call the shading kernels.
              */
-            //TODO pass surface data and output pixel buffers.
             ShadingLaunchParameters shadingLaunchParams(
-                resolutionAndDepth,
-                primRaysPrevFrame.GetDevicePtr<IntersectionRayBatch>(),
-                primHitsPrevFrame.GetDevicePtr<IntersectionBuffer>(),
-                currentRays.GetDevicePtr<IntersectionRayBatch>(),
-                currentHits.GetDevicePtr<IntersectionBuffer>(),
-                secondaryRays.GetDevicePtr<IntersectionRayBatch>(),
-                m_ShadowRayBatch->GetDevicePtr<ShadowRayBatch>(),
-                m_LightBufferTemp->GetDevicePtr<LightDataBuffer>(),
-                nullptr, //TODO: REPLACE THIS WITH LIGHT BUFFER FROM SCENE.
-                m_ResultBuffer->GetDevicePtr<ResultBuffer>());
+                uint3{m_Settings.renderResolution.x, m_Settings.renderResolution.y, m_Settings.depth},
+                m_SurfaceData[currentIndex].GetDevicePtr<SurfaceData>(),
+                m_SurfaceData[temporalIndex].GetDevicePtr<SurfaceData>(),
+                m_ShadowRays.GetDevicePtr<AtomicBuffer<ShadowRayData>>(),
+                m_TriangleLights.GetDevicePtr<TriangleLight>(),
+                3,  //TODO hard coded for now but will be updated dynamically.
+                nullptr,    //TODO get CDF from ReSTIR.
+                m_PixelBufferSeparate.GetDevicePtr<float3>()
+            );
 
             Shade(shadingLaunchParams);
 
@@ -167,13 +191,13 @@ namespace WaveFront
             m_Rays.Write(&counterDefault, sizeof(unsigned), 0);
         }
 
-        //TODO pass output buffers and also the current frame surface buffer.
         PostProcessLaunchParameters postProcessLaunchParams(
-            m_RenderResolution,
-            m_OutputResolution,
-            m_ResultBuffer->GetDevicePtr<ResultBuffer>(),
-            m_PixelBufferSingleChannel->GetDevicePtr<PixelBuffer>(),
-            m_OutputBuffer->GetDevicePointer());
+            m_Settings.renderResolution,
+            m_Settings.outputResolution,
+            m_PixelBufferSeparate.GetDevicePtr<float3>(),
+            m_PixelBufferCombined.GetDevicePtr<float3>(),
+            m_OutputBuffer.GetDevicePointer()
+        );
 
         //Post processing using CUDA kernel.
         PostProcess(postProcessLaunchParams);
@@ -187,6 +211,26 @@ namespace WaveFront
 
         //Return the GLuint texture ID.
         return m_OutputBuffer.GetTexture();
+    }
+
+    void WaveFrontRenderer2WithAVengeance::SetInstanceMaterial(unsigned a_InstanceId,
+        std::shared_ptr<Lumen::ILumenMaterial>& a_Material)
+    {
+        //Current size in pointers.
+        const auto size = m_Materials->GetSize() / sizeof(void*);
+
+        //Allocate more memory if not enough is available.
+        if(size <= a_InstanceId)
+        {
+            std::unique_ptr<MemoryBuffer> temp = std::make_unique<MemoryBuffer>(m_Materials->GetSize() * 2);
+            temp->CopyFrom(*m_Materials, m_Materials->GetSize(), 0, 0);
+            m_Materials = std::move(temp);
+        }
+
+        auto asMaterial = std::static_pointer_cast<Material>(a_Material);
+
+        //Set the device material pointer for the ID.
+        m_Materials->Write(asMaterial->GetDeviceMaterial(), sizeof(void*), a_InstanceId * sizeof(void*));
     }
 }
 #endif

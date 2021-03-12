@@ -26,17 +26,20 @@ namespace WaveFront
             :
             m_Origin(make_float3(0.f, 0.f, 0.f)),
             m_Direction(make_float3(0.f, 0.f, 0.f)),
-            m_Contribution(make_float3(0.f, 0.f, 0.f))
+            m_Contribution(make_float3(0.f, 0.f, 0.f)),
+            m_PixelIndex(0)
         {}
 
         CPU_GPU IntersectionRayData(
             const float3& a_Origin,
             const float3& a_Direction,
-            const float3& a_Contribution)
+            const float3& a_Contribution,
+            const unsigned a_PixelIndex)
             :
             m_Origin(a_Origin),
             m_Direction(a_Direction),
-            m_Contribution(a_Contribution)
+            m_Contribution(a_Contribution),
+            m_PixelIndex(a_PixelIndex)
         {}
 
 
@@ -70,6 +73,8 @@ namespace WaveFront
         /// </summary>
         float3 m_Contribution;
 
+        //The index of the pixel that this ray contributes to.
+        unsigned int m_PixelIndex;
     };
 
     /// <summary>

@@ -4,6 +4,8 @@
 
 using namespace WaveFront;
 
+#define GET_PIXEL_INDEX(X, Y, WIDTH) ((Y) * WIDTH + (X))
+
 GPU_ONLY void HaltonSequence(
     unsigned int index,
     unsigned int base,
@@ -12,7 +14,7 @@ GPU_ONLY void HaltonSequence(
 //Generate some rays based on the thread index.
 CPU_ON_GPU void GeneratePrimaryRay(
     int a_NumRays,
-    IntersectionRayData* const a_Buffer,
+    AtomicBuffer<IntersectionRayData>* const a_Buffer,
     float3 a_U,
     float3 a_V,
     float3 a_W,
@@ -54,9 +56,9 @@ CPU_ON_GPU void ShadeIndirect(
 
 CPU_ON_GPU void DEBUGShadePrimIntersections(
     const uint3 a_ResolutionAndDepth,
-    const IntersectionRayBatch* const a_PrimaryRays,
-    const IntersectionBuffer* const a_PrimaryIntersections,
-    ResultBuffer* const a_Output);
+    const SurfaceData* a_CurrentSurfaceData,
+    float3* const a_Output
+);
 
 //Called during post-processing.
 
@@ -70,8 +72,8 @@ CPU_ON_GPU void Denoise();
  */
 CPU_ON_GPU void MergeOutputChannels(
     const uint2 a_Resolution,
-    const ResultBuffer* const a_Input,
-    PixelBuffer* const a_Output);
+    const float3* const a_Input,
+    float3* const a_Output);
 
 /*
  *
@@ -86,5 +88,5 @@ CPU_ON_GPU void PostProcessingEffects();
 //Temporary step till post-processing is in place.
 CPU_ON_GPU void WriteToOutput(
     const uint2 a_Resolution,
-    const PixelBuffer* const a_Input,
+    const float3* const a_Input,
     uchar4* a_Output);
