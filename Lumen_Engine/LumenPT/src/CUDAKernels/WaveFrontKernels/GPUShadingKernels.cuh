@@ -12,13 +12,15 @@ GPU_ONLY void HaltonSequence(
 //Generate some rays based on the thread index.
 CPU_ON_GPU void GeneratePrimaryRay(
     int a_NumRays,
-    IntersectionRayBatch* const a_Buffer,
+    IntersectionRayData* const a_Buffer,
     float3 a_U,
     float3 a_V,
     float3 a_W,
     float3 a_Eye,
     int2 a_Dimensions,
     unsigned int a_FrameCount);
+
+CPU_ON_GPU void ExtractSurfaceDataGpu(unsigned a_NumIntersections, AtomicBuffer<IntersectionData>* a_IntersectionData, AtomicBuffer<IntersectionRayData>* a_Rays, SurfaceData* a_OutPut, DeviceMaterial* a_Materials);
 
 //Called during shading
 

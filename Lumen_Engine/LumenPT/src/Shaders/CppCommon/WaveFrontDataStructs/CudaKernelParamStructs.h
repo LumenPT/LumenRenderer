@@ -1,19 +1,12 @@
 #pragma once
-#include "../CudaDefines.h"
 #include "../WaveFrontDataStructs.h"
-
-#include <Optix/optix.h>
-#include <Cuda/cuda/helpers.h>
-#include <cassert>
+#include "../CudaDefines.h"
 
 namespace WaveFront
 {
-
-
     //Kernel Launch parameters
     struct PrimRayGenLaunchParameters
     {
-
         //Camera data
         struct DeviceCameraData
         {
@@ -43,7 +36,7 @@ namespace WaveFront
         CPU_ONLY PrimRayGenLaunchParameters(
             const uint2& a_Resolution,
             const DeviceCameraData& a_Camera,
-            IntersectionRayBatch* const a_PrimaryRays,
+            AtomicBuffer < WaveFront::IntersectionRayData>* a_PrimaryRays,
             const unsigned int a_FrameCount)
             :
             m_Resolution(a_Resolution),
@@ -56,7 +49,7 @@ namespace WaveFront
 
         const uint2 m_Resolution;
         const DeviceCameraData m_Camera;
-        IntersectionRayBatch* const m_PrimaryRays;
+        AtomicBuffer<IntersectionRayData> * m_PrimaryRays;
         const unsigned int m_FrameCount;
     };
 

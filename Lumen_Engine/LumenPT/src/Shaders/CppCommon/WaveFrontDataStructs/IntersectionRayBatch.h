@@ -24,9 +24,9 @@ namespace WaveFront
 
         CPU_GPU IntersectionRayData()
             :
-            m_Origin(make_float3(0.f)),
-            m_Direction(make_float3(0.f)),
-            m_Contribution(make_float3(0.f))
+            m_Origin(make_float3(0.f, 0.f, 0.f)),
+            m_Direction(make_float3(0.f, 0.f, 0.f)),
+            m_Contribution(make_float3(0.f, 0.f, 0.f))
         {}
 
         CPU_GPU IntersectionRayData(

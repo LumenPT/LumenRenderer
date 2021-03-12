@@ -68,48 +68,22 @@ namespace WaveFront
 
         GPU_ONLY INLINE unsigned int GetSize() const
         {
-
-            return m_NumPixels * m_NumSurfaceDataPerPixel;
-
+            return m_NumPixels;
         }
 
-        GPU_ONLY void SetSurfaceData(const SurfaceData& a_Data, unsigned int a_PixelIndex, unsigned int a_DataIndex)
+        GPU_ONLY void SetSurfaceData(const SurfaceData& a_Data, unsigned int a_PixelIndex)
         {
-
-            m_SurfaceData[GetSurfaceDataArrayIndex(a_PixelIndex, a_DataIndex)] = a_Data;
-
+            m_SurfaceData[a_PixelIndex] = a_Data;
         }
 
-        GPU_ONLY const SurfaceData& GetSurfaceData(unsigned int a_PixelIndex, unsigned int a_DataIndex) const
+        GPU_ONLY const SurfaceData& GetSurfaceData(unsigned int a_PixelIndex) const
         {
-
-            return m_SurfaceData[GetSurfaceDataArrayIndex(a_PixelIndex, a_DataIndex)];
-
-        }
-
-        GPU_ONLY const SurfaceData& GetSurfaceData(unsigned int a_SurfaceDataArrayIndex) const
-        {
-
-            assert(a_SurfaceDataArrayIndex < GetSize());
-
-            return m_SurfaceData[a_SurfaceDataArrayIndex];
-
-        }
-
-        GPU_ONLY unsigned int GetSurfaceDataArrayIndex(unsigned int a_PixelIndex, unsigned int a_DataIndex) const
-        {
-
-            assert(a_PixelIndex < m_NumPixels && a_DataIndex < m_NumSurfaceDataPerPixel);
-
-            return a_PixelIndex * m_NumSurfaceDataPerPixel + a_DataIndex;
-
+            assert(a_PixelIndex < GetSize());
+            return m_SurfaceData[a_PixelIndex];
         }
 
         unsigned int m_NumPixels;
-        unsigned int m_NumSurfaceDataPerPixel;
-
         SurfaceData m_SurfaceData[];
-
     };
 
 }

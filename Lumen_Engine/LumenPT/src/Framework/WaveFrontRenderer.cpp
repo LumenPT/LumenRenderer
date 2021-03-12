@@ -27,7 +27,16 @@
 WaveFrontRenderer::WaveFrontRenderer(const InitializationData& a_InitializationData)
     :
 m_ServiceLocator({}),
+m_DeviceContext(nullptr),
+m_PipelineRays(nullptr),
+m_PipelineShadowRays(nullptr),
+m_PipelineRaysLaunchParams(nullptr),
+m_PipelineShadowRaysLaunchParams(nullptr),
+m_RaysSBTGenerator(nullptr),
+m_ShadowRaysSBTGenerator(nullptr),
+m_ProgramGroups({}),
 m_OutputBuffer(nullptr),
+m_SBTBuffer(nullptr),
 m_RayBatchIndices({0}),
 m_HitBufferIndices({0}),
 m_ResultBuffer(nullptr),
@@ -50,10 +59,19 @@ m_Initialized(false)
     m_Initialized = Initialize(a_InitializationData);
     if(!m_Initialized)
     {
-        
+        std::fprintf(stderr, "Initialization of wavefront renderer unsuccessful");
+        abort();
     }
 
+    m_RaysSBTGenerator = std::make_unique<ShaderBindingTableGenerator>();
+    m_ShadowRaysSBTGenerator = std::make_unique<ShaderBindingTableGenerator>();
+
     m_Texture = std::make_unique<Texture>(LumenPTConsts::gs_AssetDirectory + "debugTex.jpg");
+
+    m_ServiceLocator.m_SBTGenerator = m_RaysSBTGenerator.get();
+    m_ServiceLocator.m_Renderer = this;
+
+    CreateShaderBindingTables();
 	
 }
 
@@ -66,6 +84,8 @@ bool WaveFrontRenderer::Initialize(const InitializationData& a_InitializationDat
     //Temporary(put into init data)
     const std::string shaderPath = LumenPTConsts::gs_ShaderPathBase + "WaveFrontShaders.ptx";
 
+    InitializeContext();
+    CreatePipelineBuffers();
     CreateOutputBuffer();
     CreateDataBuffers();
     SetupInitialBufferIndices();
@@ -77,6 +97,131 @@ bool WaveFrontRenderer::Initialize(const InitializationData& a_InitializationDat
     return success;
 
 }
+
+void WaveFrontRenderer::InitializeContext()
+{
+
+    cudaFree(0);
+    CUcontext cu_ctx = 0;
+    CHECKOPTIXRESULT(optixInit());
+    OptixDeviceContextOptions options = {};
+    options.logCallbackFunction = &WaveFrontRenderer::DebugCallback;
+    options.logCallbackLevel = 4;
+    CHECKOPTIXRESULT(optixDeviceContextCreate(cu_ctx, &options, &m_DeviceContext));
+
+}
+
+OptixPipelineCompileOptions WaveFrontRenderer::CreatePipelineOptions(
+    const std::string& a_LaunchParamName,
+    unsigned int a_NumPayloadValues, 
+    unsigned int a_NumAttributes) const
+{
+
+    OptixPipelineCompileOptions pipelineOptions = {};
+    pipelineOptions.usesMotionBlur = false;
+    pipelineOptions.traversableGraphFlags = OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_ANY;
+    pipelineOptions.numPayloadValues = std::clamp(a_NumPayloadValues, 0u, 8u);
+    pipelineOptions.numAttributeValues = std::clamp(a_NumAttributes, 2u, 8u);
+    pipelineOptions.exceptionFlags = OPTIX_EXCEPTION_FLAG_DEBUG;
+    pipelineOptions.pipelineLaunchParamsVariableName = a_LaunchParamName.c_str();
+    pipelineOptions.usesPrimitiveTypeFlags = OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE & OPTIX_PRIMITIVE_TYPE_FLAGS_CUSTOM;
+
+    return pipelineOptions;
+
+}
+
+
+
+bool WaveFrontRenderer::CreatePipelines(const std::string& a_ShaderPath)
+{
+
+    bool success = true;
+
+    const std::string resolveRaysParams = "launchParams";
+    const std::string resolveRaysRayGenFuncName = "__raygen__UberGenShader";
+    //const std::string resolveRaysRayGenFuncName = "__raygen__ResolveRaysRayGen";
+    const std::string resolveRaysHitFuncName = "__closesthit__UberClosestHit";
+    const std::string resolveRaysMissFuncName = "__miss__UberMiss";
+    const std::string resolveRaysAnyhitFuncName = "__miss__UberAnyHit";
+
+    const std::string resolveShadowRaysParams = "launchParams";
+    //const std::string resolveShadowRaysRayGenFuncName = "__raygen__ResolveShadowRaysRayGen";
+    //const std::string resolveShadowRaysHitFuncName = "__anyhit__ResolveShadowRaysAnyHit";
+    //const std::string resolveShadowRaysMissFuncName = "__miss__ResolveShadowRaysMiss";
+
+    OptixPipelineCompileOptions compileOptions = CreatePipelineOptions(resolveRaysParams, 2, 2);
+
+    OptixModule shaderModule = CreateModule(a_ShaderPath, compileOptions);
+    if (shaderModule == nullptr) { return false; }
+
+    success &= CreatePipeline(
+        shaderModule,
+        compileOptions,
+        PipelineType::RESOLVE_RAYS, 
+        resolveRaysRayGenFuncName, 
+        resolveRaysHitFuncName,
+        resolveRaysMissFuncName,
+        m_PipelineRays);
+
+    //optixModuleDestroy(shaderModule);
+
+    compileOptions = CreatePipelineOptions(resolveShadowRaysParams, 2, 2);
+    shaderModule = CreateModule(a_ShaderPath, compileOptions);
+    if (shaderModule == nullptr) { return false; }
+
+    //success &= CreatePipeline(
+    //    shaderModule,
+    //    compileOptions,
+    //    PipelineType::RESOLVE_SHADOW_RAYS, 
+    //    resolveShadowRaysRayGenFuncName, 
+    //    resolveShadowRaysHitFuncName,
+    //    resolveShadowRaysMissFuncName,
+    //    m_PipelineShadowRays);
+
+    //optixModuleDestroy(shaderModule);
+
+    return success;
+
+}
+
+//TODO: implement necessary Optix shaders for wavefront algorithm
+//Shaders:
+// - RayGen: trace rays from ray definitions in ray batch, different methods for radiance or shadow.
+// - Miss: is this shader necessary, miss result by default in intersection buffer?
+// - ClosestHit: radiance trace, report intersection into intersection buffer.
+// - AnyHit: shadow trace, report if any hit in between certain max distance.
+bool WaveFrontRenderer::CreatePipeline(
+    const OptixModule& a_Module,
+    const OptixPipelineCompileOptions& a_PipelineOptions,
+    PipelineType a_Type, 
+    const std::string& a_RayGenFuncName, 
+    const std::string& a_HitFuncName,
+    const std::string& a_MissFuncName,
+    OptixPipeline& a_Pipeline)
+{
+
+    OptixProgramGroup rayGenProgram = nullptr;
+    OptixProgramGroup hitProgram = nullptr;
+    OptixProgramGroup missProgram = nullptr;
+
+    OptixProgramGroupDesc rgGroupDesc = {};
+    rgGroupDesc.kind = OPTIX_PROGRAM_GROUP_KIND_RAYGEN;
+    rgGroupDesc.raygen.entryFunctionName = a_RayGenFuncName.c_str();
+    rgGroupDesc.raygen.module = a_Module;
+
+    OptixProgramGroupDesc htGroupDesc = {};
+    htGroupDesc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
+
+    OptixProgramGroupDesc msGroupDesc = {};
+    msGroupDesc.kind = OPTIX_PROGRAM_GROUP_KIND_MISS;
+
+    switch (a_Type)
+    {
+
+        case PipelineType::RESOLVE_RAYS:
+            {
+                htGroupDesc.hitgroup.entryFunctionNameCH = a_HitFuncName.c_str();
+                htGroupDesc.hitgroup.moduleCH = a_Module;
 
 
 

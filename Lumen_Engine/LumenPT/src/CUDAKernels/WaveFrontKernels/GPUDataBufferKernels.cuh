@@ -25,3 +25,5 @@ CPU_ON_GPU void ResetPixelBufferMembers(
     unsigned int a_ChannelsPerPixel);
 
 CPU_ON_GPU void ResetPixelBufferData(PixelBuffer* const a_PixelBuffer);
+
+CPU_ON_GPU void ResetLightChannelData(float3* a_LightData, unsigned a_NumChannels, unsigned a_NumPixels);

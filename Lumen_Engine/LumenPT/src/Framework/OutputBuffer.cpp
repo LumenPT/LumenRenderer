@@ -28,6 +28,11 @@ OutputBuffer::OutputBuffer(uint32_t a_Width, uint32_t a_Height)
     Resize(a_Width, a_Height);
 }
 
+OutputBuffer::OutputBuffer()
+{
+
+}
+
 OutputBuffer::~OutputBuffer()
 {
     glDeleteBuffers(1, &m_PixelBuffer);

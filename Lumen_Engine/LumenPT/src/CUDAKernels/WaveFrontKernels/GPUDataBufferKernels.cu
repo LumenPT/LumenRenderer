@@ -78,3 +78,18 @@ CPU_ON_GPU void ResetPixelBufferData(PixelBuffer* const a_PixelBuffer)
     }
 
 }
+
+CPU_ON_GPU void ResetLightChannelData(float3* a_LightData, unsigned a_NumChannels, unsigned a_NumPixels)
+{
+    const unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
+    const unsigned int stride = blockDim.x * gridDim.x;
+
+    //Loop over every pixel index, and then set each channel to 0,0,0.
+    for (unsigned int i = index; i < a_NumPixels; i += stride)
+    {
+        for(int channel = 0; channel < a_NumChannels; ++channel)
+        {
+            a_LightData[a_NumChannels * i + channel] = float3{ 0.f, 0.f, 0.f };
+        }
+    }
+}

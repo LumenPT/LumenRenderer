@@ -23,7 +23,7 @@ GPU_ONLY void HaltonSequence(
 
 CPU_ON_GPU void GeneratePrimaryRay(
     int a_NumRays,
-    IntersectionRayBatch* const a_Buffer,
+    IntersectionRayData* const a_Buffer,
     float3 a_U,
     float3 a_V,
     float3 a_W,
@@ -54,7 +54,23 @@ CPU_ON_GPU void GeneratePrimaryRay(
         direction = normalize(direction.x * a_U + direction.y * a_V + a_W);
 
         IntersectionRayData ray{ origin, direction, make_float3(1.f, 1.f, 1.f) };
-        a_Buffer->SetRay(ray, i, 0);
-
+        a_Buffer[i] = ray;
     }
+}
+
+CPU_ON_GPU void ExtractSurfaceDataGpu(unsigned a_NumIntersections, AtomicBuffer<IntersectionData>* a_IntersectionData, AtomicBuffer<IntersectionRayData>* a_Rays, SurfaceData* a_OutPut, DeviceMaterial* a_Materials)
+{
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    int stride = blockDim.x * gridDim.x;
+    for (int i = index; i < a_NumIntersections; i += stride)
+    {
+        //TODO: ensure that index is the same for the intersection data and ray.
+        auto* intersection = a_IntersectionData->GetData(i);
+        auto* ray = a_Rays->GetData(i);
+
+        //TODO get material pointer from intersection data.
+        //TODO extract barycentric coordinates and all that.
+        //TODO store in output buffer.
+    }
+
 }
