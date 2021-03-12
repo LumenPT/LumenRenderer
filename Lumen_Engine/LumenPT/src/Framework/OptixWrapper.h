@@ -28,6 +28,8 @@ namespace WaveFront
     class OptixWrapper
     {
 
+    public:
+
         struct InitializationData
         {
 
@@ -47,8 +49,6 @@ namespace WaveFront
 
         };
 
-    public:
-
         OptixWrapper(const InitializationData& a_InitializationData);
         ~OptixWrapper();
 
@@ -64,9 +64,9 @@ namespace WaveFront
         std::unique_ptr<AccelerationStructure> BuildInstanceAccelerationStructure(std::vector<OptixInstance> a_Instances) const;
 
         void TraceRays(
-            RayType a_TraceType, 
+            unsigned int a_NumRays,
             const OptixLaunchParameters& a_LaunchParams,
-            float2 a_MinMaxTraceDistance);
+            CUstream a_CUDAStream = nullptr) const;
 
     private:
 
@@ -74,7 +74,7 @@ namespace WaveFront
 
         bool InitializeContext(CUcontext a_CUDAContext);
 
-        bool OptixWrapper::CreatePipeline(const InitializationData::ProgramData& a_ProgramData);
+        bool CreatePipeline(const InitializationData::ProgramData& a_ProgramData);
 
         OptixPipelineCompileOptions CreatePipelineOptions(
             const std::string& a_LaunchParamName,
@@ -92,6 +92,8 @@ namespace WaveFront
         OptixModule CreateModule(const std::filesystem::path& a_PtxPath, const OptixPipelineCompileOptions& a_PipelineOptions) const;
 
         OptixProgramGroup CreateProgramGroup(OptixProgramGroupDesc a_ProgramGroupDesc, const std::string& a_Name);
+
+        void DestroyProgramGroups();
 
         ProgramGroupHeader GetProgramGroupHeader(const std::string& a_GroupName) const;
 
@@ -122,7 +124,7 @@ namespace WaveFront
 
         std::unique_ptr<MemoryBuffer> m_SBTRecordBuffer;
 
-        std::unique_ptr<MemoryBuffer> m_OptixLaunchParameters;
+        std::unique_ptr<MemoryBuffer> m_OptixLaunchParamBuffer;
 
         std::map<std::string, OptixProgramGroup> m_ProgramGroups;
 

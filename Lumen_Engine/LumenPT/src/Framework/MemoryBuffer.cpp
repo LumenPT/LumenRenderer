@@ -77,3 +77,10 @@ size_t MemoryBuffer::GetSize() const
 {
     return m_Size;
 }
+
+unsigned long long MemoryBuffer::GetCUDAPtr() const
+{
+
+    return m_CudaPtr;
+
+}
