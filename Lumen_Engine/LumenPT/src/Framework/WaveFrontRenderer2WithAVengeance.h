@@ -1,4 +1,5 @@
 #pragma once
+#include "OptixWrapper.h"
 #if defined(WAVEFRONT)
 #include "OutputBuffer.h"
 #include "MemoryBuffer.h"
@@ -14,24 +15,22 @@
 
 namespace WaveFront
 {
-    enum class LightChannel
-    {
-        DIRECT,
-        INDIRECT,
-        SPECULAR,
-        NUM_CHANNELS
-    };
-
     struct WaveFrontSettings
     {
         //The maximum path length in the scene.
         std::uint32_t depth;
 
         //The resolution to render at.
-        glm::uvec2 renderResolution;
+        uint2 renderResolution;
 
         //The resolution to output at (up-scaling).
-        glm::uvec2 outputResolution;
+        uint2 outputResolution;
+
+        //The minimum distance a ray has to travel before intersecting a surface.
+        float minIntersectionT;
+
+        //The maximum distance a ray can travel before terminating.
+        float maxIntersectionT;
     };
 
     class WaveFrontRenderer2WithAVengeance : public LumenRenderer
@@ -52,6 +51,11 @@ namespace WaveFront
          * Render.
          */
         unsigned TraceFrame();
+
+        /*
+         * Set the material to be used for a specific instance ID.
+         */
+        void SetInstanceMaterial(unsigned a_InstanceId, std::shared_ptr<Lumen::ILumenMaterial>& a_Material);
 
         /*
          * Initialize the wavefront pipeline.
@@ -85,6 +89,9 @@ namespace WaveFront
 
         //Triangle lights.
         MemoryBuffer m_TriangleLights;
+
+        //Optix system
+        std::unique_ptr<OptixWrapper> m_OptixSystem;
 
         //Variables and settings.
     private:

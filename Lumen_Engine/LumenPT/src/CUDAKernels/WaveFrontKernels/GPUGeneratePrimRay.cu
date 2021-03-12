@@ -23,7 +23,7 @@ GPU_ONLY void HaltonSequence(
 
 CPU_ON_GPU void GeneratePrimaryRay(
     int a_NumRays,
-    IntersectionRayData* const a_Buffer,
+    AtomicBuffer<IntersectionRayData>* const a_Buffer,
     float3 a_U,
     float3 a_V,
     float3 a_W,
@@ -36,7 +36,6 @@ CPU_ON_GPU void GeneratePrimaryRay(
 
     for (int i = index; i < a_NumRays; i += stride)
     {
-
         //Convert the index into the screen dimensions.
         const int screenY = i / a_Dimensions.x;
         const int screenX = i - (screenY * a_Dimensions.x);
@@ -54,7 +53,7 @@ CPU_ON_GPU void GeneratePrimaryRay(
         direction = normalize(direction.x * a_U + direction.y * a_V + a_W);
 
         IntersectionRayData ray{ origin, direction, make_float3(1.f, 1.f, 1.f) };
-        a_Buffer[i] = ray;
+        a_Buffer->Set(i, &ray); //Set because primary rays are ALWAYS a ray per pixel. No need to do atomic indexing. The atomic counter is manually set later.
     }
 }
 

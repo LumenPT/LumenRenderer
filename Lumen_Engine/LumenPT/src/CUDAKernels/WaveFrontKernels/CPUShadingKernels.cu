@@ -98,9 +98,8 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
 
     DEBUGShadePrimIntersections<<<numBlocks, blockSize>>>(
         a_ShadingParams.m_ResolutionAndDepth,
-        a_ShadingParams.m_CurrentRays,
-        a_ShadingParams.m_CurrentIntersections,
-        a_ShadingParams.m_DEBUGResultBuffer);
+        a_ShadingParams.m_CurrentSurfaceData,
+        a_ShadingParams.m_Output);
 
     cudaDeviceSynchronize();
     CHECKLASTCUDAERROR;
@@ -129,7 +128,7 @@ CPU_ONLY void PostProcess(const PostProcessLaunchParameters& a_PostProcessParams
     MergeOutputChannels << <numBlocks, blockSize >> > (
         a_PostProcessParams.m_RenderResolution,
         a_PostProcessParams.m_WavefrontOutput,
-        a_PostProcessParams.m_MergedResults);
+        a_PostProcessParams.m_ProcessedOutput);
 
     /*cudaDeviceSynchronize();
     CHECKLASTCUDAERROR;*/
@@ -146,7 +145,7 @@ CPU_ONLY void PostProcess(const PostProcessLaunchParameters& a_PostProcessParams
     CHECKLASTCUDAERROR;*/
 
     //TODO
-    PostProcessingEffects << <numBlocksUpscaled, blockSizeUpscaled >> > ();
+    //PostProcessingEffects << <numBlocksUpscaled, blockSizeUpscaled >> > ();
 
     /*cudaDeviceSynchronize();
     CHECKLASTCUDAERROR;*/
@@ -154,8 +153,8 @@ CPU_ONLY void PostProcess(const PostProcessLaunchParameters& a_PostProcessParams
     //TODO This is temporary till the post-processing is  in place. Let the last stage copy it directly to the output buffer.
     WriteToOutput << <numBlocksUpscaled, blockSizeUpscaled >> > (
         a_PostProcessParams.m_OutputResolution,
-        a_PostProcessParams.m_MergedResults,
-        a_PostProcessParams.m_ImageOutput);
+        a_PostProcessParams.m_ProcessedOutput,
+        a_PostProcessParams.m_FinalOutput);
 
     cudaDeviceSynchronize();
     CHECKLASTCUDAERROR;

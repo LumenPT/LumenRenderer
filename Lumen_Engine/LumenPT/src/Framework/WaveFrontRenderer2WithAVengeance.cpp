@@ -25,7 +25,7 @@ namespace WaveFront
 
         //Set up buffers.
         const unsigned numPixels = m_Settings.renderResolution.x * m_Settings.renderResolution.y;
-        const unsigned numOutputChannels = 3;
+        const unsigned numOutputChannels = static_cast<unsigned>(LightChannel::NUM_CHANNELS);
 
         //Allocate pixel buffer.
         m_PixelBufferSeparate.Resize(sizeof(float3) * numPixels * numOutputChannels);
@@ -60,6 +60,12 @@ namespace WaveFront
             {{0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}},
             {{0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}} };
         m_TriangleLights.Write(&lights[0], sizeof(TriangleLight) * numLights, 0);
+
+
+        //TODO initialize optix system. This is currently private it seems.
+        OptixWrapper::InitializationData optixInitData;
+
+        m_OptixSystem = std::make_unique<OptixWrapper>(optixInitData);
     }
 
     std::unique_ptr<Lumen::ILumenPrimitive> WaveFrontRenderer2WithAVengeance::CreatePrimitive(PrimitiveData& a_MeshData)
@@ -113,7 +119,7 @@ namespace WaveFront
         m_Camera.GetVectorData(eye, u, v, w);
         const WaveFront::PrimRayGenLaunchParameters::DeviceCameraData cameraData(eye, u, v, w);
         auto rayPtr = m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>();
-        const PrimRayGenLaunchParameters primaryRayGenParams(uint2{m_Settings.renderResolution.x, m_Settings.renderResolution.y}, cameraData, rayPtr);
+        const PrimRayGenLaunchParameters primaryRayGenParams(uint2{m_Settings.renderResolution.x, m_Settings.renderResolution.y}, cameraData, rayPtr, 1);   //TODO what is framecount?
         GeneratePrimaryRays(primaryRayGenParams);
         m_Rays.Write(numPixels, 0); //Set the counter to be equal to the amount of rays being shot. This is manual because the atomic is not used yet.
 
@@ -124,13 +130,22 @@ namespace WaveFront
         const unsigned counterDefault = 0;
         m_ShadowRays.Write(&counterDefault, sizeof(unsigned), 0);
 
+        //Pass the buffers to the optix shader for shading.
+        OptixLaunchParameters rayLaunchParameters;
+        rayLaunchParameters.m_ResolutionAndDepth = uint3{ m_Settings.renderResolution.x, m_Settings.renderResolution.y, m_Settings.depth };
+        const float2 minMaxDistanceRay = { 0.005f, 99999999.f };
+        //TODO set the params (pass the buffers). Atomic so gotta change signature.
+
+        //The settings for shadow ray resolving.
+        OptixLaunchParameters shadowRayLaunchParameters;
+
         /*
          * Resolve rays and shade at every depth.
          */
         for(unsigned depth = 0; depth < m_Settings.depth; ++depth)
         {
             //Tell Optix to resolve the primary rays that have been generated.
-            //TODO resolve primary rays.
+            m_OptixSystem->TraceRays(RayType::INTERSECTION_RAY, rayLaunchParameters, minMaxDistanceRay);
 
             /*
              * Calculate the surface data for this depth.
@@ -141,23 +156,21 @@ namespace WaveFront
             const auto surfaceDataBufferIndex = depth == 0 ? currentIndex : 2;   //1 and 2 are used for the first intersection and remembered for temporal use.
             ExtractSurfaceData(numIntersections, m_IntersectionData.GetDevicePtr<AtomicBuffer<IntersectionData>>(), m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>(), m_SurfaceData[surfaceDataBufferIndex].GetDevicePtr<SurfaceData>(), nullptr);
 
-            //TODO add ReSTIR for first depth here.
+            //TODO add ReSTIR instance and run from shading kernel.
 
             /*
              * Call the shading kernels.
              */
-            //TODO pass surface data and output pixel buffers.
             ShadingLaunchParameters shadingLaunchParams(
-                resolutionAndDepth,
-                primRaysPrevFrame.GetDevicePtr<IntersectionRayBatch>(),
-                primHitsPrevFrame.GetDevicePtr<IntersectionBuffer>(),
-                currentRays.GetDevicePtr<IntersectionRayBatch>(),
-                currentHits.GetDevicePtr<IntersectionBuffer>(),
-                secondaryRays.GetDevicePtr<IntersectionRayBatch>(),
-                m_ShadowRayBatch->GetDevicePtr<ShadowRayBatch>(),
-                m_LightBufferTemp->GetDevicePtr<LightDataBuffer>(),
-                nullptr, //TODO: REPLACE THIS WITH LIGHT BUFFER FROM SCENE.
-                m_ResultBuffer->GetDevicePtr<ResultBuffer>());
+                uint3{m_Settings.renderResolution.x, m_Settings.renderResolution.y, m_Settings.depth},
+                m_SurfaceData[currentIndex].GetDevicePtr<SurfaceData>(),
+                m_SurfaceData[temporalIndex].GetDevicePtr<SurfaceData>(),
+                m_ShadowRays.GetDevicePtr<AtomicBuffer<ShadowRayData>>(),
+                m_TriangleLights.GetDevicePtr<TriangleLight>(),
+                3,  //TODO hard coded for now but will be updated dynamically.
+                nullptr,    //TODO get CDF from ReSTIR.
+                m_PixelBufferSeparate.GetDevicePtr<float3>()
+            );
 
             Shade(shadingLaunchParams);
 
@@ -167,13 +180,13 @@ namespace WaveFront
             m_Rays.Write(&counterDefault, sizeof(unsigned), 0);
         }
 
-        //TODO pass output buffers and also the current frame surface buffer.
         PostProcessLaunchParameters postProcessLaunchParams(
-            m_RenderResolution,
-            m_OutputResolution,
-            m_ResultBuffer->GetDevicePtr<ResultBuffer>(),
-            m_PixelBufferSingleChannel->GetDevicePtr<PixelBuffer>(),
-            m_OutputBuffer->GetDevicePointer());
+            m_Settings.renderResolution,
+            m_Settings.outputResolution,
+            m_PixelBufferSeparate.GetDevicePtr<float3>(),
+            m_PixelBufferCombined.GetDevicePtr<float3>(),
+            m_OutputBuffer.GetDevicePointer()
+        );
 
         //Post processing using CUDA kernel.
         PostProcess(postProcessLaunchParams);
@@ -187,6 +200,12 @@ namespace WaveFront
 
         //Return the GLuint texture ID.
         return m_OutputBuffer.GetTexture();
+    }
+
+    void WaveFrontRenderer2WithAVengeance::SetInstanceMaterial(unsigned a_InstanceId,
+        std::shared_ptr<Lumen::ILumenMaterial>& a_Material)
+    {
+        //TODO set material in a buffer. Look up when extracting surface data.
     }
 }
 #endif
