@@ -11,4 +11,5 @@ struct PTServiceLocator
 
     class ShaderBindingTableGenerator* m_SBTGenerator;
 
+    class SceneDataTable* m_SceneDataTable;
 };

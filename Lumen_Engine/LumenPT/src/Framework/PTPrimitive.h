@@ -1,6 +1,7 @@
 #pragma once
 #include "Renderer/ILumenResources.h"
 #include "ShaderBindingTableRecord.h"
+#include "SceneDataTableEntry.h"
 
 #include "../../src/Shaders/CppCommon/ModelStructs.h"
 
@@ -23,7 +24,6 @@ public:
 	std::unique_ptr<MemoryBuffer> m_IndexBuffer;
 	std::unique_ptr<AccelerationStructure> m_GeometryAccelerationStructure;
 
-	RecordHandle<DevicePrimitive> m_RecordHandle;
-
+	SceneDataTableEntry<DevicePrimitive> m_SceneDataTableEntry;
 private:
 };

@@ -11,6 +11,12 @@ struct Record
     T m_Data;
 };
 
+template<>
+struct Record<void>
+{
+    ProgramGroupHeader m_Header;
+};
+
 class RecordHandleBase
 {
     friend class ShaderBindingTableGenerator;
