@@ -1,5 +1,6 @@
 #include "GPUShadingKernels.cuh"
 #include <device_launch_parameters.h>
+#include "../../Shaders/CppCommon/SceneDataTableAccessor.h"
 
 GPU_ONLY void HaltonSequence(
     unsigned int index,
@@ -57,7 +58,7 @@ CPU_ON_GPU void GeneratePrimaryRay(
     }
 }
 
-CPU_ON_GPU void ExtractSurfaceDataGpu(unsigned a_NumIntersections, AtomicBuffer<IntersectionData>* a_IntersectionData, AtomicBuffer<IntersectionRayData>* a_Rays, SurfaceData* a_OutPut, DeviceMaterial* a_Materials)
+CPU_ON_GPU void ExtractSurfaceDataGpu(unsigned a_NumIntersections, AtomicBuffer<IntersectionData>* a_IntersectionData, AtomicBuffer<IntersectionRayData>* a_Rays, SurfaceData* a_OutPut, SceneDataTableAccessor* a_SceneDataTable)
 {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     int stride = blockDim.x * gridDim.x;
@@ -77,26 +78,27 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(unsigned a_NumIntersections, AtomicBuffer<
         if (currIntersection->IsIntersection())
         {
             // Get ray used to calculate intersection.
+            const unsigned int instanceId = currIntersection->m_InstanceId;
             const unsigned int rayArrayIndex = currIntersection->m_RayArrayIndex;
             const unsigned int vertexIndex = 3 * currIntersection->m_PrimitiveIndex;
-            const DevicePrimitive* primitive = currIntersection->m_Primitive;
+            auto devicePrimitive = a_SceneDataTable->GetTableEntry<DevicePrimitive>(instanceId);
 
-            if (primitive == nullptr ||
-                primitive->m_IndexBuffer == nullptr ||
-                primitive->m_VertexBuffer == nullptr ||
-                primitive->m_Material == nullptr)
+            if (devicePrimitive == nullptr ||
+                devicePrimitive->m_IndexBuffer == nullptr ||
+                devicePrimitive->m_VertexBuffer == nullptr ||
+                devicePrimitive->m_Material == nullptr)
             {
 
-                if (!primitive)
+                if (!devicePrimitive)
                 {
-                    printf("Error, primitive: %p \n", primitive);
+                    printf("Error, primitive: %p \n", devicePrimitive);
                 }
                 else
                 {
                     printf("Error, found nullptr in primitive variables: \n\tm_IndexBuffer: %p \n\tm_VertexBuffer: %p \n\tm_Material: %p\n",
-                           primitive->m_IndexBuffer,
-                           primitive->m_VertexBuffer,
-                           primitive->m_Material);
+                           devicePrimitive->m_IndexBuffer,
+                           devicePrimitive->m_VertexBuffer,
+                           devicePrimitive->m_Material);
                 }
 
                 //Set to debug color purple.
@@ -110,27 +112,25 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(unsigned a_NumIntersections, AtomicBuffer<
                 primitive->m_IndexBuffer,
                 primitive->m_VertexBuffer);*/
 
-            const unsigned int vertexIndexA = primitive->m_IndexBuffer[vertexIndex + 0];
-            const unsigned int vertexIndexB = primitive->m_IndexBuffer[vertexIndex + 1];
-            const unsigned int vertexIndexC = primitive->m_IndexBuffer[vertexIndex + 2];
+            const unsigned int vertexIndexA = devicePrimitive->m_IndexBuffer[vertexIndex + 0];
+            const unsigned int vertexIndexB = devicePrimitive->m_IndexBuffer[vertexIndex + 1];
+            const unsigned int vertexIndexC = devicePrimitive->m_IndexBuffer[vertexIndex + 2];
 
             //printf("VertexA Index: %i\n", vertexIndexA);
             //printf("VertexB Index: %i\n", vertexIndexB);
             //printf("VertexC Index: %i\n", vertexIndexC);
 
-            const Vertex* A = &primitive->m_VertexBuffer[vertexIndexA];
-            const Vertex* B = &primitive->m_VertexBuffer[vertexIndexB];
-            const Vertex* C = &primitive->m_VertexBuffer[vertexIndexC];
+            const Vertex* A = &devicePrimitive->m_VertexBuffer[vertexIndexA];
+            const Vertex* B = &devicePrimitive->m_VertexBuffer[vertexIndexB];
+            const Vertex* C = &devicePrimitive->m_VertexBuffer[vertexIndexC];
 
-            const float U = currIntersection->m_UVs.x;
-            const float V = currIntersection->m_UVs.y;
+            const float U = currIntersection->m_Barycentrics.x;
+            const float V = currIntersection->m_Barycentrics.y;
             const float W = 1.f - (U + V);
 
             const float2 texCoords = A->m_UVCoord * W + B->m_UVCoord * U + C->m_UVCoord * V;
 
-            //TODO extract material using instance id.
-            const auto instanceId = 0;    //currIntersection->m_InstanceId
-            const DeviceMaterial* material = &a_Materials[instanceId];
+            const DeviceMaterial* material = devicePrimitive->m_Material;
 
             //TODO extract different textures (emissive, diffuse, metallic, roughness).
             const float4 textureColor = tex2D<float4>(material->m_DiffuseTexture, texCoords.x, texCoords.y);

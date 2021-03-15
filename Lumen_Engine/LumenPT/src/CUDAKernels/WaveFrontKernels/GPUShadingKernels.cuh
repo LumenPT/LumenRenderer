@@ -4,6 +4,8 @@
 
 using namespace WaveFront;
 
+class SceneDataTableAccessor;
+
 #define GET_PIXEL_INDEX(X, Y, WIDTH) ((Y) * WIDTH + (X))
 
 GPU_ONLY void HaltonSequence(
@@ -22,7 +24,11 @@ CPU_ON_GPU void GeneratePrimaryRay(
     int2 a_Dimensions,
     unsigned int a_FrameCount);
 
-CPU_ON_GPU void ExtractSurfaceDataGpu(unsigned a_NumIntersections, AtomicBuffer<IntersectionData>* a_IntersectionData, AtomicBuffer<IntersectionRayData>* a_Rays, SurfaceData* a_OutPut, DeviceMaterial* a_Materials);
+CPU_ON_GPU void ExtractSurfaceDataGpu(unsigned a_NumIntersections,
+    AtomicBuffer<IntersectionData>* a_IntersectionData,
+    AtomicBuffer<IntersectionRayData>* a_Rays,
+    SurfaceData* a_OutPut,
+    SceneDataTableAccessor* a_SceneDataTable);
 
 //Called during shading
 

@@ -14,6 +14,7 @@
 #include "../CUDAKernels/WaveFrontKernels.cuh"
 #include <filesystem>
 #include <glm/gtx/compatibility.hpp>
+#include "SceneDataTable.h"
 
 namespace WaveFront
 {
@@ -21,6 +22,10 @@ namespace WaveFront
     {
         m_FrameIndex = 0;
         m_Settings = a_Settings;
+
+        //Init CUDA
+        cudaFree(0);
+        m_CUDAContext = 0;
 
         //Set up the OpenGL output buffer.
         m_OutputBuffer.Resize(m_Settings.outputResolution.x, m_Settings.outputResolution.y);
@@ -63,25 +68,97 @@ namespace WaveFront
             {{0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}} };
         m_TriangleLights.Write(&lights[0], sizeof(TriangleLight) * numLights, 0);
 
-        //Set up material buffer. Initial space for 1024 meshes.
-        m_Materials = std::make_unique<MemoryBuffer>(1024 * sizeof(void*));
-
-        //TODO: initialize optix system.
-        //TODO: I don't think wavefront should care about this data at all. 
+        //TODO: Ensure shader names match what we put down here.
         OptixWrapper::InitializationData optixInitData;
+        optixInitData.m_CUDAContext = m_CUDAContext;
+        optixInitData.m_ProgramData.m_ProgramPath = "/shaders/";
+        optixInitData.m_ProgramData.m_MaxNumHitResultAttributes = 2;
+        optixInitData.m_ProgramData.m_MaxNumPayloads = 2;
+        optixInitData.m_ProgramData.m_ProgramAnyHitFuncName = "__anyhit__ah";
+        optixInitData.m_ProgramData.m_ProgramClosestHitFuncName = "__closesthit__ch";
+        optixInitData.m_ProgramData.m_ProgramLaunchParamName = "launchParams";
+        optixInitData.m_ProgramData.m_ProgramMissFuncName = "__miss__ms";
+        optixInitData.m_ProgramData.m_ProgramRayGenFuncName = "__raygen__rg";
 
         m_OptixSystem = std::make_unique<OptixWrapper>(optixInitData);
+
+        //Set the service locator pointer to point to the m'table.
+        m_Table = std::make_unique<SceneDataTable>();
+        m_ServiceLocator.m_SceneDataTable = m_Table.get();
     }
 
     std::unique_ptr<Lumen::ILumenPrimitive> WaveFrontRenderer2WithAVengeance::CreatePrimitive(PrimitiveData& a_MeshData)
     {
         //TODO let optix build the acceleration structure and return the handle.
+
+        //auto vertexBuffer = InterleaveVertexData(a_PrimitiveData);
+        //cudaDeviceSynchronize();
+        //auto err = cudaGetLastError();
+
+        //std::vector<uint32_t> correctedIndices;
+
+        //if (a_PrimitiveData.m_IndexSize != 4)
+        //{
+        //    VectorView<uint16_t, uint8_t> indexView(a_PrimitiveData.m_IndexBinary);
+
+        //    for (size_t i = 0; i < indexView.Size(); i++)
+        //    {
+        //        correctedIndices.push_back(indexView[i]);
+        //    }
+
+        //}
+
+        ////printf("Index buffer Size %i \n", static_cast<int>(correctedIndices.size()));
+        //std::unique_ptr<MemoryBuffer> indexBuffer = std::make_unique<MemoryBuffer>(correctedIndices);
+
+        //unsigned int geomFlags = OPTIX_GEOMETRY_FLAG_NONE;
+
+        //OptixAccelBuildOptions buildOptions = {};
+        //buildOptions.buildFlags = OPTIX_BUILD_FLAG_PREFER_FAST_TRACE;
+        //buildOptions.operation = OPTIX_BUILD_OPERATION_BUILD;
+        //buildOptions.motionOptions = {};
+
+        //OptixBuildInput buildInput = {};
+        //buildInput.type = OPTIX_BUILD_INPUT_TYPE_TRIANGLES;
+        //buildInput.triangleArray.indexBuffer = **indexBuffer;
+        //buildInput.triangleArray.indexFormat = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
+        //buildInput.triangleArray.indexStrideInBytes = 0;
+        //buildInput.triangleArray.numIndexTriplets = correctedIndices.size() / 3;
+        //buildInput.triangleArray.vertexBuffers = &**vertexBuffer;
+        //buildInput.triangleArray.vertexFormat = OPTIX_VERTEX_FORMAT_FLOAT3;
+        //buildInput.triangleArray.vertexStrideInBytes = sizeof(Vertex);
+        //buildInput.triangleArray.numVertices = a_PrimitiveData.m_Positions.Size();
+        //buildInput.triangleArray.numSbtRecords = 1;
+        //buildInput.triangleArray.flags = &geomFlags;
+
+        //auto gAccel = BuildGeometryAccelerationStructure(buildOptions, buildInput);
+
+        //auto prim = std::make_unique<PTPrimitive>(std::move(vertexBuffer), std::move(indexBuffer), std::move(gAccel));
+
+        //prim->m_Material = a_PrimitiveData.m_Material;
+
+        //prim->m_RecordHandle = m_RaysSBTGenerator->AddHitGroup<DevicePrimitive>();
+        //auto& rec = prim->m_RecordHandle.GetRecord();
+        //rec.m_Header = GetProgramGroupHeader(s_RaysHitPGName);
+        //rec.m_Data.m_VertexBuffer = prim->m_VertBuffer->GetDevicePtr<Vertex>();
+        //rec.m_Data.m_IndexBuffer = prim->m_IndexBuffer->GetDevicePtr<unsigned int>();
+        //rec.m_Data.m_Material = reinterpret_cast<Material*>(prim->m_Material.get())->GetDeviceMaterial();
+
+        ///*printf("Primitive: Material: %p, VertexBuffer: %p, IndexBufferPtr: %p \n",
+        //    rec.m_Data.m_Material,
+        //    rec.m_Data.m_VertexBuffer,
+        //    rec.m_Data.m_IndexBuffer);*/
+
+        //return prim;
     }
 
     std::shared_ptr<Lumen::ILumenMesh> WaveFrontRenderer2WithAVengeance::CreateMesh(
         std::vector<std::unique_ptr<Lumen::ILumenPrimitive>>& a_Primitives)
     {
         //TODO Let optix build the medium level acceleration structure and return the mesh handle for it.
+
+        auto mesh = std::make_shared<PTMesh>(a_Primitives, m_ServiceLocator);
+        return mesh;
     }
 
     std::shared_ptr<Lumen::ILumenTexture> WaveFrontRenderer2WithAVengeance::CreateTexture(void* a_PixelData,
@@ -104,14 +181,21 @@ namespace WaveFront
     std::shared_ptr<Lumen::ILumenVolume> WaveFrontRenderer2WithAVengeance::CreateVolume(const std::string& a_FilePath)
     {
         //TODO tell optix to create a volume acceleration structure.
+        std::shared_ptr<Lumen::ILumenVolume> volume = std::make_shared<PTVolume>(a_FilePath, m_ServiceLocator);
+        return volume;
     }
 
-    WaveFrontRenderer2WithAVengeance::WaveFrontRenderer2WithAVengeance() : m_FrameIndex(0)
+    std::shared_ptr<Lumen::ILumenScene> WaveFrontRenderer2WithAVengeance::CreateScene(SceneData a_SceneData)
+    {
+        return std::make_shared<PTScene>(a_SceneData, m_ServiceLocator);
+    }
+
+    WaveFrontRenderer2WithAVengeance::WaveFrontRenderer2WithAVengeance() : m_FrameIndex(0), m_CUDAContext(nullptr)
     {
 
     }
 
-    unsigned WaveFrontRenderer2WithAVengeance::TraceFrame()
+    unsigned WaveFrontRenderer2WithAVengeance::TraceFrame(std::shared_ptr<Lumen::ILumenScene>& a_Scene)
     {
         //Index of the current and last frame to access buffers.
         const auto currentIndex = m_FrameIndex;
@@ -121,8 +205,8 @@ namespace WaveFront
         const unsigned numPixels = m_Settings.renderResolution.x * m_Settings.renderResolution.y;
 
         //Start by clearing the data from the previous frame.
-        ResetLightChannels(m_PixelBufferCombined.GetDevicePtr<float3>(), numPixels, static_cast<unsigned>(LightChannel::NUM_CHANNELS));
-        ResetLightChannels(m_PixelBufferSeparate.GetDevicePtr<float3>(), numPixels, 1);
+        ResetLightChannels(m_PixelBufferSeparate.GetDevicePtr<float3>(), numPixels, static_cast<unsigned>(LightChannel::NUM_CHANNELS));
+        ResetLightChannels(m_PixelBufferCombined.GetDevicePtr<float3>(), numPixels, 1);
 
         //Generate camera rays.
         float3 eye, u, v, w;
@@ -141,14 +225,28 @@ namespace WaveFront
         const unsigned counterDefault = 0;
         m_ShadowRays.Write(&counterDefault, sizeof(unsigned), 0);
 
+        //Retrieve the acceleration structure and scene data table once.
+        m_OptixSystem->UpdateSBT();
+        auto* sceneDataTableAccessor = m_Table->GetDevicePointer();
+        auto accelerationStructure = std::static_pointer_cast<PTScene>(a_Scene)->GetSceneAccelerationStructure();
+
         //Pass the buffers to the optix shader for shading.
         OptixLaunchParameters rayLaunchParameters;
+        rayLaunchParameters.m_TraceType = RayType::INTERSECTION_RAY;
+        rayLaunchParameters.m_IntersectionBuffer = m_IntersectionData.GetDevicePtr<AtomicBuffer<IntersectionData>>();
+        rayLaunchParameters.m_IntersectionRayBatch = m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>();
+        rayLaunchParameters.m_TraversableHandle = accelerationStructure;
         rayLaunchParameters.m_ResolutionAndDepth = uint3{ m_Settings.renderResolution.x, m_Settings.renderResolution.y, m_Settings.depth };
-        const float2 minMaxDistanceRay = { 0.005f, 99999999.f };
-        //TODO set the params (pass the buffers). Atomic so gotta change signature.
 
         //The settings for shadow ray resolving.
         OptixLaunchParameters shadowRayLaunchParameters;
+        shadowRayLaunchParameters = rayLaunchParameters;
+        shadowRayLaunchParameters.m_ResultBuffer = m_PixelBufferSeparate.GetDevicePtr<float3>();
+        shadowRayLaunchParameters.m_ShadowRayBatch = m_ShadowRays.GetDevicePtr<AtomicBuffer<ShadowRayData>>();
+        shadowRayLaunchParameters.m_TraceType = RayType::SHADOW_RAY;
+
+        //Set the amount of rays to trace. Initially same as screen size.
+        auto numIntersectionRays = numPixels;
 
         /*
          * Resolve rays and shade at every depth.
@@ -156,16 +254,15 @@ namespace WaveFront
         for(unsigned depth = 0; depth < m_Settings.depth; ++depth)
         {
             //Tell Optix to resolve the primary rays that have been generated.
-            m_OptixSystem->TraceRays(RayType::INTERSECTION_RAY, rayLaunchParameters, minMaxDistanceRay);
+            m_OptixSystem->TraceRays(numIntersectionRays, rayLaunchParameters);
 
             /*
              * Calculate the surface data for this depth.
              */
-            //TODO: Replace material pointer with actual pointer.
             unsigned numIntersections = 0;
             m_IntersectionData.Read(&numIntersections, sizeof(unsigned), 0);
             const auto surfaceDataBufferIndex = depth == 0 ? currentIndex : 2;   //1 and 2 are used for the first intersection and remembered for temporal use.
-            ExtractSurfaceData(numIntersections, m_IntersectionData.GetDevicePtr<AtomicBuffer<IntersectionData>>(), m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>(), m_SurfaceData[surfaceDataBufferIndex].GetDevicePtr<SurfaceData>(), nullptr);
+            ExtractSurfaceData(numIntersections, m_IntersectionData.GetDevicePtr<AtomicBuffer<IntersectionData>>(), m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>(), m_SurfaceData[surfaceDataBufferIndex].GetDevicePtr<SurfaceData>(), sceneDataTableAccessor);
 
             //TODO add ReSTIR instance and run from shading kernel.
 
@@ -189,7 +286,17 @@ namespace WaveFront
             cudaMemset(m_SurfaceData[2].GetDevicePtr(), 0, sizeof(SurfaceData) * numPixels);
             m_IntersectionData.Write(&counterDefault, sizeof(unsigned), 0);
             m_Rays.Write(&counterDefault, sizeof(unsigned), 0);
+
+            //Set the number of intersection rays to the size of the ray buffer.
+            m_Rays.Read(&numIntersectionRays, sizeof(unsigned int), 0);
         }
+
+        //The amount of shadow rays to trace.
+        unsigned numShadowRays = 0;
+        m_ShadowRays.Read(&numShadowRays, sizeof(unsigned), 0);
+
+        //Tell optix to resolve the shadow rays.
+        m_OptixSystem->TraceRays(numShadowRays, shadowRayLaunchParameters);
 
         PostProcessLaunchParameters postProcessLaunchParams(
             m_Settings.renderResolution,
@@ -211,26 +318,6 @@ namespace WaveFront
 
         //Return the GLuint texture ID.
         return m_OutputBuffer.GetTexture();
-    }
-
-    void WaveFrontRenderer2WithAVengeance::SetInstanceMaterial(unsigned a_InstanceId,
-        std::shared_ptr<Lumen::ILumenMaterial>& a_Material)
-    {
-        //Current size in pointers.
-        const auto size = m_Materials->GetSize() / sizeof(void*);
-
-        //Allocate more memory if not enough is available.
-        if(size <= a_InstanceId)
-        {
-            std::unique_ptr<MemoryBuffer> temp = std::make_unique<MemoryBuffer>(m_Materials->GetSize() * 2);
-            temp->CopyFrom(*m_Materials, m_Materials->GetSize(), 0, 0);
-            m_Materials = std::move(temp);
-        }
-
-        auto asMaterial = std::static_pointer_cast<Material>(a_Material);
-
-        //Set the device material pointer for the ID.
-        m_Materials->Write(asMaterial->GetDeviceMaterial(), sizeof(void*), a_InstanceId * sizeof(void*));
     }
 }
 #endif

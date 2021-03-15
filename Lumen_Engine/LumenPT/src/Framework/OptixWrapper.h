@@ -37,11 +37,11 @@ namespace WaveFront
             struct ProgramData
             {
                 std::filesystem::path m_ProgramPath;
-                std::string& m_ProgramLaunchParamName;
-                std::string& m_ProgramRayGenFuncName;
-                std::string& m_ProgramMissFuncName;
-                std::string& m_ProgramAnyHitFuncName;
-                std::string& m_ProgramClosestHitFuncName;
+                std::string m_ProgramLaunchParamName;
+                std::string m_ProgramRayGenFuncName;
+                std::string m_ProgramMissFuncName;
+                std::string m_ProgramAnyHitFuncName;
+                std::string m_ProgramClosestHitFuncName;
                 uint8_t m_MaxNumPayloads = 2;
                 uint8_t m_MaxNumHitResultAttributes = 2;
             }m_ProgramData;
@@ -61,6 +61,11 @@ namespace WaveFront
             const OptixBuildInput& a_BuildInput) const;
 
         std::unique_ptr<AccelerationStructure> BuildInstanceAccelerationStructure(std::vector<OptixInstance> a_Instances) const;
+
+        /*
+         * Prepare thyself.
+         */
+        void UpdateSBT();
 
         void TraceRays(
             unsigned int a_NumRays,

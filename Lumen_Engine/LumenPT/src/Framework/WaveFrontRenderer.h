@@ -137,7 +137,7 @@ private:
 
 
     PTServiceLocator m_ServiceLocator;
-
+     
     std::unique_ptr<OutputBuffer> m_OutputBuffer;
 
     //Data buffers for the wavefront algorithm.

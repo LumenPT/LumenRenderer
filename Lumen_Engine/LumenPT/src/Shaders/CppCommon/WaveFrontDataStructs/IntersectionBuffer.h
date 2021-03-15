@@ -28,25 +28,25 @@ namespace WaveFront
             :
             m_RayArrayIndex(0),
             m_IntersectionT(-1.f),
-            m_UVs({0.f, 0.f}),
+            m_Barycentrics({0.f, 0.f}),
             m_PrimitiveIndex(0),
-            m_Primitive(0),
+            m_InstanceId(0),
             m_PixelIndex(0)
         {}
 
         CPU_GPU IntersectionData(
             unsigned int a_RayArrayIndex,
             float a_IntersectionT,
-            float2 a_UVs,
+            float2 a_Barycentrics,
             unsigned int a_PrimitiveIndex,
-            DevicePrimitive* a_Primitive,
+            unsigned int a_InstanceId,
             unsigned int a_PixelIndex)
             :
             m_RayArrayIndex(a_RayArrayIndex),
             m_IntersectionT(a_IntersectionT),
-            m_UVs(a_UVs),
+            m_Barycentrics(a_Barycentrics),
             m_PrimitiveIndex(a_PrimitiveIndex),
-            m_Primitive(a_Primitive),
+            m_InstanceId(a_InstanceId),
             m_PixelIndex(a_PixelIndex)
         {}
 
@@ -84,13 +84,11 @@ namespace WaveFront
         //The index of the pixel/surface that this intersection affects.
         unsigned int m_PixelIndex;
 
-        /// <summary>
-        /// <b>Description</b> \n Distance along the ray the intersection happened. \n
-        /// <b>Default</b>: -1.f
-        /// </summary>
-        float m_IntersectionT;
+        //Instance ID unique to the surface intersected.
+        unsigned int m_InstanceId;
 
-        float2 m_UVs;
+        //The barycentric coordinates of the triangle hit.
+        float2 m_Barycentrics;
 
         /// <summary>
         /// <b>Description</b> \n The index of the primitive(triangle, quad, etc.) of the mesh that the ray intersected with. \n
@@ -99,11 +97,10 @@ namespace WaveFront
         unsigned int m_PrimitiveIndex;
 
         /// <summary>
-        /// <b>Description</b> \n The primitive(a VertexBuffer, IndexBuffer and Material) that the ray intersected with. \n
-        /// <b>Default</b>: 0
+        /// <b>Description</b> \n Distance along the ray the intersection happened. \n
+        /// <b>Default</b>: -1.f
         /// </summary>
-        DevicePrimitive* m_Primitive;
-
+        float m_IntersectionT;
     };
 
     struct IntersectionBuffer

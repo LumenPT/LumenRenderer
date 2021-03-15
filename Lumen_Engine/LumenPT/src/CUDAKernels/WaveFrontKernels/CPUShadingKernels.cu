@@ -50,12 +50,12 @@ CPU_ONLY void GenerateMotionVectors()
 {
 }
 
-CPU_ONLY void ExtractSurfaceData(unsigned a_NumIntersections, AtomicBuffer < IntersectionData>* a_IntersectionData, AtomicBuffer < IntersectionRayData>* a_Rays, SurfaceData* a_OutPut, DeviceMaterial* a_Materials)
+CPU_ONLY void ExtractSurfaceData(unsigned a_NumIntersections, AtomicBuffer < IntersectionData>* a_IntersectionData, AtomicBuffer < IntersectionRayData>* a_Rays, SurfaceData* a_OutPut, SceneDataTableAccessor* a_SceneDataTable)
 {
     const int blockSize = 256;
     const int numBlocks = (a_NumIntersections + blockSize - 1) / blockSize;
 
-    ExtractSurfaceDataGpu<<<numBlocks, blockSize>>>(a_NumIntersections, a_IntersectionData, a_Rays, a_OutPut, a_Materials);
+    ExtractSurfaceDataGpu<<<numBlocks, blockSize>>>(a_NumIntersections, a_IntersectionData, a_Rays, a_OutPut, a_SceneDataTable);
 }
 
 CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)

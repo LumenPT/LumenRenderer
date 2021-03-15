@@ -1,10 +1,11 @@
 #pragma once
-#include "OptixWrapper.h"
 #if defined(WAVEFRONT)
+#include "OptixWrapper.h"
 #include "OutputBuffer.h"
 #include "MemoryBuffer.h"
 #include "Camera.h"
 #include "../Shaders/CppCommon/WaveFrontDataStructs.h"
+#include "PTServiceLocator.h"
 
 #include "Renderer/LumenRenderer.h"
 
@@ -12,6 +13,8 @@
 #include <string>
 #include <vector>
 #include <memory>
+
+class SceneDataTable;
 
 namespace WaveFront
 {
@@ -42,6 +45,7 @@ namespace WaveFront
         std::shared_ptr<Lumen::ILumenTexture> CreateTexture(void* a_PixelData, uint32_t a_Width, uint32_t a_Height) override;
         std::shared_ptr<Lumen::ILumenMaterial> CreateMaterial(const MaterialData& a_MaterialData) override;
         std::shared_ptr<Lumen::ILumenVolume> CreateVolume(const std::string& a_FilePath) override;
+        std::shared_ptr<Lumen::ILumenScene> CreateScene(SceneData a_SceneData) override;
 
         //Public functionality
     public:
@@ -50,12 +54,7 @@ namespace WaveFront
         /*
          * Render.
          */
-        unsigned TraceFrame();
-
-        /*
-         * Set the material to be used for a specific instance ID.
-         */
-        void SetInstanceMaterial(unsigned a_InstanceId, std::shared_ptr<Lumen::ILumenMaterial>& a_Material);
+        unsigned TraceFrame(std::shared_ptr<Lumen::ILumenScene>& a_Scene);
 
         /*
          * Initialize the wavefront pipeline.
@@ -90,9 +89,6 @@ namespace WaveFront
         //Triangle lights.
         MemoryBuffer m_TriangleLights;
 
-        //Buffer binding instance ID to material.
-        std::unique_ptr<MemoryBuffer> m_Materials;
-
         //Optix system
         std::unique_ptr<OptixWrapper> m_OptixSystem;
 
@@ -105,6 +101,15 @@ namespace WaveFront
 
         //The camera to render with.
         Camera m_Camera;
+
+        //The CUDA instance context stuff
+        CUcontext m_CUDAContext;
+
+        //The server locator instance.
+        PTServiceLocator m_ServiceLocator;
+
+        //Kamen's lookup table
+        std::unique_ptr<SceneDataTable> m_Table;
     };
 }
 #endif
