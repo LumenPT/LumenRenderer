@@ -2,17 +2,23 @@
 
 #include "LumenPT.h"
 #include "Framework/Camera.h"
+
 #include "Lumen/Input.h"
+#include "Lumen/ModelLoading/SceneManager.h"
+#include "Lumen/KeyCodes.h"
 
 #include "Glad/glad.h"
 
 #include "imgui/imgui.h"
 
+#include "GLFW/glfw3.h"
+
+#include "filesystem"
 #include <iostream>
 
-#include "Lumen/KeyCodes.h"
-
 OutputLayer::OutputLayer()
+	: m_CameraMovementSpeed(15.0f)
+	, m_CameraMouseSensitivity(0.2f)
 {
 	auto vs = glCreateShader(GL_VERTEX_SHADER);
 	auto fs = glCreateShader(GL_FRAGMENT_SHADER);
@@ -69,9 +75,6 @@ OutputLayer::OutputLayer()
 #endif
 
 	m_LumenPT = std::make_unique<LumenPT>(init);
-
-
-
 }
 
 OutputLayer::~OutputLayer()
@@ -82,6 +85,8 @@ OutputLayer::~OutputLayer()
 void OutputLayer::OnUpdate(){
 
 	HandleCameraInput(m_LumenPT->m_Camera);
+	HandleSceneInput();
+
 	auto texture = m_LumenPT->TraceFrame(); // TRACE SUM
 
 
@@ -92,6 +97,7 @@ void OutputLayer::OnUpdate(){
 
 void OutputLayer::OnImGuiRender()
 {
+	ImGuiCameraSettings();
     if (!m_LumenPT->m_Scene->m_MeshInstances.empty())
     {
 		auto& tarTransform = m_LumenPT->m_Scene->m_MeshInstances[0]->m_Transform;
@@ -157,19 +163,77 @@ void OutputLayer::OnImGuiRender()
 	}
 }
 
+void OutputLayer::InitializeScenePresets()
+{
+	ScenePreset pres = {};
+
+
+	//temporary stuff to avoid absolute paths to gltf file
+	std::filesystem::path p = std::filesystem::current_path();
+	std::string assetPath{ p.string() };
+	std::replace(assetPath.begin(), assetPath.end(), '\\', '/');
+
+	assetPath += "/Sandbox/assets/models/";
+
+	auto& scene = m_LumenPT->m_Scene;
+	auto assetManager = m_LayerServices->m_SceneManager;
+
+	// Sample scene loading preset
+	pres.m_Key = LMN_KEY_1;
+	pres.m_Function = [this, assetManager, assetPath]()
+	{
+	    auto fileName = "Lantern.gltf";
+
+		auto scene = m_LumenPT->m_Scene;
+		// I suggest doing a scene clear so that we don't end up with scenes with duplicate meshes
+		scene->Clear();	
+
+		auto res = assetManager->LoadGLTF(fileName, assetPath);
+
+		auto mesh = scene->AddMesh();
+		auto meshLight = scene->AddMesh();
+		mesh->SetMesh(res->m_MeshPool[0]); // We just take the first mesh for simplicity of having a model
+		meshLight->SetMesh(res->m_MeshPool[0]);
+	};
+	m_ScenePresets.push_back(pres);
+
+	pres.m_Key = LMN_KEY_2;
+	pres.m_Function = [this, assetManager, assetPath]()
+	{
+		auto fileName = "Sponza.gltf";
+		auto scene = m_LumenPT->m_Scene;
+		scene->Clear();
+
+		auto res = assetManager->LoadGLTF(fileName, assetPath);
+
+		auto mesh = scene->AddMesh();
+		mesh->SetMesh(res->m_MeshPool[0]); // The file has a single mesh, which is sponza itself
+		mesh->m_Transform.SetScale(glm::vec3(0.1f));
+	};
+	m_ScenePresets.push_back(pres);
+}
+
+
 void OutputLayer::HandleCameraInput(Camera& a_Camera)
 {
-	float movementSpeed = 1.0f / 60.f;
-	if(Lumen::Input::IsKeyPressed(LMN_KEY_SPACE))
+	if (!ImGui::IsAnyItemActive() && Lumen::Input::IsMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT))
 	{
-		movementSpeed *= 150.f;
+		auto delta = Lumen::Input::GetMouseDelta();
+
+		a_Camera.IncrementYaw(-glm::radians(delta.first * m_CameraMouseSensitivity));
+		a_Camera.IncrementPitch(glm::radians(delta.second * m_CameraMouseSensitivity));
+
 	}
+
+
+	float movementSpeed = m_CameraMovementSpeed / 60.f;
 	
 	glm::vec3 movementDirection = glm::vec3(0.f, 0.f, 0.f);
 	glm::vec3 eye, U, V, W;
 	a_Camera.GetVectorData(eye, U, V, W);
-	
-	if (Lumen::Input::IsKeyPressed(LMN_KEY_UP) || Lumen::Input::IsKeyPressed(LMN_KEY_W))
+
+
+	if (Lumen::Input::IsKeyPressed(LMN_KEY_W))	
 	{
 		movementDirection += glm::normalize(W) * movementSpeed;
 	}
@@ -219,7 +283,48 @@ void OutputLayer::HandleCameraInput(Camera& a_Camera)
 		pitchRotation += rotationSpeed;
 	}
 
-	a_Camera.IncrementYaw(glm::radians(yawRotation));
-	a_Camera.IncrementPitch(glm::radians(pitchRotation));
+	//a_Camera.IncrementYaw(glm::radians(yawRotation));
+	//a_Camera.IncrementPitch(glm::radians(pitchRotation));
 	//a_Camera.SetYaw(a_Camera.GetYaw() + yawRotation);
+}
+
+void OutputLayer::HandleSceneInput()
+{
+	static uint16_t keyDown = 0;
+
+	if (!ImGui::IsAnyItemActive())
+	{
+		if (!keyDown)
+		{
+			for (auto preset : m_ScenePresets)
+			{
+				if (Lumen::Input::IsKeyPressed(preset.m_Key))
+				{
+					preset.m_Function();
+					keyDown = preset.m_Key;
+
+					break;
+				}
+			}
+		}
+		else
+		{
+			if (!Lumen::Input::IsKeyPressed(keyDown))
+				keyDown = 0;
+		}
+	}
+}
+
+void OutputLayer::ImGuiCameraSettings()
+{
+	ImGui::Begin("Camera settings");
+
+	auto del = Lumen::Input::GetMouseDelta();
+
+	ImGui::PushItemWidth(80.0f);
+	ImGui::DragFloat("Camera Sensitivity", &m_CameraMouseSensitivity, 0.01f, 0.0f, 1.0f, "%.2f");
+
+	ImGui::DragFloat("Camera Movement Speed", &m_CameraMovementSpeed, 0.1f, 0.0f);
+
+	ImGui::End();
 }

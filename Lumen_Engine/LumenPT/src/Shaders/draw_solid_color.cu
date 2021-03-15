@@ -36,6 +36,7 @@
 #include "Optix/optix.h"
 #include "CppCommon/LaunchParameters.h"
 #include "CppCommon/RenderingUtility.h"
+#include "CppCommon/SceneDataTableAccessor.h"
 
 extern "C" {
 __constant__ LaunchParameters params;
@@ -93,6 +94,8 @@ __global__ void __raygen__draw_solid_color()
         col.z = int_as_float(p2);
     }
 
+    //void* prim = params.m_SceneData->GetTableEntry(0);
+
     params.m_Image[launch_index.y * params.m_ImageWidth + launch_index.x] =
         make_color( col );
 }
@@ -112,7 +115,7 @@ __global__ void __miss__MissShader()
 extern "C"
 __global__ void __closesthit__HitShader()
 {
-    DevicePrimitive* prim = reinterpret_cast<DevicePrimitive*>(optixGetSbtDataPointer());;
+    DevicePrimitive* prim = params.m_SceneData->GetTableEntry<DevicePrimitive>(optixGetInstanceId());
 
     const float2 barycentrics = optixGetTriangleBarycentrics();
     float U = barycentrics.x;
