@@ -73,7 +73,6 @@ public:
 		
 
 		OutputLayer* m_ContextLayer = new OutputLayer;
-		PushLayer(new ExampleLayer());
 		PushLayer(m_ContextLayer);
 
 
@@ -91,10 +90,10 @@ public:
 
 		//p_string.append("/Sandbox/assets/models/Sponza/Sponza.gltf");
 		LMN_TRACE(p_string);
-		
-		Lumen::SceneManager manager = Lumen::SceneManager();
-		manager.SetPipeline(*m_ContextLayer->GetPipeline());
-		auto res = manager.LoadGLTF(meshName, meshPath);
+
+
+	    m_SceneManager->SetPipeline(*m_ContextLayer->GetPipeline());
+		auto res = m_SceneManager->LoadGLTF(meshName, meshPath);
 
 		auto lumenPT = m_ContextLayer->GetPipeline();
 
@@ -127,7 +126,7 @@ public:
 		std::string vndbFilePath = { p.string() };
 		//vndbFilePath.append("/Sandbox/assets/volume/Sphere.vndb");
 		vndbFilePath.append("/Sandbox/assets/volume/bunny.vdb");
-		auto volumeRes = manager.m_VolumeManager.LoadVDB(vndbFilePath);
+		auto volumeRes = m_SceneManager->m_VolumeManager.LoadVDB(vndbFilePath);
 
 		auto volume = lumenPT->m_Scene->AddVolume();
 		volume->SetVolume(volumeRes->m_Volume);

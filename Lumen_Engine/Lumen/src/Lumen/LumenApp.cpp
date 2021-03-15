@@ -1,5 +1,9 @@
 #include "lmnpch.h"
 #include "LumenApp.h"
+#include "Layer.h"
+#include "ImGui/ImGuiLayer.h"
+
+#include "ModelLoading/SceneManager.h"
 
 #include "Lumen/Log.h"
 
@@ -26,11 +30,16 @@ namespace Lumen
 
 		m_ImGuiLayer = new ImGuiLayer();
 		PushOverlay(m_ImGuiLayer);
+
+		m_SceneManager = std::make_unique<SceneManager>();
+
+		// Fill out the service locator for the layers
+		m_LayerServices.m_SceneManager = m_SceneManager.get();
 	}
 
 	LumenApp::~LumenApp()
 	{
-		
+		m_SceneManager.reset();
 	}
 
 	void LumenApp::Run()
@@ -40,6 +49,8 @@ namespace Lumen
 			//a hack, very dirty. This shouldn't be here
 			glClearColor(1, 1, 0.5f, 1);
 			glClear(GL_COLOR_BUFFER_BIT);
+
+			Input::Update();
 
 			//Update loop
 			for (Layer* layer: m_LayerStack)
@@ -80,6 +91,7 @@ namespace Lumen
 
 	void LumenApp::PushLayer(Layer* layer)
 	{
+		layer->SetLayerServices(&m_LayerServices);
 		m_LayerStack.PushLayer(layer);
 		layer->OnAttach();
 	}

@@ -22,9 +22,17 @@ using LumenPT = OptiXRenderer;
 
 class OutputLayer : public Lumen::Layer
 {
+    struct ScenePreset
+    {
+        uint16_t m_Key;
+        std::function<void()> m_Function;
+    };
+
 public:
     OutputLayer();
     ~OutputLayer();
+
+    void OnAttach() override { InitializeScenePresets(); };
 
     void OnUpdate() override;
 
@@ -34,11 +42,21 @@ public:
 
 private:
 
+    void InitializeScenePresets();
     void HandleCameraInput(Camera& a_Camera);
-	
+
+    void HandleSceneInput();
+
+    void ImGuiCameraSettings();
+
     std::unique_ptr<LumenPT> m_LumenPT;
 
     uint32_t m_Program;
+    
+    std::vector<ScenePreset> m_ScenePresets;
+
+    float m_CameraMouseSensitivity;
+    float m_CameraMovementSpeed;
 
     inline static const char* m_VSSource = "#version 330 core \n                                                                  "
     "                                                                                                                             "

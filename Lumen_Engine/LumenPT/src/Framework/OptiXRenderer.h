@@ -111,11 +111,12 @@ private:
     OptixPipeline                   m_Pipeline;
 
     std::unique_ptr<ShaderBindingTableGenerator> m_ShaderBindingTableGenerator;
+    std::unique_ptr<SceneDataTable> m_SceneDataTable;
 
 
     RecordHandle<RaygenData>    m_RayGenRecord;
     RecordHandle<MissData>      m_MissRecord;
-    RecordHandle<HitData>       m_HitRecord;
+    RecordHandle<void>       m_HitRecord;
 
     std::unique_ptr<class Texture> m_Texture;
 
