@@ -105,11 +105,21 @@ void OutputLayer::OnImGuiRender()
 		ImGui::DragFloat3("Position", &pos[0]);
 		ImGui::DragFloat3("Scale", &scale[0]);
 		ImGui::DragFloat3("Rotation", &rot[0]);
-
-		ImGui::End();
 		tarTransform.SetPosition(pos);
 		tarTransform.SetScale(scale);
-		tarTransform.SetRotation(rot);
+
+		auto deltaRotation = rot - tarTransform.GetRotationEuler();
+
+		glm::quat deltaQuat = glm::quat(glm::radians(deltaRotation));
+		if (ImGui::Button("Reset Rotation"))
+		{
+			tarTransform.SetRotation(glm::vec3(0.0f));
+		}
+		else
+		{
+			tarTransform.Rotate(deltaQuat);
+		}
+		ImGui::End();
 
     }
 
@@ -126,12 +136,24 @@ void OutputLayer::OnImGuiRender()
 		ImGui::DragFloat3("Position", &pos[0]);
 		ImGui::DragFloat3("Scale", &scale[0]);
 		ImGui::DragFloat3("Rotation", &rot[0]);
+		
 
-		ImGui::End();
 		tarTransform.SetPosition(pos);
 		tarTransform.SetScale(scale);
-		tarTransform.SetRotation(rot);
 
+		auto deltaRotation = rot - tarTransform.GetRotationEuler();
+
+		glm::quat deltaQuat = glm::quat(glm::radians(deltaRotation));
+
+		if (ImGui::Button("Reset Rotation"))
+		{
+			tarTransform.SetRotation(glm::vec3(0.0f));
+		}
+		else
+		{
+		    tarTransform.Rotate(deltaQuat);		    
+		}
+		ImGui::End();
 	}
 }
 
