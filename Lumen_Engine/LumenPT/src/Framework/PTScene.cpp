@@ -34,6 +34,14 @@ Lumen::VolumeInstance* PTScene::AddVolume()
     return m_VolumeInstances.back().get();
 }
 
+void PTScene::Clear()
+{
+    // Do the same as the parent class
+    // and mark the acceleration structure as dirty and waiting for an update
+    ILumenScene::Clear();
+    m_AccelerationStructureDirty = true;
+}
+
 void PTScene::MarkSceneForUpdate()
 {
     m_AccelerationStructureDirty = true;
@@ -93,7 +101,7 @@ void PTScene::UpdateSceneAccelerationStructure()
             inst.traversableHandle = ptVolume->m_AccelerationStructure->m_TraversableHandle;
             inst.sbtOffset = ptVolume->m_RecordHandle.m_TableIndex;
             inst.visibilityMask = 255;
-            inst.instanceId = instanceID++;
+            inst.instanceId = ptVolume->m_SceneEntry.m_TableIndex;
             inst.flags = OPTIX_INSTANCE_FLAG_NONE;
 
             auto transformMat = glm::transpose(ptvi.m_Transform.GetTransformationMatrix());

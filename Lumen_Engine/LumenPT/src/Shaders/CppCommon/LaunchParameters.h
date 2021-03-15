@@ -2,10 +2,13 @@
 
 #include "ModelStructs.h"
 
+//#include "SceneDataTableAccessor.h"
 #include <Optix/optix_types.h>
+
 
 #include "Cuda/cuda/helpers.h"
 
+class SceneDataTableAccessor;
 
 struct ProgramGroupHeader
 {
@@ -19,6 +22,8 @@ struct LaunchParameters
     OptixTraversableHandle m_Handle;
     unsigned int m_ImageHeight;
     unsigned int m_ImageWidth;
+
+    SceneDataTableAccessor* m_SceneData;
 
     float3       eye;
     float3       U;

@@ -11,6 +11,7 @@
 #include "../../src/Shaders/CppCommon/VolumeStructs.h"
 #include "../../Lumen/src/Lumen/Renderer/ILumenResources.h"
 #include "ModelLoading/ILumenScene.h"
+#include "SceneDataTableEntry.h"
 
 class AccelerationStructure;
 struct PTServiceLocator;
@@ -30,6 +31,7 @@ public:
 	PTServiceLocator& m_Services;
 
 	RecordHandle<DeviceVolume> m_RecordHandle;
+	SceneDataTableEntry<DeviceVolume> m_SceneEntry;
 
 	std::unique_ptr<AccelerationStructure> m_AccelerationStructure = nullptr;
 	

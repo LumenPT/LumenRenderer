@@ -13,6 +13,8 @@ namespace Lumen
         virtual Lumen::MeshInstance* AddMesh();
         virtual Lumen::VolumeInstance* AddVolume();
 
+        virtual void Clear();
+
         std::vector<std::unique_ptr<Lumen::MeshInstance>> m_MeshInstances;
         std::vector<std::unique_ptr<Lumen::VolumeInstance>> m_VolumeInstances;
 
