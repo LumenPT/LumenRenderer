@@ -1626,12 +1626,12 @@ std::unique_ptr<Lumen::ILumenPrimitive> WaveFrontRenderer::CreatePrimitive(Primi
 
     prim->m_Material = a_PrimitiveData.m_Material;
 
-    prim->m_RecordHandle = m_RaysSBTGenerator->AddHitGroup<DevicePrimitive>();
-    auto& rec = prim->m_RecordHandle.GetRecord();
-    rec.m_Header = GetProgramGroupHeader(s_RaysHitPGName);
-    rec.m_Data.m_VertexBuffer = prim->m_VertBuffer->GetDevicePtr<Vertex>();
-    rec.m_Data.m_IndexBuffer = prim->m_IndexBuffer->GetDevicePtr<unsigned int>();
-    rec.m_Data.m_Material = reinterpret_cast<Material*>(prim->m_Material.get())->GetDeviceMaterial();
+    //prim->m_RecordHandle = m_RaysSBTGenerator->AddHitGroup<DevicePrimitive>();
+    //auto& rec = prim->m_RecordHandle.GetRecord();
+    //rec.m_Header = GetProgramGroupHeader(s_RaysHitPGName);
+    //rec.m_Data.m_VertexBuffer = prim->m_VertBuffer->GetDevicePtr<Vertex>();
+    //rec.m_Data.m_IndexBuffer = prim->m_IndexBuffer->GetDevicePtr<unsigned int>();
+    //rec.m_Data.m_Material = reinterpret_cast<Material*>(prim->m_Material.get())->GetDeviceMaterial();
 
     /*printf("Primitive: Material: %p, VertexBuffer: %p, IndexBufferPtr: %p \n",
         rec.m_Data.m_Material, 
