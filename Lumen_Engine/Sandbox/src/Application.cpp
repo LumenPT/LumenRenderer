@@ -57,7 +57,7 @@ public:
 		if(event.GetEventType() == Lumen::EventType::KeyPressed)
 		{
 			Lumen::KeyPressedEvent& e = static_cast<Lumen::KeyPressedEvent&>(event);
-			LMN_TRACE("{0}", static_cast<char>(e.GetKeyCode()));
+			//LMN_TRACE("{0}", static_cast<char>(e.GetKeyCode()));
 		}
 	}
 };
@@ -91,7 +91,6 @@ public:
 		//p_string.append("/Sandbox/assets/models/Sponza/Sponza.gltf");
 		LMN_TRACE(p_string);
 
-
 	    m_SceneManager->SetPipeline(*m_ContextLayer->GetPipeline());
 		auto res = m_SceneManager->LoadGLTF(meshName, meshPath);
 
@@ -100,7 +99,7 @@ public:
 		LumenRenderer::SceneData scData = {};
 		
 		lumenPT->m_Scene = lumenPT->CreateScene(scData);
-
+		
 		//Loop over the nodes in the scene, and add their meshes if they have one.
 		for(auto& node: res->m_NodePool)
 		{
