@@ -1,4 +1,4 @@
-#if defined(WAVEFRONT)
+#if defined(WAVEFRONTOLD)
 #include "WaveFrontRenderer.h"
 #include "PTMesh.h"
 #include "PTScene.h"
@@ -185,51 +185,6 @@ bool WaveFrontRenderer::CreatePipelines(const std::string& a_ShaderPath)
     return success;
 
 }
-
-//TODO: implement necessary Optix shaders for wavefront algorithm
-//Shaders:
-// - RayGen: trace rays from ray definitions in ray batch, different methods for radiance or shadow.
-// - Miss: is this shader necessary, miss result by default in intersection buffer?
-// - ClosestHit: radiance trace, report intersection into intersection buffer.
-// - AnyHit: shadow trace, report if any hit in between certain max distance.
-bool WaveFrontRenderer::CreatePipeline(
-    const OptixModule& a_Module,
-    const OptixPipelineCompileOptions& a_PipelineOptions,
-    PipelineType a_Type, 
-    const std::string& a_RayGenFuncName, 
-    const std::string& a_HitFuncName,
-    const std::string& a_MissFuncName,
-    OptixPipeline& a_Pipeline)
-{
-
-    OptixProgramGroup rayGenProgram = nullptr;
-    OptixProgramGroup hitProgram = nullptr;
-    OptixProgramGroup missProgram = nullptr;
-
-    OptixProgramGroupDesc rgGroupDesc = {};
-    rgGroupDesc.kind = OPTIX_PROGRAM_GROUP_KIND_RAYGEN;
-    rgGroupDesc.raygen.entryFunctionName = a_RayGenFuncName.c_str();
-    rgGroupDesc.raygen.module = a_Module;
-
-    OptixProgramGroupDesc htGroupDesc = {};
-    htGroupDesc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-
-    OptixProgramGroupDesc msGroupDesc = {};
-    msGroupDesc.kind = OPTIX_PROGRAM_GROUP_KIND_MISS;
-
-    switch (a_Type)
-    {
-
-        case PipelineType::RESOLVE_RAYS:
-            {
-                htGroupDesc.hitgroup.entryFunctionNameCH = a_HitFuncName.c_str();
-                htGroupDesc.hitgroup.moduleCH = a_Module;
-
-
-
-
-
-
 
 
 void WaveFrontRenderer::CreateOutputBuffer()

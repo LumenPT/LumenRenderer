@@ -3,6 +3,7 @@
 #include "PTPrimitive.h"
 #include "PTServiceLocator.h"
 #include "RendererDefinition.h"
+#include "OptixWrapper.h"
 
 #include "glm/mat4x4.hpp"
 
@@ -32,7 +33,9 @@ void PTMesh::UpdateAccelerationStructure()
         m_LastUsedInstanceIDs[ptPrim] = ptPrim->m_SceneDataTableEntry.m_TableIndex;
     }
 
-    m_AccelerationStructure = m_Services.m_Renderer->BuildInstanceAccelerationStructure(instances);
+    
+
+    m_AccelerationStructure = m_Services.m_OptixWrapper->BuildInstanceAccelerationStructure(instances);
 }
 
 bool PTMesh::VerifyStructCorrectness()

@@ -4,7 +4,7 @@
 //#include "Framework/Camera.h"
 
 #ifdef WAVEFRONT
-#include "../../LumenPT/src/Framework/WaveFrontRenderer.h"
+#include "../../LumenPT/src/Framework/WaveFrontRenderer2WithAVengeance.h"
 #else
 #include "../../LumenPT/src/Framework/OptiXRenderer.h"
 #endif
@@ -85,21 +85,21 @@ OutputLayer::OutputLayer()
 //#endif
 
 #ifdef WAVEFRONT
-	m_Renderer = std::make_unique<WaveFrontRenderer>(init);
+	m_Renderer = std::make_unique<WaveFront::WaveFrontRenderer2WithAVengeance>();
 #else
 	m_Renderer = std::make_unique<OptiXRenderer>(init);
 #endif
 }
 
 OutputLayer::~OutputLayer()
-{
+{										    
 	glDeleteProgram(m_Program);
 }
 
 void OutputLayer::OnUpdate(){
 
 	HandleCameraInput(*m_Renderer->m_Scene->m_Camera);
-	auto texture = m_Renderer->TraceFrame(); // TRACE SUM
+	auto texture = m_Renderer->TraceFrame(m_Renderer->m_Scene); // TRACE SUM
 	HandleSceneInput();
 
 	glBindTexture(GL_TEXTURE_2D, texture);

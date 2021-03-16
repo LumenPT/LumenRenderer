@@ -445,11 +445,15 @@ void OptixWrapper::SetupPipelineBuffer()
 void OptixWrapper::SetupShaderBindingTable()
 {
 
-    m_RayGenRecord = m_SBTGenerator->SetRayGen<OptixSBTRecordDataRayGen>();
-    m_MissRecord = m_SBTGenerator->AddMiss<OptixSBTRecordDataMiss>();
+    m_RayGenRecord = m_SBTGenerator->SetRayGen<void>();
+    m_HitRecord = m_SBTGenerator->AddHitGroup<void>();
+    m_MissRecord = m_SBTGenerator->AddMiss<void>();
 
     auto& rayGenRecord = m_RayGenRecord.GetRecord();
     rayGenRecord.m_Header = GetProgramGroupHeader(s_RayGenPGName);
+
+    auto& hitRecord = m_HitRecord.GetRecord();
+    hitRecord.m_Header = GetProgramGroupHeader(s_HitPGName);
 
     auto& raysMissRecord = m_MissRecord.GetRecord();
     raysMissRecord.m_Header = GetProgramGroupHeader(s_MissPGName);
@@ -464,6 +468,13 @@ void OptixWrapper::OptixDebugCallback(unsigned a_Level, const char* a_Tag, const
 }
 
 
+
+void OptixWrapper::UpdateSBT()
+{
+
+    m_SBTGenerator->UpdateTable();
+
+}
 
 void OptixWrapper::TraceRays(
     unsigned int a_NumRays,

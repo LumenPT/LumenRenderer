@@ -8,6 +8,14 @@
 namespace WaveFront
 {
 
+    enum class LightChannel : unsigned int
+    {
+        DIRECT,
+        INDIRECT,
+        SPECULAR,
+        NUM_CHANNELS
+    };
+
     //An emissive triangle
     struct TriangleLight
     {

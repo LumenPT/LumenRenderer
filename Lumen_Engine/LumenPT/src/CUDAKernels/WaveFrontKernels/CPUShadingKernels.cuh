@@ -2,6 +2,7 @@
 #include "../../Shaders/CppCommon/CudaDefines.h"
 #include "../../Shaders/CppCommon/WaveFrontDataStructs/CudaKernelParamStructs.h"
 
+class SceneDataTableAccessor;
 using namespace WaveFront;
 
 //CPU_GPU void HaltonSequence(
@@ -25,7 +26,12 @@ CPU_ONLY void GenerateMotionVectors();
  * Extract the surface data for the current depth.
  * Requires the rays and intersection buffers.
  */
-CPU_ONLY void ExtractSurfaceData(unsigned a_NumIntersections, AtomicBuffer < IntersectionData>* a_IntersectionData, AtomicBuffer < IntersectionRayData>* a_Rays, SurfaceData* a_OutPut, SceneDataTableAccessor* a_SceneDataTable);
+CPU_ONLY void ExtractSurfaceData(
+    unsigned a_NumIntersections, 
+    AtomicBuffer < IntersectionData>* a_IntersectionData, 
+    AtomicBuffer < IntersectionRayData>* a_Rays, 
+    SurfaceData* a_OutPut, 
+    SceneDataTableAccessor* a_SceneDataTable);
 
 /*
  * Called each wave after resolving a RayBatch.

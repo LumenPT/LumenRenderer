@@ -1,7 +1,7 @@
 #pragma once
 
 #ifdef WAVEFRONT
-#include "WaveFrontRenderer.h"
+#include "WaveFrontRenderer2WithAVengeance.h"
 #else
 #include "OptiXRenderer.h"
 #endif

@@ -62,9 +62,8 @@ namespace WaveFront
 
         std::unique_ptr<AccelerationStructure> BuildInstanceAccelerationStructure(std::vector<OptixInstance> a_Instances) const;
 
-        /*
-         * Prepare thyself.
-         */
+
+
         void UpdateSBT();
 
         void TraceRays(
@@ -123,8 +122,9 @@ namespace WaveFront
 
         std::unique_ptr<ShaderBindingTableGenerator> m_SBTGenerator;
 
-        RecordHandle<OptixSBTRecordDataRayGen> m_RayGenRecord;
-        RecordHandle<OptixSBTRecordDataMiss> m_MissRecord;
+        RecordHandle<void> m_RayGenRecord;
+        RecordHandle<void> m_HitRecord;
+        RecordHandle<void> m_MissRecord;
 
         std::unique_ptr<MemoryBuffer> m_SBTRecordBuffer;
 

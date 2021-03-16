@@ -30,7 +30,7 @@ public:
      */
     GPU_ONLY void Set(int a_Index, T* a_Data)
     {
-        data[a_Index] = a_Data;
+        data[a_Index] = *a_Data;
     }
 
     /*

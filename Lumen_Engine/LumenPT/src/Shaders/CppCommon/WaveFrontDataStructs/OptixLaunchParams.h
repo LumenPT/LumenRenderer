@@ -1,6 +1,5 @@
 #pragma once
 #include "GPUDataBuffers.h"
-#include "SceneDataTable.h"
 #include "AtomicBuffer.h"
 
 #include <Optix/optix.h>
@@ -25,6 +24,7 @@ namespace WaveFront
         AtomicBuffer<IntersectionData>* m_IntersectionBuffer;
         AtomicBuffer<ShadowRayData>* m_ShadowRayBatch;
         float3* m_ResultBuffer;
+        float2 m_MinMaxDistance;
         RayType m_TraceType;
     };
 

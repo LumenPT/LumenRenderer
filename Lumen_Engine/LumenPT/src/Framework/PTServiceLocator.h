@@ -4,7 +4,7 @@ struct PTServiceLocator
 {
 
 #ifdef  WAVEFRONT
-    class WaveFrontRenderer* m_Renderer;
+    class WaveFrontRenderer2WithAVengeance* m_Renderer;
 #else
     class OptiXRenderer* m_Renderer;
 #endif
@@ -12,4 +12,6 @@ struct PTServiceLocator
     class ShaderBindingTableGenerator* m_SBTGenerator;
 
     class SceneDataTable* m_SceneDataTable;
+
+    class OptixWrapper* m_OptixWrapper;
 };

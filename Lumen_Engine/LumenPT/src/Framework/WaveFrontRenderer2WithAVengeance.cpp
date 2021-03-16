@@ -1,8 +1,10 @@
+#include "../Shaders/CppCommon/LumenPTConsts.h"
 #if defined(WAVEFRONT)
 
 #include "../Shaders/CppCommon/WaveFrontDataStructs.h"
 #include "WaveFrontRenderer2WithAVengeance.h"
 #include "WaveFrontRenderer.h"
+#include "PTPrimitive.h"
 #include "PTMesh.h"
 #include "PTScene.h"
 #include "Material.h"
@@ -71,14 +73,14 @@ namespace WaveFront
         //TODO: Ensure shader names match what we put down here.
         OptixWrapper::InitializationData optixInitData;
         optixInitData.m_CUDAContext = m_CUDAContext;
-        optixInitData.m_ProgramData.m_ProgramPath = "/shaders/";
+        optixInitData.m_ProgramData.m_ProgramPath = LumenPTConsts::gs_ShaderPathBase + "WaveFrontShaders.ptx";;
+        optixInitData.m_ProgramData.m_ProgramLaunchParamName = "launchParams";
+        optixInitData.m_ProgramData.m_ProgramRayGenFuncName = "__raygen__RG";
+        optixInitData.m_ProgramData.m_ProgramMissFuncName = "__miss__MS";
+        optixInitData.m_ProgramData.m_ProgramAnyHitFuncName = "__anyhit__AH";
+        optixInitData.m_ProgramData.m_ProgramClosestHitFuncName = "__closesthit__CH";
         optixInitData.m_ProgramData.m_MaxNumHitResultAttributes = 2;
         optixInitData.m_ProgramData.m_MaxNumPayloads = 2;
-        optixInitData.m_ProgramData.m_ProgramAnyHitFuncName = "__anyhit__ah";
-        optixInitData.m_ProgramData.m_ProgramClosestHitFuncName = "__closesthit__ch";
-        optixInitData.m_ProgramData.m_ProgramLaunchParamName = "launchParams";
-        optixInitData.m_ProgramData.m_ProgramMissFuncName = "__miss__ms";
-        optixInitData.m_ProgramData.m_ProgramRayGenFuncName = "__raygen__rg";
 
         m_OptixSystem = std::make_unique<OptixWrapper>(optixInitData);
 
@@ -87,69 +89,79 @@ namespace WaveFront
         m_ServiceLocator.m_SceneDataTable = m_Table.get();
     }
 
-    std::unique_ptr<Lumen::ILumenPrimitive> WaveFrontRenderer2WithAVengeance::CreatePrimitive(PrimitiveData& a_MeshData)
+    std::unique_ptr<MemoryBuffer> WaveFrontRenderer2WithAVengeance::InterleaveVertexData(const PrimitiveData& a_MeshData) const
+    {
+        std::vector<Vertex> vertices;
+
+        for (size_t i = 0; i < a_MeshData.m_Positions.Size(); i++)
+        {
+            auto& v = vertices.emplace_back();
+            v.m_Position = make_float3(a_MeshData.m_Positions[i].x, a_MeshData.m_Positions[i].y, a_MeshData.m_Positions[i].z);
+            if (!a_MeshData.m_TexCoords.Empty())
+                v.m_UVCoord = make_float2(a_MeshData.m_TexCoords[i].x, a_MeshData.m_TexCoords[i].y);
+            if (!a_MeshData.m_Normals.Empty())
+                v.m_Normal = make_float3(a_MeshData.m_Normals[i].x, a_MeshData.m_Normals[i].y, a_MeshData.m_Normals[i].z);
+        }
+        return std::make_unique<MemoryBuffer>(vertices);
+    }
+
+    std::unique_ptr<Lumen::ILumenPrimitive> WaveFrontRenderer2WithAVengeance::CreatePrimitive(PrimitiveData& a_PrimitiveData)
     {
         //TODO let optix build the acceleration structure and return the handle.
 
-        //auto vertexBuffer = InterleaveVertexData(a_PrimitiveData);
-        //cudaDeviceSynchronize();
-        //auto err = cudaGetLastError();
+        auto vertexBuffer = InterleaveVertexData(a_PrimitiveData);
+        cudaDeviceSynchronize();
+        auto err = cudaGetLastError();
 
-        //std::vector<uint32_t> correctedIndices;
+        std::vector<uint32_t> correctedIndices;
 
-        //if (a_PrimitiveData.m_IndexSize != 4)
-        //{
-        //    VectorView<uint16_t, uint8_t> indexView(a_PrimitiveData.m_IndexBinary);
+        if (a_PrimitiveData.m_IndexSize != 4)
+        {
+            VectorView<uint16_t, uint8_t> indexView(a_PrimitiveData.m_IndexBinary);
 
-        //    for (size_t i = 0; i < indexView.Size(); i++)
-        //    {
-        //        correctedIndices.push_back(indexView[i]);
-        //    }
+            for (size_t i = 0; i < indexView.Size(); i++)
+            {
+                correctedIndices.push_back(indexView[i]);
+            }
 
-        //}
+        }
 
-        ////printf("Index buffer Size %i \n", static_cast<int>(correctedIndices.size()));
-        //std::unique_ptr<MemoryBuffer> indexBuffer = std::make_unique<MemoryBuffer>(correctedIndices);
+        //printf("Index buffer Size %i \n", static_cast<int>(correctedIndices.size()));
+        std::unique_ptr<MemoryBuffer> indexBuffer = std::make_unique<MemoryBuffer>(correctedIndices);
 
-        //unsigned int geomFlags = OPTIX_GEOMETRY_FLAG_NONE;
+        unsigned int geomFlags = OPTIX_GEOMETRY_FLAG_NONE;
 
-        //OptixAccelBuildOptions buildOptions = {};
-        //buildOptions.buildFlags = OPTIX_BUILD_FLAG_PREFER_FAST_TRACE;
-        //buildOptions.operation = OPTIX_BUILD_OPERATION_BUILD;
-        //buildOptions.motionOptions = {};
+        OptixAccelBuildOptions buildOptions = {};
+        buildOptions.buildFlags = OPTIX_BUILD_FLAG_PREFER_FAST_TRACE;
+        buildOptions.operation = OPTIX_BUILD_OPERATION_BUILD;
+        buildOptions.motionOptions = {};
 
-        //OptixBuildInput buildInput = {};
-        //buildInput.type = OPTIX_BUILD_INPUT_TYPE_TRIANGLES;
-        //buildInput.triangleArray.indexBuffer = **indexBuffer;
-        //buildInput.triangleArray.indexFormat = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
-        //buildInput.triangleArray.indexStrideInBytes = 0;
-        //buildInput.triangleArray.numIndexTriplets = correctedIndices.size() / 3;
-        //buildInput.triangleArray.vertexBuffers = &**vertexBuffer;
-        //buildInput.triangleArray.vertexFormat = OPTIX_VERTEX_FORMAT_FLOAT3;
-        //buildInput.triangleArray.vertexStrideInBytes = sizeof(Vertex);
-        //buildInput.triangleArray.numVertices = a_PrimitiveData.m_Positions.Size();
-        //buildInput.triangleArray.numSbtRecords = 1;
-        //buildInput.triangleArray.flags = &geomFlags;
+        OptixBuildInput buildInput = {};
+        buildInput.type = OPTIX_BUILD_INPUT_TYPE_TRIANGLES;
+        buildInput.triangleArray.indexBuffer = **indexBuffer;
+        buildInput.triangleArray.indexFormat = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
+        buildInput.triangleArray.indexStrideInBytes = 0;
+        buildInput.triangleArray.numIndexTriplets = correctedIndices.size() / 3;
+        buildInput.triangleArray.vertexBuffers = &**vertexBuffer;
+        buildInput.triangleArray.vertexFormat = OPTIX_VERTEX_FORMAT_FLOAT3;
+        buildInput.triangleArray.vertexStrideInBytes = sizeof(Vertex);
+        buildInput.triangleArray.numVertices = a_PrimitiveData.m_Positions.Size();
+        buildInput.triangleArray.numSbtRecords = 1;
+        buildInput.triangleArray.flags = &geomFlags;
 
-        //auto gAccel = BuildGeometryAccelerationStructure(buildOptions, buildInput);
+        auto gAccel = m_OptixSystem->BuildGeometryAccelerationStructure(buildOptions, buildInput);
 
-        //auto prim = std::make_unique<PTPrimitive>(std::move(vertexBuffer), std::move(indexBuffer), std::move(gAccel));
+        auto prim = std::make_unique<PTPrimitive>(std::move(vertexBuffer), std::move(indexBuffer), std::move(gAccel));
 
-        //prim->m_Material = a_PrimitiveData.m_Material;
+        prim->m_Material = a_PrimitiveData.m_Material;
 
-        //prim->m_RecordHandle = m_RaysSBTGenerator->AddHitGroup<DevicePrimitive>();
-        //auto& rec = prim->m_RecordHandle.GetRecord();
-        //rec.m_Header = GetProgramGroupHeader(s_RaysHitPGName);
-        //rec.m_Data.m_VertexBuffer = prim->m_VertBuffer->GetDevicePtr<Vertex>();
-        //rec.m_Data.m_IndexBuffer = prim->m_IndexBuffer->GetDevicePtr<unsigned int>();
-        //rec.m_Data.m_Material = reinterpret_cast<Material*>(prim->m_Material.get())->GetDeviceMaterial();
+        prim->m_SceneDataTableEntry = m_Table->AddEntry<DevicePrimitive>();
+        auto& entry = prim->m_SceneDataTableEntry.GetData();
+        entry.m_VertexBuffer = prim->m_VertBuffer->GetDevicePtr<Vertex>();
+        entry.m_IndexBuffer = prim->m_IndexBuffer->GetDevicePtr<unsigned int>();
+        entry.m_Material = static_cast<Material*>(prim->m_Material.get())->GetDeviceMaterial();
 
-        ///*printf("Primitive: Material: %p, VertexBuffer: %p, IndexBufferPtr: %p \n",
-        //    rec.m_Data.m_Material,
-        //    rec.m_Data.m_VertexBuffer,
-        //    rec.m_Data.m_IndexBuffer);*/
-
-        //return prim;
+        return prim;
     }
 
     std::shared_ptr<Lumen::ILumenMesh> WaveFrontRenderer2WithAVengeance::CreateMesh(
@@ -182,6 +194,7 @@ namespace WaveFront
     {
         //TODO tell optix to create a volume acceleration structure.
         std::shared_ptr<Lumen::ILumenVolume> volume = std::make_shared<PTVolume>(a_FilePath, m_ServiceLocator);
+
         return volume;
     }
 
@@ -209,10 +222,17 @@ namespace WaveFront
         ResetLightChannels(m_PixelBufferCombined.GetDevicePtr<float3>(), numPixels, 1);
 
         //Generate camera rays.
-        float3 eye, u, v, w;
+        glm::vec3 eye, u, v, w;
         m_Camera.SetAspectRatio(static_cast<float>(m_Settings.renderResolution.x) / static_cast<float>(m_Settings.renderResolution.y));
         m_Camera.GetVectorData(eye, u, v, w);
-        const WaveFront::PrimRayGenLaunchParameters::DeviceCameraData cameraData(eye, u, v, w);
+
+        float3 eyeCuda, uCuda, vCuda, wCuda;
+        eyeCuda = make_float3(eye.x, eye.y, eye.z);
+        uCuda = make_float3(u.x, u.y, u.z);
+        vCuda = make_float3(v.x, v.y, v.z);
+        wCuda = make_float3(w.x, w.y, w.z);
+
+        const WaveFront::PrimRayGenLaunchParameters::DeviceCameraData cameraData(eyeCuda, uCuda, vCuda, wCuda);
         auto rayPtr = m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>();
         const PrimRayGenLaunchParameters primaryRayGenParams(uint2{m_Settings.renderResolution.x, m_Settings.renderResolution.y}, cameraData, rayPtr, 1);   //TODO what is framecount?
         GeneratePrimaryRays(primaryRayGenParams);

@@ -8,18 +8,6 @@ class Camera;
 
 class LumenRenderer;
 
-#ifdef WAVEFRONT
-
-//class WaveFrontRenderer;
-//using LumenPT = WaveFrontRenderer;
-
-#else
-
-class OptiXRenderer;
-using LumenPT = OptiXRenderer;
-
-#endif
-
 class OutputLayer : public Lumen::Layer
 {
     struct ScenePreset

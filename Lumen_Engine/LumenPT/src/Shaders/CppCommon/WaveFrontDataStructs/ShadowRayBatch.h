@@ -1,6 +1,6 @@
 #pragma once
 #include "../CudaDefines.h"
-#include "ResultBuffer.h"
+#include "LightDataBuffer.h"
 
 #include <Optix/optix.h>
 #include <Cuda/cuda/helpers.h>
@@ -18,7 +18,7 @@ namespace WaveFront
             m_Direction(make_float3(0.f, 0.f, 0.f)),
             m_MaxDistance(0.f),
             m_PotentialRadiance(make_float3(0.f, 0.f, 0.f)),
-            m_OutputChannelIndex(ResultBuffer::OutputChannel::DIRECT)
+            m_OutputChannel(LightChannel::DIRECT)
         {}
 
         CPU_GPU ShadowRayData(
@@ -26,13 +26,13 @@ namespace WaveFront
             const float3& a_Direction,
             const float& a_MaxDistance,
             const float3& a_PotentialRadiance,
-            ResultBuffer::OutputChannel a_OutputChannelIndex)
+            LightChannel a_OutputChannel)
             :
             m_Origin(a_Origin),
             m_Direction(a_Direction),
             m_MaxDistance(a_MaxDistance),
             m_PotentialRadiance(a_PotentialRadiance),
-            m_OutputChannelIndex(a_OutputChannelIndex)
+            m_OutputChannel(a_OutputChannel)
         {}
 
         GPU_ONLY INLINE bool IsValidRay() const
@@ -46,12 +46,14 @@ namespace WaveFront
 
         }
 
-        //Read only
+
+
+        unsigned int m_PixelIndex;
         float3 m_Origin;
         float3 m_Direction;
         float m_MaxDistance;
         float3 m_PotentialRadiance;
-        ResultBuffer::OutputChannel m_OutputChannelIndex;
+        LightChannel m_OutputChannel;
 
     };
 

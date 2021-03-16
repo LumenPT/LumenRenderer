@@ -7,9 +7,9 @@
 
 #ifdef WAVEFRONT
 
-#include "Framework/WaveFrontRenderer.h"
+#include "Framework/WaveFrontRenderer2WithAVengeance.h"
 
-using LumenPT = WaveFrontRenderer;
+using LumenPT = WaveFront::WaveFrontRenderer2WithAVengeance;
 
 #else
 

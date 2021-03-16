@@ -81,7 +81,7 @@ public:
 	virtual std::shared_ptr<Lumen::ILumenScene> CreateScene(SceneData a_SceneData);
 	virtual std::shared_ptr<Lumen::ILumenVolume> CreateVolume(const std::string& a_FilePath) = 0;
 
-	virtual unsigned int TraceFrame();	//scene argument may be redundant... or not 
+	virtual unsigned int TraceFrame(std::shared_ptr<Lumen::ILumenScene>& a_Scene);	//scene argument may be redundant... or not 
 
 	std::shared_ptr<Lumen::ILumenScene> m_Scene;
 
