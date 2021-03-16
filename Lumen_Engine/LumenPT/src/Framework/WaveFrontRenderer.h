@@ -1,5 +1,5 @@
 #pragma once
-#if defined(WAVEFRONT)
+#if defined(WAVEFRONTOLD)
 #include "ShaderBindingTableRecord.h"
 #include "MemoryBuffer.h"
 #include "Camera.h"
