@@ -157,7 +157,7 @@ __device__ __forceinline__ void ReSTIRRayGen()
 
 
 extern "C"
-__global__ void __raygen__WaveFrontRG()
+__global__ __forceinline__ void __raygen__WaveFrontRG()
 {
 
 	switch (launchParams.m_TraceType)
@@ -178,8 +178,8 @@ __global__ void __raygen__WaveFrontRG()
 }
 
 
-
-__global__ void __miss__WaveFrontMS()
+extern "C"
+__global__ __forceinline__ void __miss__WaveFrontMS()
 {
 
     /*switch (launchParams.m_TraceType)
@@ -198,8 +198,8 @@ __global__ void __miss__WaveFrontMS()
 }
 
 
-
-__global__ void __anyhit__WaveFrontAH()
+extern "C"
+__global__ __forceinline__ void __anyhit__WaveFrontAH()
 {
     switch (launchParams.m_TraceType)
     {
@@ -216,8 +216,8 @@ __global__ void __anyhit__WaveFrontAH()
 }
 
 
-
-__global__ void __closesthit__WaveFrontCH()
+extern "C"
+__global__ __forceinline__ void __closesthit__WaveFrontCH()
 {
     switch (launchParams.m_TraceType)
     {

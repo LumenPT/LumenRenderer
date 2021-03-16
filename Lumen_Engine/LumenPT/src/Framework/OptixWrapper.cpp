@@ -136,6 +136,9 @@ bool OptixWrapper::Initialize(const InitializationData& a_InitializationData)
 
     bool success = true;
 
+    //Create SBT instance.
+    m_SBTGenerator = std::make_unique<ShaderBindingTableGenerator>();
+
     success &= InitializeContext(a_InitializationData.m_CUDAContext);
     success &= CreatePipeline(a_InitializationData.m_ProgramData);
 
