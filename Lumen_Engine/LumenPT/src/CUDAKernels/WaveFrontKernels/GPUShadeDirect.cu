@@ -67,11 +67,12 @@ CPU_ON_GPU void ShadeDirect(
             sRayOrigin = sRayOrigin + (sRayDir * 0.001f);
 
             ShadowRayData shadowRay(
+                currIntersection.m_PixelIndex,
                 sRayOrigin,
                 sRayDir,
-                0.11f,
+                0.11f, //TODO: add max distance.
                 potRadiance,    // light contribution value at intersection point that will reflect in the direction of the incoming ray (intersection ray).
-                ResultBuffer::OutputChannel::DIRECT
+                LightChannel::DIRECT
             );
 
             a_ShadowRays->SetShadowRay(shadowRay, a_ResolutionAndDepth.z, i, 0 /*Ray index is 0 as there is only one ray per pixel*/);

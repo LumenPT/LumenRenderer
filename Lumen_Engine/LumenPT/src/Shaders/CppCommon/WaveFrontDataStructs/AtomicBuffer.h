@@ -3,7 +3,6 @@
 #include <Cuda/cuda/helpers.h>
 #include <cassert>
 #include "cuda_runtime_api.h"
-#include "cuda/device_atomic_functions.h"
 
 namespace WaveFront
 {
@@ -21,7 +20,7 @@ public:
     GPU_ONLY void Add(T* a_Data)
     {
         //Add at index - 1 because the counter gives the total size, which starts at 1. 
-        const unsigned index = atomicAdd(counter, 1);
+        const unsigned index = atomicAdd(&counter, 1);
         data[index - 1] = *a_Data;
     }
 

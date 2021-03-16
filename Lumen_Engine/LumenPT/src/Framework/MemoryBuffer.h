@@ -35,8 +35,7 @@ public:
     template<typename PointerType = void>
     PointerType* GetDevicePtr() const { return static_cast<PointerType*>(m_DevPtr); }
 
-    template<typename PointerType = void>
-    PointerType* GetDevicePtr(size_t a_Offset) const { return static_cast<PointerType*>(m_DevPtr + a_Offset); }
+    
 
     unsigned long long GetCUDAPtr() const;
 

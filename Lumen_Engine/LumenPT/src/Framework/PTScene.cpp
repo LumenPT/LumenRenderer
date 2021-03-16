@@ -109,7 +109,7 @@ void PTScene::UpdateSceneAccelerationStructure()
         }
 
         m_AccelerationStructureDirty = false;
-        m_SceneAccelerationStructure = m_Services.m_Renderer->BuildInstanceAccelerationStructure(instances);
+        m_SceneAccelerationStructure = m_Services.m_OptixWrapper->BuildInstanceAccelerationStructure(instances);
     }
 
 }

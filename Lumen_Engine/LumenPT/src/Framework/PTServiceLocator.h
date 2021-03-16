@@ -1,17 +1,23 @@
 #pragma once
 
+#ifdef  WAVEFRONT
+namespace WaveFront
+{
+    class WaveFrontRenderer2WithAVengeance;
+    class OptixWrapper;
+}
+#endif
+
 struct PTServiceLocator
 {
 
 #ifdef  WAVEFRONT
-    class WaveFrontRenderer2WithAVengeance* m_Renderer;
+    WaveFront::WaveFrontRenderer2WithAVengeance* m_Renderer;
 #else
     class OptiXRenderer* m_Renderer;
 #endif
 
-    class ShaderBindingTableGenerator* m_SBTGenerator;
-
     class SceneDataTable* m_SceneDataTable;
 
-    class OptixWrapper* m_OptixWrapper;
+    WaveFront::OptixWrapper* m_OptixWrapper;
 };

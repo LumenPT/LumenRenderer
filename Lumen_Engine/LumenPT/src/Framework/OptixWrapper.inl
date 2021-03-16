@@ -2,10 +2,8 @@
 #include "OptixWrapper.h"
 #include "MemoryBuffer.h"
 
-using namespace WaveFront;
-
 template <typename VertexType, typename IndexType>
-std::unique_ptr<AccelerationStructure> OptixWrapper::BuildGeometryAccelerationStructure(
+std::unique_ptr<AccelerationStructure> WaveFront::OptixWrapper::BuildGeometryAccelerationStructure(
     std::vector<VertexType> a_Vertices,
     size_t a_VertexOffset, std::vector<IndexType> a_Indices, size_t a_IndexOffset) const
 {

@@ -35,7 +35,7 @@ CPU_ON_GPU void GeneratePrimaryRay(
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     int stride = blockDim.x * gridDim.x;
 
-    for (int i = index; i < a_NumRays; i += stride)
+    for (unsigned int i = index; i < a_NumRays; i += stride)
     {
         //Convert the index into the screen dimensions.
         const int screenY = i / a_Dimensions.x;
@@ -53,7 +53,7 @@ CPU_ON_GPU void GeneratePrimaryRay(
         direction.y = -(direction.y * 2.0f - 1.0f);
         direction = normalize(direction.x * a_U + direction.y * a_V + a_W);
 
-        IntersectionRayData ray{ origin, direction, make_float3(1.f, 1.f, 1.f) };
+        IntersectionRayData ray{i, origin, direction, make_float3(1.f, 1.f, 1.f) };
         a_Buffer->Set(i, &ray); //Set because primary rays are ALWAYS a ray per pixel. No need to do atomic indexing. The atomic counter is manually set later.
     }
 }

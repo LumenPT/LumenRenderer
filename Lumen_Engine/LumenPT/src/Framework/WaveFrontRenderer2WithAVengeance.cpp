@@ -1,7 +1,5 @@
-#include "../Shaders/CppCommon/LumenPTConsts.h"
 #if defined(WAVEFRONT)
 
-#include "../Shaders/CppCommon/WaveFrontDataStructs.h"
 #include "WaveFrontRenderer2WithAVengeance.h"
 #include "WaveFrontRenderer.h"
 #include "PTPrimitive.h"
@@ -13,10 +11,14 @@
 #include "Material.h"
 #include "MemoryBuffer.h"
 #include "OutputBuffer.h"
+#include "SceneDataTable.h"
 #include "../CUDAKernels/WaveFrontKernels.cuh"
+#include "../Shaders/CppCommon/LumenPTConsts.h"
+#include "../Shaders/CppCommon/WaveFrontDataStructs.h"
+
+#include <Optix/optix_function_table_definition.h>
 #include <filesystem>
 #include <glm/gtx/compatibility.hpp>
-#include "SceneDataTable.h"
 
 namespace WaveFront
 {
@@ -75,18 +77,26 @@ namespace WaveFront
         optixInitData.m_CUDAContext = m_CUDAContext;
         optixInitData.m_ProgramData.m_ProgramPath = LumenPTConsts::gs_ShaderPathBase + "WaveFrontShaders.ptx";;
         optixInitData.m_ProgramData.m_ProgramLaunchParamName = "launchParams";
-        optixInitData.m_ProgramData.m_ProgramRayGenFuncName = "__raygen__RG";
-        optixInitData.m_ProgramData.m_ProgramMissFuncName = "__miss__MS";
-        optixInitData.m_ProgramData.m_ProgramAnyHitFuncName = "__anyhit__AH";
-        optixInitData.m_ProgramData.m_ProgramClosestHitFuncName = "__closesthit__CH";
+        optixInitData.m_ProgramData.m_ProgramRayGenFuncName = "__raygen__WaveFrontRG";
+        optixInitData.m_ProgramData.m_ProgramMissFuncName = "__miss__WaveFrontMS";
+        optixInitData.m_ProgramData.m_ProgramAnyHitFuncName = "__anyhit__WaveFrontAH";
+        optixInitData.m_ProgramData.m_ProgramClosestHitFuncName = "__closesthit__WaveFrontCH";
         optixInitData.m_ProgramData.m_MaxNumHitResultAttributes = 2;
         optixInitData.m_ProgramData.m_MaxNumPayloads = 2;
 
         m_OptixSystem = std::make_unique<OptixWrapper>(optixInitData);
 
+        //Set the service locator's pointer to the OptixWrapper.
+        m_ServiceLocator.m_OptixWrapper = m_OptixSystem.get();
+
         //Set the service locator pointer to point to the m'table.
         m_Table = std::make_unique<SceneDataTable>();
         m_ServiceLocator.m_SceneDataTable = m_Table.get();
+
+        m_ServiceLocator.m_Renderer = this;
+
+        
+
     }
 
     std::unique_ptr<MemoryBuffer> WaveFrontRenderer2WithAVengeance::InterleaveVertexData(const PrimitiveData& a_MeshData) const

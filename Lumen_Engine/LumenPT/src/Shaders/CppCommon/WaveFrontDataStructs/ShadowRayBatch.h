@@ -14,25 +14,28 @@ namespace WaveFront
 
         CPU_GPU ShadowRayData()
             :
-            m_Origin(make_float3(0.f, 0.f, 0.f)),
-            m_Direction(make_float3(0.f, 0.f, 0.f)),
-            m_MaxDistance(0.f),
-            m_PotentialRadiance(make_float3(0.f, 0.f, 0.f)),
-            m_OutputChannel(LightChannel::DIRECT)
+        m_PixelIndex(0),
+        m_Origin(make_float3(0.f, 0.f, 0.f)),
+        m_Direction(make_float3(0.f, 0.f, 0.f)),
+        m_MaxDistance(0.f),
+        m_PotentialRadiance(make_float3(0.f, 0.f, 0.f)),
+        m_OutputChannel(LightChannel::DIRECT)
         {}
 
         CPU_GPU ShadowRayData(
+            unsigned int a_PixelIndex,
             const float3& a_Origin,
             const float3& a_Direction,
             const float& a_MaxDistance,
             const float3& a_PotentialRadiance,
             LightChannel a_OutputChannel)
             :
-            m_Origin(a_Origin),
-            m_Direction(a_Direction),
-            m_MaxDistance(a_MaxDistance),
-            m_PotentialRadiance(a_PotentialRadiance),
-            m_OutputChannel(a_OutputChannel)
+        m_PixelIndex(a_PixelIndex),
+        m_Origin(a_Origin),
+        m_Direction(a_Direction),
+        m_MaxDistance(a_MaxDistance),
+        m_PotentialRadiance(a_PotentialRadiance),
+        m_OutputChannel(a_OutputChannel)
         {}
 
         GPU_ONLY INLINE bool IsValidRay() const

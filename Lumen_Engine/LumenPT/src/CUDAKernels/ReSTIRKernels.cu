@@ -602,7 +602,7 @@ __global__ void GenerateWaveFrontShadowRaysInternal(Reservoir* a_Reservoirs, Wav
 
                 //TODO ensure no shadow acne.
                 //TODO: Pass pixel index to shadow ray data.
-                auto data = WaveFront::ShadowRayData{ pixel->m_Position, toLightDir, l - 0.005f, contribution, WaveFront::ResultBuffer::OutputChannel::DIRECT, pixel->m_Index};
+                auto data = WaveFront::ShadowRayData{ pixel->m_Index, pixel->m_Position, toLightDir, l - 0.005f, contribution, WaveFront::LightChannel::DIRECT};
                 a_AtomicBuffer->Add(&data);
             }
         }

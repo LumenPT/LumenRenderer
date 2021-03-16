@@ -39,7 +39,7 @@ CPU_ON_GPU void ShadeIndirect(
         float3 totalLightTransport = russianRouletteWeight * ray.m_Contribution * brdf;  //Total amount of light that will end up in the camera through this path.
 
         //Add to the output buffer.
-        a_Output->SetRay({ pos, dir, totalLightTransport }, i, 0);
+        a_Output->SetRay({intersection.m_PixelIndex, pos, dir, totalLightTransport }, i, 0);
     }
 
 }

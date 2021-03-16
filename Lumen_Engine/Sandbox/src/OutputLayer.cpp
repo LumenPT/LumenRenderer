@@ -85,7 +85,18 @@ OutputLayer::OutputLayer()
 //#endif
 
 #ifdef WAVEFRONT
+
 	m_Renderer = std::make_unique<WaveFront::WaveFrontRenderer2WithAVengeance>();
+
+	WaveFront::WaveFrontSettings settings{};
+	settings.depth = 3;
+	settings.minIntersectionT = 0.1f;
+	settings.maxIntersectionT = 5000.f;
+	settings.renderResolution = { 800, 600 };
+	settings.outputResolution = { 800, 600 };
+
+	static_cast<WaveFront::WaveFrontRenderer2WithAVengeance*>(m_Renderer.get())->Init(settings);
+
 #else
 	m_Renderer = std::make_unique<OptiXRenderer>(init);
 #endif

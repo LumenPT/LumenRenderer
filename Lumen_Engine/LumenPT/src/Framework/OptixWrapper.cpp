@@ -220,8 +220,8 @@ bool OptixWrapper::CreatePipeline(
 
     OptixProgramGroupDesc hitGroupDesc = {};
     hitGroupDesc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-    hitGroupDesc.hitgroup.entryFunctionNameAH = a_AnyHitFuncName.c_str();
-    hitGroupDesc.hitgroup.entryFunctionNameCH = a_ClosestHitFuncName.c_str();
+    hitGroupDesc.hitgroup.entryFunctionNameAH = (a_AnyHitFuncName.length() > 0) ? a_AnyHitFuncName.c_str() : nullptr;
+    hitGroupDesc.hitgroup.entryFunctionNameCH = (a_ClosestHitFuncName.length() > 0) ? a_ClosestHitFuncName.c_str() : nullptr;
     hitGroupDesc.hitgroup.moduleAH = a_Module;
     hitGroupDesc.hitgroup.moduleCH = a_Module;
 

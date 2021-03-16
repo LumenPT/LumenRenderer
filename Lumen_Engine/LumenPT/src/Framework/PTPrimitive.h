@@ -2,6 +2,7 @@
 #include "Renderer/ILumenResources.h"
 #include "ShaderBindingTableRecord.h"
 #include "SceneDataTableEntry.h"
+#include "AccelerationStructure.h"
 
 #include "../../src/Shaders/CppCommon/ModelStructs.h"
 
@@ -10,7 +11,6 @@
 #include <memory>
 
 class MemoryBuffer;
-class AccelerationStructure;
 
 class PTPrimitive : public Lumen::ILumenPrimitive
 {

@@ -1,19 +1,17 @@
 #pragma once
-
-#include <string>
-#include <memory>
-
-#include <nanovdb/NanoVDB.h>
-#include <nanovdb/util/IO.h>
-#include "nanovdb/util/CudaDeviceBuffer.h"
-
+#include "SceneDataTableEntry.h"
+#include "AccelerationStructure.h"
 #include "ShaderBindingTableRecord.h"
 #include "../../src/Shaders/CppCommon/VolumeStructs.h"
 #include "../../Lumen/src/Lumen/Renderer/ILumenResources.h"
 #include "ModelLoading/ILumenScene.h"
-#include "SceneDataTableEntry.h"
 
-class AccelerationStructure;
+#include <nanovdb/util/CudaDeviceBuffer.h>
+#include <nanovdb/NanoVDB.h>
+#include <nanovdb/util/IO.h>
+#include <string>
+#include <memory>
+
 struct PTServiceLocator;
 
 class PTVolume : public Lumen::ILumenVolume
