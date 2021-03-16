@@ -2,16 +2,16 @@
 
 #include "Lumen/Layer.h"
 
-
 #include <cstdint>
-
 
 class Camera;
 
+class LumenRenderer;
+
 #ifdef WAVEFRONT
 
-class WaveFrontRenderer;
-using LumenPT = WaveFrontRenderer;
+//class WaveFrontRenderer;
+//using LumenPT = WaveFrontRenderer;
 
 #else
 
@@ -38,18 +38,17 @@ public:
 
     void OnImGuiRender() override;
 
-    LumenPT* GetPipeline() { return m_LumenPT.get(); };
+    //LumenPT* GetPipeline() { return m_LumenPT.get(); };
+    LumenRenderer* GetPipeline() { return m_Renderer.get(); };
 
 private:
 
     void InitializeScenePresets();
     void HandleCameraInput(Camera& a_Camera);
-
     void HandleSceneInput();
-
     void ImGuiCameraSettings();
-
-    std::unique_ptr<LumenPT> m_LumenPT;
+    std::unique_ptr<LumenRenderer> m_Renderer;
+    //std::unique_ptr<LumenPT> m_LumenPT;
 
     uint32_t m_Program;
     

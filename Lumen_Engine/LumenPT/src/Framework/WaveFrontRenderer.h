@@ -2,7 +2,7 @@
 #if defined(WAVEFRONT)
 #include "ShaderBindingTableRecord.h"
 #include "MemoryBuffer.h"
-#include "Camera.h"
+//#include "Camera.h"
 #include "PTServiceLocator.h"
 #include "../Shaders/CppCommon/WaveFrontDataStructs.h"
 
@@ -33,7 +33,7 @@ class WaveFrontRenderer : public LumenRenderer
 {
 public:
 
-    struct InitializationData
+    /*struct InitializationData
     {
 
         uint8_t m_MaxDepth;
@@ -43,7 +43,7 @@ public:
         uint2 m_RenderResolution;
         uint2 m_OutputResolution;
 
-    };
+    };*/
 
     WaveFrontRenderer(const InitializationData& a_InitializationData);
     ~WaveFrontRenderer();
@@ -67,9 +67,10 @@ public:
     std::shared_ptr<Lumen::ILumenVolume> LumenRenderer::CreateVolume(const std::string& a_FilePath) override;
    
 
-    GLuint TraceFrame();
-
-    Camera m_Camera;
+    //GLuint TraceFrame();
+    unsigned int TraceFrame() override;
+	
+    //Camera m_Camera;
 
     Lumen::Transform m_TestTransform;
 

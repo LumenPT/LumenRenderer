@@ -3,8 +3,6 @@
 #include <glm/glm.hpp>
 #include <glm/gtx/quaternion.hpp>
 
-class float3;
-
 //#include "Lumen.h"
 
 class Camera
@@ -31,7 +29,6 @@ public:
 	float GetAspectRatio() { return m_AspectRatio; }
 	
 	void GetVectorData(glm::vec3& a_Eye, glm::vec3& a_U, glm::vec3& a_V, glm::vec3& a_W);
-	void GetVectorData(float3& a_Eye, float3& a_U, float3& a_V, float3& a_W);
 
 private:
 	void UpdateValues();

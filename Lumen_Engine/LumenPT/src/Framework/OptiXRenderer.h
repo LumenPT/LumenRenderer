@@ -32,10 +32,10 @@ class OptiXRenderer : public LumenRenderer
 {
 public:
 
-    struct InitializationData
+    /*struct InitializationData
     {
 
-    };
+    };*/
 
     OptiXRenderer(const InitializationData& a_InitializationData);
     ~OptiXRenderer();
