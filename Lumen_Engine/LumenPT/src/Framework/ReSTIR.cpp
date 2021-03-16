@@ -31,14 +31,6 @@ CPU_ONLY void ReSTIR::Initialize(const ReSTIRSettings& a_Settings)
 		m_ShadowRays.Resize(size);
 	}
 
-	//Pixel data caching
-	{
-		const size_t numPixels = m_Settings.width * m_Settings.height;
-		const size_t size = numPixels * sizeof(PixelData);
-		m_Pixels[0].Resize(size);
-		m_Pixels[1].Resize(size);
-	}
-
 	//Reservoirs
 	{
 		//Reserve enough memory for both the front and back buffer to contain all reservoirs.
@@ -69,12 +61,13 @@ CPU_ONLY void ReSTIR::Initialize(const ReSTIRSettings& a_Settings)
 }
 
 CPU_ONLY void ReSTIR::Run(
-	const WaveFront::IntersectionData* const a_CurrentIntersections,
-	const WaveFront::RayData* const a_RayBuffer,
+	WaveFront::SurfaceData* a_CurrentPixelData,
+	WaveFront::SurfaceData* a_PreviousPixelData,
 	const std::vector<WaveFront::TriangleLight>& a_Lights,
 	const float3 a_CameraPosition,
 	const std::uint32_t a_Seed,
-	const OptixTraversableHandle a_OptixSceneHandle
+	const OptixTraversableHandle a_OptixSceneHandle,
+	WaveFront::AtomicBuffer<WaveFront::ShadowRayData>* a_WaveFrontShadowRayBuffer
 )
 {
 	assert(m_SwapDirtyFlag && "SwapBuffers has to be called once per frame for ReSTIR to properly work.");
@@ -113,21 +106,17 @@ CPU_ONLY void ReSTIR::Run(
 		FillLightBags(m_Settings.numLightBags, static_cast<CDF*>(m_Cdf.GetDevicePtr()), static_cast<LightBagEntry*>(m_LightBags.GetDevicePtr()), static_cast<WaveFront::TriangleLight*>(m_Lights.GetDevicePtr()), seed);
 	}
 
-	//Pointers to the pixel data buffers.
-	PixelData* currentPixelData = m_Pixels[currentIndex].GetDevicePtr<PixelData>();
-	PixelData* temporalPixelData = m_Pixels[temporalIndex].GetDevicePtr<PixelData>();
-
 	/*
 	 * Pick primary samples in parallel. Store the samples in the reservoirs.
 	 */
 	seed = WangHash(seed);
-	PickPrimarySamples(a_RayBuffer, a_CurrentIntersections, static_cast<LightBagEntry*>(m_LightBags.GetDevicePtr()), static_cast<Reservoir*>(m_Reservoirs->GetDevicePtr()), m_Settings, currentPixelData, seed);
+	PickPrimarySamples(static_cast<LightBagEntry*>(m_LightBags.GetDevicePtr()), static_cast<Reservoir*>(m_Reservoirs->GetDevicePtr()), m_Settings, a_CurrentPixelData, seed);
 
 	/*
 	 * Generate shadow rays for each reservoir and resolve them.
 	 * If a shadow ray is occluded, the reservoirs weight is set to 0.
 	 */
-	const int numRaysGenerated = GenerateReSTIRShadowRays(&m_Atomics, static_cast<Reservoir*>(m_Reservoirs[m_SwapChainIndex].GetDevicePtr()), m_ShadowRays.GetDevicePtr<RestirShadowRay>(), currentPixelData);
+	const int numRaysGenerated = GenerateReSTIRShadowRays(&m_Atomics, static_cast<Reservoir*>(m_Reservoirs[m_SwapChainIndex].GetDevicePtr()), m_ShadowRays.GetDevicePtr<RestirShadowRay>(), a_CurrentPixelData);
 
 	//Parameters for optix launch.
 	ReSTIROptixParameters params;
@@ -149,8 +138,8 @@ CPU_ONLY void ReSTIR::Run(
 		TemporalNeighbourSampling(
 			m_Reservoirs[currentIndex].GetDevicePtr<Reservoir>(),
 			m_Reservoirs[temporalIndex].GetDevicePtr<Reservoir>(),
-			currentPixelData,
-			temporalPixelData,
+			a_CurrentPixelData,
+			a_PreviousPixelData,
 			seed
 		);
 	}
@@ -164,20 +153,15 @@ CPU_ONLY void ReSTIR::Run(
 		SpatialNeighbourSampling(
 			static_cast<Reservoir*>(m_Reservoirs[currentIndex].GetDevicePtr()),
 			static_cast<Reservoir*>(m_Reservoirs[2].GetDevicePtr()), 
-			currentPixelData,
+			a_CurrentPixelData,
 			seed
 		);
 	}
 
-	//TODO: Get the atomic index from WaveFront as well as the shadow ray buffer.
-	MemoryBuffer* atomic = nullptr;
-	WaveFront::ShadowRayData* wfShadowRays = nullptr;
-
 	GenerateWaveFrontShadowRays(
 		static_cast<Reservoir*>(m_Reservoirs[currentIndex].GetDevicePtr()),
-		currentPixelData,
-		atomic,
-		wfShadowRays
+		a_CurrentPixelData,
+		a_WaveFrontShadowRayBuffer
 	);
 
 	//Ensure that swap buffers is called.

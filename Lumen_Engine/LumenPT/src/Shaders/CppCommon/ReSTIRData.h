@@ -64,19 +64,6 @@ struct ReSTIRSettings
     static constexpr bool enableTemporal = true;
 };
 
-//Data about a pixels world position.
-struct PixelData
-{
-    int index;                      //The index of this pixel.
-    float3 directionIncoming;       //The direction from which this pixel was hit.
-    float3 worldPosition;           //The world position of this pixel.
-    float3 worldNormal;             //The surface normal of this pixel.
-    float3 diffuse;                 //The diffuse color of this pixels material.
-    float metallic;                 //The metallic factor of this pixel.
-    float roughness;                //The roughness factor of this pixel.
-    float depth;                    //The depth along the incoming ray at which the intersection happened.
-};
-
 /*
  * A visibility ray used by ReSTIR to determine if a light sample is occluded or not.
  */
@@ -102,8 +89,6 @@ struct LightSample
     float3 unshadowedPathContribution;       //Contribution with geometry and BSDF taken into account.
     float solidAnglePdf;                    //solid angle PDF which is used to weight this samples importance.
 };
-
-
 
 /*
  * Reservoirs contain a weight and chosen sample.
