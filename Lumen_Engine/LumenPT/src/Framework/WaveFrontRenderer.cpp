@@ -378,7 +378,7 @@ void WaveFrontRenderer::SetupInitialBufferIndices()
 
 
 
-GLuint WaveFrontRenderer::TraceFrame()
+unsigned int WaveFrontRenderer::TraceFrame()
 {
 
     CHECKLASTCUDAERROR;
@@ -391,8 +391,8 @@ GLuint WaveFrontRenderer::TraceFrame()
 
     //Generate Camera rays using CUDA kernel.
     float3 eye, u, v, w;
-    m_Camera.SetAspectRatio(static_cast<float>(m_RenderResolution.x) / static_cast<float>(m_RenderResolution.y));
-    m_Camera.GetVectorData(eye, u, v, w);
+    m_Scene->m_Camera->SetAspectRatio(static_cast<float>(m_RenderResolution.x) / static_cast<float>(m_RenderResolution.y));
+    m_Scene->m_Camera->GetVectorData(eye, u, v, w);
     const WaveFront::PrimRayGenLaunchParameters::DeviceCameraData cameraData(eye, u, v, w);
 
     //Get new Ray Batch to fill with Primary Rays (Either first or last ray batch, opposite of current PrimRaysPrevFrame batch)
