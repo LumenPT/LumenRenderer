@@ -41,9 +41,9 @@ __global__ void FillLightBagsInternal(unsigned a_NumLightBags, CDF* a_Cdf, Light
 /*
  * Prick primary lights and apply reservoir sampling.
  */
-__host__ void PickPrimarySamples(const WaveFront::RayData* const a_RayData, const WaveFront::IntersectionData* const a_IntersectionData, const LightBagEntry* const a_LightBags, Reservoir* a_Reservoirs, const ReSTIRSettings& a_Settings, PixelData* a_PixelData, const std::uint32_t a_Seed);
+__host__ void PickPrimarySamples(const LightBagEntry* const a_LightBags, Reservoir* a_Reservoirs, const ReSTIRSettings& a_Settings, WaveFront::SurfaceData* a_PixelData, const std::uint32_t a_Seed);
 
-__global__ void PickPrimarySamplesInternal(const WaveFront::RayData* const a_RayData, const WaveFront::IntersectionData* const a_IntersectionData, const LightBagEntry* const a_LightBags, Reservoir* a_Reservoirs, const ReSTIRSettings& a_Settings, PixelData* a_PixelData, const std::uint32_t a_Seed);
+__global__ void PickPrimarySamplesInternal(const LightBagEntry* const a_LightBags, Reservoir* a_Reservoirs, const ReSTIRSettings& a_Settings, WaveFront::SurfaceData* a_PixelData, const std::uint32_t a_Seed);
 
 /*
  * Generate shadow rays for the given reservoirs.
@@ -51,10 +51,10 @@ __global__ void PickPrimarySamplesInternal(const WaveFront::RayData* const a_Ray
  *
  * The amount of shadow rays that was generated will be returned as an int.
  */
-__host__ int GenerateReSTIRShadowRays(MemoryBuffer* a_AtomicCounter, Reservoir* a_Reservoirs, RestirShadowRay* a_ShadowRays, PixelData* a_PixelData);
+__host__ int GenerateReSTIRShadowRays(MemoryBuffer* a_AtomicCounter, Reservoir* a_Reservoirs, RestirShadowRay* a_ShadowRays, WaveFront::SurfaceData* a_PixelData);
 
 //Generate a shadow ray based on the thread ID.
-__global__ void GenerateShadowRay(int* a_AtomicCounter, Reservoir* a_Reservoirs, RestirShadowRay* a_ShadowRays, PixelData* a_PixelData);
+__global__ void GenerateShadowRay(int* a_AtomicCounter, Reservoir* a_Reservoirs, RestirShadowRay* a_ShadowRays, WaveFront::SurfaceData* a_PixelData);
 
 /*
  * Resample spatial neighbours with an intermediate output buffer.
@@ -63,14 +63,14 @@ __global__ void GenerateShadowRay(int* a_AtomicCounter, Reservoir* a_Reservoirs,
 __host__ void SpatialNeighbourSampling(
     Reservoir* a_Reservoirs,
     Reservoir* a_SwapBuffer,
-    PixelData* a_PixelData,
+    WaveFront::SurfaceData* a_PixelData,
     const std::uint32_t a_Seed
 );
 
 __global__ void SpatialNeighbourSamplingInternal(
     Reservoir* a_Reservoirs,
     Reservoir* a_SwapBuffer,
-    PixelData* a_PixelData,
+    WaveFront::SurfaceData* a_PixelData,
     const std::uint32_t a_Seed
 );
 
@@ -80,16 +80,16 @@ __global__ void SpatialNeighbourSamplingInternal(
 __host__ void TemporalNeighbourSampling(
     Reservoir* a_CurrentReservoirs,
     Reservoir* a_PreviousReservoirs,
-    PixelData* a_CurrentPixelData,
-    PixelData* a_PreviousPixelData,
+    WaveFront::SurfaceData* a_CurrentPixelData,
+    WaveFront::SurfaceData* a_PreviousPixelData,
     const std::uint32_t a_Seed
 );
 
 __global__ void CombineTemporalSamplesInternal(
     Reservoir* a_CurrentReservoirs,
     Reservoir* a_PreviousReservoirs,
-    PixelData* a_CurrentPixelData,
-    PixelData* a_PreviousPixelData,
+    WaveFront::SurfaceData* a_CurrentPixelData,
+    WaveFront::SurfaceData* a_PreviousPixelData,
     const std::uint32_t a_Seed
 );
 
@@ -100,7 +100,7 @@ __global__ void CombineTemporalSamplesInternal(
  * a_Count indicates the amount of pixels to process in a_ToCombine.
  * This runs for every reservoir at a_PixelIndex.
  */
-__device__ void CombineUnbiased(int a_PixelIndex, int a_Count, Reservoir** a_Reservoirs, PixelData** a_ToCombine, const std::uint32_t a_Seed);
+__device__ void CombineUnbiased(int a_PixelIndex, int a_Count, Reservoir** a_Reservoirs, WaveFront::SurfaceData** a_ToCombine, const std::uint32_t a_Seed);
 
 /*
  * Combine multiple reservoirs biased.
@@ -109,7 +109,7 @@ __device__ void CombineUnbiased(int a_PixelIndex, int a_Count, Reservoir** a_Res
  * a_Count indicates the amount of indices to process in a_ToCombineIndices.
  * This runs for every reservoir depth.
  */
-__device__ void CombineBiased(int a_PixelIndex, int a_Count, Reservoir** a_Reservoirs, PixelData** a_ToCombine, const std::uint32_t a_Seed);
+__device__ void CombineBiased(int a_PixelIndex, int a_Count, Reservoir** a_Reservoirs, WaveFront::SurfaceData** a_ToCombine, const std::uint32_t a_Seed);
 
 /*
  * Resample an old light sample.
@@ -117,12 +117,12 @@ __device__ void CombineBiased(int a_PixelIndex, int a_Count, Reservoir** a_Reser
  * The output is then stored in a_Output.
  *
  */
-__device__ void Resample(LightSample* a_Input, const PixelData* a_PixelData, LightSample* a_Output);
+__device__ void Resample(LightSample* a_Input, const WaveFront::SurfaceData* a_PixelData, LightSample* a_Output);
 
 /*
  * Generate shadow rays from the reservoirs after ReSTIR runs.
  * Add the shadow rays with scaled-by-weight payload to the wavefront buffer.
  */
-__host__ void GenerateWaveFrontShadowRays(Reservoir* a_Reservoirs, PixelData* a_PixelData, MemoryBuffer* a_Atomic, WaveFront::ShadowRayData* a_ShadowRays);
+__host__ void GenerateWaveFrontShadowRays(Reservoir* a_Reservoirs, WaveFront::SurfaceData* a_PixelData, WaveFront::AtomicBuffer<WaveFront::ShadowRayData>* a_AtomicBuffer);
 
-__global__ void GenerateWaveFrontShadowRaysInternal(Reservoir* a_Reservoirs, PixelData* a_PixelData, int* a_Atomic, WaveFront::ShadowRayData* a_ShadowRays);
+__global__ void GenerateWaveFrontShadowRaysInternal(Reservoir* a_Reservoirs, WaveFront::SurfaceData* a_PixelData, WaveFront::AtomicBuffer<WaveFront::ShadowRayData>* a_AtomicBuffer);
