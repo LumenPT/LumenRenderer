@@ -19,9 +19,10 @@ public:
      */
     GPU_ONLY void Add(T* a_Data)
     {
-        //Add at index - 1 because the counter gives the total size, which starts at 1. 
+        //Add at index - 1 because the counter gives the total size, which starts at 1.
+        //IMPORTANT: atomicAdd returns old value. https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#arithmetic-functions
         const uint32_t index = atomicAdd(&counter, 1);
-        data[index - 1] = *a_Data;
+        data[index] = *a_Data;
     }
 
     /*

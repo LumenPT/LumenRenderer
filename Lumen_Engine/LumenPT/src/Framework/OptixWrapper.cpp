@@ -498,4 +498,7 @@ void OptixWrapper::TraceRays(
         1,
         1));
 
+    cudaDeviceSynchronize();
+    CHECKLASTCUDAERROR;
+
 }

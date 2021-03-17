@@ -157,7 +157,7 @@ __device__ __forceinline__ void ReSTIRRayGen()
 
 
 extern "C"
-__global__ __forceinline__ void __raygen__WaveFrontRG()
+__global__ void __raygen__WaveFrontRG()
 {
 
 	switch (launchParams.m_TraceType)
@@ -168,18 +168,21 @@ __global__ __forceinline__ void __raygen__WaveFrontRG()
         break;
     case WaveFront::RayType::SHADOW_RAY:
         //Shadow rays
-        ShadowRaysRayGen();
+        //ShadowRaysRayGen();
         break;
     case WaveFront::RayType::RESTIR_RAY:
         //Actually Primary rays
-        ReSTIRRayGen();
+        //ReSTIRRayGen();
         break;
 	}
+
+    return;
+
 }
 
 
 extern "C"
-__global__ __forceinline__ void __miss__WaveFrontMS()
+__global__ void __miss__WaveFrontMS()
 {
 
     /*switch (launchParams.m_TraceType)
@@ -195,12 +198,15 @@ __global__ __forceinline__ void __miss__WaveFrontMS()
         break;
     }*/
 
+    return;
+
 }
 
 
 extern "C"
-__global__ __forceinline__ void __anyhit__WaveFrontAH()
+__global__ void __anyhit__WaveFrontAH()
 {
+
     switch (launchParams.m_TraceType)
     {
     case WaveFront::RayType::INTERSECTION_RAY:
@@ -208,17 +214,22 @@ __global__ __forceinline__ void __anyhit__WaveFrontAH()
     case WaveFront::RayType::SHADOW_RAY:
         {
             optixSetPayload_0(1);
+
         }
         break;
     case WaveFront::RayType::RESTIR_RAY:
         break;
     }
+
+    return;
+
 }
 
 
 extern "C"
-__global__ __forceinline__ void __closesthit__WaveFrontCH()
+__global__ void __closesthit__WaveFrontCH()
 {
+
     switch (launchParams.m_TraceType)
     {
     case WaveFront::RayType::INTERSECTION_RAY:
@@ -228,6 +239,7 @@ __global__ __forceinline__ void __closesthit__WaveFrontCH()
             const unsigned int intersectionPtr_Low = optixGetPayload_1();
             WaveFront::IntersectionData* intersection = UnpackPointer<WaveFront::IntersectionData>(intersectionPtr_Up, intersectionPtr_Low);
 
+            ////TODO: Try to fit this into 4 floats and one write.
             intersection->m_IntersectionT = optixGetRayTmax();
             intersection->m_Barycentrics = optixGetTriangleBarycentrics();
             intersection->m_PrimitiveIndex = optixGetPrimitiveIndex();
@@ -235,13 +247,14 @@ __global__ __forceinline__ void __closesthit__WaveFrontCH()
         }    
         break;
     case WaveFront::RayType::SHADOW_RAY:
-        return;
         break;
     case WaveFront::RayType::RESTIR_RAY:
         //Get the reservoir and set its weight to 0 so that it is no longer considered a valid candidate.
         //reSTIRParams.reservoirs[optixGetAttribute_0()].weight = 0.f;
         //optixTerminateRay();
-        return;
         break;
     }
+
+    return;
+
 }

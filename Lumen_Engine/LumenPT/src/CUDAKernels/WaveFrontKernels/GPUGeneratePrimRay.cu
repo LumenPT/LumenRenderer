@@ -58,7 +58,12 @@ CPU_ON_GPU void GeneratePrimaryRay(
     }
 }
 
-CPU_ON_GPU void ExtractSurfaceDataGpu(unsigned a_NumIntersections, AtomicBuffer<IntersectionData>* a_IntersectionData, AtomicBuffer<IntersectionRayData>* a_Rays, SurfaceData* a_OutPut, SceneDataTableAccessor* a_SceneDataTable)
+CPU_ON_GPU void ExtractSurfaceDataGpu(
+    unsigned a_NumIntersections, 
+    AtomicBuffer<IntersectionData>* a_IntersectionData, 
+    AtomicBuffer<IntersectionRayData>* a_Rays, 
+    SurfaceData* a_OutPut, 
+    SceneDataTableAccessor* a_SceneDataTable)
 {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     int stride = blockDim.x * gridDim.x;

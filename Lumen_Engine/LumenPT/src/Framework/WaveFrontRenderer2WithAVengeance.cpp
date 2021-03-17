@@ -31,6 +31,7 @@ namespace WaveFront
         //Init CUDA
         cudaFree(0);
         m_CUDAContext = 0;
+        
 
         //TODO: Ensure shader names match what we put down here.
         OptixWrapper::InitializationData optixInitData;
@@ -48,13 +49,6 @@ namespace WaveFront
 
         //Set the service locator's pointer to the OptixWrapper.
         m_ServiceLocator.m_OptixWrapper = m_OptixSystem.get();
-
-        int value = 5;
-        int readBack = 999;
-        void* ptr = nullptr;
-        auto error = cudaMalloc(&ptr, sizeof(int));
-        auto error2 = cudaMemcpy(ptr, &value, sizeof(int), cudaMemcpyHostToDevice);
-        auto error3 = cudaMemcpy(&readBack, ptr, sizeof(int), cudaMemcpyDeviceToHost);
 
         //Set up the OpenGL output buffer.
         m_OutputBuffer.Resize(m_Settings.outputResolution.x, m_Settings.outputResolution.y);
@@ -75,8 +69,15 @@ namespace WaveFront
         m_Rays.Resize(sizeof(AtomicBuffer<IntersectionRayData>) + sizeof(IntersectionRayData) * numPrimaryRays);
         m_ShadowRays.Resize(sizeof(AtomicBuffer<ShadowRayData>) + sizeof(ShadowRayData) * numShadowRays);
 
+        //Reset Atomic Counters for Intersection and Shadow Rays
+        m_Rays.Write(0);
+        m_ShadowRays.Write(0);
+
         //Initialize the intersection data. This one is the size of numPixels maximum.
         m_IntersectionData.Resize(sizeof(AtomicBuffer<IntersectionData>) + sizeof(IntersectionData) * numPixels);
+
+        //Reset Atomic Counter for Intersection Buffer.
+        m_IntersectionData.Write(0);
 
         //Initialize each surface data buffer.
         for(int i = 0; i < 3; ++i)
@@ -309,12 +310,15 @@ namespace WaveFront
 
         //Set the shadow ray count to 0.
         const unsigned counterDefault = 0;
-        m_ShadowRays.Write(&counterDefault, sizeof(unsigned), 0);
+        m_ShadowRays.Write(counterDefault);
+        m_IntersectionData.Write(counterDefault);
 
         //Retrieve the acceleration structure and scene data table once.
         m_OptixSystem->UpdateSBT();
         auto* sceneDataTableAccessor = m_Table->GetDevicePointer();
         auto accelerationStructure = std::static_pointer_cast<PTScene>(a_Scene)->GetSceneAccelerationStructure();
+         cudaDeviceSynchronize();
+            CHECKLASTCUDAERROR;
 
         //Pass the buffers to the optix shader for shading.
         OptixLaunchParameters rayLaunchParameters;
@@ -341,6 +345,8 @@ namespace WaveFront
         {
             //Tell Optix to resolve the primary rays that have been generated.
             m_OptixSystem->TraceRays(numIntersectionRays, rayLaunchParameters);
+            cudaDeviceSynchronize();
+            CHECKLASTCUDAERROR;
 
             /*
              * Calculate the surface data for this depth.
@@ -348,7 +354,12 @@ namespace WaveFront
             unsigned numIntersections = 0;
             m_IntersectionData.Read(&numIntersections, sizeof(uint32_t), 0);
             const auto surfaceDataBufferIndex = depth == 0 ? currentIndex : 2;   //1 and 2 are used for the first intersection and remembered for temporal use.
-            ExtractSurfaceData(numIntersections, m_IntersectionData.GetDevicePtr<AtomicBuffer<IntersectionData>>(), m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>(), m_SurfaceData[surfaceDataBufferIndex].GetDevicePtr<SurfaceData>(), sceneDataTableAccessor);
+            ExtractSurfaceData(
+                numIntersections, 
+                m_IntersectionData.GetDevicePtr<AtomicBuffer<IntersectionData>>(), 
+                m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>(), 
+                m_SurfaceData[surfaceDataBufferIndex].GetDevicePtr<SurfaceData>(), 
+                sceneDataTableAccessor);
             cudaDeviceSynchronize();
             CHECKLASTCUDAERROR;
 
@@ -384,7 +395,7 @@ namespace WaveFront
             cudaDeviceSynchronize();
             CHECKLASTCUDAERROR;
 
-            m_IntersectionData.Write(&counterDefault, sizeof(uint32_t), 0);
+            m_IntersectionData.Write(counterDefault);
         }
 
         //The amount of shadow rays to trace.
@@ -395,6 +406,8 @@ namespace WaveFront
         {
             //Tell optix to resolve the shadow rays.
             m_OptixSystem->TraceRays(numShadowRays, shadowRayLaunchParameters);
+            cudaDeviceSynchronize();
+            CHECKLASTCUDAERROR;
         }
 
         PostProcessLaunchParameters postProcessLaunchParams(
