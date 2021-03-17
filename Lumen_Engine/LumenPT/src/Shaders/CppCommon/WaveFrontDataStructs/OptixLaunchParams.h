@@ -23,6 +23,8 @@ namespace WaveFront
         AtomicBuffer<IntersectionRayData>* m_IntersectionRayBatch;
         AtomicBuffer<IntersectionData>* m_IntersectionBuffer;
         AtomicBuffer<ShadowRayData>* m_ShadowRayBatch;
+        AtomicBuffer<RestirShadowRay>* m_ReSTIRShadowRayBatch;
+        Reservoir* m_Reservoirs;
         float3* m_ResultBuffer;
         float2 m_MinMaxDistance;
         RayType m_TraceType;

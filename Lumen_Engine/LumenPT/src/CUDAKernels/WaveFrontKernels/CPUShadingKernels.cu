@@ -38,12 +38,6 @@ CPU_ONLY void GeneratePrimaryRays(const PrimRayGenLaunchParameters& a_PrimaryRay
     const int numBlocks = (numRays + blockSize - 1) / blockSize;
 
     GeneratePrimaryRay<<<numBlocks, blockSize>>>(numRays, a_PrimaryRayGenParams.m_PrimaryRays, u, v, w, eye, dimensions, frameCount);
-
-    cudaDeviceSynchronize();
-    CHECKLASTCUDAERROR;
-
-
-
 }
 
 CPU_ONLY void GenerateMotionVectors()
@@ -100,10 +94,6 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
         a_ShadingParams.m_ResolutionAndDepth,
         a_ShadingParams.m_CurrentSurfaceData,
         a_ShadingParams.m_Output);
-
-    cudaDeviceSynchronize();
-    CHECKLASTCUDAERROR;
-
 }
 
 CPU_ONLY void PostProcess(const PostProcessLaunchParameters& a_PostProcessParams)
@@ -155,8 +145,4 @@ CPU_ONLY void PostProcess(const PostProcessLaunchParameters& a_PostProcessParams
         a_PostProcessParams.m_OutputResolution,
         a_PostProcessParams.m_ProcessedOutput,
         a_PostProcessParams.m_FinalOutput);
-
-    cudaDeviceSynchronize();
-    CHECKLASTCUDAERROR;
-
 }

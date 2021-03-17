@@ -7,6 +7,7 @@
 
 
 namespace WaveFront {
+    class OptixWrapper;
     struct IntersectionBuffer;
 }
 
@@ -35,7 +36,8 @@ public:
 	    const float3 a_CameraPosition,
 		const std::uint32_t a_Seed,
 		const OptixTraversableHandle a_OptixSceneHandle,
-		WaveFront::AtomicBuffer<WaveFront::ShadowRayData>* a_WaveFrontShadowRayBuffer
+		WaveFront::AtomicBuffer<WaveFront::ShadowRayData>* a_WaveFrontShadowRayBuffer,
+        WaveFront::OptixWrapper* a_OptixSystem
 	);
 
 	/*

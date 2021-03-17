@@ -15,6 +15,7 @@
 #include "../CUDAKernels/WaveFrontKernels.cuh"
 #include "../Shaders/CppCommon/LumenPTConsts.h"
 #include "../Shaders/CppCommon/WaveFrontDataStructs.h"
+#include "CudaUtilities.h"
 
 #include <Optix/optix_function_table_definition.h>
 #include <filesystem>
@@ -271,6 +272,8 @@ namespace WaveFront
         //Start by clearing the data from the previous frame.
         ResetLightChannels(m_PixelBufferSeparate.GetDevicePtr<float3>(), numPixels, static_cast<unsigned>(LightChannel::NUM_CHANNELS));
         ResetLightChannels(m_PixelBufferCombined.GetDevicePtr<float3>(), numPixels, 1);
+        cudaDeviceSynchronize();
+        CHECKLASTCUDAERROR;
 
         //Generate camera rays.
         glm::vec3 eye, u, v, w;
@@ -287,10 +290,15 @@ namespace WaveFront
         auto rayPtr = m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>();
         const PrimRayGenLaunchParameters primaryRayGenParams(uint2{m_Settings.renderResolution.x, m_Settings.renderResolution.y}, cameraData, rayPtr, 1);   //TODO what is framecount?
         GeneratePrimaryRays(primaryRayGenParams);
+        cudaDeviceSynchronize();
+        CHECKLASTCUDAERROR;
+
         m_Rays.Write(numPixels, 0); //Set the counter to be equal to the amount of rays being shot. This is manual because the atomic is not used yet.
 
         //Clear the surface data that contains information from the second last frame so that it can be reused by this frame.
         cudaMemset(m_SurfaceData[currentIndex].GetDevicePtr(), 0, sizeof(SurfaceData) * numPixels);
+        cudaDeviceSynchronize();
+        CHECKLASTCUDAERROR;
 
         //Set the shadow ray count to 0.
         const unsigned counterDefault = 0;
@@ -322,7 +330,7 @@ namespace WaveFront
         /*
          * Resolve rays and shade at every depth.
          */
-        for(unsigned depth = 0; depth < m_Settings.depth; ++depth)
+        for(unsigned depth = 0; depth < m_Settings.depth && numIntersectionRays > 0; ++depth)
         {
             //Tell Optix to resolve the primary rays that have been generated.
             m_OptixSystem->TraceRays(numIntersectionRays, rayLaunchParameters);
@@ -334,6 +342,8 @@ namespace WaveFront
             m_IntersectionData.Read(&numIntersections, sizeof(unsigned), 0);
             const auto surfaceDataBufferIndex = depth == 0 ? currentIndex : 2;   //1 and 2 are used for the first intersection and remembered for temporal use.
             ExtractSurfaceData(numIntersections, m_IntersectionData.GetDevicePtr<AtomicBuffer<IntersectionData>>(), m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>(), m_SurfaceData[surfaceDataBufferIndex].GetDevicePtr<SurfaceData>(), sceneDataTableAccessor);
+            cudaDeviceSynchronize();
+            CHECKLASTCUDAERROR;
 
             //TODO add ReSTIR instance and run from shading kernel.
 
@@ -351,23 +361,33 @@ namespace WaveFront
                 m_PixelBufferSeparate.GetDevicePtr<float3>()
             );
 
-            Shade(shadingLaunchParams);
-
-            //Reset the atomic counters for the next wave. Also clear the surface data at depth 2 (the one that is overwritten each wave).
-            cudaMemset(m_SurfaceData[2].GetDevicePtr(), 0, sizeof(SurfaceData) * numPixels);
-            m_IntersectionData.Write(&counterDefault, sizeof(unsigned), 0);
+            //Reset the atomic counter.
             m_Rays.Write(&counterDefault, sizeof(unsigned), 0);
+
+            Shade(shadingLaunchParams);
+            cudaDeviceSynchronize();
+            CHECKLASTCUDAERROR;
 
             //Set the number of intersection rays to the size of the ray buffer.
             m_Rays.Read(&numIntersectionRays, sizeof(unsigned int), 0);
+
+            //Reset the atomic counters for the next wave. Also clear the surface data at depth 2 (the one that is overwritten each wave).
+            cudaMemset(m_SurfaceData[2].GetDevicePtr(), 0, sizeof(SurfaceData) * numPixels);
+            cudaDeviceSynchronize();
+            CHECKLASTCUDAERROR;
+
+            m_IntersectionData.Write(&counterDefault, sizeof(unsigned), 0);
         }
 
         //The amount of shadow rays to trace.
         unsigned numShadowRays = 0;
         m_ShadowRays.Read(&numShadowRays, sizeof(unsigned), 0);
 
-        //Tell optix to resolve the shadow rays.
-        m_OptixSystem->TraceRays(numShadowRays, shadowRayLaunchParameters);
+        if(numShadowRays > 0)
+        {
+            //Tell optix to resolve the shadow rays.
+            m_OptixSystem->TraceRays(numShadowRays, shadowRayLaunchParameters);
+        }
 
         PostProcessLaunchParameters postProcessLaunchParams(
             m_Settings.renderResolution,
@@ -379,6 +399,8 @@ namespace WaveFront
 
         //Post processing using CUDA kernel.
         PostProcess(postProcessLaunchParams);
+        cudaDeviceSynchronize();
+        CHECKLASTCUDAERROR;
         
         //Change frame index 0..1
         ++m_FrameIndex;

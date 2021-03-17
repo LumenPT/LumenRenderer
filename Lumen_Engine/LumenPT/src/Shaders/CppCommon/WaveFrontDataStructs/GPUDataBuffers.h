@@ -5,3 +5,4 @@
 #include "LightDataBuffer.h"
 #include "PixelBuffer.h"
 #include "ResultBuffer.h"
+#include "../ReSTIRData.h"

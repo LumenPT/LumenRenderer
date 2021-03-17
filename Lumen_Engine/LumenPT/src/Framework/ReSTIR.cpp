@@ -4,6 +4,7 @@
 #include <cuda_runtime.h>
 
 #include "../CUDAKernels/RandomUtilities.cuh"
+#include "OptixWrapper.h"
 
 
 CPU_ONLY void ReSTIR::Initialize(const ReSTIRSettings& a_Settings)
@@ -67,10 +68,12 @@ CPU_ONLY void ReSTIR::Run(
 	const float3 a_CameraPosition,
 	const std::uint32_t a_Seed,
 	const OptixTraversableHandle a_OptixSceneHandle,
-	WaveFront::AtomicBuffer<WaveFront::ShadowRayData>* a_WaveFrontShadowRayBuffer
+	WaveFront::AtomicBuffer<WaveFront::ShadowRayData>* a_WaveFrontShadowRayBuffer,
+	WaveFront::OptixWrapper* a_OptixSystem
 )
 {
 	assert(m_SwapDirtyFlag && "SwapBuffers has to be called once per frame for ReSTIR to properly work.");
+	assert(a_OptixSystem && "Optix System cannot be nullptr!");
 
 	//Index of the reservoir buffers (current and temporal).
 	auto currentIndex = m_SwapChainIndex;
@@ -119,15 +122,13 @@ CPU_ONLY void ReSTIR::Run(
 	const int numRaysGenerated = GenerateReSTIRShadowRays(&m_Atomics, static_cast<Reservoir*>(m_Reservoirs[m_SwapChainIndex].GetDevicePtr()), m_ShadowRays.GetDevicePtr<RestirShadowRay>(), a_CurrentPixelData);
 
 	//Parameters for optix launch.
-	ReSTIROptixParameters params;
-	params.numRays = numRaysGenerated;
-	params.optixSceneHandle = a_OptixSceneHandle;
-	params.reservoirs = static_cast<Reservoir*>(m_Reservoirs[m_SwapChainIndex].GetDevicePtr());
-	params.shadowRays = m_ShadowRays.GetDevicePtr<RestirShadowRay>();
+	WaveFront::OptixLaunchParameters params;
+	params.m_TraversableHandle = a_OptixSceneHandle;
+	params.m_Reservoirs = static_cast<Reservoir*>(m_Reservoirs[m_SwapChainIndex].GetDevicePtr());
+	params.m_ReSTIRShadowRayBatch = m_ShadowRays.GetDevicePtr<WaveFront::AtomicBuffer<RestirShadowRay>>();
 
-	//TODO: Bind shaders defined in ReSTIRVisibilityShader.cu and then do the optix launch with the above parameters.
-	//Launch optix.
-	//optixLaunch();
+	//Tell Optix to resolve all shadow rays, which sets reservoir weight to 0 when occluded.
+	a_OptixSystem->TraceRays(numRaysGenerated, params);
 
 	/*
      * Temporal sampling where reservoirs are combined with those of the previous frame.
