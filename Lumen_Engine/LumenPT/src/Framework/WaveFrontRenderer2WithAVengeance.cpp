@@ -32,6 +32,30 @@ namespace WaveFront
         cudaFree(0);
         m_CUDAContext = 0;
 
+        //TODO: Ensure shader names match what we put down here.
+        OptixWrapper::InitializationData optixInitData;
+        optixInitData.m_CUDAContext = m_CUDAContext;
+        optixInitData.m_ProgramData.m_ProgramPath = LumenPTConsts::gs_ShaderPathBase + "WaveFrontShaders.ptx";;
+        optixInitData.m_ProgramData.m_ProgramLaunchParamName = "launchParams";
+        optixInitData.m_ProgramData.m_ProgramRayGenFuncName = "__raygen__WaveFrontRG";
+        optixInitData.m_ProgramData.m_ProgramMissFuncName = "__miss__WaveFrontMS";
+        optixInitData.m_ProgramData.m_ProgramAnyHitFuncName = "__anyhit__WaveFrontAH";
+        optixInitData.m_ProgramData.m_ProgramClosestHitFuncName = "__closesthit__WaveFrontCH";
+        optixInitData.m_ProgramData.m_MaxNumHitResultAttributes = 2;
+        optixInitData.m_ProgramData.m_MaxNumPayloads = 2;
+
+        m_OptixSystem = std::make_unique<OptixWrapper>(optixInitData);
+
+        //Set the service locator's pointer to the OptixWrapper.
+        m_ServiceLocator.m_OptixWrapper = m_OptixSystem.get();
+
+        int value = 5;
+        int readBack = 999;
+        void* ptr = nullptr;
+        auto error = cudaMalloc(&ptr, sizeof(int));
+        auto error2 = cudaMemcpy(ptr, &value, sizeof(int), cudaMemcpyHostToDevice);
+        auto error3 = cudaMemcpy(&readBack, ptr, sizeof(int), cudaMemcpyDeviceToHost);
+
         //Set up the OpenGL output buffer.
         m_OutputBuffer.Resize(m_Settings.outputResolution.x, m_Settings.outputResolution.y);
 
@@ -72,23 +96,6 @@ namespace WaveFront
             {{0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}},
             {{0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}} };
         m_TriangleLights.Write(&lights[0], sizeof(TriangleLight) * numLights, 0);
-
-        //TODO: Ensure shader names match what we put down here.
-        OptixWrapper::InitializationData optixInitData;
-        optixInitData.m_CUDAContext = m_CUDAContext;
-        optixInitData.m_ProgramData.m_ProgramPath = LumenPTConsts::gs_ShaderPathBase + "WaveFrontShaders.ptx";;
-        optixInitData.m_ProgramData.m_ProgramLaunchParamName = "launchParams";
-        optixInitData.m_ProgramData.m_ProgramRayGenFuncName = "__raygen__WaveFrontRG";
-        optixInitData.m_ProgramData.m_ProgramMissFuncName = "__miss__WaveFrontMS";
-        optixInitData.m_ProgramData.m_ProgramAnyHitFuncName = "__anyhit__WaveFrontAH";
-        optixInitData.m_ProgramData.m_ProgramClosestHitFuncName = "__closesthit__WaveFrontCH";
-        optixInitData.m_ProgramData.m_MaxNumHitResultAttributes = 2;
-        optixInitData.m_ProgramData.m_MaxNumPayloads = 2;
-
-        m_OptixSystem = std::make_unique<OptixWrapper>(optixInitData);
-
-        //Set the service locator's pointer to the OptixWrapper.
-        m_ServiceLocator.m_OptixWrapper = m_OptixSystem.get();
 
         //Set the service locator pointer to point to the m'table.
         m_Table = std::make_unique<SceneDataTable>();
@@ -267,7 +274,7 @@ namespace WaveFront
         const auto temporalIndex = m_FrameIndex == 1 ? 0 : 1;
 
         //Data needed in the algorithms.
-        const unsigned numPixels = m_Settings.renderResolution.x * m_Settings.renderResolution.y;
+        const uint32_t numPixels = m_Settings.renderResolution.x * m_Settings.renderResolution.y;
 
         //Start by clearing the data from the previous frame.
         ResetLightChannels(m_PixelBufferSeparate.GetDevicePtr<float3>(), numPixels, static_cast<unsigned>(LightChannel::NUM_CHANNELS));
@@ -339,7 +346,7 @@ namespace WaveFront
              * Calculate the surface data for this depth.
              */
             unsigned numIntersections = 0;
-            m_IntersectionData.Read(&numIntersections, sizeof(unsigned), 0);
+            m_IntersectionData.Read(&numIntersections, sizeof(uint32_t), 0);
             const auto surfaceDataBufferIndex = depth == 0 ? currentIndex : 2;   //1 and 2 are used for the first intersection and remembered for temporal use.
             ExtractSurfaceData(numIntersections, m_IntersectionData.GetDevicePtr<AtomicBuffer<IntersectionData>>(), m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>(), m_SurfaceData[surfaceDataBufferIndex].GetDevicePtr<SurfaceData>(), sceneDataTableAccessor);
             cudaDeviceSynchronize();
@@ -362,26 +369,27 @@ namespace WaveFront
             );
 
             //Reset the atomic counter.
-            m_Rays.Write(&counterDefault, sizeof(unsigned), 0);
+            m_Rays.Write(counterDefault);
+            cudaDeviceSynchronize();
 
             Shade(shadingLaunchParams);
             cudaDeviceSynchronize();
             CHECKLASTCUDAERROR;
 
             //Set the number of intersection rays to the size of the ray buffer.
-            m_Rays.Read(&numIntersectionRays, sizeof(unsigned int), 0);
+            m_Rays.Read(&numIntersectionRays, sizeof(uint32_t), 0);
 
             //Reset the atomic counters for the next wave. Also clear the surface data at depth 2 (the one that is overwritten each wave).
             cudaMemset(m_SurfaceData[2].GetDevicePtr(), 0, sizeof(SurfaceData) * numPixels);
             cudaDeviceSynchronize();
             CHECKLASTCUDAERROR;
 
-            m_IntersectionData.Write(&counterDefault, sizeof(unsigned), 0);
+            m_IntersectionData.Write(&counterDefault, sizeof(uint32_t), 0);
         }
 
         //The amount of shadow rays to trace.
         unsigned numShadowRays = 0;
-        m_ShadowRays.Read(&numShadowRays, sizeof(unsigned), 0);
+        m_ShadowRays.Read(&numShadowRays, sizeof(uint32_t), 0);
 
         if(numShadowRays > 0)
         {

@@ -20,7 +20,7 @@ public:
     GPU_ONLY void Add(T* a_Data)
     {
         //Add at index - 1 because the counter gives the total size, which starts at 1. 
-        const unsigned index = atomicAdd(&counter, 1);
+        const uint32_t index = atomicAdd(&counter, 1);
         data[index - 1] = *a_Data;
     }
 
@@ -62,7 +62,7 @@ public:
 
     //Data
 public:
-    unsigned counter;
+    uint32_t counter;
     T data[];
 };
 
