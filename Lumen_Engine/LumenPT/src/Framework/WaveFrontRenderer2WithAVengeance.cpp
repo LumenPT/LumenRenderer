@@ -205,6 +205,47 @@ namespace WaveFront
         //TODO tell optix to create a volume acceleration structure.
         std::shared_ptr<Lumen::ILumenVolume> volume = std::make_shared<PTVolume>(a_FilePath, m_ServiceLocator);
 
+        //volumetric_bookmark
+    //TODO: add volume records to sbt
+    /*volume->m_RecordHandle = m_ShaderBindingTableGenerator->AddHitGroup<DeviceVolume>();
+    auto& rec = volume->m_RecordHandle.GetRecord();
+    rec.m_Header = GetProgramGroupHeader("VolumetricHit");
+    rec.m_Data.m_Grid = volume->m_Handle.grid<float>();*/
+
+        uint32_t geomFlags[1] = { OPTIX_GEOMETRY_FLAG_NONE };
+
+        OptixAccelBuildOptions buildOptions = {};
+        buildOptions.buildFlags = OPTIX_BUILD_FLAG_PREFER_FAST_TRACE;
+        buildOptions.operation = OPTIX_BUILD_OPERATION_BUILD;
+        buildOptions.motionOptions = {};
+
+        OptixAabb aabb = { -1.5f, -1.5f, -1.5f, 1.5f, 1.5f, 1.5f };
+
+        auto grid = std::static_pointer_cast<PTVolume>(volume)->GetHandle()->grid<float>();
+        auto bbox = grid->worldBBox();
+
+        nanovdb::Vec3<double> temp = bbox.min();
+        float bboxMinX = bbox.min()[0];
+        float bboxMinY = bbox.min()[1];
+        float bboxMinZ = bbox.min()[2];
+        float bboxMaxX = bbox.max()[0];
+        float bboxMaxY = bbox.max()[1];
+        float bboxMaxZ = bbox.max()[2];
+
+        aabb = { bboxMinX, bboxMinY, bboxMinZ, bboxMaxX, bboxMaxY, bboxMaxZ };
+
+        MemoryBuffer aabb_buffer(sizeof(OptixAabb));
+        aabb_buffer.Write(aabb);
+
+        OptixBuildInput buildInput = {};
+        buildInput.type = OPTIX_BUILD_INPUT_TYPE_CUSTOM_PRIMITIVES;
+        buildInput.customPrimitiveArray.aabbBuffers = &*aabb_buffer;
+        buildInput.customPrimitiveArray.numPrimitives = 1;
+        buildInput.customPrimitiveArray.flags = geomFlags;
+        buildInput.customPrimitiveArray.numSbtRecords = 1;
+
+        std::static_pointer_cast<PTVolume>(volume)->m_AccelerationStructure = m_OptixSystem->BuildGeometryAccelerationStructure(buildOptions, buildInput);
+
         return volume;
     }
 
