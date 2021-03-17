@@ -83,7 +83,11 @@ __global__ void __raygen__draw_solid_color()
 
     unsigned int p0, p1, p2, p3;
 
-    optixTrace(params.m_Handle, origin, dir, 0.0f, 5000.0f, 0.0f, OptixVisibilityMask(255), OPTIX_RAY_FLAG_NONE, 0, 1, 0, p0, p1, p2, p3);
+	//opaque trace
+    optixTrace(params.m_Handle, origin, dir, 0.0f, 5000.0f, 0.0f, OptixVisibilityMask(128), OPTIX_RAY_FLAG_NONE, 0, 1, 0, p0, p1, p2, p3);
+	
+	//volumetric trace
+	optixTrace(params.m_Handle, origin, dir, 0.0f, 5000.0f, 0.0f, OptixVisibilityMask(64), OPTIX_RAY_FLAG_NONE, 0, 1, 0, p0, p1, p2, p3);
 
     float3 col = make_float3(0.4f, 0.5f, 0.9f);
 
@@ -106,10 +110,10 @@ __global__ void __miss__MissShader()
     MissData* msd = reinterpret_cast<MissData*>(optixGetSbtDataPointer());
 
 
-    optixSetPayload_0(42);
-    optixSetPayload_1(float_as_int(msd->m_Color.y));
-    optixSetPayload_2(float_as_int(msd->m_Color.z));
-    optixSetPayload_3(0);
+    //optixSetPayload_0(42);
+    //optixSetPayload_1(float_as_int(msd->m_Color.y));
+    //optixSetPayload_2(float_as_int(msd->m_Color.z));
+    //optixSetPayload_3(0);
 }
 
 extern "C"

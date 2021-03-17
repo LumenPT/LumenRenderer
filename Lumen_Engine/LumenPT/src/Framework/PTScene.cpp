@@ -82,7 +82,7 @@ void PTScene::UpdateSceneAccelerationStructure()
             auto& inst = instances.emplace_back();
             inst.traversableHandle = ptMesh->m_AccelerationStructure->m_TraversableHandle;
             inst.sbtOffset = 0;
-            inst.visibilityMask = 255;
+            inst.visibilityMask = 128;
             inst.instanceId = instanceID++;
             inst.flags = OPTIX_INSTANCE_FLAG_NONE;
 
@@ -100,7 +100,7 @@ void PTScene::UpdateSceneAccelerationStructure()
             auto& inst = instances.emplace_back();
             inst.traversableHandle = ptVolume->m_AccelerationStructure->m_TraversableHandle;
             inst.sbtOffset = ptVolume->m_RecordHandle.m_TableIndex;
-            inst.visibilityMask = 255;
+            inst.visibilityMask = 64;
             inst.instanceId = ptVolume->m_SceneEntry.m_TableIndex;
             inst.flags = OPTIX_INSTANCE_FLAG_NONE;
 
