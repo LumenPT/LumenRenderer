@@ -282,7 +282,7 @@ void Lumen::SceneManager::LoadMeshes(fx::gltf::Document& a_Doc, GLTFResource& a_
 		std::vector<std::unique_ptr<Lumen::ILumenPrimitive>> primitives;
 		for (auto& fxPrim : fxMesh.primitives)
 		{
-			std::vector<uint8_t> posBinary, texBinary;
+			std::vector<uint8_t> posBinary, texBinary, norBinary;
 			for (auto& fxAttribute : fxPrim.attributes)
 			{
 				if (fxAttribute.first == "POSITION")
@@ -304,7 +304,7 @@ void Lumen::SceneManager::LoadMeshes(fx::gltf::Document& a_Doc, GLTFResource& a_
 				}
 				else if (fxAttribute.first == "NORMAL")
 				{
-
+					norBinary = LoadBinary(a_Doc, fxAttribute.second);
 				}
 			}
 			auto& acc = fxPrim.attributes["POSITION"];
@@ -324,6 +324,7 @@ void Lumen::SceneManager::LoadMeshes(fx::gltf::Document& a_Doc, GLTFResource& a_
 			LumenRenderer::PrimitiveData primitiveData;
 			primitiveData.m_Positions = posBinary;
 			primitiveData.m_TexCoords = texBinary;
+			primitiveData.m_Normals = norBinary;
 
 			primitiveData.m_IndexBinary = indexBin;
 			primitiveData.m_IndexSize = indexSize;
