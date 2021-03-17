@@ -45,7 +45,8 @@ OptiXRenderer::OptiXRenderer(const InitializationData& a_InitializationData)
     m_Texture(nullptr),
     m_ProgramGroups({}),
     m_OutputBuffer(nullptr),
-    m_SBTBuffer(nullptr)
+    m_SBTBuffer(nullptr),
+	m_MotionVectors(make_uint2(gs_ImageWidth, gs_ImageHeight))
 {
     bool success = true;
 

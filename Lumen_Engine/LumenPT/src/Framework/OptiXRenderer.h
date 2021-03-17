@@ -5,6 +5,7 @@
 #include "../Shaders/CppCommon/LaunchParameters.h"
 #include "Camera.h"
 #include "PTServiceLocator.h"
+#include "MotionVectors.h"
 
 #include "Renderer/LumenRenderer.h"
 
@@ -88,6 +89,8 @@ public:
     Camera m_Camera;
 
     Lumen::Transform m_TestTransform;
+
+    MotionVectors m_MotionVectors;
 	
 private:
     static void DebugCallback(unsigned int a_Level, const char* a_Tag, const char* a_Message, void* /*extra data provided during context initialization*/);
