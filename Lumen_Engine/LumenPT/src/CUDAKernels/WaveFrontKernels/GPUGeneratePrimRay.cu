@@ -70,15 +70,14 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
     for (int i = index; i < a_NumIntersections; i += stride)
     {
         //TODO: ensure that index is the same for the intersection data and ray.
-        auto* intersection = a_IntersectionData->GetData(i);
-        auto* ray = a_Rays->GetData(i);
-        unsigned int surfaceDataIndex = intersection->m_PixelIndex;
+        const IntersectionData* currIntersection = a_IntersectionData->GetData(i);
+        const IntersectionRayData* currRay = a_Rays->GetData(currIntersection->m_RayArrayIndex);
+        unsigned int surfaceDataIndex = currIntersection->m_PixelIndex;
 
         //TODO get material pointer from intersection data.
         //TODO extract barycentric coordinates and all that.
         //TODO store in output buffer.
 
-        const IntersectionData* currIntersection = a_IntersectionData->GetData(i);
 
         if (currIntersection->IsIntersection())
         {
@@ -150,11 +149,11 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
             output->m_Color = finalColor;
             output->m_IntersectionT = currIntersection->m_IntersectionT;
             output->m_Normal = normalize(A->m_Normal + B->m_Normal + C->m_Normal);  //TODO untested.
-            output->m_Position;
-            output->m_IncomingRayDirection;
+            output->m_Position = currRay->m_Origin + currRay->m_Direction * currIntersection->m_IntersectionT;
+            output->m_IncomingRayDirection = currRay->m_Direction;
             output->m_Metallic;
             output->m_Roughness;
-            output->m_TransportFactor;
+            output->m_TransportFactor = currRay->m_Contribution;
         
         }
         

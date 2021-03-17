@@ -92,9 +92,9 @@ namespace WaveFront
 
         //Temporary lights, stored in the buffer.
         TriangleLight lights[numLights] = {
-            {{0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}},
-            {{0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}},
-            {{0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}, {0.f, 0.f, 0.f}} };
+            {{0.f, 10.f, 20.f}, {0.f, 10.f, 20.f}, {0.f, 10.f, 20.f}, {0.f, 0.f, 0.f}, {100.f, 100.f, 0.f}, 0.f},
+            {{100.f, 180.f, 20.f}, {100.f, 180.f, 20.f}, {100.f, 180.f, 20.f}, {0.f, 0.f, 0.f}, {100.f, 0.f, 100.f}, 0.f},
+            {{200.f, 20.f, 110.f}, {200.f, 20.f, 110.f}, {200.f, 20.f, 110.f}, {0.f, 0.f, 0.f}, {0.f, 1000.f, 1000.f}, 0.f} };
         m_TriangleLights.Write(&lights[0], sizeof(TriangleLight) * numLights, 0);
 
         //Set the service locator pointer to point to the m'table.

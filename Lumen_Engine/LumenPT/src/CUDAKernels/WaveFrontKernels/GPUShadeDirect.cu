@@ -1,20 +1,20 @@
 #include "GPUShadingKernels.cuh"
 #include <device_launch_parameters.h>
+#include <sutil/vec_math.h>
 
 CPU_ON_GPU void ShadeDirect(
     const uint3 a_ResolutionAndDepth,
-    const IntersectionRayBatch* const a_CurrentRays,
-    const IntersectionBuffer* const a_CurrentIntersections,
-    ShadowRayBatch* const a_ShadowRays,
-    const LightDataBuffer* const a_Lights,
-    CDF* const a_CDF)
+    const SurfaceData* a_TemporalSurfaceDatBuffer,
+    const SurfaceData* a_SurfaceDataBuffer,
+    AtomicBuffer<ShadowRayData>* const a_ShadowRays,
+    const TriangleLight* const a_Lights,
+    const unsigned int a_NumLights,
+    const CDF* const a_CDF )
 {
 
     const unsigned int numPixels = a_ResolutionAndDepth.x * a_ResolutionAndDepth.y;
     const unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
     const unsigned int stride = blockDim.x * gridDim.x;
-
-    float3 potRadiance = { 0.5f,0.5f,0.5f };
 
     //keep CDF pointer here
     //extract light index from CDF. just random float or smth
@@ -30,52 +30,42 @@ CPU_ON_GPU void ShadeDirect(
     {
 
         // Get intersection.
-        const IntersectionData& currIntersection = a_CurrentIntersections->GetIntersection(i, 0 /*There is only one ray per pixel, only one intersection per pixel (for now)*/);
+        const SurfaceData& surfaceData = a_SurfaceDataBuffer[i];
 
-        if (currIntersection.IsIntersection())
+        if (surfaceData.m_IntersectionT > 0.f)
         {
 
-            // Get ray used to calculate intersection.
-            const unsigned int rayArrayIndex = currIntersection.m_RayArrayIndex;
-
-            const IntersectionRayData& currRay = a_CurrentRays->GetRay(rayArrayIndex);
-
-            //unsigned int lightIndex = 0;
-            //float lightPDF = 0;
-            //float random = RandomFloat(lightIndex);
-
-            //auto& diffColor = currIntersection.m_Primitive->m_Material->m_DiffuseColor;
-
-            //potRadiance = make_float3(diffColor);
-
-            potRadiance = make_float3(1.f);
-
-            float3 sRayOrigin = currRay.m_Origin + (currRay.m_Direction * currIntersection.m_IntersectionT);
-
-            //const auto& light = a_Lights[lightIndex];
-            //
-            ////worldspace position of emissive triangle
-            //const float3 lightPos = (light.m_Lights->p0 + light.m_Lights->p1 + light.m_Lights->p2) * 0.33f;
-            //float3 sRayDir = normalize(lightPos - sRayOrigin);
+            for(unsigned int lightIndex = 0; lightIndex < a_NumLights && a_NumLights <= 7; ++lightIndex)
+            {
 
 
-            unsigned int x = threadIdx.x, y = threadIdx.y, z = threadIdx.z;
-            float3 sRayDir = { RandomFloat(x), RandomFloat(y), RandomFloat(z) };
-            sRayDir = normalize(sRayDir);
+                const TriangleLight& light = a_Lights[lightIndex];
 
-            // apply epsilon... very hacky, very temporary
-            sRayOrigin = sRayOrigin + (sRayDir * 0.001f);
+                float3 lightCenter = (light.p0 + light.p1 + light.p2) / 3.f;
 
-            ShadowRayData shadowRay(
-                currIntersection.m_PixelIndex,
-                sRayOrigin,
-                sRayDir,
-                0.11f, //TODO: add max distance.
-                potRadiance,    // light contribution value at intersection point that will reflect in the direction of the incoming ray (intersection ray).
-                LightChannel::DIRECT
-            );
+                float3 shadowRayDir = surfaceData.m_Position - lightCenter;
+                float lightDistance = length(shadowRayDir);
+                shadowRayDir = shadowRayDir / lightDistance;
 
-            a_ShadowRays->SetShadowRay(shadowRay, a_ResolutionAndDepth.z, i, 0 /*Ray index is 0 as there is only one ray per pixel*/);
+                float cosFactor = dot(shadowRayDir, -surfaceData.m_Normal);
+                cosFactor = fmax(cosFactor, 0.f);
+
+                float3 irradiance = cosFactor * (light.radiance / lightDistance * lightDistance);
+
+                //HACK: apply epsilon... very hacky, very temporary
+                float3 shadowRayOrigin = surfaceData.m_Position + (shadowRayDir * 0.001f);
+
+                ShadowRayData shadowRay(
+                    i,
+                    shadowRayOrigin,
+                    shadowRayDir,
+                    lightDistance - 0.001f,
+                    surfaceData.m_Color * irradiance * surfaceData.m_TransportFactor,
+                    LightChannel::DIRECT);
+
+                a_ShadowRays->Add(&shadowRay);
+
+            }
 
         }
 

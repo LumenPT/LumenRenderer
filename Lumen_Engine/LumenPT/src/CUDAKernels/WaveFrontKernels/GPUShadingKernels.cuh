@@ -39,11 +39,12 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(unsigned a_NumIntersections,
  */
 CPU_ON_GPU void ShadeDirect(
     const uint3 a_ResolutionAndDepth,
-    const IntersectionRayBatch* const a_CurrentRays,
-    const IntersectionBuffer* const a_CurrentIntersections,
-    ShadowRayBatch* const a_ShadowRays,
-    const LightDataBuffer* const a_Lights,
-    CDF* const a_CDF /*const CDF* a_CDF*/);
+    const SurfaceData* a_TemporalSurfaceDatBuffer,
+    const SurfaceData* a_SurfaceDataBuffer,
+    AtomicBuffer<ShadowRayData>* const a_ShadowRays,
+    const TriangleLight* const a_Lights,
+    const unsigned int a_NumLights,
+    const CDF* const a_CDF = nullptr );
 
 /*
  *
@@ -55,9 +56,12 @@ CPU_ON_GPU void ShadeSpecular();
  */
 CPU_ON_GPU void ShadeIndirect(
     const uint3 a_ResolutionAndDepth,
-    const IntersectionRayBatch* const a_CurrentRays,
-    const IntersectionBuffer* const a_Intersections,
-    IntersectionRayBatch* const a_Output);
+    const SurfaceData* a_TemporalSurfaceDatBuffer,
+    const SurfaceData* a_SurfaceDataBuffer,
+    AtomicBuffer<IntersectionRayData>* const a_IntersectionRays,
+    const TriangleLight* const a_Lights,
+    const unsigned int a_NumLights,
+    const CDF* const a_CDF = nullptr);
 
 
 CPU_ON_GPU void DEBUGShadePrimIntersections(

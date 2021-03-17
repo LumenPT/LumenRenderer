@@ -87,18 +87,19 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
       CHECKLASTCUDAERROR;*/
 
     //Generate shadow rays for direct lights.
-    /*ShadeDirect<<<numBlocks, blockSize>>>(
-          a_ShadingParams.m_ResolutionAndDepth,
-          a_ShadingParams.m_CurrentRays,
-          a_ShadingParams.m_CurrentIntersections,
-          a_ShadingParams.m_ShadowRaysBatch,
-          a_ShadingParams.m_LightBuffer,
-          a_ShadingParams.m_CDF);*/
+    ShadeDirect<<<numBlocks, blockSize>>>(
+        a_ShadingParams.m_ResolutionAndDepth, 
+        a_ShadingParams.m_TemporalSurfaceData, 
+        a_ShadingParams.m_CurrentSurfaceData, 
+        a_ShadingParams.m_ShadowRays, 
+        a_ShadingParams.m_TriangleLights, 
+        a_ShadingParams.m_NumLights, 
+        a_ShadingParams.m_CDF);
 
-    DEBUGShadePrimIntersections<<<numBlocks, blockSize>>>(
+    /*DEBUGShadePrimIntersections<<<numBlocks, blockSize>>>(
         a_ShadingParams.m_ResolutionAndDepth,
         a_ShadingParams.m_CurrentSurfaceData,
-        a_ShadingParams.m_Output);
+        a_ShadingParams.m_Output);*/
 }
 
 CPU_ONLY void PostProcess(const PostProcessLaunchParameters& a_PostProcessParams)

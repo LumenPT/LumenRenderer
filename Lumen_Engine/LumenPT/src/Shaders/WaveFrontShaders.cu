@@ -110,14 +110,16 @@ __device__ __forceinline__ void ShadowRaysRayGen()
 
     //3. If no hit, accumulate result in buffer
 
-    if(isIntersection != 0)
+    if(isIntersection == 0)
     {
 
         using namespace WaveFront;
 
-        launchParams.m_ResultBuffer[
+        unsigned int resultIndex =
             static_cast<unsigned int>(LightChannel::NUM_CHANNELS) * rayData.m_PixelIndex +
-            static_cast<unsigned int>(rayData.m_OutputChannel)] = rayData.m_PotentialRadiance;
+            static_cast<unsigned int>(rayData.m_OutputChannel);
+
+        launchParams.m_ResultBuffer[resultIndex] = rayData.m_PotentialRadiance;
 
     }
 
@@ -168,7 +170,7 @@ __global__ void __raygen__WaveFrontRG()
         break;
     case WaveFront::RayType::SHADOW_RAY:
         //Shadow rays
-        //ShadowRaysRayGen();
+        ShadowRaysRayGen();
         break;
     case WaveFront::RayType::RESTIR_RAY:
         //Actually Primary rays
@@ -214,7 +216,6 @@ __global__ void __anyhit__WaveFrontAH()
     case WaveFront::RayType::SHADOW_RAY:
         {
             optixSetPayload_0(1);
-
         }
         break;
     case WaveFront::RayType::RESTIR_RAY:
