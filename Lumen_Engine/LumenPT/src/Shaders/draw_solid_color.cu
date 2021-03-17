@@ -81,19 +81,20 @@ __global__ void __raygen__draw_solid_color()
         params.W
     );
 
-    unsigned int p0, p1, p2, p3;
+    unsigned int p0, p1, p2, p3, p4, p5;
 
-    optixTrace(params.m_Handle, origin, dir, 0.0f, 5000.0f, 0.0f, OptixVisibilityMask(255), OPTIX_RAY_FLAG_NONE, 0, 1, 0, p0, p1, p2, p3);
+    optixTrace(params.m_Handle, origin, dir, 0.0f, 5000.0f, 0.0f, OptixVisibilityMask(255), OPTIX_RAY_FLAG_NONE, 0, 1, 0, p0, p1, p2, p3, p4, p5);
 
     float3 col = make_float3(0.4f, 0.5f, 0.9f);
 
-    if (p3 == 1)
-    {
-        col.x = int_as_float(p0);
-        col.y = int_as_float(p1);
-        col.z = int_as_float(p2);
-    }
+    col.x = int_as_float(p0);
+    col.y = int_as_float(p1);
+    col.z = int_as_float(p2);
 
+    /*col.x = int_as_float(p3);
+    col.y = int_as_float(p4);
+    col.z = int_as_float(p5);*/
+	
     //void* prim = params.m_SceneData->GetTableEntry(0);
 
     params.m_Image[launch_index.y * params.m_ImageWidth + launch_index.x] =
@@ -105,11 +106,15 @@ __global__ void __miss__MissShader()
 {
     MissData* msd = reinterpret_cast<MissData*>(optixGetSbtDataPointer());
 
+    float3 col = make_float3(0.4f, 0.5f, 0.9f);
 
-    optixSetPayload_0(42);
-    optixSetPayload_1(float_as_int(msd->m_Color.y));
-    optixSetPayload_2(float_as_int(msd->m_Color.z));
-    optixSetPayload_3(0);
+    optixSetPayload_0(col.x);
+    optixSetPayload_1(col.y);
+    optixSetPayload_2(col.z);
+
+    optixSetPayload_3(col.x);
+    optixSetPayload_4(col.y);
+    optixSetPayload_5(col.z);
 }
 
 extern "C"
@@ -127,25 +132,7 @@ __global__ void __closesthit__HitShader()
     Vertex* B = &prim->m_VertexBuffer[prim->m_IndexBuffer[vertIndex + 1]];
     Vertex* C = &prim->m_VertexBuffer[prim->m_IndexBuffer[vertIndex + 2]];
 
-    if (U + V + W != 1.0f)
-    {
-        optixSetPayload_0(float_as_int(0.0f));
-        optixSetPayload_1(float_as_int(0.0f));
-        optixSetPayload_2(float_as_int(1.0f));
-        optixSetPayload_3(0);
-    }
-
     float2 texCoords = A->m_UVCoord * W + B->m_UVCoord * U + C->m_UVCoord * V;
-	
-    //texCoords.x = 1.0f - texCoords.x;
-
-    if (texCoords.x > 1.0f || texCoords.y > 1.0f)
-    {
-        optixSetPayload_0(float_as_int(0.0f));
-        optixSetPayload_1(float_as_int(0.0f));
-        optixSetPayload_2(float_as_int(1.0f));
-        optixSetPayload_3(0);
-    }
 
     float4 smpCol = tex2D<float4>(prim->m_Material->m_DiffuseTexture, texCoords.x, texCoords.y);
     float4 finalCol = smpCol * prim->m_Material->m_DiffuseColor;
@@ -154,10 +141,14 @@ __global__ void __closesthit__HitShader()
     optixSetPayload_1(float_as_int(finalCol.y));
     optixSetPayload_2(float_as_int(finalCol.z));
 
-    //optixSetPayload_0(float_as_int(texCoords.x));
-    //optixSetPayload_1(float_as_int(texCoords.y));
-    //optixSetPayload_2(float_as_int(0.0f));
+    const float3 rayOrig = optixGetWorldRayOrigin();
+    const float3 rayDir = optixGetWorldRayDirection();
+    const float t = optixGetRayTmax();
 
-    optixSetPayload_3(1);
+    float3 hitPosition = rayOrig + rayDir * t;
+	
+    optixSetPayload_3(float_as_int(hitPosition.x));
+    optixSetPayload_4(float_as_int(hitPosition.y));
+    optixSetPayload_5(float_as_int(hitPosition.z));
 }
 
