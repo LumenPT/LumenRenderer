@@ -44,17 +44,19 @@ void Camera::SetLookAt(glm::vec3 a_Position, glm::vec3 a_LookAtPos, glm::vec3 a_
 	m_DirtyFlag = true;
 }
 
-void Camera::IncrementYaw(float AngleInRadians)
-{
-	m_Rotation = glm::angleAxis(AngleInRadians, glm::vec3(m_WorldUp)) * m_Rotation;
-	m_DirtyFlag = true;
-}
-
-void Camera::IncrementPitch(float AngleInRadians)
+void Camera::IncrementYaw(const float& a_AngleInRadians)
 {
 	UpdateCameraVectors();
 	
-	m_Rotation = glm::angleAxis(AngleInRadians, glm::vec3(m_Right)) * m_Rotation;
+	m_Rotation = glm::angleAxis(a_AngleInRadians, glm::vec3(m_WorldUp)) * m_Rotation;
+	m_DirtyFlag = true;
+}
+
+void Camera::IncrementPitch(const float& a_AngleInRadians)
+{
+	UpdateCameraVectors();
+	
+	m_Rotation = glm::angleAxis(a_AngleInRadians, glm::vec3(m_Right)) * m_Rotation;
 	m_DirtyFlag = true;
 }
 
