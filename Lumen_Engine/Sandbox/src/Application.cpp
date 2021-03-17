@@ -12,7 +12,7 @@
 #include "Lumen/ModelLoading/SceneManager.h"
 
 #ifdef WAVEFRONT
-#include "../../LumenPT/src/Framework/WaveFrontRenderer2WithAVengeance.h"
+#include "../../LumenPT/src/Framework/WaveFrontRenderer.h"
 #else
 #include "../../LumenPT/src/Framework/OptiXRenderer.h"
 #endif

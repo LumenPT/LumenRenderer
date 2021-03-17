@@ -4,7 +4,7 @@
 //#include "Framework/Camera.h"
 
 #ifdef WAVEFRONT
-#include "../../LumenPT/src/Framework/WaveFrontRenderer2WithAVengeance.h"
+#include "../../LumenPT/src/Framework/WaveFrontRenderer.h"
 #else
 #include "../../LumenPT/src/Framework/OptiXRenderer.h"
 #endif
@@ -86,7 +86,7 @@ OutputLayer::OutputLayer()
 
 #ifdef WAVEFRONT
 
-	m_Renderer = std::make_unique<WaveFront::WaveFrontRenderer2WithAVengeance>();
+	m_Renderer = std::make_unique<WaveFront::WaveFrontRenderer>();
 
 	WaveFront::WaveFrontSettings settings{};
 	settings.depth = 3;
@@ -95,7 +95,7 @@ OutputLayer::OutputLayer()
 	settings.renderResolution = { 800, 600 };
 	settings.outputResolution = { 800, 600 };
 
-	static_cast<WaveFront::WaveFrontRenderer2WithAVengeance*>(m_Renderer.get())->Init(settings);
+	static_cast<WaveFront::WaveFrontRenderer*>(m_Renderer.get())->Init(settings);
 
 #else
 	m_Renderer = std::make_unique<OptiXRenderer>(init);

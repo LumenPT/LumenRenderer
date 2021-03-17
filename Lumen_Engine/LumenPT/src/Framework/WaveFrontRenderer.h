@@ -1,10 +1,10 @@
 #pragma once
-#if defined(WAVEFRONTOLD)
-#include "ShaderBindingTableRecord.h"
+#if defined(WAVEFRONT)
+#include "OptixWrapper.h"
+#include "OutputBuffer.h"
 #include "MemoryBuffer.h"
-//#include "Camera.h"
-#include "PTServiceLocator.h"
 #include "../Shaders/CppCommon/WaveFrontDataStructs.h"
+#include "PTServiceLocator.h"
 
 #include "Renderer/LumenRenderer.h"
 
@@ -12,169 +12,102 @@
 #include <string>
 #include <vector>
 #include <memory>
-#include <array>
-#include <Optix/optix_types.h>
-#include <CUDA/builtin_types.h>
 
-using GLuint = unsigned;
+class SceneDataTable;
 
-class OutputBuffer;
-class ShaderBindingTableGenerator;
-
-class AccelerationStructure;
-
-namespace Lumen
+namespace WaveFront
 {
-    class ILumenTexture;
-    class ILumenPrimitive;
+    struct WaveFrontSettings
+    {
+        //The maximum path length in the scene.
+        std::uint32_t depth;
+
+        //The resolution to render at.
+        uint2 renderResolution;
+
+        //The resolution to output at (up-scaling).
+        uint2 outputResolution;
+
+        //The minimum distance a ray has to travel before intersecting a surface.
+        float minIntersectionT;
+
+        //The maximum distance a ray can travel before terminating.
+        float maxIntersectionT;
+    };
+
+    class WaveFrontRenderer : public LumenRenderer
+    {
+        //Overridden functionality.
+    public:
+        std::unique_ptr<Lumen::ILumenPrimitive> CreatePrimitive(PrimitiveData& a_PrimitiveData) override;
+        std::shared_ptr<Lumen::ILumenMesh> CreateMesh(std::vector<std::unique_ptr<Lumen::ILumenPrimitive>>& a_Primitives) override;
+        std::shared_ptr<Lumen::ILumenTexture> CreateTexture(void* a_PixelData, uint32_t a_Width, uint32_t a_Height) override;
+        std::shared_ptr<Lumen::ILumenMaterial> CreateMaterial(const MaterialData& a_MaterialData) override;
+        std::shared_ptr<Lumen::ILumenVolume> CreateVolume(const std::string& a_FilePath) override;
+        std::shared_ptr<Lumen::ILumenScene> CreateScene(SceneData a_SceneData) override;
+
+        //Public functionality
+    public:
+        WaveFrontRenderer();
+
+        /*
+         * Render.
+         */
+        unsigned TraceFrame(std::shared_ptr<Lumen::ILumenScene>& a_Scene) override;
+
+        /*
+         * Initialize the wavefront pipeline.
+         * This sets up all buffers required by CUDA.
+         */
+        void Init(const WaveFrontSettings& a_Settings);
+
+        //Buffers
+    private:
+
+        std::unique_ptr<MemoryBuffer> InterleaveVertexData(const PrimitiveData& a_MeshData) const;
+
+        //OpenGL buffer to write output to.
+        OutputBuffer m_OutputBuffer;
+
+        //The surface data per pixel. 0 and 1 are used for the current and previous frame. 2 is used for any other depth.
+        MemoryBuffer m_SurfaceData[3];
+
+        //Intersection points passed to Optix.
+        MemoryBuffer m_IntersectionData;
+
+        //Buffer containing intersection rays.
+        MemoryBuffer m_Rays;
+
+        //Buffer containing shadow rays.
+        MemoryBuffer m_ShadowRays;
+
+        //Buffer used for output of separate channels of light.
+        MemoryBuffer m_PixelBufferSeparate;
+
+        //Buffer used to combine light channels after denoising.
+        MemoryBuffer m_PixelBufferCombined;
+
+        //Triangle lights.
+        MemoryBuffer m_TriangleLights;
+
+        //Optix system
+        std::unique_ptr<OptixWrapper> m_OptixSystem;
+
+        //Variables and settings.
+    private:
+        WaveFrontSettings m_Settings;
+
+        //Index of the frame, used to swap buffers.
+        std::uint32_t m_FrameIndex;
+
+        //The CUDA instance context stuff
+        CUcontext m_CUDAContext;
+
+        //The server locator instance.
+        PTServiceLocator m_ServiceLocator;
+
+        //Kamen's lookup table
+        std::unique_ptr<SceneDataTable> m_Table;
+    };
 }
-
-class WaveFrontRenderer : public LumenRenderer
-{
-public:
-
-    /*struct InitializationData
-    {
-
-        uint8_t m_MaxDepth;
-        uint8_t m_RaysPerPixel;
-        uint8_t m_ShadowRaysPerPixel;
-
-        uint2 m_RenderResolution;
-        uint2 m_OutputResolution;
-
-    };*/
-
-    WaveFrontRenderer(const InitializationData& a_InitializationData);
-    ~WaveFrontRenderer();
-
-
-
-
-
-    // Creates a cuda texture from the provided raw data and sizes. Only works if the pixel format is uchar4.
-    std::shared_ptr<Lumen::ILumenTexture> CreateTexture(void* a_PixelData, uint32_t a_Width, uint32_t a_Height) override;
-
-    std::unique_ptr<Lumen::ILumenPrimitive> CreatePrimitive(PrimitiveData& a_PrimitiveData) override;
-    std::unique_ptr<MemoryBuffer> InterleaveVertexData(const PrimitiveData& a_MeshData);
-
-    std::shared_ptr<Lumen::ILumenMesh> CreateMesh(std::vector<std::unique_ptr<Lumen::ILumenPrimitive>>& a_Primitives) override;
-
-    std::shared_ptr<Lumen::ILumenMaterial> CreateMaterial(const MaterialData& a_MaterialData) override;
-
-    std::shared_ptr<Lumen::ILumenScene> CreateScene(SceneData a_SceneData) override;
-	
-    std::shared_ptr<Lumen::ILumenVolume> LumenRenderer::CreateVolume(const std::string& a_FilePath) override;
-   
-
-    //GLuint TraceFrame();
-    unsigned int TraceFrame() override;
-	
-    //Camera m_Camera;
-
-    Lumen::Transform m_TestTransform;
-
-    static inline const uint2 s_minResolution = make_uint2(1, 1);
-    static inline const uint8_t s_minDepth = 1;
-    static inline const uint8_t s_minRaysPerPixel = 1;
-    static inline const uint8_t s_minShadowRaysPerPixel = 1;
-
-private:
-
-    
-
-    enum class PipelineType
-    {
-        RESOLVE_RAYS,
-        RESOLVE_SHADOW_RAYS
-    };
-
-    enum class RayBatchTypeIndex
-    {
-        PRIM_RAYS_PREV_FRAME,
-        CURRENT_RAYS,
-        SECONDARY_RAYS,
-        NUM_RAY_BATCH_TYPES
-    };
-
-    enum class HitBufferTypeIndex
-    {
-        PRIM_HITS_PREV_FRAME,
-        CURRENT_HITS,
-        NUM_HIT_BUFFER_TYPES
-    };
-
-    static constexpr unsigned s_NumRayBatchTypes = static_cast<unsigned>(RayBatchTypeIndex::NUM_RAY_BATCH_TYPES);
-    static constexpr unsigned s_NumHitBufferTypes = static_cast<unsigned>(HitBufferTypeIndex::NUM_HIT_BUFFER_TYPES);
-    static constexpr float s_MinTraceDistance = 0.1f;
-    static constexpr float s_MaxTraceDistance = 5000.f;
-
-
-
-    bool Initialize(const InitializationData& a_InitializationData);
-
-    
-
-    void CreateOutputBuffer();
-
-    void CreateDataBuffers();
-
-    void SetupInitialBufferIndices();
-
-    
-
-    
-
-    static void GetRayBatchIndices(
-        unsigned a_WaveIndex, 
-        const std::array<unsigned, s_NumRayBatchTypes>& a_CurrentIndices, 
-        std::array<unsigned, s_NumRayBatchTypes>& a_Indices);
-
-    static void GetHitBufferIndices(
-        unsigned a_WaveIndex,
-        const std::array<unsigned, s_NumHitBufferTypes>& a_CurrentIndices,
-        std::array<unsigned, s_NumHitBufferTypes>& a_Indices);
-
-
-
-    PTServiceLocator m_ServiceLocator;
-     
-    std::unique_ptr<OutputBuffer> m_OutputBuffer;
-
-    //Data buffers for the wavefront algorithm.
-
-    std::array<unsigned, s_NumRayBatchTypes> m_RayBatchIndices;
-    std::array<unsigned, s_NumHitBufferTypes> m_HitBufferIndices;
-
-    //ResultBuffer storing the different PixelBuffers as different light channels;
-    std::unique_ptr<MemoryBuffer> m_ResultBuffer;
-    //2 PixelBuffers 1 for the different channels in the ResultBuffer and 1 PixelBuffer for the merged results (to allow for up-scaling the output).
-    std::unique_ptr<MemoryBuffer> m_PixelBufferMultiChannel;
-    std::unique_ptr<MemoryBuffer> m_PixelBufferSingleChannel;
-    //2 ray batches, 1 for storing primary rays, other for overwriting secondary rays.
-    std::unique_ptr<MemoryBuffer> m_IntersectionRayBatches[s_NumRayBatchTypes];
-    //2 intersection buffers, 1 for storing primary intersections, other for overwriting secondary intersections.
-    std::unique_ptr<MemoryBuffer> m_IntersectionBuffers[s_NumHitBufferTypes];
-    //1 shadow ray batch to overwrite with shadow rays.
-    std::unique_ptr<MemoryBuffer> m_ShadowRayBatch;
-
-    //TEMPORARY
-    std::unique_ptr<MemoryBuffer> m_LightBufferTemp;
-
-    std::unique_ptr<class Texture> m_Texture;
-
-    uint2 m_RenderResolution;
-    uint2 m_OutputResolution;
-
-    uint8_t m_MaxDepth;
-    uint8_t m_RaysPerPixel;
-    uint8_t m_ShadowRaysPerPixel;
-
-    unsigned int m_FrameCount;
-
-    bool m_Initialized;
-
-};
-
-
 #endif

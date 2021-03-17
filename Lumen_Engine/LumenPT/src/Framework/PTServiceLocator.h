@@ -3,7 +3,7 @@
 #ifdef  WAVEFRONT
 namespace WaveFront
 {
-    class WaveFrontRenderer2WithAVengeance;
+    class WaveFrontRenderer;
     class OptixWrapper;
 }
 #endif
@@ -12,7 +12,7 @@ struct PTServiceLocator
 {
 
 #ifdef  WAVEFRONT
-    WaveFront::WaveFrontRenderer2WithAVengeance* m_Renderer;
+    WaveFront::WaveFrontRenderer* m_Renderer;
 #else
     class OptiXRenderer* m_Renderer;
 #endif
