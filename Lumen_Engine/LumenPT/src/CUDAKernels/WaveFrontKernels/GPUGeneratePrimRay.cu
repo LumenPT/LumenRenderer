@@ -155,7 +155,9 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
             output->m_Metallic;
             output->m_Roughness;
             output->m_TransportFactor;
+        
         }
+        
     }
 
 }

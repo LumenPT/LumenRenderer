@@ -244,6 +244,7 @@ __global__ void __closesthit__WaveFrontCH()
             intersection->m_Barycentrics = optixGetTriangleBarycentrics();
             intersection->m_PrimitiveIndex = optixGetPrimitiveIndex();
             intersection->m_InstanceId = optixGetInstanceId();
+
         }    
         break;
     case WaveFront::RayType::SHADOW_RAY:

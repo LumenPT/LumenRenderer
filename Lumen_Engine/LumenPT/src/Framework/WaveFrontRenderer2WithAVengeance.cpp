@@ -323,6 +323,7 @@ namespace WaveFront
         //Pass the buffers to the optix shader for shading.
         OptixLaunchParameters rayLaunchParameters;
         rayLaunchParameters.m_TraceType = RayType::INTERSECTION_RAY;
+        rayLaunchParameters.m_MinMaxDistance = { 0.01f, 5000.f };
         rayLaunchParameters.m_IntersectionBuffer = m_IntersectionData.GetDevicePtr<AtomicBuffer<IntersectionData>>();
         rayLaunchParameters.m_IntersectionRayBatch = m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>();
         rayLaunchParameters.m_TraversableHandle = accelerationStructure;

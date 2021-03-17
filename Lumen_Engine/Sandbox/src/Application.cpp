@@ -82,11 +82,11 @@ public:
 		std::replace(p_string.begin(), p_string.end(), '\\', '/');
 		//p_string.append("/Sandbox/assets/models/Lantern.gltf");
 
-		const std::string meshPath = p_string.append("/Sandbox/assets/models/BoomBoxWithAxes/glTF/");
+		const std::string meshPath = p_string.append("/Sandbox/assets/models/Sponza/");
 		//Base path for meshes.
 
 		//Mesh name
-		const std::string meshName = "BoomBoxWithAxes.gltf";
+		const std::string meshName = "Sponza.gltf";
 
 		//p_string.append("/Sandbox/assets/models/Sponza/Sponza.gltf");
 		LMN_TRACE(p_string);
@@ -119,21 +119,21 @@ public:
 		mesh->m_Transform.SetPosition(glm::vec3(0.f, 0.f, 15.0f));
 		mesh->m_Transform.SetScale(glm::vec3(1.0f));
 
-		for (size_t i = 0; i < 10; i++)
-		{
-			//load lantern yay
-		}
+		//for (size_t i = 0; i < 10; i++)
+		//{
+		//	//load lantern yay
+		//}
 		
 		//meshLight->m_Transform.SetPosition(glm::vec3(0.f, 0.f, 15.0f));
 		//meshLight->m_Transform.SetScale(glm::vec3(1.0f));
 
-		std::string vndbFilePath = { p.string() };
-		//vndbFilePath.append("/Sandbox/assets/volume/Sphere.vndb");
-		vndbFilePath.append("/Sandbox/assets/volume/bunny.vdb");
-		auto volumeRes = m_SceneManager->m_VolumeManager.LoadVDB(vndbFilePath);
+		//std::string vndbFilePath = { p.string() };
+		////vndbFilePath.append("/Sandbox/assets/volume/Sphere.vndb");
+		//vndbFilePath.append("/Sandbox/assets/volume/bunny.vdb");
+		//auto volumeRes = m_SceneManager->m_VolumeManager.LoadVDB(vndbFilePath);
 
-		auto volume = lumenPT->m_Scene->AddVolume();
-		volume->SetVolume(volumeRes->m_Volume);
+		//auto volume = lumenPT->m_Scene->AddVolume();
+		//volume->SetVolume(volumeRes->m_Volume);
 	}
 
 	~Sandbox()
