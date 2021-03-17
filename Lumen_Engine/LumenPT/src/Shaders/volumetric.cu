@@ -21,9 +21,10 @@ __global__ void __closesthit__VolumetricHitShader()
 
 	float entry = int_as_float(optixGetAttribute_0());
 	float exit = int_as_float(optixGetAttribute_1());
+	exit = min(exit, int_as_float(optixGetPayload_4()));
 	
 	const int MAX_STEPS = 1000;
-	const float STEP_SIZE = 5.0f;
+	const float STEP_SIZE = 1.0f;
 	const float HARDCODED_DENSITY_PER_STEP = 0.005f;
 	const float VOLUME_COLOR_R = 1.0f;
 	const float VOLUME_COLOR_G = 1.0f;
@@ -54,7 +55,6 @@ __global__ void __closesthit__VolumetricHitShader()
 	optixSetPayload_1(float_as_int(g));
 	optixSetPayload_2(float_as_int(b));
     optixSetPayload_3(1);
-
 
     return;
 }
@@ -103,15 +103,14 @@ __global__ void __intersection__VolumetricHitShader()
 	//
     //}
 
-	auto bbox = grid.indexBBox();
-	float t0;	//volume entrance point
+	auto bbox = grid.worldBBox();
+	float t0;	//volume entry point
 	float t1;	//volume exit point
-	if (iRay.intersects(bbox, t0, t1))
+	if (wRay.intersects(bbox, t0, t1))
 	{
-		optixReportIntersection(1.0f, 0,
+		optixReportIntersection(t0, 0,
 			float_as_int(t0),
 			float_as_int(t1));
-
 	}
 
 	////temp code to visualize voxel outlines
