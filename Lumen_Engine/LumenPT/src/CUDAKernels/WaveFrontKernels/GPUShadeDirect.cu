@@ -59,8 +59,10 @@ CPU_ON_GPU void ShadeDirect(
                     i,
                     shadowRayOrigin,
                     shadowRayDir,
-                    lightDistance - 0.001f,
-                    surfaceData.m_Color * irradiance * surfaceData.m_TransportFactor,
+                    0.1f,
+                    //lightDistance - 0.001f,
+                    //surfaceData.m_Color * irradiance * surfaceData.m_TransportFactor,
+                    surfaceData.m_Color,
                     LightChannel::DIRECT);
 
                 a_ShadowRays->Add(&shadowRay);
