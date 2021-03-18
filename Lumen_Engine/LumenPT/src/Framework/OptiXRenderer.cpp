@@ -23,6 +23,7 @@
 #include "Cuda/cuda_runtime.h"
 #include "Optix/optix_stubs.h"
 #include <glm/gtx/compatibility.hpp>
+#include <Optix/optix_function_table_definition.h>
 
 #include "PTVolume.h"
 
@@ -45,8 +46,7 @@ OptiXRenderer::OptiXRenderer(const InitializationData& a_InitializationData)
     m_Texture(nullptr),
     m_ProgramGroups({}),
     m_OutputBuffer(nullptr),
-    m_SBTBuffer(nullptr),
-	m_MotionVectors(make_uint2(gs_ImageWidth, gs_ImageHeight))
+    m_SBTBuffer(nullptr)
 {
     bool success = true;
 
@@ -60,15 +60,12 @@ OptiXRenderer::OptiXRenderer(const InitializationData& a_InitializationData)
     m_ServiceLocator.m_Renderer = this;
     m_Texture = std::make_unique<Texture>(LumenPTConsts::gs_AssetDirectory + "debugTex.jpg");
 
-    m_ServiceLocator.m_SBTGenerator = m_ShaderBindingTableGenerator.get();
-    m_ServiceLocator.m_Renderer = this;
-
     CreateShaderBindingTable();
 
     m_SceneDataTable = std::make_unique<SceneDataTable>();
     m_ServiceLocator.m_SceneDataTable = m_SceneDataTable.get();
 
-    m_Camera.SetPosition(glm::vec3(0.f, 0.f, -50.f));
+    // m_Scene->m_Camera->SetPosition(glm::vec3(0.f, 0.f, -50.f));
 }
 
 OptiXRenderer::~OptiXRenderer()
@@ -94,12 +91,12 @@ void OptiXRenderer::InitializePipelineOptions()
     m_PipelineCompileOptions.traversableGraphFlags = OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_ANY;
     m_PipelineCompileOptions.numAttributeValues = 3;
     // Defines how many 32-bit values can be output by a miss or hit shader
-    m_PipelineCompileOptions.numPayloadValues = 6;
+    m_PipelineCompileOptions.numPayloadValues = 5;
     // What exceptions can the pipeline throw.
     m_PipelineCompileOptions.exceptionFlags = OptixExceptionFlags::OPTIX_EXCEPTION_FLAG_DEBUG
-    | OPTIX_EXCEPTION_FLAG_TRACE_DEPTH | OPTIX_EXCEPTION_FLAG_STACK_OVERFLOW;
+        | OPTIX_EXCEPTION_FLAG_TRACE_DEPTH | OPTIX_EXCEPTION_FLAG_STACK_OVERFLOW;
     // 0 corresponds to enabling custom primitives and triangles, but nothing else 
-    m_PipelineCompileOptions.usesPrimitiveTypeFlags = 0; 
+    m_PipelineCompileOptions.usesPrimitiveTypeFlags = 0;
     m_PipelineCompileOptions.usesMotionBlur = false;
     m_PipelineCompileOptions.pipelineLaunchParamsVariableName = "params";
 
@@ -200,7 +197,7 @@ void OptiXRenderer::CreatePipeline()
 OptixModule OptiXRenderer::CreateModule(const std::string& a_PtxPath)
 {
     assert(std::filesystem::exists(a_PtxPath));
-	
+
     OptixModuleCompileOptions moduleOptions = {};
     moduleOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_LINEINFO;
     moduleOptions.maxRegisterCount = OPTIX_COMPILE_DEFAULT_MAX_REGISTER_COUNT;
@@ -384,9 +381,9 @@ void OptiXRenderer::CreateShaderBindingTable()
     missRecord.m_Data.m_Num = 2;
     missRecord.m_Data.m_Color = { 0.f, 0.f, 1.f };
 
-	//bookmark
+    //bookmark
     m_HitRecord = m_ShaderBindingTableGenerator->AddHitGroup<void>();
-    
+
     auto& hitRecord = m_HitRecord.GetRecord();
     hitRecord.m_Header = GetProgramGroupHeader("Hit");
 }
@@ -404,7 +401,7 @@ ProgramGroupHeader OptiXRenderer::GetProgramGroupHeader(const std::string& a_Gro
 
 }
 
-GLuint OptiXRenderer::TraceFrame()
+unsigned int OptiXRenderer::TraceFrame(std::shared_ptr<Lumen::ILumenScene>& a_Scene)
 {
     std::vector<float3> vert = {
         {0.5f, 0.5f, 0.5f},
@@ -426,18 +423,18 @@ GLuint OptiXRenderer::TraceFrame()
     OptixShaderBindingTable sbt = m_ShaderBindingTableGenerator->GetTableDesc();
 
     params.m_SceneData = m_SceneDataTable->GetDevicePointer();
-    auto str = static_cast<PTScene*>(m_Scene.get())->GetSceneAccelerationStructure();
+    auto str = static_cast<PTScene*>(a_Scene.get())->GetSceneAccelerationStructure();
 
     params.m_Image = m_OutputBuffer->GetDevicePointer();
     params.m_Handle = str;
-	
+
     params.m_ImageWidth = gs_ImageWidth;
     params.m_ImageHeight = gs_ImageHeight;
     params.m_VertexBuffer = vertexBuffer.GetDevicePtr<Vertex>();
 
-    m_Camera.SetAspectRatio(static_cast<float>(gs_ImageWidth) / static_cast<float>(gs_ImageHeight));
+    a_Scene->m_Camera->SetAspectRatio(static_cast<float>(gs_ImageWidth) / static_cast<float>(gs_ImageHeight));
     glm::vec3 eye, U, V, W;
-    m_Camera.GetVectorData(eye, U, V, W);
+    a_Scene->m_Camera->GetVectorData(eye, U, V, W);
     params.eye = make_float3(eye.x, eye.y, eye.z);
     params.U = make_float3(U.x, U.y, U.z);
     params.V = make_float3(V.x, V.y, V.z);
@@ -608,7 +605,7 @@ std::shared_ptr<Lumen::ILumenVolume> OptiXRenderer::CreateVolume(const std::stri
 
     auto grid = volume->GetHandle()->grid<float>();
     auto bbox = grid->worldBBox();
-	
+
     nanovdb::Vec3<double> temp = bbox.min();
     float bboxMinX = bbox.min()[0];
     float bboxMinY = bbox.min()[1];
@@ -616,12 +613,12 @@ std::shared_ptr<Lumen::ILumenVolume> OptiXRenderer::CreateVolume(const std::stri
     float bboxMaxX = bbox.max()[0];
     float bboxMaxY = bbox.max()[1];
     float bboxMaxZ = bbox.max()[2];
-	
+
     aabb = { bboxMinX, bboxMinY, bboxMinZ, bboxMaxX, bboxMaxY, bboxMaxZ };
-	
+
     MemoryBuffer aabb_buffer(sizeof(OptixAabb));
     aabb_buffer.Write(aabb);
-	
+
     OptixBuildInput buildInput = {};
     buildInput.type = OPTIX_BUILD_INPUT_TYPE_CUSTOM_PRIMITIVES;
     buildInput.customPrimitiveArray.aabbBuffers = &*aabb_buffer;

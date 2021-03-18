@@ -1,7 +1,13 @@
 #include "OutputLayer.h"
 
-#include "LumenPT.h"
-#include "Framework/Camera.h"
+//#include "LumenPT.h"
+//#include "Framework/Camera.h"
+
+#ifdef WAVEFRONT
+#include "../../LumenPT/src/Framework/WaveFrontRenderer.h"
+#else
+#include "../../LumenPT/src/Framework/OptiXRenderer.h"
+#endif
 
 #include "Lumen/Input.h"
 #include "Lumen/ModelLoading/SceneManager.h"
@@ -63,32 +69,49 @@ OutputLayer::OutputLayer()
 
 	m_Program = program;
 
-	LumenPT::InitializationData init{};
-
-#ifdef WAVEFRONT
+	LumenRenderer::InitializationData init{};
 	init.m_RenderResolution = { 800, 600 };
 	init.m_OutputResolution = { 800, 600 };
 	init.m_MaxDepth = 1;
 	init.m_RaysPerPixel = 1;
 	init.m_ShadowRaysPerPixel = 1;
-#else
-#endif
+//#ifdef WAVEFRONT
+//	init.m_RenderResolution = { 800, 600 };
+//	init.m_OutputResolution = { 800, 600 };
+//	init.m_MaxDepth = 1;
+//	init.m_RaysPerPixel = 1;
+//	init.m_ShadowRaysPerPixel = 1;
+//#else
+//#endif
 
-	m_LumenPT = std::make_unique<LumenPT>(init);
+#ifdef WAVEFRONT
+
+	m_Renderer = std::make_unique<WaveFront::WaveFrontRenderer>();
+
+	WaveFront::WaveFrontSettings settings{};
+	settings.depth = 3;
+	settings.minIntersectionT = 0.1f;
+	settings.maxIntersectionT = 5000.f;
+	settings.renderResolution = { 800, 600 };
+	settings.outputResolution = { 800, 600 };
+
+	static_cast<WaveFront::WaveFrontRenderer*>(m_Renderer.get())->Init(settings);
+
+#else
+	m_Renderer = std::make_unique<OptiXRenderer>(init);
+#endif
 }
 
 OutputLayer::~OutputLayer()
-{
+{										    
 	glDeleteProgram(m_Program);
 }
 
 void OutputLayer::OnUpdate(){
 
-	HandleCameraInput(m_LumenPT->m_Camera);
+	HandleCameraInput(*m_Renderer->m_Scene->m_Camera);
+	auto texture = m_Renderer->TraceFrame(m_Renderer->m_Scene); // TRACE SUM
 	HandleSceneInput();
-
-	auto texture = m_LumenPT->TraceFrame(); // TRACE SUM
-
 
 	glBindTexture(GL_TEXTURE_2D, texture);
 	glUseProgram(m_Program);
@@ -98,9 +121,9 @@ void OutputLayer::OnUpdate(){
 void OutputLayer::OnImGuiRender()
 {
 	ImGuiCameraSettings();
-    if (!m_LumenPT->m_Scene->m_MeshInstances.empty())
+    if (!m_Renderer->m_Scene->m_MeshInstances.empty())
     {
-		auto& tarTransform = m_LumenPT->m_Scene->m_MeshInstances[0]->m_Transform;
+		auto& tarTransform = m_Renderer->m_Scene->m_MeshInstances[0]->m_Transform;
 
 		glm::vec3 pos, scale, rot;
 		pos = tarTransform.GetPosition();
@@ -129,9 +152,9 @@ void OutputLayer::OnImGuiRender()
 
     }
 
-	if (!m_LumenPT->m_Scene->m_VolumeInstances.empty())
+	if (!m_Renderer->m_Scene->m_VolumeInstances.empty())
 	{
-		auto& tarTransform = m_LumenPT->m_Scene->m_VolumeInstances[0]->m_Transform;
+		auto& tarTransform = m_Renderer->m_Scene->m_VolumeInstances[0]->m_Transform;
 
 		glm::vec3 pos, scale, rot;
 		pos = tarTransform.GetPosition();
@@ -143,7 +166,6 @@ void OutputLayer::OnImGuiRender()
 		ImGui::DragFloat3("Scale", &scale[0]);
 		ImGui::DragFloat3("Rotation", &rot[0]);
 		
-
 		tarTransform.SetPosition(pos);
 		tarTransform.SetScale(scale);
 
@@ -175,7 +197,7 @@ void OutputLayer::InitializeScenePresets()
 
 	assetPath += "/Sandbox/assets/models/";
 
-	auto& scene = m_LumenPT->m_Scene;
+	auto& scene = m_Renderer->m_Scene;
 	auto assetManager = m_LayerServices->m_SceneManager;
 
 	// Sample scene loading preset
@@ -184,7 +206,7 @@ void OutputLayer::InitializeScenePresets()
 	{
 	    auto fileName = "Lantern.gltf";
 
-		auto scene = m_LumenPT->m_Scene;
+		auto scene = m_Renderer->m_Scene;
 		// I suggest doing a scene clear so that we don't end up with scenes with duplicate meshes
 		scene->Clear();	
 
@@ -201,7 +223,7 @@ void OutputLayer::InitializeScenePresets()
 	pres.m_Function = [this, assetManager, assetPath]()
 	{
 		auto fileName = "Sponza.gltf";
-		auto scene = m_LumenPT->m_Scene;
+		auto scene = m_Renderer->m_Scene;
 		scene->Clear();
 
 		auto res = assetManager->LoadGLTF(fileName, assetPath);
@@ -231,9 +253,8 @@ void OutputLayer::HandleCameraInput(Camera& a_Camera)
 	glm::vec3 movementDirection = glm::vec3(0.f, 0.f, 0.f);
 	glm::vec3 eye, U, V, W;
 	a_Camera.GetVectorData(eye, U, V, W);
-
-
-	if (Lumen::Input::IsKeyPressed(LMN_KEY_W))	
+	
+	if (Lumen::Input::IsKeyPressed(LMN_KEY_W))
 	{
 		movementDirection += glm::normalize(W) * movementSpeed;
 	}

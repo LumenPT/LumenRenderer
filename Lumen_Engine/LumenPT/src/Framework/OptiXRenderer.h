@@ -3,9 +3,7 @@
 #include "MemoryBuffer.h"
 #include "ShaderBindingTableRecord.h"
 #include "../Shaders/CppCommon/LaunchParameters.h"
-#include "Camera.h"
 #include "PTServiceLocator.h"
-#include "MotionVectors.h"
 
 #include "Renderer/LumenRenderer.h"
 
@@ -33,10 +31,10 @@ class OptiXRenderer : public LumenRenderer
 {
 public:
 
-    struct InitializationData
+    /*struct InitializationData
     {
 
-    };
+    };*/
 
     OptiXRenderer(const InitializationData& a_InitializationData);
     ~OptiXRenderer();
@@ -84,13 +82,12 @@ public:
 	
     void CreateOutputBuffer();
 
-    GLuint TraceFrame();
+    unsigned int TraceFrame(std::shared_ptr<Lumen::ILumenScene>& a_Scene) override;
 
-    Camera m_Camera;
+    //Camera m_Camera;
 
     Lumen::Transform m_TestTransform;
 
-    MotionVectors m_MotionVectors;
 	
 private:
     static void DebugCallback(unsigned int a_Level, const char* a_Tag, const char* a_Message, void* /*extra data provided during context initialization*/);

@@ -81,9 +81,13 @@ __global__ void __raygen__draw_solid_color()
         params.W
     );
 
-    unsigned int p0, p1, p2, p3, p4, p5;
+    unsigned int p0, p1, p2, p3, depth;
 
-    optixTrace(params.m_Handle, origin, dir, 0.0f, 5000.0f, 0.0f, OptixVisibilityMask(255), OPTIX_RAY_FLAG_NONE, 0, 1, 0, p0, p1, p2, p3, p4, p5);
+	//opaque trace
+    optixTrace(params.m_Handle, origin, dir, 0.0f, 5000.0f, 0.0f, OptixVisibilityMask(128), OPTIX_RAY_FLAG_NONE, 0, 1, 0, p0, p1, p2, p3, depth);
+	
+	//volumetric trace
+	optixTrace(params.m_Handle, origin, dir, 0.0f, depth, 0.0f, OptixVisibilityMask(64), OPTIX_RAY_FLAG_NONE, 0, 1, 0, p0, p1, p2, p3, depth);
 
     float3 col = make_float3(0.4f, 0.5f, 0.9f);
 
@@ -108,13 +112,10 @@ __global__ void __miss__MissShader()
 
     float3 col = make_float3(0.4f, 0.5f, 0.9f);
 
-    optixSetPayload_0(col.x);
-    optixSetPayload_1(col.y);
-    optixSetPayload_2(col.z);
-
-    optixSetPayload_3(col.x);
-    optixSetPayload_4(col.y);
-    optixSetPayload_5(col.z);
+    //optixSetPayload_0(42);
+    //optixSetPayload_1(float_as_int(msd->m_Color.y));
+    //optixSetPayload_2(float_as_int(msd->m_Color.z));
+    //optixSetPayload_3(0);
 }
 
 extern "C"
@@ -145,10 +146,7 @@ __global__ void __closesthit__HitShader()
     const float3 rayDir = optixGetWorldRayDirection();
     const float t = optixGetRayTmax();
 
-    float3 hitPosition = rayOrig + rayDir * t;
-	
-    optixSetPayload_3(float_as_int(hitPosition.x));
-    optixSetPayload_4(float_as_int(hitPosition.y));
-    optixSetPayload_5(float_as_int(hitPosition.z));
+    optixSetPayload_3(1);
+	optixSetPayload_4(float_as_int(optixGetRayTmax()));
 }
 
