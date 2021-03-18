@@ -33,8 +33,20 @@ CPU_ONLY void GenerateRays(const SetupLaunchParameters& a_SetupParams)
 
 }
 
-CPU_ONLY void GenerateMotionVectors()
+CPU_ON_GPU void GenerateMotionVector(
+    const MotionVectorBuffer* a_Buffer,
+    uint2 a_Resolution)
 {
+    printf("yeet");
+}
+
+CPU_ONLY void GenerateMotionVectors(const MotionVectorsGenerationData& a_MotionVectorsData)
+{
+    const int numPixels = a_MotionVectorsData.m_ScreenResolution.x * a_MotionVectorsData.m_ScreenResolution.y;
+    const int blockSize = 256;
+    const int numBlocks = (numPixels + blockSize - 1) / blockSize;
+
+    GenerateMotionVector<<<numBlocks, blockSize>>>(nullptr, a_MotionVectorsData.m_ScreenResolution);
 }
 
 CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)

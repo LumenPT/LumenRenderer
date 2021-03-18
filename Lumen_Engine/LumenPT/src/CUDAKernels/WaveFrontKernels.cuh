@@ -24,7 +24,7 @@ CPU_ONLY void GenerateRays(const SetupLaunchParameters& a_SetupParams);
 /*
  * 
  */
-CPU_ONLY void GenerateMotionVectors();
+CPU_ONLY void GenerateMotionVectors(const MotionVectorsGenerationData& a_MotionVectorsData);
 
 /*
  * Called each wave after resolving a RayBatch.

@@ -2,6 +2,7 @@
 #include "CudaDefines.h"
 #include "ModelStructs.h"
 #include "ReSTIRData.h"
+#include "../Framework/MotionVectors.h"
 
 #include <Optix/optix.h>
 #include <Cuda/cuda/helpers.h>
@@ -876,4 +877,10 @@ namespace WaveFront
 
     };
 
+    struct MotionVectorsGenerationData
+    {
+        const MotionVectorBuffer* m_MotionVectorBuffer;
+        uint2 m_ScreenResolution;
+
+    };
 }

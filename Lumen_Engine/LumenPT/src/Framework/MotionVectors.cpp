@@ -1,5 +1,7 @@
 #include "MotionVectors.h"
 
+#include "../CUDAKernels/WaveFrontKernels.cuh"
+
 MotionVectors::MotionVectors(uint2 a_Resolution) :
 	m_Resolution(a_Resolution)
 {
@@ -15,6 +17,12 @@ MotionVectors::MotionVectors(uint2 a_Resolution) :
         static_cast<size_t>(motionVectorDataStructSize));
 	
     m_MotionVectorBuffer->Write(numPixels, 0);
+
+    MotionVectorsGenerationData motionVectorsGenerationData;
+    motionVectorsGenerationData.m_MotionVectorBuffer = nullptr;
+    motionVectorsGenerationData.m_ScreenResolution = m_Resolution;
+	
+    GenerateMotionVectors(motionVectorsGenerationData);
 }
 
 MotionVectors::~MotionVectors()
