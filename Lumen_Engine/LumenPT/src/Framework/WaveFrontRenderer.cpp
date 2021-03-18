@@ -92,19 +92,19 @@ namespace WaveFront
 
         //Temporary lights, stored in the buffer.
         float3 pos1, pos2, pos3;
-        pos1 = { 200.f, 40.f, 210.f };
-        pos2 = { 200.f, 40.f, 110.f };
-        pos3 = { 100.f, 40.f, 210.f };
+        pos1 = { 150.f, 41.f, 210.f };
+        pos2 = { 150.f, 41.f, 110.f };
+        pos3 = { 90.f, 41.f, 210.f };
 
-        float i1 = 300000.f;
-        float i2 = 30000.f;
+        float i1 = 3000000.f;
+        float i2 = 300000.f;
         float i3 = 699999.f;
 
         TriangleLight lights[numLights] =
         {
-            {pos1, pos1, pos1, {0.f, 0.f, 0.f}, {i1, i1, i1}, 0.f},
-            {pos2, pos2, pos2, {0.f, 0.f, 0.f}, {i2, i2, i2}, 0.f},
-            {pos3, pos3, pos3, {0.f, 0.f, 0.f}, {i3, i3, i3}, 0.f}
+            {pos1, pos1, pos1, {0.f, 0.f, 0.f}, {i1, i1, i1}, 10.f},
+            {pos2, pos2, pos2, {0.f, 0.f, 0.f}, {i2, i2, i2}, 10.f},
+            {pos3, pos3, pos3, {0.f, 0.f, 0.f}, {i3, i3, i3}, 10.f}
         };
 
         m_TriangleLights.Write(&lights[0], sizeof(TriangleLight) * numLights, 0);
