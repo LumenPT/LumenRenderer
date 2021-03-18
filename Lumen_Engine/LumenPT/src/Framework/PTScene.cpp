@@ -117,3 +117,4 @@ void PTScene::UpdateSceneAccelerationStructure()
     }
 
 }
+

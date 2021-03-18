@@ -91,7 +91,7 @@ void OptiXRenderer::InitializePipelineOptions()
     m_PipelineCompileOptions.traversableGraphFlags = OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_ANY;
     m_PipelineCompileOptions.numAttributeValues = 3;
     // Defines how many 32-bit values can be output by a miss or hit shader
-    m_PipelineCompileOptions.numPayloadValues = 4;
+    m_PipelineCompileOptions.numPayloadValues = 5;
     // What exceptions can the pipeline throw.
     m_PipelineCompileOptions.exceptionFlags = OptixExceptionFlags::OPTIX_EXCEPTION_FLAG_DEBUG
     | OPTIX_EXCEPTION_FLAG_TRACE_DEPTH | OPTIX_EXCEPTION_FLAG_STACK_OVERFLOW;
