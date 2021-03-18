@@ -91,10 +91,22 @@ namespace WaveFront
         m_TriangleLights.Resize(sizeof(TriangleLight) * numLights);
 
         //Temporary lights, stored in the buffer.
-        TriangleLight lights[numLights] = {
-            {{0.f, 10.f, 20.f}, {0.f, 10.f, 20.f}, {0.f, 10.f, 20.f}, {0.f, 0.f, 0.f}, {100.f, 100.f, 0.f}, 0.f},
-            {{100.f, 180.f, 20.f}, {100.f, 180.f, 20.f}, {100.f, 180.f, 20.f}, {0.f, 0.f, 0.f}, {100.f, 0.f, 100.f}, 0.f},
-            {{200.f, 20.f, 110.f}, {200.f, 20.f, 110.f}, {200.f, 20.f, 110.f}, {0.f, 0.f, 0.f}, {0.f, 1000.f, 1000.f}, 0.f} };
+        float3 pos1, pos2, pos3;
+        pos1 = { 200.f, 40.f, 210.f };
+        pos2 = { 200.f, 40.f, 110.f };
+        pos3 = { 100.f, 40.f, 210.f };
+
+        float i1 = 300000.f;
+        float i2 = 30000.f;
+        float i3 = 699999.f;
+
+        TriangleLight lights[numLights] =
+        {
+            {pos1, pos1, pos1, {0.f, 0.f, 0.f}, {i1, i1, i1}, 0.f},
+            {pos2, pos2, pos2, {0.f, 0.f, 0.f}, {i2, i2, i2}, 0.f},
+            {pos3, pos3, pos3, {0.f, 0.f, 0.f}, {i3, i3, i3}, 0.f}
+        };
+
         m_TriangleLights.Write(&lights[0], sizeof(TriangleLight) * numLights, 0);
 
         //Set the service locator pointer to point to the m'table.

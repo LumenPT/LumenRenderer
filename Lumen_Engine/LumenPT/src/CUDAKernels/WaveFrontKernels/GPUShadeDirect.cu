@@ -37,32 +37,28 @@ CPU_ON_GPU void ShadeDirect(
 
             for(unsigned int lightIndex = 0; lightIndex < a_NumLights && a_NumLights <= 7; ++lightIndex)
             {
-
-
                 const TriangleLight& light = a_Lights[lightIndex];
 
                 float3 lightCenter = (light.p0 + light.p1 + light.p2) / 3.f;
 
                 float3 shadowRayDir = surfaceData.m_Position - lightCenter;
-                float lightDistance = length(shadowRayDir);
+                const float lightDistance = length(shadowRayDir);
                 shadowRayDir = shadowRayDir / lightDistance;
 
-                float cosFactor = dot(shadowRayDir, -surfaceData.m_Normal);
+                float cosFactor = dot(-shadowRayDir, surfaceData.m_Normal);
                 cosFactor = fmax(cosFactor, 0.f);
 
-                float3 irradiance = cosFactor * (light.radiance / lightDistance * lightDistance);
+                float3 irradiance = cosFactor * (light.radiance / (lightDistance * lightDistance));
 
                 //HACK: apply epsilon... very hacky, very temporary
-                float3 shadowRayOrigin = surfaceData.m_Position + (shadowRayDir * 0.001f);
+                float3 shadowRayOrigin = surfaceData.m_Position + (shadowRayDir * 0.01f);
 
                 ShadowRayData shadowRay(
                     i,
                     shadowRayOrigin,
                     shadowRayDir,
-                    0.1f,
-                    //lightDistance - 0.001f,
-                    //surfaceData.m_Color * irradiance * surfaceData.m_TransportFactor,
-                    surfaceData.m_Color,
+                    lightDistance - 0.01f,
+                    surfaceData.m_Color * irradiance * surfaceData.m_TransportFactor,
                     LightChannel::DIRECT);
 
                 a_ShadowRays->Add(&shadowRay);
