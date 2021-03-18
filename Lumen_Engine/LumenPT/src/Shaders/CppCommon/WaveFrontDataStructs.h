@@ -879,7 +879,7 @@ namespace WaveFront
 
     struct MotionVectorsGenerationData
     {
-        const MotionVectorBuffer* m_MotionVectorBuffer;
+        MotionVectorBuffer* m_MotionVectorBuffer;
         uint2 m_ScreenResolution;
 
     };

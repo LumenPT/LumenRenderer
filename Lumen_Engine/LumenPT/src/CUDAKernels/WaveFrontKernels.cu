@@ -34,19 +34,34 @@ CPU_ONLY void GenerateRays(const SetupLaunchParameters& a_SetupParams)
 }
 
 CPU_ON_GPU void GenerateMotionVector(
-    const MotionVectorBuffer* a_Buffer,
+    MotionVectorBuffer* a_Buffer,
     uint2 a_Resolution)
 {
-    printf("yeet");
+    int size = a_Resolution.x * a_Resolution.y;
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    int stride = blockDim.x * gridDim.x;
+
+    for (int i = index; i < size; i += stride)
+    {
+        MotionVectorData motionVectorData;
+        motionVectorData.m_Velocity = make_float2(1.f, 1.f);
+
+        a_Buffer->SetMotionVectorData(motionVectorData, i);
+
+        a_Buffer->m_MotionVectorBuffer[0].m_Velocity;
+        //printf("x: %.6f y: %.6f \n", a_Buffer->m_MotionVectorBuffer[i].m_Velocity.x, a_Buffer->m_MotionVectorBuffer[i].m_Velocity.y);
+    }
 }
 
-CPU_ONLY void GenerateMotionVectors(const MotionVectorsGenerationData& a_MotionVectorsData)
+CPU_ONLY void GenerateMotionVectors(MotionVectorsGenerationData& a_MotionVectorsData)
 {
     const int numPixels = a_MotionVectorsData.m_ScreenResolution.x * a_MotionVectorsData.m_ScreenResolution.y;
     const int blockSize = 256;
     const int numBlocks = (numPixels + blockSize - 1) / blockSize;
 
-    GenerateMotionVector<<<numBlocks, blockSize>>>(nullptr, a_MotionVectorsData.m_ScreenResolution);
+    GenerateMotionVector<<<numBlocks, blockSize>>>(a_MotionVectorsData.m_MotionVectorBuffer, a_MotionVectorsData.m_ScreenResolution);
+
+    cudaDeviceSynchronize();
 }
 
 CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
