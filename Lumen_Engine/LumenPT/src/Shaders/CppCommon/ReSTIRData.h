@@ -4,8 +4,10 @@
  * This file contains data structures used by ReSTIR on the GPU.
  */
 
+#include "CudaDefines.h"
+#include "WaveFrontDataStructs/LightDataBuffer.h"
+
 #include <Optix/optix.h>
-#include "../Shaders/CppCommon/CudaDefines.h"
 #include <Cuda/cuda/helpers.h>
 #include <assert.h>
 #include <limits>
@@ -62,19 +64,6 @@ struct ReSTIRSettings
     static constexpr bool enableTemporal = true;
 };
 
-//Data about a pixels world position.
-struct PixelData
-{
-    int index;                      //The index of this pixel.
-    float3 directionIncoming;       //The direction from which this pixel was hit.
-    float3 worldPosition;           //The world position of this pixel.
-    float3 worldNormal;             //The surface normal of this pixel.
-    float3 diffuse;                 //The diffuse color of this pixels material.
-    float metallic;                 //The metallic factor of this pixel.
-    float roughness;                //The roughness factor of this pixel.
-    float depth;                    //The depth along the incoming ray at which the intersection happened.
-};
-
 /*
  * A visibility ray used by ReSTIR to determine if a light sample is occluded or not.
  */
@@ -99,17 +88,6 @@ struct LightSample
     float area;
     float3 unshadowedPathContribution;       //Contribution with geometry and BSDF taken into account.
     float solidAnglePdf;                    //solid angle PDF which is used to weight this samples importance.
-};
-
-/*
- * An emissive triangle.
- */
-struct TriangleLight
-{
-    float3 p0, p1, p2;
-    float3 normal;
-    float3 radiance;    //Radiance has the texture color baked into it. Probably average texture color.
-    float area;         //The area of the triangle. This is required to project the light onto a hemisphere.
 };
 
 /*
@@ -273,18 +251,6 @@ struct CDF
 
 struct LightBagEntry
 {
-    TriangleLight light;
+    WaveFront::TriangleLight light;
     float pdf;
-};
-
-/*
- * Data required by Optix to resolve shadow rays.
- */
-struct ReSTIROptixParameters
-{
-    OptixTraversableHandle optixSceneHandle;
-    std::uint32_t numRays;
-
-    RestirShadowRay* shadowRays;
-    Reservoir* reservoirs;
 };

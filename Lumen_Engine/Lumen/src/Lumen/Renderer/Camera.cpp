@@ -3,8 +3,6 @@
 #include <assert.h>
 
 #include <glm/gtx/rotate_vector.hpp>
-#include <Cuda/cuda/helpers.h>
-#include <Optix/optix_types.h>
 
 Camera::Camera() :
 	m_DirtyFlag(true)
@@ -46,17 +44,19 @@ void Camera::SetLookAt(glm::vec3 a_Position, glm::vec3 a_LookAtPos, glm::vec3 a_
 	m_DirtyFlag = true;
 }
 
-void Camera::IncrementYaw(float AngleInRadians)
-{
-	m_Rotation = glm::angleAxis(AngleInRadians, glm::vec3(m_WorldUp)) * m_Rotation;
-	m_DirtyFlag = true;
-}
-
-void Camera::IncrementPitch(float AngleInRadians)
+void Camera::IncrementYaw(const float& a_AngleInRadians)
 {
 	UpdateCameraVectors();
 	
-	m_Rotation = glm::angleAxis(AngleInRadians, glm::vec3(m_Right)) * m_Rotation;
+	m_Rotation = glm::angleAxis(a_AngleInRadians, glm::vec3(m_WorldUp)) * m_Rotation;
+	m_DirtyFlag = true;
+}
+
+void Camera::IncrementPitch(const float& a_AngleInRadians)
+{
+	UpdateCameraVectors();
+	
+	m_Rotation = glm::angleAxis(a_AngleInRadians, glm::vec3(m_Right)) * m_Rotation;
 	m_DirtyFlag = true;
 }
 
@@ -74,27 +74,6 @@ void Camera::GetVectorData(glm::vec3& a_Eye, glm::vec3& a_U, glm::vec3& a_V, glm
 	a_V = m_Up * m_ImagePlaneHalfSize.y;
 
 	a_W = m_Forward * m_FocalLength;
-}
-
-void Camera::GetVectorData(float3& a_Eye, float3& a_U, float3& a_V, float3& a_W)
-{
-
-	if(m_DirtyFlag)
-	{
-		UpdateValues();
-	}
-
-	a_Eye = make_float3(m_Position.x, m_Position.y, m_Position.z);
-
-	glm::vec3 U = m_Right * m_ImagePlaneHalfSize.x;
-	a_U = make_float3(U.x, U.y, U.z);
-
-	glm::vec3 V = m_Up * m_ImagePlaneHalfSize.y;
-	a_V = make_float3(V.x, V.y, V.z);
-
-	glm::vec3 W = m_Forward * m_FocalLength;
-	a_W = make_float3(W.x, W.y, W.z);
-
 }
 
 void Camera::UpdateValues()

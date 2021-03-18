@@ -20,6 +20,7 @@ namespace Lumen
         virtual void SetDiffuseColor(const glm::vec4& a_NewDiffuseColor) = 0;
         virtual void SetDiffuseTexture(std::shared_ptr<ILumenTexture> a_NewDiffuseTexture) = 0;
         virtual void SetEmission(const glm::vec3& a_EmssivionVal = glm::vec3(1.0f, 1.0f, 1.0f)) = 0;
+        virtual void SetEmissiveTexture(std::shared_ptr<ILumenTexture> a_EmissiveTexture) = 0;
     	
         virtual glm::vec4 GetDiffuseColor() const = 0;
         virtual ILumenTexture& GetDiffuseTexture() const = 0;

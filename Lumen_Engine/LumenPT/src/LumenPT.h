@@ -9,7 +9,7 @@
 
 #include "Framework/WaveFrontRenderer.h"
 
-using LumenPT = WaveFrontRenderer;
+using LumenPT = WaveFront::WaveFrontRenderer;
 
 #else
 

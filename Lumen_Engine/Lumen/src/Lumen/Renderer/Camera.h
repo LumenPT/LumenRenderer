@@ -3,15 +3,13 @@
 #include <glm/glm.hpp>
 #include <glm/gtx/quaternion.hpp>
 
-class float3;
-
 //#include "Lumen.h"
 
 class Camera
 {
 public:
 	Camera();
-	Camera(glm::vec3 a_Position, glm::vec3 a_Up);
+	Camera(glm::vec3 a_Position, glm::vec3 a_Up = glm::vec3(0.0f,1.0f,0.0f));
 	~Camera();
 
 	//TODO: set lookat
@@ -23,15 +21,14 @@ public:
 	
 	void SetLookAt(glm::vec3 a_Position, glm::vec3 a_LookAt, glm::vec3 a_WorldUp);
 
-	void IncrementYaw(float AngleInRadians);
+	void IncrementYaw(const float& a_AngleInRadians);
 
-	void IncrementPitch(float AngleInRadians);
+	void IncrementPitch(const float& a_AngleInRadians);
 
 	void SetAspectRatio(float a_AspectRatio) { m_AspectRatio = a_AspectRatio; m_DirtyFlag = true; }
 	float GetAspectRatio() { return m_AspectRatio; }
 	
 	void GetVectorData(glm::vec3& a_Eye, glm::vec3& a_U, glm::vec3& a_V, glm::vec3& a_W);
-	void GetVectorData(float3& a_Eye, float3& a_U, float3& a_V, float3& a_W);
 
 private:
 	void UpdateValues();

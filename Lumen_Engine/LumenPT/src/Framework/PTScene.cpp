@@ -61,7 +61,7 @@ void PTScene::UpdateSceneAccelerationStructure()
     {
         if (meshInstance->GetMesh())
         {
-            sbtMatchStructs &= static_cast<PTMesh*>(meshInstance->GetMesh().get())->VerifyStructCorrectness();            
+            sbtMatchStructs &= static_cast<PTMesh*>(meshInstance->GetMesh().get())->VerifyStructCorrectness();
         }
     }
 
@@ -82,7 +82,7 @@ void PTScene::UpdateSceneAccelerationStructure()
             auto& inst = instances.emplace_back();
             inst.traversableHandle = ptMesh->m_AccelerationStructure->m_TraversableHandle;
             inst.sbtOffset = 0;
-            inst.visibilityMask = 128;
+            inst.visibilityMask = 255;
             inst.instanceId = instanceID++;
             inst.flags = OPTIX_INSTANCE_FLAG_NONE;
 
@@ -100,7 +100,7 @@ void PTScene::UpdateSceneAccelerationStructure()
             auto& inst = instances.emplace_back();
             inst.traversableHandle = ptVolume->m_AccelerationStructure->m_TraversableHandle;
             inst.sbtOffset = ptVolume->m_RecordHandle.m_TableIndex;
-            inst.visibilityMask = 64;
+            inst.visibilityMask = 255;
             inst.instanceId = ptVolume->m_SceneEntry.m_TableIndex;
             inst.flags = OPTIX_INSTANCE_FLAG_NONE;
 
@@ -109,7 +109,12 @@ void PTScene::UpdateSceneAccelerationStructure()
         }
 
         m_AccelerationStructureDirty = false;
+#ifdef WAVEFRONT
+        m_SceneAccelerationStructure = m_Services.m_OptixWrapper->BuildInstanceAccelerationStructure(instances);
+#else
         m_SceneAccelerationStructure = m_Services.m_Renderer->BuildInstanceAccelerationStructure(instances);
+#endif
     }
 
 }
+

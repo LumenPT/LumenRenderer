@@ -23,6 +23,7 @@
 #include "Cuda/cuda_runtime.h"
 #include "Optix/optix_stubs.h"
 #include <glm/gtx/compatibility.hpp>
+#include <Optix/optix_function_table_definition.h>
 
 #include "PTVolume.h"
 
@@ -59,15 +60,12 @@ OptiXRenderer::OptiXRenderer(const InitializationData& a_InitializationData)
     m_ServiceLocator.m_Renderer = this;
     m_Texture = std::make_unique<Texture>(LumenPTConsts::gs_AssetDirectory + "debugTex.jpg");
 
-    m_ServiceLocator.m_SBTGenerator = m_ShaderBindingTableGenerator.get();
-    m_ServiceLocator.m_Renderer = this;
-
     CreateShaderBindingTable();
 
     m_SceneDataTable = std::make_unique<SceneDataTable>();
     m_ServiceLocator.m_SceneDataTable = m_SceneDataTable.get();
 
-    m_Camera.SetPosition(glm::vec3(0.f, 0.f, -50.f));
+   // m_Scene->m_Camera->SetPosition(glm::vec3(0.f, 0.f, -50.f));
 }
 
 OptiXRenderer::~OptiXRenderer()
@@ -403,7 +401,7 @@ ProgramGroupHeader OptiXRenderer::GetProgramGroupHeader(const std::string& a_Gro
 
 }
 
-GLuint OptiXRenderer::TraceFrame()
+unsigned int OptiXRenderer::TraceFrame(std::shared_ptr<Lumen::ILumenScene>& a_Scene)
 {
     std::vector<float3> vert = {
         {0.5f, 0.5f, 0.5f},
@@ -425,7 +423,7 @@ GLuint OptiXRenderer::TraceFrame()
     OptixShaderBindingTable sbt = m_ShaderBindingTableGenerator->GetTableDesc();
 
     params.m_SceneData = m_SceneDataTable->GetDevicePointer();
-    auto str = static_cast<PTScene*>(m_Scene.get())->GetSceneAccelerationStructure();
+    auto str = static_cast<PTScene*>(a_Scene.get())->GetSceneAccelerationStructure();
 
     params.m_Image = m_OutputBuffer->GetDevicePointer();
     params.m_Handle = str;
@@ -434,9 +432,9 @@ GLuint OptiXRenderer::TraceFrame()
     params.m_ImageHeight = gs_ImageHeight;
     params.m_VertexBuffer = vertexBuffer.GetDevicePtr<Vertex>();
 
-    m_Camera.SetAspectRatio(static_cast<float>(gs_ImageWidth) / static_cast<float>(gs_ImageHeight));
+    a_Scene->m_Camera->SetAspectRatio(static_cast<float>(gs_ImageWidth) / static_cast<float>(gs_ImageHeight));
     glm::vec3 eye, U, V, W;
-    m_Camera.GetVectorData(eye, U, V, W);
+    a_Scene->m_Camera->GetVectorData(eye, U, V, W);
     params.eye = make_float3(eye.x, eye.y, eye.z);
     params.U = make_float3(U.x, U.y, U.z);
     params.V = make_float3(V.x, V.y, V.z);

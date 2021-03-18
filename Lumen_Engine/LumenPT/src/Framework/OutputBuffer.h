@@ -9,6 +9,7 @@ class OutputBuffer
 {
 public:
     OutputBuffer(uint32_t a_Width, uint32_t a_Height);
+    OutputBuffer();
     ~OutputBuffer();
 
     uchar4* GetDevicePointer();

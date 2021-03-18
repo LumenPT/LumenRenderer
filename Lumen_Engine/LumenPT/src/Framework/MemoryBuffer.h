@@ -26,7 +26,7 @@ public:
 
     void Read(void* a_Dst, size_t a_ReadSize, size_t a_SrcOffset) const;
 
-    void CopyFrom(MemoryBuffer a_MemoryBuffer, size_t a_Size, size_t a_DstOffset = 0, size_t a_SrcOffset = 0);
+    void CopyFrom(MemoryBuffer& a_MemoryBuffer, size_t a_Size, size_t a_DstOffset = 0, size_t a_SrcOffset = 0);
 
     void Resize(size_t a_NewSize);
 
@@ -34,6 +34,10 @@ public:
 
     template<typename PointerType = void>
     PointerType* GetDevicePtr() const { return static_cast<PointerType*>(m_DevPtr); }
+
+    
+
+    unsigned long long GetCUDAPtr() const;
 
 private:
     union

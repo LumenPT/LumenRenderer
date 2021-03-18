@@ -6,6 +6,13 @@
 #include "../../vendor/Include/Optix/optix.h"
 #include "../../vendor/Include/Optix/optix_device.h"
 
+extern "C"
+{
+
+    __constant__ WaveFront::OptixLaunchParameters launchParams;
+
+}
+
 
 
 template<typename T>
@@ -29,209 +36,91 @@ __device__ __forceinline__ static void PackPointer(T const* const a_Ptr, unsigne
 
 }
 
-extern "C"
-{
 
-    __constant__ WaveFront::ResolveRaysLaunchParameters resolveRaysParams;
-
-}
 
 extern "C"
-__global__ void __raygen__ResolveRaysRayGen()
+__device__ __forceinline__ void IntersectionRaysRayGen()
 {
 
-    WaveFront::ResolveRaysRayGenData* rayGenData = reinterpret_cast<WaveFront::ResolveRaysRayGenData*>(optixGetSbtDataPointer());
-    const float minDistance = rayGenData->m_MinDistance;
-    const float maxDistance = rayGenData->m_MaxDistance;
 
-    //For each pixel:
+ 
     //1. Get ray definition from buffer
-    const uint3 launchIndex = optixGetLaunchIndex();
-    const uint3 launchDim = optixGetLaunchDimensions();
-
-    const unsigned numPixels = launchDim.x * launchDim.y;
-    const unsigned numPixelsBuffer = resolveRaysParams.m_Rays->m_NumPixels;
-    const unsigned maxPixelBufferSize = resolveRaysParams.m_Rays->GetSize();
-
-    const unsigned pixelIndex = launchIndex.y * launchDim.x + launchIndex.x;
-    const unsigned sampleIndex = launchIndex.z;
-
-    const unsigned int rayArrayIndex = resolveRaysParams.m_Rays->GetRayArrayIndex(pixelIndex, sampleIndex);
-    const WaveFront::RayData& rayData = resolveRaysParams.m_Rays->GetRay(rayArrayIndex);
+    const unsigned idx = optixGetLaunchIndex().x;
+    const WaveFront::IntersectionRayData& rayData = *launchParams.m_IntersectionRayBatch->GetData(idx);
 
     //2. Trace ray: optixTrace()
-
     WaveFront::IntersectionData intersection{};
-    intersection.m_RayArrayIndex = rayArrayIndex;
+    intersection.m_RayArrayIndex = idx;
+    intersection.m_PixelIndex = rayData.m_PixelIndex;
 
     unsigned int intersectionPtr_Up = 0;
     unsigned int intersectionPtr_Low = 0;
 
     PackPointer(&intersection, intersectionPtr_Up, intersectionPtr_Low);
 
-    const OptixTraversableHandle scene = resolveRaysParams.m_Common.m_Traversable;
+    const OptixTraversableHandle scene = launchParams.m_TraversableHandle;
 
-    if(rayData.IsValidRay())
-    {
-
-        optixTrace(
-            scene,
-            rayData.m_Origin,
-            rayData.m_Direction,
-            minDistance,
-            maxDistance,
-            0.f,
-            OptixVisibilityMask(255),
-            OPTIX_RAY_FLAG_NONE,
-            0, //SBT offset for selecting the SBT records to use
-            1, //SBT stride for selecting the SBT records to use, multiplied with SBT-GAS index
-            0,
-            intersectionPtr_Up,
-            intersectionPtr_Low);
-
-    }
+    optixTrace(
+        scene,
+        rayData.m_Origin,
+        rayData.m_Direction,
+        launchParams.m_MinMaxDistance.x,
+        launchParams.m_MinMaxDistance.y,
+        0.f, //Ray Time, can be 0 in our case.
+        OptixVisibilityMask(255),
+        OPTIX_RAY_FLAG_NONE,
+        0, //SBT offset for selecting the SBT records to use
+        0, //SBT stride for selecting the SBT records to use, multiplied with SBT-GAS index
+        0, //Miss SBT index, always use first miss shader.
+        intersectionPtr_Up,
+        intersectionPtr_Low);
 
     //3. Store IntersectionData in buffer
-
-    resolveRaysParams.m_Intersections->SetIntersection(intersection, pixelIndex, launchIndex.z);
-
-    return;
-
-}
-
-extern"C"
-__global__ void __closesthit__ResolveRaysClosestHit()
-{
-
-    DevicePrimitive* hitPrimitive = reinterpret_cast<DevicePrimitive*>(optixGetSbtDataPointer());
-    
-    //If closest hit found, return IntersectionData.
-    
-    const unsigned int intersectionPtr_Up = optixGetPayload_0();
-    const unsigned int intersectionPtr_Low = optixGetPayload_1();
-
-    
-    WaveFront::IntersectionData* intersection = UnpackPointer<WaveFront::IntersectionData>(intersectionPtr_Up, intersectionPtr_Low);
-    
-    intersection->m_IntersectionT = optixGetRayTmax();
-    intersection->m_UVs = optixGetTriangleBarycentrics();
-    intersection->m_PrimitiveIndex = optixGetPrimitiveIndex();
-    intersection->m_Primitive = hitPrimitive;
-
-    /*printf("Shader - Primitive: %p, m_IndexBuffer: %p, m_VertexBuffer: %p \n",
-        hitPrimitive,
-        hitPrimitive->m_IndexBuffer,
-        hitPrimitive->m_VertexBuffer);*/
+    launchParams.m_IntersectionBuffer->Add(&intersection);
 
     return;
-
-}
-
-extern"C"
-__global__ void __miss__ResolveRaysMiss()
-{
-
-    return;
-
-}
-
-
-
-extern "C"
-{
-
-    __constant__ WaveFront::ResolveShadowRaysLaunchParameters resolveShadowRaysParams;
 
 }
 
 extern "C"
-__global__ void __raygen__ResolveShadowRaysRayGen()
+__device__ __forceinline__ void ShadowRaysRayGen()
 {
 
-    WaveFront::ResolveShadowRaysRayGenData* rayGenData = reinterpret_cast<WaveFront::ResolveShadowRaysRayGenData*>(optixGetSbtDataPointer());
-    const float minDistance = rayGenData->m_MinDistance;
-    const float maxDistance = rayGenData->m_MaxDistance;
-
-    //For each pixel:
-    //For depth (num rays per pixel)
-    //1. Get shadow ray definition from buffer
-
-    const unsigned int numRaysPerPixel = resolveShadowRaysParams.m_ShadowRays->m_RaysPerPixel;
-    const unsigned int maxDepth = resolveShadowRaysParams.m_ShadowRays->m_MaxDepth;
-
-    const uint3 launchIndex = optixGetLaunchIndex();
-    const uint3 launchDim = optixGetLaunchDimensions();
-
-    const unsigned int pixelIndex = launchDim.x * launchIndex.y + launchIndex.x;
-    const unsigned int depthIndex = launchIndex.z;
-    const unsigned int rayIndex = 0;
-
-    /*printf("LaunchIndex: (%i, %i, %i) LaunchDim: (%i, %i, %i) PixelIndex: %i, DepthIndex: %i \n",
-        launchIndex.x, launchIndex.y, launchIndex.z,
-        launchDim.x, launchDim.y, launchDim.z,
-        pixelIndex,
-        depthIndex);*/
-
-    const unsigned int rayArrayIndex = resolveShadowRaysParams.m_ShadowRays->GetShadowRayArrayIndex(depthIndex, pixelIndex, rayIndex);
-    const WaveFront::ShadowRayData& rayData = resolveShadowRaysParams.m_ShadowRays->GetShadowRayData(rayArrayIndex);
+    unsigned int idx = optixGetLaunchIndex().x;
+    const WaveFront::ShadowRayData& rayData = *launchParams.m_ShadowRayBatch->GetData(idx);
 
     //2. Trace ray: optixTrace()
+    const OptixTraversableHandle scene = launchParams.m_TraversableHandle;
 
-    const OptixTraversableHandle scene = resolveRaysParams.m_Common.m_Traversable;
+    unsigned int isIntersection = 0;
 
-    WaveFront::Occlusion occlusion(rayData.m_MaxDistance);
+    optixTrace(
+        scene,
+        rayData.m_Origin,
+        rayData.m_Direction,
+        launchParams.m_MinMaxDistance.x,
+        rayData.m_MaxDistance,
+        0.f,
+        OptixVisibilityMask(255),
+        OPTIX_RAY_FLAG_NONE,
+        0,
+        1,
+        0,
+        isIntersection);
 
-    unsigned int occlusionPtr_Up = 0;
-    unsigned int occlusionPtr_Low = 0;
+    //3. If no hit, accumulate result in buffer
 
-    PackPointer(&occlusion, occlusionPtr_Up, occlusionPtr_Low);
-
-    if(rayData.IsValidRay())
+    if(isIntersection == 0)
     {
 
-        optixTrace(
-            scene,
-            rayData.m_Origin,
-            rayData.m_Direction,
-            minDistance,
-            maxDistance,
-            0.f,
-            OptixVisibilityMask(255),
-            OPTIX_RAY_FLAG_NONE,
-            0,
-            1,
-            0,
-            occlusionPtr_Up,
-            occlusionPtr_Low);
+        using namespace WaveFront;
 
-    }
+        unsigned int resultIndex =
+            static_cast<unsigned int>(LightChannel::NUM_CHANNELS) * rayData.m_PixelIndex +
+            static_cast<unsigned int>(rayData.m_OutputChannel);
 
-    ////3. If no hit, accumulate result in buffer;
+        launchParams.m_ResultBuffer[resultIndex] = rayData.m_PotentialRadiance;
 
-    float3 red = make_float3(1.f, 0.f, 1.f);
-    float3 blue = make_float3(0.f, 0.f, 1.f);
-
-    if(!occlusion.m_Occluded)
-    {
-        /*resolveShadowRaysParams.m_Results->SetPixel(rayData.m_PotentialRadiance, pixelIndex, rayData.m_OutputChannelIndex);
-
-        float3 setColor = resolveShadowRaysParams.m_Results->m_PixelBuffer->GetPixel(pixelIndex, static_cast<unsigned>(rayData.m_OutputChannelIndex));
-
-        const unsigned pixelArrIndex = resolveShadowRaysParams.m_Results->m_PixelBuffer->GetPixelArrayIndex(pixelIndex, static_cast<unsigned>(rayData.m_OutputChannelIndex));
-
-        const float3* pixelPtr = &resolveShadowRaysParams.m_Results->m_PixelBuffer->m_Pixels[pixelArrIndex];
-
-        if(setColor.x != 0.f || setColor.y != 0.f || setColor.z != 0.f)
-        {
-            printf("PixelIndex:%i PixelPtr: %p ColorSet: %f, %f, %f \n", pixelIndex, pixelPtr, setColor.x, setColor.y, setColor.z);
-        }*/
-
-        resolveShadowRaysParams.m_Results->SetPixel(red, pixelIndex, WaveFront::ResultBuffer::OutputChannel::DIRECT);
-
-    }
-    else
-    {
-        resolveShadowRaysParams.m_Results->SetPixel(blue, pixelIndex, WaveFront::ResultBuffer::OutputChannel::DIRECT);
     }
 
     return;
@@ -239,39 +128,134 @@ __global__ void __raygen__ResolveShadowRaysRayGen()
 }
 
 extern "C"
-__global__ void __anyhit__ResolveShadowRaysAnyHit()
+__device__ __forceinline__ void ReSTIRRayGen()
+{
+    //Launch as a 1D Array so that idx.x corresponds to the literal ray index.
+    const uint3 idx = optixGetLaunchIndex();
+
+    //Retrieve the data.
+    //const RestirShadowRay& rayData = reSTIRParams.shadowRays[idx.x];
+    //const OptixTraversableHandle scene = reSTIRParams.optixSceneHandle;
+    //auto reservoirIndex = rayData.index;
+
+    //optixTrace(
+    //    scene,
+    //    rayData.origin,
+    //    rayData.direction,
+    //    0.005f, //Prevent self shadowing so offset a little bit.
+    //    rayData.distance,   //Max distance already has a small offset to prevent self-shadowing.
+    //    0.f,
+    //    OptixVisibilityMask(255),
+    //    OPTIX_RAY_FLAG_NONE,
+    //    0,  //TODO
+    //    1,  //TODO
+    //    0,  //TODO
+    //    reservoirIndex  //Pass the reservoir index so that it can be set to 0 when a hit is found.
+    //);
+
+    return;
+}
+
+
+
+extern "C"
+__global__ void __raygen__WaveFrontRG()
 {
 
-    //If any hit found before max distance, return true;
+	switch (launchParams.m_TraceType)
+	{
+    case WaveFront::RayType::INTERSECTION_RAY:
+        //Primary rays
+        IntersectionRaysRayGen();
+        break;
+    case WaveFront::RayType::SHADOW_RAY:
+        //Shadow rays
+        ShadowRaysRayGen();
+        break;
+    case WaveFront::RayType::RESTIR_RAY:
+        //Actually Primary rays
+        //ReSTIRRayGen();
+        break;
+	}
 
-    const unsigned int intersectionPtr_Up = optixGetPayload_0();
-    const unsigned int intersectionPtr_Low = optixGetPayload_1();
+    return;
 
-    WaveFront::Occlusion* occlusion = UnpackPointer<WaveFront::Occlusion>(intersectionPtr_Up, intersectionPtr_Low);
+}
 
-    const float intersectionT = optixGetRayTmax();
 
-    if (intersectionT < occlusion->m_MaxDistance)
+extern "C"
+__global__ void __miss__WaveFrontMS()
+{
+
+    /*switch (launchParams.m_TraceType)
     {
-        occlusion->m_Occluded = true;
-        optixTerminateRay();
+    case WaveFront::RayType::INTERSECTION_RAY:
         return;
+        break;
+    case WaveFront::RayType::SHADOW_RAY:
+        return;
+        break;
+    case WaveFront::RayType::RESTIR_RAY:
+        return;
+        break;
+    }*/
+
+    return;
+
+}
+
+
+extern "C"
+__global__ void __anyhit__WaveFrontAH()
+{
+
+    switch (launchParams.m_TraceType)
+    {
+    case WaveFront::RayType::INTERSECTION_RAY:
+        break;
+    case WaveFront::RayType::SHADOW_RAY:
+        {
+            optixSetPayload_0(1);
+        }
+        break;
+    case WaveFront::RayType::RESTIR_RAY:
+        break;
     }
 
     return;
 
 }
 
+
 extern "C"
-__global__ void __miss__ResolveShadowRaysMiss()
+__global__ void __closesthit__WaveFrontCH()
 {
 
-    const unsigned int intersectionPtr_Up = optixGetPayload_0();
-    const unsigned int intersectionPtr_Low = optixGetPayload_1();
+    switch (launchParams.m_TraceType)
+    {
+    case WaveFront::RayType::INTERSECTION_RAY:
+        {
+            //If closest hit found, return IntersectionData.
+            const unsigned int intersectionPtr_Up = optixGetPayload_0();
+            const unsigned int intersectionPtr_Low = optixGetPayload_1();
+            WaveFront::IntersectionData* intersection = UnpackPointer<WaveFront::IntersectionData>(intersectionPtr_Up, intersectionPtr_Low);
 
-    WaveFront::Occlusion* occlusion = UnpackPointer<WaveFront::Occlusion>(intersectionPtr_Up, intersectionPtr_Low);
+            ////TODO: Try to fit this into 4 floats and one write.
+            intersection->m_IntersectionT = optixGetRayTmax();
+            intersection->m_Barycentrics = optixGetTriangleBarycentrics();
+            intersection->m_PrimitiveIndex = optixGetPrimitiveIndex();
+            intersection->m_InstanceId = optixGetInstanceId();
 
-    occlusion->m_Occluded = false;
+        }    
+        break;
+    case WaveFront::RayType::SHADOW_RAY:
+        break;
+    case WaveFront::RayType::RESTIR_RAY:
+        //Get the reservoir and set its weight to 0 so that it is no longer considered a valid candidate.
+        //reSTIRParams.reservoirs[optixGetAttribute_0()].weight = 0.f;
+        //optixTerminateRay();
+        break;
+    }
 
     return;
 

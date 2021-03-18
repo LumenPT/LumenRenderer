@@ -10,7 +10,6 @@
 #include <openvdb/io/io.h>
 
 #include "MemoryBuffer.h"
-#include "AccelerationStructure.h"
 
 PTVolume::PTVolume(PTServiceLocator& a_ServiceLocator)
 	: m_Services(a_ServiceLocator)
