@@ -29,6 +29,7 @@ public:
 	float GetAspectRatio() { return m_AspectRatio; }
 	
 	void GetVectorData(glm::vec3& a_Eye, glm::vec3& a_U, glm::vec3& a_V, glm::vec3& a_W);
+	void GetMatrixData(glm::mat4& a_PreviousFrameMatrix, glm::mat4& a_CurrentFrameMatrix) const;
 
 private:
 	void UpdateValues();
@@ -43,6 +44,9 @@ private:
 	glm::vec3 m_Up = glm::vec3(0.f, 1.f, 0.f);
 
 	glm::quat m_Rotation = glm::quat(1.f, 0.f, 0.f, 0.f);
+
+	glm::mat4 m_previousFrameMatrix;
+	glm::mat4 m_currentFrameMatrix;
 
 	float m_FocalLength = 1.0f;
 	float m_AspectRatio = 1.0f;

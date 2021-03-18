@@ -9,6 +9,8 @@ Camera::Camera() :
 {
 	UpdateCameraVectors();
 	UpdateImagePlane();
+
+	m_previousFrameMatrix = m_currentFrameMatrix;
 }
 
 Camera::Camera(glm::vec3 a_Position, glm::vec3 a_Up) :
@@ -18,6 +20,8 @@ Camera::Camera(glm::vec3 a_Position, glm::vec3 a_Up) :
 {
 	UpdateCameraVectors();
 	UpdateImagePlane();
+
+	m_previousFrameMatrix = m_currentFrameMatrix;
 }
 
 Camera::~Camera()
@@ -76,6 +80,12 @@ void Camera::GetVectorData(glm::vec3& a_Eye, glm::vec3& a_U, glm::vec3& a_V, glm
 	a_W = m_Forward * m_FocalLength;
 }
 
+void Camera::GetMatrixData(glm::mat4& a_PreviousFrameMatrix, glm::mat4& a_CurrentFrameMatrix) const
+{
+	a_PreviousFrameMatrix = a_PreviousFrameMatrix;
+	a_CurrentFrameMatrix = a_CurrentFrameMatrix;
+}
+
 void Camera::UpdateValues()
 {
 	UpdateImagePlane();
@@ -89,12 +99,15 @@ void Camera::UpdateImagePlane()
 }
 
 void Camera::UpdateCameraVectors()
-{	
-	glm::mat4 rotationMatrix = glm::toMat4(m_Rotation);
+{
+	m_previousFrameMatrix = m_currentFrameMatrix;
+	
+	m_currentFrameMatrix = glm::toMat4(m_Rotation);
+	m_currentFrameMatrix[3] = glm::vec4(m_Position, 1.0f);
 
-	m_Right = rotationMatrix[0];
-	m_Up = rotationMatrix[1];
-	m_Forward = rotationMatrix[2];
+	m_Right = m_currentFrameMatrix[0];
+	m_Up = m_currentFrameMatrix[1];
+	m_Forward = m_currentFrameMatrix[2];
 	
 	m_DirtyFlag = false;
 }
