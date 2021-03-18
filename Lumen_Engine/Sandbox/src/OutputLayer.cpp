@@ -23,7 +23,7 @@
 #include <iostream>
 
 OutputLayer::OutputLayer()
-	: m_CameraMovementSpeed(15.0f)
+	: m_CameraMovementSpeed(300.0f)
 	, m_CameraMouseSensitivity(0.2f)
 {
 	auto vs = glCreateShader(GL_VERTEX_SHADER);
