@@ -61,7 +61,7 @@ void PTScene::UpdateSceneAccelerationStructure()
     {
         if (meshInstance->GetMesh())
         {
-            sbtMatchStructs &= static_cast<PTMesh*>(meshInstance->GetMesh().get())->VerifyStructCorrectness();            
+            sbtMatchStructs &= static_cast<PTMesh*>(meshInstance->GetMesh().get())->VerifyStructCorrectness();
         }
     }
 
@@ -109,7 +109,11 @@ void PTScene::UpdateSceneAccelerationStructure()
         }
 
         m_AccelerationStructureDirty = false;
+#ifdef WAVEFRONT
         m_SceneAccelerationStructure = m_Services.m_OptixWrapper->BuildInstanceAccelerationStructure(instances);
+#else
+        m_SceneAccelerationStructure = m_Services.m_Renderer->BuildInstanceAccelerationStructure(instances);
+#endif
     }
 
 }

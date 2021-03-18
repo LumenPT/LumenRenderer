@@ -1,3 +1,4 @@
+#ifdef WAVEFRONT
 #include "OptixWrapper.h"
 #include "CudaUtilities.h"
 #include "MemoryBuffer.h"
@@ -502,3 +503,4 @@ void OptixWrapper::TraceRays(
     CHECKLASTCUDAERROR;
 
 }
+#endif

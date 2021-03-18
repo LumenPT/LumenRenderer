@@ -1,3 +1,4 @@
+#ifdef WAVEFRONT
 #include "ReSTIR.h"
 
 #include <cassert>
@@ -185,3 +186,4 @@ CDF* ReSTIR::GetCdfGpuPointer() const
 {
 	return static_cast<CDF*>(m_Cdf.GetDevicePtr());
 }
+#endif

@@ -34,8 +34,11 @@ void PTMesh::UpdateAccelerationStructure()
     }
 
     
-
+#ifdef WAVEFRONT
     m_AccelerationStructure = m_Services.m_OptixWrapper->BuildInstanceAccelerationStructure(instances);
+#else 
+    m_AccelerationStructure = m_Services.m_Renderer->BuildInstanceAccelerationStructure(instances);
+#endif
 }
 
 bool PTMesh::VerifyStructCorrectness()
