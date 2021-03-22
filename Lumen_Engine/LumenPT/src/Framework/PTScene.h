@@ -20,6 +20,8 @@ public:
     Lumen::MeshInstance* AddMesh() override;
     Lumen::VolumeInstance* AddVolume() override;
 
+    void Clear() override;
+
     void MarkSceneForUpdate();
 
     OptixTraversableHandle GetSceneAccelerationStructure();

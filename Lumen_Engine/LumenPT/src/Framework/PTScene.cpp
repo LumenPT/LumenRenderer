@@ -34,6 +34,14 @@ Lumen::VolumeInstance* PTScene::AddVolume()
     return m_VolumeInstances.back().get();
 }
 
+void PTScene::Clear()
+{
+    // Do the same as the parent class
+    // and mark the acceleration structure as dirty and waiting for an update
+    ILumenScene::Clear();
+    m_AccelerationStructureDirty = true;
+}
+
 void PTScene::MarkSceneForUpdate()
 {
     m_AccelerationStructureDirty = true;
@@ -53,7 +61,7 @@ void PTScene::UpdateSceneAccelerationStructure()
     {
         if (meshInstance->GetMesh())
         {
-            sbtMatchStructs &= static_cast<PTMesh*>(meshInstance->GetMesh().get())->VerifyStructCorrectness();            
+            sbtMatchStructs &= static_cast<PTMesh*>(meshInstance->GetMesh().get())->VerifyStructCorrectness();
         }
     }
 
@@ -74,7 +82,7 @@ void PTScene::UpdateSceneAccelerationStructure()
             auto& inst = instances.emplace_back();
             inst.traversableHandle = ptMesh->m_AccelerationStructure->m_TraversableHandle;
             inst.sbtOffset = 0;
-            inst.visibilityMask = 255;
+            inst.visibilityMask = 128;
             inst.instanceId = instanceID++;
             inst.flags = OPTIX_INSTANCE_FLAG_NONE;
 
@@ -92,8 +100,8 @@ void PTScene::UpdateSceneAccelerationStructure()
             auto& inst = instances.emplace_back();
             inst.traversableHandle = ptVolume->m_AccelerationStructure->m_TraversableHandle;
             inst.sbtOffset = ptVolume->m_RecordHandle.m_TableIndex;
-            inst.visibilityMask = 255;
-            inst.instanceId = instanceID++;
+            inst.visibilityMask = 64;
+            inst.instanceId = ptVolume->m_SceneEntry.m_TableIndex;
             inst.flags = OPTIX_INSTANCE_FLAG_NONE;
 
             auto transformMat = glm::transpose(ptvi.m_Transform.GetTransformationMatrix());
@@ -101,7 +109,12 @@ void PTScene::UpdateSceneAccelerationStructure()
         }
 
         m_AccelerationStructureDirty = false;
+#ifdef WAVEFRONT
+        m_SceneAccelerationStructure = m_Services.m_OptixWrapper->BuildInstanceAccelerationStructure(instances);
+#else
         m_SceneAccelerationStructure = m_Services.m_Renderer->BuildInstanceAccelerationStructure(instances);
+#endif
     }
 
 }
+

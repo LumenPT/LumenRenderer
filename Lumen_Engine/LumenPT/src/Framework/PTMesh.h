@@ -24,5 +24,5 @@ public:
 
     std::unique_ptr<AccelerationStructure> m_AccelerationStructure;
 private:
-    std::map<PTPrimitive*, uint32_t> m_LastUsedSBTOffsets;
+    std::map<PTPrimitive*, uint32_t> m_LastUsedInstanceIDs;
 };

@@ -36,6 +36,7 @@
 #include "Optix/optix.h"
 #include "CppCommon/LaunchParameters.h"
 #include "CppCommon/RenderingUtility.h"
+#include "CppCommon/SceneDataTableAccessor.h"
 
 extern "C" {
 __constant__ LaunchParameters params;
@@ -80,9 +81,13 @@ __global__ void __raygen__draw_solid_color()
         params.W
     );
 
-    unsigned int p0, p1, p2, p3;
+    unsigned int p0, p1, p2, p3, depth;
 
-    optixTrace(params.m_Handle, origin, dir, 0.0f, 1000.0f, 0.0f, OptixVisibilityMask(255), OPTIX_RAY_FLAG_NONE, 0, 1, 0, p0, p1, p2, p3);
+	//opaque trace
+    optixTrace(params.m_Handle, origin, dir, 0.0f, 5000.0f, 0.0f, OptixVisibilityMask(128), OPTIX_RAY_FLAG_NONE, 0, 1, 0, p0, p1, p2, p3, depth);
+	
+	//volumetric trace
+	optixTrace(params.m_Handle, origin, dir, 0.0f, depth, 0.0f, OptixVisibilityMask(64), OPTIX_RAY_FLAG_NONE, 0, 1, 0, p0, p1, p2, p3, depth);
 
     float3 col = make_float3(0.4f, 0.5f, 0.9f);
 
@@ -92,6 +97,8 @@ __global__ void __raygen__draw_solid_color()
         col.y = int_as_float(p1);
         col.z = int_as_float(p2);
     }
+
+    //void* prim = params.m_SceneData->GetTableEntry(0);
 
     params.m_Image[launch_index.y * params.m_ImageWidth + launch_index.x] =
         make_color( col );
@@ -103,16 +110,16 @@ __global__ void __miss__MissShader()
     MissData* msd = reinterpret_cast<MissData*>(optixGetSbtDataPointer());
 
 
-    optixSetPayload_0(42);
-    optixSetPayload_1(float_as_int(msd->m_Color.y));
-    optixSetPayload_2(float_as_int(msd->m_Color.z));
-    optixSetPayload_3(0);
+    //optixSetPayload_0(42);
+    //optixSetPayload_1(float_as_int(msd->m_Color.y));
+    //optixSetPayload_2(float_as_int(msd->m_Color.z));
+    //optixSetPayload_3(0);
 }
 
 extern "C"
 __global__ void __closesthit__HitShader()
 {
-    DevicePrimitive* prim = reinterpret_cast<DevicePrimitive*>(optixGetSbtDataPointer());;
+    DevicePrimitive* prim = params.m_SceneData->GetTableEntry<DevicePrimitive>(optixGetInstanceId());
 
     const float2 barycentrics = optixGetTriangleBarycentrics();
     float U = barycentrics.x;
@@ -156,5 +163,6 @@ __global__ void __closesthit__HitShader()
     //optixSetPayload_2(float_as_int(0.0f));
 
     optixSetPayload_3(1);
+	optixSetPayload_4(float_as_int(optixGetRayTmax()));
 }
 

@@ -1,12 +1,13 @@
 #pragma once
 
 #include "Lumen/Core.h"
-#include "Layer.h"
 
 #include <vector>
 
+
 namespace Lumen
 {
+	class Layer;
 	class LayerStack
 	{
 	public:

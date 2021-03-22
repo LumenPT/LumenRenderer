@@ -11,6 +11,30 @@
 //#include <string>
 #include <memory>
 
+Lumen::SceneManager::~SceneManager()
+{
+    for (auto loadedScene : m_LoadedScenes)
+    {
+		// Release the meshes and materials from each GLTFResource manually
+		auto& res = loadedScene.second;
+
+        for (auto& mesh : res.m_MeshPool)
+			mesh.reset();
+
+        for (auto& material : res.m_MaterialPool)
+			material.reset();
+    }
+
+	// Release the meshes and materials which are no longer parts of GLTFResources
+	// due to being in use by the renderer
+
+    for (auto& inUseMesh : m_InUseMeshes)
+		inUseMesh.reset();
+
+    for (auto& inUseMaterial : m_InUseMaterials)
+		inUseMaterial.reset();
+}
+
 Lumen::SceneManager::GLTFResource* Lumen::SceneManager::LoadGLTF(std::string a_FileName, std::string a_Path, const glm::mat4& a_TransformMat)
 {
 	const auto fullPath = a_Path + a_FileName;
@@ -62,6 +86,63 @@ void Lumen::SceneManager::SetPipeline(LumenRenderer& a_Renderer)
 {
 	m_RenderPipeline = &a_Renderer;
 	m_VolumeManager.SetPipeline(a_Renderer);
+}
+
+void Lumen::SceneManager::ClearUnusedAssets()
+{
+    for (auto loadedScene : m_LoadedScenes)
+    {
+		auto& res = loadedScene.second;
+
+        for (auto& mesh : res.m_MeshPool)
+        {
+            if (mesh.use_count() > 1) // Are there other shared pointer instances to this mesh?
+            {
+                // If yes, store the mesh separately from the GLTF resource
+				m_InUseMeshes.push_back(mesh);
+            }
+			else
+			{
+			    // Otherwise, reset the pointer, thus destroying the mesh
+				mesh.reset();
+			}
+        }
+
+        for (auto& material : res.m_MaterialPool)
+        {
+			if (material.use_count() > 1) // Are there other shared pointer instances to this material?
+			{
+				// If yes, store the material separately from the GLTF resource
+				m_InUseMaterials.push_back(material);
+			}
+			else
+			{
+				// Otherwise, reset the pointer, thus destroying the material
+				material.reset();
+			}
+        }
+    }
+
+	// Verify that none of the meshes and materials that are stored separately
+    // have been left unused since the last call to this function
+
+	for (auto& mesh : m_InUseMeshes)
+	{
+		if (mesh.use_count() <= 1) // Are there no other shared pointer instances to this mesh?
+		{
+			// If there are none, this mesh can be safely deleted.
+			mesh.reset();
+		}
+	}
+
+	for (auto& material : m_InUseMaterials)
+	{
+		if (material.use_count() <= 1) // Are there no other shared pointer instances to this material?
+		{
+			// If there are none, this material can be safely deleted.
+			material.reset();
+		}
+	}
 }
 
 void Lumen::SceneManager::LoadNodes(fx::gltf::Document& a_Doc, GLTFResource& a_Res, int a_NodeId, bool a_Root, const glm::mat4& a_TransformMat)
@@ -201,7 +282,7 @@ void Lumen::SceneManager::LoadMeshes(fx::gltf::Document& a_Doc, GLTFResource& a_
 		std::vector<std::unique_ptr<Lumen::ILumenPrimitive>> primitives;
 		for (auto& fxPrim : fxMesh.primitives)
 		{
-			std::vector<uint8_t> posBinary, texBinary;
+			std::vector<uint8_t> posBinary, texBinary, norBinary;
 			for (auto& fxAttribute : fxPrim.attributes)
 			{
 				if (fxAttribute.first == "POSITION")
@@ -223,7 +304,7 @@ void Lumen::SceneManager::LoadMeshes(fx::gltf::Document& a_Doc, GLTFResource& a_
 				}
 				else if (fxAttribute.first == "NORMAL")
 				{
-
+					norBinary = LoadBinary(a_Doc, fxAttribute.second);
 				}
 			}
 			auto& acc = fxPrim.attributes["POSITION"];
@@ -243,6 +324,7 @@ void Lumen::SceneManager::LoadMeshes(fx::gltf::Document& a_Doc, GLTFResource& a_
 			LumenRenderer::PrimitiveData primitiveData;
 			primitiveData.m_Positions = posBinary;
 			primitiveData.m_TexCoords = texBinary;
+			primitiveData.m_Normals = norBinary;
 
 			primitiveData.m_IndexBinary = indexBin;
 			primitiveData.m_IndexSize = indexSize;
@@ -372,6 +454,18 @@ void Lumen::SceneManager::LoadMaterials(fx::gltf::Document& a_Doc, GLTFResource&
 				fxMat.emissiveFactor.at(1),
 				fxMat.emissiveFactor.at(2)
 			));
+		}
+
+		if (fxMat.emissiveTexture.index != -1)
+		{
+			auto info = LoadTexture(a_Doc, fxMat.emissiveTexture.index, a_Path, 4);
+			const auto tex = m_RenderPipeline->CreateTexture(info.data, info.w, info.h);
+			
+			mat->SetEmissiveTexture(tex);
+
+			//LMN_INFO("Emissive texture present");
+			
+			stbi_image_free(info.data);
 		}
 
 

@@ -2,43 +2,48 @@
 
 #include "Lumen/Layer.h"
 
-
 #include <cstdint>
-
 
 class Camera;
 
-#ifdef WAVEFRONT
-
-class WaveFrontRenderer;
-using LumenPT = WaveFrontRenderer;
-
-#else
-
-class OptiXRenderer;
-using LumenPT = OptiXRenderer;
-
-#endif
+class LumenRenderer;
 
 class OutputLayer : public Lumen::Layer
 {
+    struct ScenePreset
+    {
+        uint16_t m_Key;
+        std::function<void()> m_Function;
+    };
+
 public:
     OutputLayer();
     ~OutputLayer();
+
+    void OnAttach() override { InitializeScenePresets(); };
 
     void OnUpdate() override;
 
     void OnImGuiRender() override;
 
-    LumenPT* GetPipeline() { return m_LumenPT.get(); };
+    //LumenPT* GetPipeline() { return m_LumenPT.get(); };
+    LumenRenderer* GetPipeline() { return m_Renderer.get(); };
 
 private:
 
+    void InitializeScenePresets();
     void HandleCameraInput(Camera& a_Camera);
-	
-    std::unique_ptr<LumenPT> m_LumenPT;
+    void HandleSceneInput();
+    void ImGuiCameraSettings();
+    std::unique_ptr<LumenRenderer> m_Renderer;
+    //std::unique_ptr<LumenPT> m_LumenPT;
 
     uint32_t m_Program;
+    
+    std::vector<ScenePreset> m_ScenePresets;
+
+    float m_CameraMouseSensitivity;
+    float m_CameraMovementSpeed;
 
     inline static const char* m_VSSource = "#version 330 core \n                                                                  "
     "                                                                                                                             "
