@@ -145,14 +145,14 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
 
             //TODO set all these.
             output->m_Index = currIntersection->m_PixelIndex;
-            output->m_Emissive;
+            output->m_Emissive = false; //TODO
             output->m_Color = finalColor;
             output->m_IntersectionT = currIntersection->m_IntersectionT;
             output->m_Normal = normalize(A->m_Normal + B->m_Normal + C->m_Normal);  //TODO untested.
             output->m_Position = currRay->m_Origin + currRay->m_Direction * currIntersection->m_IntersectionT;
             output->m_IncomingRayDirection = currRay->m_Direction;
-            output->m_Metallic;
-            output->m_Roughness;
+            output->m_Metallic = 1;     //TODO
+            output->m_Roughness = 1;    //TODO
             output->m_TransportFactor = currRay->m_Contribution;
         
         }

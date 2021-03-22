@@ -524,9 +524,9 @@ __device__ void Resample(LightSample* a_Input, const WaveFront::SurfaceData* a_P
     //Light distance from pixel.
     pixelToLightDir /= lDistance;
     //Normalize.
-    const float cosIn = clamp(dot(pixelToLightDir, a_PixelData->m_Position), 0.f, 1.f);
+    const float cosIn = fmax(dot(pixelToLightDir, a_PixelData->m_Normal), 0.f);
     //Lambertian term clamped between 0 and 1. SurfaceN dot ToLight
-    const float cosOut = clamp(dot(a_Input->normal, -pixelToLightDir), 0.f, 1.f);
+    const float cosOut = fmax(dot(a_Input->normal, -pixelToLightDir), 0.f);
     //Light normal at sample point dotted with light direction. Invert light dir for this (light to pixel instead of pixel to light)
 
     //Light is not facing towards the surface or too close to the surface.
@@ -540,7 +540,7 @@ __device__ void Resample(LightSample* a_Input, const WaveFront::SurfaceData* a_P
     const float solidAngle = (cosOut * a_Input->area) / (lDistance * lDistance);
 
     //BSDF is equal to material color for now.
-    const auto brdf = MicrofacetBRDF(-pixelToLightDir, a_PixelData->m_IncomingRayDirection, a_PixelData->m_Normal,
+    const auto brdf = MicrofacetBRDF(pixelToLightDir, -a_PixelData->m_IncomingRayDirection, a_PixelData->m_Normal,
                                      a_PixelData->m_Color, a_PixelData->m_Metallic, a_PixelData->m_Roughness);
 
     //The unshadowed contribution (contributed if no obstruction is between the light and surface) takes the BRDF,
