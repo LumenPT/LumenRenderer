@@ -5,21 +5,21 @@
 
 
 extern "C"
-__global__ void __closesthit__VolumetricHitShader()
+__global__ void __closesthit__Volumetric()
 {
 
     return;
 }
 
 extern "C"
-__global__ void __anyhit__VolumetricHitShader()
+__global__ void __anyhit__Volumetric()
 {
 
     return;
 }
 
 extern "C"
-__global__ void __intersection__VolumetricHitShader()
+__global__ void __intersection__Volumetric()
 {
     optixReportIntersection(1.f, 0, 
         0, 0);
