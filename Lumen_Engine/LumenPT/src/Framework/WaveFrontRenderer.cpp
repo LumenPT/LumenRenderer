@@ -35,14 +35,18 @@ namespace WaveFront
         //TODO: Ensure shader names match what we put down here.
         OptixWrapper::InitializationData optixInitData;
         optixInitData.m_CUDAContext = m_CUDAContext;
-        optixInitData.m_ProgramData.m_ProgramPath = LumenPTConsts::gs_ShaderPathBase + "WaveFrontShaders.ptx";;
-        optixInitData.m_ProgramData.m_ProgramLaunchParamName = "launchParams";
-        optixInitData.m_ProgramData.m_ProgramRayGenFuncName = "__raygen__WaveFrontRG";
-        optixInitData.m_ProgramData.m_ProgramMissFuncName = "__miss__WaveFrontMS";
-        optixInitData.m_ProgramData.m_ProgramAnyHitFuncName = "__anyhit__WaveFrontAH";
-        optixInitData.m_ProgramData.m_ProgramClosestHitFuncName = "__closesthit__WaveFrontCH";
-        optixInitData.m_ProgramData.m_MaxNumHitResultAttributes = 2;
-        optixInitData.m_ProgramData.m_MaxNumPayloads = 2;
+        optixInitData.m_SolidProgramData.m_ProgramPath = LumenPTConsts::gs_ShaderPathBase + "WaveFrontShaders.ptx";;
+        optixInitData.m_SolidProgramData.m_ProgramLaunchParamName = "launchParams";
+        optixInitData.m_SolidProgramData.m_ProgramRayGenFuncName = "__raygen__WaveFrontRG";
+        optixInitData.m_SolidProgramData.m_ProgramMissFuncName = "__miss__WaveFrontMS";
+        optixInitData.m_SolidProgramData.m_ProgramAnyHitFuncName = "__anyhit__WaveFrontAH";
+        optixInitData.m_SolidProgramData.m_ProgramClosestHitFuncName = "__closesthit__WaveFrontCH";
+        optixInitData.m_VolumetricProgramData.m_ProgramPath = LumenPTConsts::gs_ShaderPathBase + "volumetric_wavefront.ptx";
+        optixInitData.m_VolumetricProgramData.m_ProgramIntersectionFuncName = "__intersection__Volumetric";
+        optixInitData.m_VolumetricProgramData.m_ProgramAnyHitFuncName = "__anyhit__Volumetric";
+        optixInitData.m_VolumetricProgramData.m_ProgramClosestHitFuncName = "__closesthit__Volumetric";
+        optixInitData.m_PipelineMaxNumHitResultAttributes = 2;
+        optixInitData.m_PipelineMaxNumPayloads = 2;
 
         m_OptixSystem = std::make_unique<OptixWrapper>(optixInitData);
 
@@ -225,12 +229,7 @@ namespace WaveFront
         //TODO tell optix to create a volume acceleration structure.
         std::shared_ptr<Lumen::ILumenVolume> volume = std::make_shared<PTVolume>(a_FilePath, m_ServiceLocator);
 
-        //volumetric_bookmark
-    //TODO: add volume records to sbt
-    /*volume->m_RecordHandle = m_ShaderBindingTableGenerator->AddHitGroup<DeviceVolume>();
-    auto& rec = volume->m_RecordHandle.GetRecord();
-    rec.m_Header = GetProgramGroupHeader("VolumetricHit");
-    rec.m_Data.m_Grid = volume->m_Handle.grid<float>();*/
+    
 
         uint32_t geomFlags[1] = { OPTIX_GEOMETRY_FLAG_NONE };
 
@@ -265,6 +264,12 @@ namespace WaveFront
         buildInput.customPrimitiveArray.numSbtRecords = 1;
 
         std::static_pointer_cast<PTVolume>(volume)->m_AccelerationStructure = m_OptixSystem->BuildGeometryAccelerationStructure(buildOptions, buildInput);
+
+        /*prim->m_SceneDataTableEntry = m_Table->AddEntry<DevicePrimitive>();
+        auto& entry = prim->m_SceneDataTableEntry.GetData();
+        entry.m_VertexBuffer = prim->m_VertBuffer->GetDevicePtr<Vertex>();
+        entry.m_IndexBuffer = prim->m_IndexBuffer->GetDevicePtr<unsigned int>();
+        entry.m_Material = static_cast<Material*>(prim->m_Material.get())->GetDeviceMaterial();*/
 
         return volume;
     }
