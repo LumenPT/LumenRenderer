@@ -227,9 +227,7 @@ namespace WaveFront
     std::shared_ptr<Lumen::ILumenVolume> WaveFrontRenderer::CreateVolume(const std::string& a_FilePath)
     {
         //TODO tell optix to create a volume acceleration structure.
-        std::shared_ptr<Lumen::ILumenVolume> volume = std::make_shared<PTVolume>(a_FilePath, m_ServiceLocator);
-
-    
+        auto volume = std::make_shared<PTVolume>(a_FilePath, m_ServiceLocator);
 
         uint32_t geomFlags[1] = { OPTIX_GEOMETRY_FLAG_NONE };
 
@@ -240,7 +238,7 @@ namespace WaveFront
 
         OptixAabb aabb = { -1.5f, -1.5f, -1.5f, 1.5f, 1.5f, 1.5f };
 
-        auto grid = std::static_pointer_cast<PTVolume>(volume)->GetHandle()->grid<float>();
+        auto grid = volume->GetHandle()->grid<float>();
         auto bbox = grid->worldBBox();
 
         nanovdb::Vec3<double> temp = bbox.min();
@@ -263,13 +261,11 @@ namespace WaveFront
         buildInput.customPrimitiveArray.flags = geomFlags;
         buildInput.customPrimitiveArray.numSbtRecords = 1;
 
-        std::static_pointer_cast<PTVolume>(volume)->m_AccelerationStructure = m_OptixSystem->BuildGeometryAccelerationStructure(buildOptions, buildInput);
+        volume->m_AccelerationStructure = m_OptixSystem->BuildGeometryAccelerationStructure(buildOptions, buildInput);
 
-        /*prim->m_SceneDataTableEntry = m_Table->AddEntry<DevicePrimitive>();
-        auto& entry = prim->m_SceneDataTableEntry.GetData();
-        entry.m_VertexBuffer = prim->m_VertBuffer->GetDevicePtr<Vertex>();
-        entry.m_IndexBuffer = prim->m_IndexBuffer->GetDevicePtr<unsigned int>();
-        entry.m_Material = static_cast<Material*>(prim->m_Material.get())->GetDeviceMaterial();*/
+        volume->m_SceneDataTableEntry = m_Table->AddEntry<DeviceVolume>();
+        auto& entry = volume->m_SceneDataTableEntry.GetData();
+        entry.m_Grid = grid;
 
         return volume;
     }

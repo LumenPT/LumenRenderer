@@ -24,7 +24,7 @@ void PTMesh::UpdateAccelerationStructure()
         auto& inst = instances.emplace_back();
         inst.instanceId = ptPrim->m_SceneDataTableEntry.m_TableIndex;
         inst.sbtOffset = 0;
-        inst.visibilityMask = 255;
+        inst.visibilityMask = OptixVisibilityMask(0b00000001);
         inst.traversableHandle = ptPrim->m_GeometryAccelerationStructure->m_TraversableHandle;
         inst.flags = OPTIX_INSTANCE_FLAG_NONE;
 
