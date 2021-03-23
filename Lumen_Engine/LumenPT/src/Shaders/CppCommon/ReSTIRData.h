@@ -24,10 +24,10 @@ constexpr float MINFLOAT = std::numeric_limits<float>::min();
 struct ReSTIRSettings
 {
     //Screen width in pixels.
-    static constexpr std::uint32_t width = 0;
+    std::uint32_t width = 0;
 
     //Screen height in pixels.
-    static constexpr std::uint32_t height = 0;
+    std::uint32_t height = 0;
 
     //The amount of reservoirs used per pixel.
     static constexpr std::uint32_t numReservoirsPerPixel = 5;

@@ -15,10 +15,12 @@
 #include "../Shaders/CppCommon/LumenPTConsts.h"
 #include "../Shaders/CppCommon/WaveFrontDataStructs.h"
 #include "CudaUtilities.h"
+#include "ReSTIR.h"
 
 #include <Optix/optix_function_table_definition.h>
 #include <filesystem>
 #include <glm/gtx/compatibility.hpp>
+
 
 namespace WaveFront
 {
@@ -102,9 +104,9 @@ namespace WaveFront
 
         TriangleLight lights[numLights] =
         {
-            {pos1, pos1, pos1, {0.f, 0.f, 0.f}, {i1, i1, i1}, 10.f},
-            {pos2, pos2, pos2, {0.f, 0.f, 0.f}, {i2, i2, i2}, 10.f},
-            {pos3, pos3, pos3, {0.f, 0.f, 0.f}, {i3, i3, i3}, 10.f}
+            {pos1, pos1, pos1, {0.f, -1.f, 0.f}, {i1, i1, i1}, 10.f},
+            {pos2, pos2, pos2, {0.f, -1.f, 0.f}, {i2, i2, i2}, 10.f},
+            {pos3, pos3, pos3, {0.f, -1.f, 0.f}, {i3, i3, i3}, 10.f}
         };
 
         m_TriangleLights.Write(&lights[0], sizeof(TriangleLight) * numLights, 0);
@@ -115,8 +117,13 @@ namespace WaveFront
 
         m_ServiceLocator.m_Renderer = this;
 
-        
+        //Use mostly the default values.
+        ReSTIRSettings rSettings;
+        rSettings.width = m_Settings.renderResolution.x;
+        rSettings.height = m_Settings.renderResolution.y;
 
+        m_ReSTIR = std::make_unique<ReSTIR>();
+        m_ReSTIR->Initialize(rSettings);
     }
 
     std::unique_ptr<MemoryBuffer> WaveFrontRenderer::InterleaveVertexData(const PrimitiveData& a_MeshData) const
@@ -299,6 +306,10 @@ namespace WaveFront
         a_Scene->m_Camera->SetAspectRatio(static_cast<float>(m_Settings.renderResolution.x) / static_cast<float>(m_Settings.renderResolution.y));
         a_Scene->m_Camera->GetVectorData(eye, u, v, w);
 
+        //Camera forward direction.
+        const float3 camForward = { w.x, w.y, w.z };
+        const float3 camPosition = { eye.x, eye.y, eye.z };
+
         float3 eyeCuda, uCuda, vCuda, wCuda;
         eyeCuda = make_float3(eye.x, eye.y, eye.z);
         uCuda = make_float3(u.x, u.y, u.z);
@@ -380,19 +391,23 @@ namespace WaveFront
             cudaDeviceSynchronize();
             CHECKLASTCUDAERROR;
 
-            //TODO add ReSTIR instance and run from shading kernel.
-
             /*
              * Call the shading kernels.
              */
             ShadingLaunchParameters shadingLaunchParams(
-                uint3{m_Settings.renderResolution.x, m_Settings.renderResolution.y, m_Settings.depth},
+                uint3{ m_Settings.renderResolution.x, m_Settings.renderResolution.y, m_Settings.depth },
                 m_SurfaceData[currentIndex].GetDevicePtr<SurfaceData>(),
                 m_SurfaceData[temporalIndex].GetDevicePtr<SurfaceData>(),
                 m_ShadowRays.GetDevicePtr<AtomicBuffer<ShadowRayData>>(),
                 m_TriangleLights.GetDevicePtr<TriangleLight>(),
-                3,  //TODO hard coded for now but will be updated dynamically.
-                nullptr,    //TODO get CDF from ReSTIR.
+                3,
+                camPosition,
+                camForward,
+                accelerationStructure,  //ReSTIR needs to check visibility early on so it does an optix launch for this scene.
+                m_OptixSystem.get(),
+                m_FrameIndex,
+                m_ReSTIR.get(), //ReSTIR, can not be nullptr.
+                depth,  //The current depth.
                 m_PixelBufferSeparate.GetDevicePtr<float3>()
             );
 
@@ -413,6 +428,9 @@ namespace WaveFront
             CHECKLASTCUDAERROR;
 
             m_IntersectionData.Write(counterDefault);
+
+            //Swap the ReSTIR buffers around.
+            m_ReSTIR->SwapBuffers();
         }
 
         //The amount of shadow rays to trace.

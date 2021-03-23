@@ -93,6 +93,9 @@ namespace WaveFront
         //Optix system
         std::unique_ptr<OptixWrapper> m_OptixSystem;
 
+        //ReSTIR
+        std::unique_ptr<ReSTIR> m_ReSTIR;
+
         //Variables and settings.
     private:
         WaveFrontSettings m_Settings;
