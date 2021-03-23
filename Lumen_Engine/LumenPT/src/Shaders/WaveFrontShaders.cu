@@ -60,6 +60,7 @@ __device__ __forceinline__ void IntersectionRaysRayGen()
 
     const OptixTraversableHandle scene = launchParams.m_TraversableHandle;
 
+    //Solid trace
     optixTrace(
         scene,
         rayData.m_Origin,
@@ -67,7 +68,7 @@ __device__ __forceinline__ void IntersectionRaysRayGen()
         launchParams.m_MinMaxDistance.x,
         launchParams.m_MinMaxDistance.y,
         0.f, //Ray Time, can be 0 in our case.
-        OptixVisibilityMask(255),
+        OptixVisibilityMask(0b00000001),
         OPTIX_RAY_FLAG_NONE,
         0, //SBT offset for selecting the SBT records to use
         0, //SBT stride for selecting the SBT records to use, multiplied with SBT-GAS index
@@ -77,6 +78,31 @@ __device__ __forceinline__ void IntersectionRaysRayGen()
 
     //3. Store IntersectionData in buffer
     launchParams.m_IntersectionBuffer->Add(&intersection);
+
+
+    //TODO: implement volumetric trace and storing of data.
+    /*unsigned int volIntersectionPtr_Up = 0;
+    unsigned int volIntersectionPtr_Low = 0;
+
+    PackPointer(&volIntersection, volIntersectionPtr_Up, volIntersectionPtr_Low);*/
+
+    //Volumetric trace
+    /*optixTrace(
+        scene,
+        rayData.m_Origin,
+        rayData.m_Direction,
+        launchParams.m_MinMaxDistance.x,
+        launchParams.m_MinMaxDistance.y,
+        0.f,
+        OptixVisibilityMask(0b00000010),
+        OPTIX_RAY_FLAG_NONE,
+        0,
+        0,
+        0
+        volIntersectionPtr_Up,
+        volIntersectionPtr_Low);*/
+
+    
 
     return;
 
