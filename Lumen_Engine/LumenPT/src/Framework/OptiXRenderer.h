@@ -16,7 +16,7 @@
 
 using GLuint = unsigned;
 
-class OutputBuffer;
+class CudaGLTexture;
 class ShaderBindingTableGenerator;
 
 class AccelerationStructure;
@@ -121,7 +121,7 @@ private:
 
     std::map<std::string, OptixProgramGroup> m_ProgramGroups;
 
-    std::unique_ptr<OutputBuffer> m_OutputBuffer;
+    std::unique_ptr<CudaGLTexture> m_OutputBuffer;
 
     std::unique_ptr<MemoryBuffer> m_SBTBuffer;
 

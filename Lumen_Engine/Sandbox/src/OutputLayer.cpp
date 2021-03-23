@@ -13,6 +13,8 @@
 #include "Lumen/ModelLoading/SceneManager.h"
 #include "Lumen/KeyCodes.h"
 
+#include "Tools/FrameSnapshot.h"
+
 #include "Glad/glad.h"
 
 #include "imgui/imgui.h"
@@ -110,8 +112,22 @@ OutputLayer::~OutputLayer()
 void OutputLayer::OnUpdate(){
 
 	HandleCameraInput(*m_Renderer->m_Scene->m_Camera);
+
+	bool recordingSnapshot = false;
+
+	if (Lumen::Input::IsKeyPressed(LMN_KEY_K))
+	{
+		recordingSnapshot = true;
+		m_Renderer->BeginSnapshot();	    
+	}
+
 	auto texture = m_Renderer->TraceFrame(m_Renderer->m_Scene); // TRACE SUM
 	HandleSceneInput();
+
+	if (recordingSnapshot)
+	{
+		m_FrameSnapshots.push_back(m_Renderer->EndSnapshot());			
+	}
 
 	glBindTexture(GL_TEXTURE_2D, texture);
 	glUseProgram(m_Program);
@@ -183,6 +199,26 @@ void OutputLayer::OnImGuiRender()
 		}
 		ImGui::End();
 	}
+
+	std::vector<std::string> names = {"John", "Peter", "Olaf", "Sven"};
+
+    if (!m_FrameSnapshots.empty())
+    {
+		ImGui::Begin("Frame Snapshots and other trinkets and baubles");
+		if (ImGui::BeginCombo("Snapshots", m_CurrentItem.c_str()))
+		{
+            for (auto& name : names)
+            {
+				if (ImGui::Selectable(name.c_str()))
+				{
+					m_CurrentItem = name;
+				}               
+            }
+			ImGui::EndCombo();
+		}
+	    
+		ImGui::End();
+    }
 }
 
 void OutputLayer::InitializeScenePresets()

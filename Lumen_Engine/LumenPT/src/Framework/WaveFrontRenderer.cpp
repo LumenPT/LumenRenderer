@@ -9,12 +9,13 @@
 #include "PTVolume.h"
 #include "Material.h"
 #include "MemoryBuffer.h"
-#include "OutputBuffer.h"
+#include "CudaGLTexture.h"
 #include "SceneDataTable.h"
 #include "../CUDAKernels/WaveFrontKernels.cuh"
 #include "../Shaders/CppCommon/LumenPTConsts.h"
 #include "../Shaders/CppCommon/WaveFrontDataStructs.h"
 #include "CudaUtilities.h"
+#include "../Tools/FrameSnapshot.h"
 
 #include <Optix/optix_function_table_definition.h>
 #include <filesystem>
@@ -115,8 +116,25 @@ namespace WaveFront
 
         m_ServiceLocator.m_Renderer = this;
 
-        
+        // A null frame snapshot will not record anything when requested to.
+        m_FrameSnapshot = std::make_unique<NullFrameSnapshot>(); 
 
+    }
+
+    void WaveFrontRenderer::BeginSnapshot()
+    {
+        // Replacing the snapshot with a non-null one will start recording requested features.
+        m_FrameSnapshot = std::make_unique<FrameSnapshot>();
+    }
+
+    std::unique_ptr<FrameSnapshot> WaveFrontRenderer::EndSnapshot()
+    {
+        // Move the snapshot to a temporary variable to return shortly
+        auto snap = std::move(m_FrameSnapshot);
+        // Make the snapshot a Null once again to stop recording
+        m_FrameSnapshot = std::make_unique<NullFrameSnapshot>();
+
+        return std::move(snap);
     }
 
     std::unique_ptr<MemoryBuffer> WaveFrontRenderer::InterleaveVertexData(const PrimitiveData& a_MeshData) const
@@ -318,6 +336,12 @@ namespace WaveFront
         CHECKLASTCUDAERROR;
 
         m_Rays.Write(numPixels, 0); //Set the counter to be equal to the amount of rays being shot. This is manual because the atomic is not used yet.
+
+        m_FrameSnapshot->AddBuffer([&]()
+        {
+                auto s = m_Rays.GetSize();
+                return std::map<std::string, FrameSnapshot::ImageBuffer>();
+        });
 
         //Clear the surface data that contains information from the second last frame so that it can be reused by this frame.
         cudaMemset(m_SurfaceData[currentIndex].GetDevicePtr(), 0, sizeof(SurfaceData) * numPixels);

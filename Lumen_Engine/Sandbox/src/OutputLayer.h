@@ -45,6 +45,9 @@ private:
     float m_CameraMouseSensitivity;
     float m_CameraMovementSpeed;
 
+    std::vector<std::unique_ptr<FrameSnapshot>> m_FrameSnapshots;
+    std::string m_CurrentItem;
+
     inline static const char* m_VSSource = "#version 330 core \n                                                                  "
     "                                                                                                                             "
     "out vec2 a_UV; // UV coordinates    \n                                                                                       "
