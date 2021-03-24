@@ -4,6 +4,8 @@
 
 #include <cstdint>
 
+#include "Tools/FrameSnapshot.h"
+
 class Camera;
 
 class LumenRenderer;
@@ -46,7 +48,10 @@ private:
     float m_CameraMovementSpeed;
 
     std::vector<std::unique_ptr<FrameSnapshot>> m_FrameSnapshots;
-    std::string m_CurrentItem;
+    int m_CurrentSnapShotIndex;
+    const std::pair<const std::string, FrameSnapshot::ImageBuffer>* m_CurrentImageBuffer;
+
+    uint32_t m_LastFrameTex;
 
     inline static const char* m_VSSource = "#version 330 core \n                                                                  "
     "                                                                                                                             "

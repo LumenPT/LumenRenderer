@@ -1,6 +1,7 @@
 #include "FrameSnapshot.h"
 
 #include "../Framework/MemoryBuffer.h"
+#include "../Framework/CudaGLTexture.h"
 
 FrameSnapshot::~FrameSnapshot()
 {

@@ -16,6 +16,7 @@
 #include "../Shaders/CppCommon/WaveFrontDataStructs.h"
 #include "CudaUtilities.h"
 #include "../Tools/FrameSnapshot.h"
+#include "../Tools/SnapShotUninterleave.cuh"
 
 #include <Optix/optix_function_table_definition.h>
 #include <filesystem>
@@ -336,11 +337,37 @@ namespace WaveFront
         CHECKLASTCUDAERROR;
 
         m_Rays.Write(numPixels, 0); //Set the counter to be equal to the amount of rays being shot. This is manual because the atomic is not used yet.
-
+       
         m_FrameSnapshot->AddBuffer([&]()
         {
-                auto s = m_Rays.GetSize();
-                return std::map<std::string, FrameSnapshot::ImageBuffer>();
+            auto numElements = (m_Rays.GetSize() - sizeof(uint32_t)) / sizeof(IntersectionRayData);
+            std::map<std::string, FrameSnapshot::ImageBuffer> resBuffers;
+            resBuffers["Origins"].m_Width = m_Settings.renderResolution.x;
+            resBuffers["Origins"].m_Height = m_Settings.renderResolution.y;
+            resBuffers["Origins"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x, m_Settings.renderResolution.y, 3 * sizeof(float));
+
+            resBuffers["Directions"].m_Width = m_Settings.renderResolution.x;
+            resBuffers["Directions"].m_Height = m_Settings.renderResolution.y;
+            resBuffers["Directions"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x, m_Settings.renderResolution.y, 3 * sizeof(float));
+
+            resBuffers["Contributions"].m_Width = m_Settings.renderResolution.x;
+            resBuffers["Contributions"].m_Height = m_Settings.renderResolution.y;
+            resBuffers["Contributions"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F ,m_Settings.renderResolution.x, m_Settings.renderResolution.y, 3 * sizeof(float));
+
+
+            cudaDeviceSynchronize();
+            auto er1r = cudaGetLastError();
+
+            SeparateIntersectionRayBufferCPU((m_Rays.GetSize() - sizeof(uint32_t)) / sizeof(IntersectionRayData),
+                m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>(),
+                resBuffers.at("Origins").m_Memory->GetDevicePtr<float3>(),
+                resBuffers.at("Directions").m_Memory->GetDevicePtr<float3>(),
+                resBuffers.at("Contributions").m_Memory->GetDevicePtr<float3>());
+
+            cudaDeviceSynchronize();
+            auto err = cudaGetLastError();
+
+            return resBuffers;
         });
 
         //Clear the surface data that contains information from the second last frame so that it can be reused by this frame.
@@ -456,7 +483,7 @@ namespace WaveFront
             m_Settings.outputResolution,
             m_PixelBufferSeparate.GetDevicePtr<float3>(),
             m_PixelBufferCombined.GetDevicePtr<float3>(),
-            m_OutputBuffer.GetDevicePointer()
+            m_OutputBuffer.GetDevicePtr()
         );
 
         //Post processing using CUDA kernel.

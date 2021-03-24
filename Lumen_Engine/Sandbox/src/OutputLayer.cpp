@@ -15,6 +15,8 @@
 
 #include "Tools/FrameSnapshot.h"
 
+#include "Tools/ImGuiUtil.h"
+
 #include "Glad/glad.h"
 
 #include "imgui/imgui.h"
@@ -27,6 +29,8 @@
 OutputLayer::OutputLayer()
 	: m_CameraMovementSpeed(300.0f)
 	, m_CameraMouseSensitivity(0.2f)
+    , m_CurrentSnapShotIndex(-1)
+    , m_CurrentImageBuffer(nullptr)
 {
 	auto vs = glCreateShader(GL_VERTEX_SHADER);
 	auto fs = glCreateShader(GL_FRAGMENT_SHADER);
@@ -123,6 +127,7 @@ void OutputLayer::OnUpdate(){
 
 	auto texture = m_Renderer->TraceFrame(m_Renderer->m_Scene); // TRACE SUM
 	HandleSceneInput();
+	m_LastFrameTex = texture;
 
 	if (recordingSnapshot)
 	{
@@ -202,21 +207,50 @@ void OutputLayer::OnImGuiRender()
 
 	std::vector<std::string> names = {"John", "Peter", "Olaf", "Sven"};
 
+	ImGui::Begin("Extra Viewport for bonus swegpoints");
+
+	ImGuiUtil::DisplayImage(m_LastFrameTex, glm::ivec2(400, 300));
+
+	ImGui::End();
+
     if (!m_FrameSnapshots.empty())
     {
 		ImGui::Begin("Frame Snapshots and other trinkets and baubles");
-		if (ImGui::BeginCombo("Snapshots", m_CurrentItem.c_str()))
+		if (ImGui::BeginCombo("Snapshots", 
+			(m_CurrentSnapShotIndex != -1) ? (std::string("Snapshot ") + std::to_string(m_CurrentSnapShotIndex)).c_str() : "No Snapshot selected"))
 		{
-            for (auto& name : names)
-            {
-				if (ImGui::Selectable(name.c_str()))
-				{
-					m_CurrentItem = name;
-				}               
-            }
+			for (size_t i = 0; i < m_FrameSnapshots.size(); i++)
+			{
+				std::string name = "Snapshot " + std::to_string(i);
+                if (ImGui::Selectable(name.c_str()))
+                {
+					m_CurrentSnapShotIndex = i;
+                }
+			}
 			ImGui::EndCombo();
 		}
-	    
+
+        if (m_CurrentSnapShotIndex != -1)
+        {
+			auto preview = m_CurrentImageBuffer ? m_CurrentImageBuffer->first : "No image buffer selected";
+			if (ImGui::BeginCombo("Snapshot buffers", preview.c_str()))
+			{
+                for (auto& frameSnapshot : m_FrameSnapshots[m_CurrentSnapShotIndex]->GetImageBuffers())
+                {
+                    if (ImGui::Selectable(frameSnapshot.first.c_str()))
+                    {
+						m_CurrentImageBuffer = &frameSnapshot;
+                    }
+                }
+				ImGui::EndCombo();
+			}
+        }
+
+        if (m_CurrentImageBuffer)
+        {
+			ImGuiUtil::DisplayImage(*m_CurrentImageBuffer->second.m_Memory);
+        }
+
 		ImGui::End();
     }
 }
