@@ -66,16 +66,16 @@ sutil::Matrix4x4 m_ProjectionMatrix
     	
         MotionVectorData motionVectorData;
         motionVectorData.m_Velocity = make_float2(1.f, 1.f);
-
+        
         a_Buffer->SetMotionVectorData(motionVectorData, i);
     	
         a_Buffer->m_MotionVectorBuffer[0].m_Velocity;
         //printf("x: %.6f y: %.6f \n", a_Buffer->m_MotionVectorBuffer[i].m_Velocity.x, a_Buffer->m_MotionVectorBuffer[i].m_Velocity.y);
-
+        
         float2 screenPos;
     	screenPos.y = i / static_cast<int>(a_Resolution.x);
-    	screenPos.x = i - screenPos.y * a_Resolution.x;
+    	screenPos.x = i - screenPos.y * static_cast<int>(a_Resolution.x);
     	
-    	printf("screen x: %i screen y: %i prev screen x: %.6f prev screen y: %.6f \n", screenPos.x, screenPos.y, screenCoordinates.x, screenCoordinates.y);
+    	printf("screen x: %.6f screen y: %.6f prev screen x: %.6f prev screen y: %.6f \n", screenPos.x, screenPos.y, screenCoordinates.x, screenCoordinates.y);
     }
 }

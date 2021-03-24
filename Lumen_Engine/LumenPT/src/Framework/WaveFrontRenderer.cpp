@@ -398,10 +398,11 @@ namespace WaveFront
         		
                 MotionVectorsGenerationData motionVectorsGenerationData;
                 motionVectorsGenerationData.m_MotionVectorBuffer = nullptr;
+                motionVectorsGenerationData.a_CurrentSurfaceData = m_SurfaceData[currentIndex].GetDevicePtr<SurfaceData>();
                 motionVectorsGenerationData.m_ScreenResolution = make_uint2(m_Settings.renderResolution.x, m_Settings.renderResolution.y);
                 motionVectorsGenerationData.m_PrevViewMatrix = prevFrameMatrixArg.inverse();
                 motionVectorsGenerationData.m_ProjectionMatrix = projectionMatrixArg;
-                //m_MotionVectors.Update(motionVectorsGenerationData);
+                m_MotionVectors.Update(motionVectorsGenerationData);
             }
         	
             //TODO add ReSTIR instance and run from shading kernel.
