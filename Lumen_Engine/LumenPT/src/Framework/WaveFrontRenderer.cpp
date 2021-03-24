@@ -193,7 +193,7 @@ namespace WaveFront
         auto& entry = prim->m_SceneDataTableEntry.GetData();
         entry.m_VertexBuffer = prim->m_VertBuffer->GetDevicePtr<Vertex>();
         entry.m_IndexBuffer = prim->m_IndexBuffer->GetDevicePtr<unsigned int>();
-        entry.m_Material = static_cast<Material*>(prim->m_Material.get())->GetDeviceMaterial();
+        entry.m_Material = std::static_pointer_cast<Material>(prim->m_Material)->GetDeviceMaterial();
 
         return prim;
     }

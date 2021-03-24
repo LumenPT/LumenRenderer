@@ -6,4 +6,4 @@
 #include "WaveFrontDataStructs/OptixLaunchParams.h"
 #include "WaveFrontDataStructs/OptixShaderStructs.h"
 #include "WaveFrontDataStructs/SurfaceDataBuffer.h"
-#include "WaveFrontDataStructs/LightDataBuffer.h"
+#include "WaveFrontDataStructs/LightData.h"
