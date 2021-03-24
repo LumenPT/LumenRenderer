@@ -37,7 +37,7 @@ CPU_ON_GPU void ShadeDirect(
         if (surfaceData.m_IntersectionT > 0.f)
         {
 
-            for(unsigned int lightIndex = 0; lightIndex < a_NumLights && a_NumLights <= 7; ++lightIndex)
+            for(unsigned int lightIndex = 0; lightIndex < a_NumLights; ++lightIndex)
             {
                 const TriangleLight& light = a_Lights[lightIndex];
 
@@ -98,8 +98,6 @@ CPU_ON_GPU void ShadeDirect(
                 a_ShadowRays->Add(&shadowRay);
 
             }
-
         }
-
     }
 }

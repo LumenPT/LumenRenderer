@@ -30,7 +30,7 @@ struct ReSTIRSettings
     std::uint32_t height = 0;
 
     //The amount of reservoirs used per pixel.
-    static constexpr std::uint32_t numReservoirsPerPixel = 5;
+    static constexpr std::uint32_t numReservoirsPerPixel = 5; //TODO 5
 
     //The amount of lights per light bag.
     static constexpr std::uint32_t numLightsPerBag = 1000;
@@ -61,7 +61,7 @@ struct ReSTIRSettings
     static constexpr bool enableSpatial = true;
 
     //Enable temporal sampling.
-    static constexpr bool enableTemporal = true;
+    static constexpr bool enableTemporal = false;
 };
 
 /*
@@ -117,7 +117,7 @@ struct Reservoir
 
         //In this case R is inclusive with 0.0 and 1.0. This means that the first sample is always chosen.
         //If weight is 0, then a division by 0 would happen. Also it'd be impossible to pick this sample.
-        if (a_Weight != 0.f && r <= (a_Weight / weightSum))
+        if (r <= (a_Weight / weightSum))
         {
             sample = a_Sample;
             return true;
@@ -190,12 +190,14 @@ struct CDF
     GPU_ONLY void Get(float a_Value, unsigned& a_LightIndex, float& a_LightPdf) const
     {
         //Index is not normalized in the actual set.
-        int index = static_cast<int>(sum * a_Value);
+        const float requiredValue = sum * a_Value;
 
         //Binary search
-        int entry = BinarySearch(0, size - 1, index);
+        const int entry = BinarySearch(0, size - 1, requiredValue);
 
-        float higher = data[entry];
+        const float higher = data[entry];
+
+        //TODO this if statement can be avoided by always making index  0 equal to 0. Then offset array indices by 1 and add 1 to the size req of the class.
         float lower = 0.f;
         if (entry != 0)
         {

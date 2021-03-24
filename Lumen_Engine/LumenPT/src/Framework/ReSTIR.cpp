@@ -38,12 +38,13 @@ CPU_ONLY void ReSTIR::Initialize(const ReSTIRSettings& a_Settings)
 		//Reserve enough memory for both the front and back buffer to contain all reservoirs.
 		const size_t numReservoirs = static_cast<size_t>(m_Settings.width) * static_cast<size_t>(m_Settings.height) * m_Settings.numReservoirsPerPixel;
 		const size_t size = numReservoirs * sizeof(Reservoir);
-		m_Reservoirs[0].Resize(size);
-		m_Reservoirs[1].Resize(size);
 
-		//Reset both buffers.
-		ResetReservoirs(numReservoirs, static_cast<Reservoir*>(m_Reservoirs[0].GetDevicePtr()));
-		ResetReservoirs(numReservoirs, static_cast<Reservoir*>(m_Reservoirs[1].GetDevicePtr()));
+		//Initialize all three reservoir buffers.
+		for(int reservoir = 0; reservoir < 3; ++reservoir)
+		{
+			m_Reservoirs[reservoir].Resize(size);
+			ResetReservoirs(numReservoirs, static_cast<Reservoir*>(m_Reservoirs[reservoir].GetDevicePtr()));
+		}
 	}
 
 	//Light bag generation
@@ -78,8 +79,8 @@ CPU_ONLY void ReSTIR::Run(
 	assert(a_OptixSystem && "Optix System cannot be nullptr!");
 
 	//Index of the reservoir buffers (current and temporal).
-	auto currentIndex = m_SwapChainIndex;
-	auto temporalIndex = currentIndex == 1 ? 0 : 1;
+	const auto currentIndex = m_SwapChainIndex;
+	const auto temporalIndex = currentIndex == 1 ? 0 : 1;
 
 	//The seed will be modified over time.
 	auto seed = a_Seed;
@@ -90,24 +91,23 @@ CPU_ONLY void ReSTIR::Run(
 	//TODO: take camera position and direction into account when doing RIS.
 	//TODO: Also use light area.
 
+
+
 	/*
-	 * Resize buffers based on the amount of lights and update data.
-	 * This uploads all triangle lights. May want to move this to the wavefront pipeline class and instead take the pointer from it.
-	 */
-	//CDF
+     * Resize buffers based on the amount of lights and update data.
+     * This uploads all triangle lights. May want to move this to the wavefront pipeline class and instead take the pointer from it.
+     */
+     //CDF
 	{
+		const auto cdfNeededSize = sizeof(CDF) + (a_NumLights * sizeof(float));
 		//Allocate enough memory for the CDF struct and the fixed sum entries.
-		m_Cdf.Resize(sizeof(CDF) + (a_NumLights * sizeof(float)));
+		if(m_Cdf.GetSize() < cdfNeededSize)
+		{
+			m_Cdf.Resize(cdfNeededSize);
+		}
 
 		//Insert the light data in the CDF.
 		FillCDF(static_cast<CDF*>(m_Cdf.GetDevicePtr()), a_Lights, a_NumLights);
-
-		//TODO remove - debug -
-		float cdf[3];
-		m_Cdf.Read(&cdf, 3 * sizeof(float), sizeof(float) + sizeof(unsigned));
-		printf("A");
-
-		//TODO - end -
 	}
 	//Fill light bags with values from the CDF.
 	{
@@ -119,27 +119,28 @@ CPU_ONLY void ReSTIR::Run(
 	 * Pick primary samples in parallel. Store the samples in the reservoirs.
 	 */
 	seed = WangHash(seed);
-	PickPrimarySamples(static_cast<LightBagEntry*>(m_LightBags.GetDevicePtr()), static_cast<Reservoir*>(m_Reservoirs->GetDevicePtr()), m_Settings, a_CurrentPixelData, seed);
+	PickPrimarySamples(static_cast<LightBagEntry*>(m_LightBags.GetDevicePtr()), static_cast<Reservoir*>(m_Reservoirs[currentIndex].GetDevicePtr()), m_Settings, a_CurrentPixelData, seed);
 
 	/*
 	 * Generate shadow rays for each reservoir and resolve them.
 	 * If a shadow ray is occluded, the reservoirs weight is set to 0.
 	 */
-	const int numRaysGenerated = GenerateReSTIRShadowRays(&m_Atomics, static_cast<Reservoir*>(m_Reservoirs[m_SwapChainIndex].GetDevicePtr()), m_ShadowRays.GetDevicePtr<RestirShadowRay>(), a_CurrentPixelData, numPixels);
+	const int numRaysGenerated = GenerateReSTIRShadowRays(&m_Atomics, static_cast<Reservoir*>(m_Reservoirs[currentIndex].GetDevicePtr()), m_ShadowRays.GetDevicePtr<RestirShadowRay>(), a_CurrentPixelData, numPixels);
 
 	//Parameters for optix launch.
 	WaveFront::OptixLaunchParameters params;
 	params.m_TraversableHandle = a_OptixSceneHandle;
-	params.m_Reservoirs = static_cast<Reservoir*>(m_Reservoirs[m_SwapChainIndex].GetDevicePtr());
+	params.m_Reservoirs = static_cast<Reservoir*>(m_Reservoirs[currentIndex].GetDevicePtr());
 	params.m_ReSTIRShadowRayBatch = m_ShadowRays.GetDevicePtr<WaveFront::AtomicBuffer<RestirShadowRay>>();
-	params.m_MinMaxDistance = { 0.01f, 50000.f };	//TODO use actual numbers but idk which ones are okay ish?
+	params.m_MinMaxDistance = { 0.1f, 50000.f };	//TODO use actual numbers but idk which ones are okay ish?
 	params.m_ResolutionAndDepth = make_uint3(m_Settings.width, m_Settings.height, 1);
 	params.m_TraceType = WaveFront::RayType::RESTIR_RAY;
 
 	//Tell Optix to resolve all shadow rays, which sets reservoir weight to 0 when occluded.
 	if(numRaysGenerated > 0)
 	{
-		a_OptixSystem->TraceRays(numRaysGenerated, params);
+		//TODO enable this.
+		//a_OptixSystem->TraceRays(numRaysGenerated, params);
 	}
 
 	/*
@@ -171,6 +172,16 @@ CPU_ONLY void ReSTIR::Run(
 			seed,
 			dimensions
 		);
+
+		//////TODO debug remove
+  //      int data = 42;
+  //      int readback = -1;
+  //      void* ptr;
+  //      cudaMalloc(&ptr, sizeof(int));
+  //      cudaMemcpy(ptr, &data, sizeof(int), cudaMemcpyHostToDevice);
+  //      cudaMemcpy(&readback, ptr, sizeof(int), cudaMemcpyDeviceToHost);
+  //      bool success = (readback == 42);
+  ////      //TODO end of debug
 	}
 
 	GenerateWaveFrontShadowRays(

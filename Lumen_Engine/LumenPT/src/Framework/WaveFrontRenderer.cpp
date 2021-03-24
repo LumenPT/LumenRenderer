@@ -66,19 +66,12 @@ namespace WaveFront
 
         //Initialize the ray buffers. Note: These are not initialized but Reset() is called when the waves start.
         const auto numPrimaryRays = numPixels;
-        const auto numShadowRays = numPixels * m_Settings.depth; //TODO: change to 2x num pixels and add safety check to resolve when full.
-        m_Rays.Resize(sizeof(AtomicBuffer<IntersectionRayData>) + sizeof(IntersectionRayData) * numPrimaryRays);
-        m_ShadowRays.Resize(sizeof(AtomicBuffer<ShadowRayData>) + sizeof(ShadowRayData) * numShadowRays);
+        const auto numShadowRays = numPixels * m_Settings.depth + (numPixels * ReSTIRSettings::numReservoirsPerPixel); //TODO: change to 2x num pixels and add safety check to resolve when full.
 
-        //Reset Atomic Counters for Intersection and Shadow Rays
-        m_Rays.Write(0);
-        m_ShadowRays.Write(0);
-
-        //Initialize the intersection data. This one is the size of numPixels maximum.
-        m_IntersectionData.Resize(sizeof(AtomicBuffer<IntersectionData>) + sizeof(IntersectionData) * numPixels);
-
-        //Reset Atomic Counter for Intersection Buffer.
-        m_IntersectionData.Write(0);
+        //Create atomic buffers. This automatically sets the counter to 0 and size to max.
+        CreateAtomicBuffer<IntersectionRayData>(&m_Rays, numPrimaryRays);
+        CreateAtomicBuffer<ShadowRayData>(&m_ShadowRays, numShadowRays);
+        CreateAtomicBuffer<IntersectionData>(&m_IntersectionData, numPixels);
 
         //Initialize each surface data buffer.
         for(int i = 0; i < 3; ++i)
@@ -94,9 +87,9 @@ namespace WaveFront
 
         //Temporary lights, stored in the buffer.
         float3 pos1, pos2, pos3;
-        pos1 = { 150.f, 41.f, 210.f };
-        pos2 = { 150.f, 41.f, 110.f };
-        pos3 = { 90.f, 41.f, 210.f };
+        pos1 = { 150.f, 700.f, 210.f };
+        pos2 = { 150.f, 700.f, 110.f };
+        pos3 = { 90.f, 700.f, 210.f };
 
         float i1 = 3000000.f;
         float i2 = 300000.f;
@@ -316,29 +309,32 @@ namespace WaveFront
         vCuda = make_float3(v.x, v.y, v.z);
         wCuda = make_float3(w.x, w.y, w.z);
 
+        //Increment framecount each frame.
         static unsigned frameCount = 0;
+        ++frameCount;
 
         const WaveFront::PrimRayGenLaunchParameters::DeviceCameraData cameraData(eyeCuda, uCuda, vCuda, wCuda);
         auto rayPtr = m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>();
         const PrimRayGenLaunchParameters primaryRayGenParams(
             uint2{m_Settings.renderResolution.x, m_Settings.renderResolution.y}, 
             cameraData, 
-            rayPtr, frameCount);   //TODO what is framecount?
+            rayPtr, frameCount);
         GeneratePrimaryRays(primaryRayGenParams);
         cudaDeviceSynchronize();
         CHECKLASTCUDAERROR;
 
-        m_Rays.Write(numPixels, 0); //Set the counter to be equal to the amount of rays being shot. This is manual because the atomic is not used yet.
+        //Set the atomic counter for primary rays to the amount of pixels.
+        SetAtomicCounter<IntersectionRayData>(&m_Rays, numPixels);
 
         //Clear the surface data that contains information from the second last frame so that it can be reused by this frame.
         cudaMemset(m_SurfaceData[currentIndex].GetDevicePtr(), 0, sizeof(SurfaceData) * numPixels);
         cudaDeviceSynchronize();
         CHECKLASTCUDAERROR;
 
-        //Set the shadow ray count to 0.
+        //Set the counters back to 0 for intersections and shadow rays.
         const unsigned counterDefault = 0;
-        m_ShadowRays.Write(counterDefault);
-        m_IntersectionData.Write(counterDefault);
+        SetAtomicCounter<ShadowRayData>(&m_ShadowRays, counterDefault);
+        SetAtomicCounter<IntersectionData>(&m_IntersectionData, counterDefault);
 
         //Retrieve the acceleration structure and scene data table once.
         m_OptixSystem->UpdateSBT();
@@ -380,7 +376,8 @@ namespace WaveFront
              * Calculate the surface data for this depth.
              */
             unsigned numIntersections = 0;
-            m_IntersectionData.Read(&numIntersections, sizeof(uint32_t), 0);
+            numIntersections = GetAtomicCounter<IntersectionData>(&m_IntersectionData);
+
             const auto surfaceDataBufferIndex = depth == 0 ? currentIndex : 2;   //1 and 2 are used for the first intersection and remembered for temporal use.
             ExtractSurfaceData(
                 numIntersections, 
@@ -405,14 +402,14 @@ namespace WaveFront
                 camForward,
                 accelerationStructure,  //ReSTIR needs to check visibility early on so it does an optix launch for this scene.
                 m_OptixSystem.get(),
-                m_FrameIndex,
+                WangHash(frameCount), //Use the frame count as the random seed.
                 m_ReSTIR.get(), //ReSTIR, can not be nullptr.
                 depth,  //The current depth.
                 m_PixelBufferSeparate.GetDevicePtr<float3>()
             );
 
             //Reset the atomic counter.
-            m_Rays.Write(counterDefault);
+            ResetAtomicBuffer<IntersectionRayData>(&m_Rays);
             cudaDeviceSynchronize();
 
             Shade(shadingLaunchParams);

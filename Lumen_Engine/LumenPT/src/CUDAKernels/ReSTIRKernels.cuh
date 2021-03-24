@@ -104,7 +104,7 @@ __global__ void CombineTemporalSamplesInternal(
  * a_Count indicates the amount of pixels to process in a_ToCombine.
  * This runs for every reservoir at a_PixelIndex.
  */
-__device__ void CombineUnbiased(int a_PixelIndex, int a_Count, Reservoir** a_Reservoirs, const WaveFront::SurfaceData** a_ToCombine, const std::uint32_t a_Seed);
+__device__ void CombineUnbiased(Reservoir* a_OutputReservoir, int a_Count, Reservoir** a_Reservoirs, const WaveFront::SurfaceData** a_ToCombine, const std::uint32_t a_Seed);
 
 /*
  * Combine multiple reservoirs biased.
@@ -113,7 +113,7 @@ __device__ void CombineUnbiased(int a_PixelIndex, int a_Count, Reservoir** a_Res
  * a_Count indicates the amount of indices to process in a_ToCombineIndices.
  * This runs for every reservoir depth.
  */
-__device__ void CombineBiased(int a_PixelIndex, int a_Count, Reservoir** a_Reservoirs, const WaveFront::SurfaceData** a_ToCombine, const std::uint32_t a_Seed);
+__device__ void CombineBiased(Reservoir* a_OutputReservoir, int a_Count, Reservoir** a_Reservoirs, const WaveFront::SurfaceData** a_ToCombine, const std::uint32_t a_Seed);
 
 /*
  * Resample an old light sample.

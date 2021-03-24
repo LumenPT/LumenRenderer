@@ -48,8 +48,8 @@ CPU_ONLY void GenerateMotionVectors()
 
 CPU_ONLY void ExtractSurfaceData(
     unsigned a_NumIntersections, 
-    AtomicBuffer < IntersectionData>* a_IntersectionData, 
-    AtomicBuffer < IntersectionRayData>* a_Rays, 
+    AtomicBuffer<IntersectionData>* a_IntersectionData, 
+    AtomicBuffer<IntersectionRayData>* a_Rays, 
     SurfaceData* a_OutPut, 
     SceneDataTableAccessor* a_SceneDataTable)
 {
@@ -91,10 +91,13 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
     //Ensure that ReSTIR is loaded so that the CDF can be extracted.
     assert(a_ShadingParams.m_ReSTIR != nullptr);
 
+    //TODO remove
+    static bool useRestir = true;
+
     /*
      * Run ReSTIR at the first depth.
      */
-    if(a_ShadingParams.m_CurrentDepth == 0)
+    if(a_ShadingParams.m_CurrentDepth == 0 && useRestir)
     {
         a_ShadingParams.m_ReSTIR->Run(
             a_ShadingParams.m_CurrentSurfaceData,
