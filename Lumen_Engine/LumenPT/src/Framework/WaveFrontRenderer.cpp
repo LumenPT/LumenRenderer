@@ -501,6 +501,7 @@ namespace WaveFront
             m_FrameIndex = 0;
         }
 
+        a_Scene->m_Camera->UpdatePreviousFrameMatrix();
         ++frameCount;
 
         //Return the GLuint texture ID.

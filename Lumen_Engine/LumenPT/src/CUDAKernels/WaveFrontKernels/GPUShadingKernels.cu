@@ -73,19 +73,9 @@ sutil::Matrix4x4 m_ProjectionMatrix
         
         a_Buffer->SetMotionVectorData(motionVectorData, i);
     	
-        a_Buffer->m_MotionVectorBuffer[0].m_Velocity;
-        printf("x: %.6f y: %.6f \n", a_Buffer->m_MotionVectorBuffer[i].m_Velocity.x, a_Buffer->m_MotionVectorBuffer[i].m_Velocity.y);
-        //printf("curr x: %.6f curr y: %.6f prev x: %.6f prev y: %.6f \n", currScreenCoord.x, currScreenCoord.y, prevScreenCoord.x, prevScreenCoord.y);
-    	
-    	//if(
-        //(screenPos.x == 0 && screenPos.y == 0) ||
-        //(screenPos.x == 400 && screenPos.y == 300) ||
-    	//(screenPos.x == 799 && screenPos.y == 599) ||
-    	//(screenPos.x == 355)
-        //)
-    	{
-    		//printf("screen x: %d screen y: %d prev screen x: %.6f prev screen y: %.6f \n", screenPos.x, screenPos.y, screenCoordinates.x, screenCoordinates.y);
-			//printf("screen x: %d screen y: %d prev screen x: %.6f prev screen y: %.6f \n", screenPos.x, screenPos.y, ndc.x, ndc.y);
-    	}
+        if(i == 800 * 300 + 400)
+        {
+	        printf("x: %.6f y: %.6f \n", a_Buffer->m_MotionVectorBuffer[i].m_Velocity.x, a_Buffer->m_MotionVectorBuffer[i].m_Velocity.y);
+        }
     }
 }

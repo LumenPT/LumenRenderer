@@ -13,8 +13,8 @@ public:
 	~Camera();
 
 	//TODO: set lookat
-	
-	void SetPosition(glm::vec3 a_Position) { m_Position = a_Position; m_DirtyFlag = true; }
+
+	void SetPosition(glm::vec3 a_Position);
 	glm::vec3 GetPosition() const { return m_Position; }
 
 	void SetRotation(glm::quat a_Rotation);
@@ -29,10 +29,11 @@ public:
 	float GetAspectRatio() { return m_AspectRatio; }
 	
 	void GetVectorData(glm::vec3& a_Eye, glm::vec3& a_U, glm::vec3& a_V, glm::vec3& a_W);
-	void GetMatrixData(glm::mat4& a_PreviousFrameMatrix, glm::mat4& a_CurrentFrameMatrix) const;
+	void GetMatrixData(glm::mat4& a_PreviousFrameMatrix, glm::mat4& a_CurrentFrameMatrix);
 	glm::mat4 GeCurrentProjectionMatrixData() const;
 	glm::mat4 GetProjectionMatrix() const;
 
+	void UpdatePreviousFrameMatrix();
 private:
 	void UpdateValues();
 	void UpdateImagePlane();
