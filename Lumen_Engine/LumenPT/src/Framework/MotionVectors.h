@@ -7,6 +7,10 @@
 
 #include <memory>
 
+namespace WaveFront
+{
+	struct MotionVectorsGenerationData;
+}
 
 class MotionVectors
 {
@@ -15,6 +19,7 @@ public:
 	~MotionVectors();
 
 	void Init(uint2 a_Resolution);
+	void Update(WaveFront::MotionVectorsGenerationData& a_MotionVectorsGenerationData);
 	
 private:
 

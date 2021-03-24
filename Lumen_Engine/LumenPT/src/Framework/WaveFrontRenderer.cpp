@@ -19,6 +19,22 @@
 #include <Optix/optix_function_table_definition.h>
 #include <filesystem>
 #include <glm/gtx/compatibility.hpp>
+#include <sutil/Matrix.h>
+
+sutil::Matrix4x4 ConvertGLMtoSutilMat4(const glm::mat4& glmMat)
+{
+    float data[16];
+	
+    for (int row = 0; row < 4; ++row)
+    {
+        for (int column = 0; column < 4; ++column)
+        {
+            data[row * 4 + column] = glmMat[column][row]; //we swap column and row indices because sutil is in row major while glm is in column major
+        }
+    }
+
+    return sutil::Matrix4x4(data);
+}
 
 namespace WaveFront
 {
@@ -300,8 +316,8 @@ namespace WaveFront
         const WaveFront::PrimRayGenLaunchParameters::DeviceCameraData cameraData(eyeCuda, uCuda, vCuda, wCuda);
         auto rayPtr = m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>();
         const PrimRayGenLaunchParameters primaryRayGenParams(
-            uint2{m_Settings.renderResolution.x, m_Settings.renderResolution.y}, 
-            cameraData, 
+            uint2{ m_Settings.renderResolution.x, m_Settings.renderResolution.y },
+            cameraData,
             rayPtr, frameCount);   //TODO what is framecount?
         GeneratePrimaryRays(primaryRayGenParams);
         cudaDeviceSynchronize();
@@ -323,8 +339,8 @@ namespace WaveFront
         m_OptixSystem->UpdateSBT();
         auto* sceneDataTableAccessor = m_Table->GetDevicePointer();
         auto accelerationStructure = std::static_pointer_cast<PTScene>(a_Scene)->GetSceneAccelerationStructure();
-         cudaDeviceSynchronize();
-            CHECKLASTCUDAERROR;
+        cudaDeviceSynchronize();
+        CHECKLASTCUDAERROR;
 
         //Pass the buffers to the optix shader for shading.
         OptixLaunchParameters rayLaunchParameters;
@@ -348,7 +364,7 @@ namespace WaveFront
         /*
          * Resolve rays and shade at every depth.
          */
-        for(unsigned depth = 0; depth < m_Settings.depth && numIntersectionRays > 0; ++depth)
+        for (unsigned depth = 0; depth < m_Settings.depth && numIntersectionRays > 0; ++depth)
         {
             //Tell Optix to resolve the primary rays that have been generated.
             m_OptixSystem->TraceRays(numIntersectionRays, rayLaunchParameters);
@@ -362,10 +378,10 @@ namespace WaveFront
             m_IntersectionData.Read(&numIntersections, sizeof(uint32_t), 0);
             const auto surfaceDataBufferIndex = depth == 0 ? currentIndex : 2;   //1 and 2 are used for the first intersection and remembered for temporal use.
             ExtractSurfaceData(
-                numIntersections, 
-                m_IntersectionData.GetDevicePtr<AtomicBuffer<IntersectionData>>(), 
-                m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>(), 
-                m_SurfaceData[surfaceDataBufferIndex].GetDevicePtr<SurfaceData>(), 
+                numIntersections,
+                m_IntersectionData.GetDevicePtr<AtomicBuffer<IntersectionData>>(),
+                m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>(),
+                m_SurfaceData[surfaceDataBufferIndex].GetDevicePtr<SurfaceData>(),
                 sceneDataTableAccessor);
             cudaDeviceSynchronize();
             CHECKLASTCUDAERROR;
@@ -376,7 +392,7 @@ namespace WaveFront
              * Call the shading kernels.
              */
             ShadingLaunchParameters shadingLaunchParams(
-                uint3{m_Settings.renderResolution.x, m_Settings.renderResolution.y, m_Settings.depth},
+                uint3{ m_Settings.renderResolution.x, m_Settings.renderResolution.y, m_Settings.depth },
                 m_SurfaceData[currentIndex].GetDevicePtr<SurfaceData>(),
                 m_SurfaceData[temporalIndex].GetDevicePtr<SurfaceData>(),
                 m_ShadowRays.GetDevicePtr<AtomicBuffer<ShadowRayData>>(),
@@ -405,6 +421,34 @@ namespace WaveFront
             m_IntersectionData.Write(counterDefault);
         }
 
+        glm::vec4 testPoint1(0.f, 0.f, 1.0f, 1.0f);
+        glm::mat4 previousFrameMatrix, currentFrameMatrix;
+        a_Scene->m_Camera->GetMatrixData(previousFrameMatrix, currentFrameMatrix);
+        glm::mat4 projectionMatrix = a_Scene->m_Camera->GetProjectionMatrix();
+
+        previousFrameMatrix = glm::translate(previousFrameMatrix, glm::vec3(0.f, 0.f, -1.f));
+
+        glm::vec4 clipCoordinates1 = projectionMatrix * glm::inverse(currentFrameMatrix) * testPoint1;
+        glm::vec3 ndc1 = glm::vec3(clipCoordinates1.x, clipCoordinates1.y, clipCoordinates1.z) / clipCoordinates1.w;
+
+        glm::vec4 clipCoordinates2 = projectionMatrix * glm::inverse(previousFrameMatrix) * testPoint1;
+        glm::vec3 ndc2 = glm::vec3(clipCoordinates2.x, clipCoordinates2.y, clipCoordinates2.z) / clipCoordinates2.w;
+
+        float data[] { 0.1f, 0.1f, 0.1f, 0.1f, 0.1f, 0.1f, 0.1f, 0.1f, 0.1f, 0.1f, 0.1f, 0.1f, 0.1f, 0.1f, 0.1f, 0.1f };
+
+        sutil::Matrix4x4 prevFrameMatrixArg = ConvertGLMtoSutilMat4(previousFrameMatrix);
+        sutil::Matrix4x4 projectionMatrixArg = ConvertGLMtoSutilMat4(projectionMatrix);
+    	
+        float4 testPoint3 = make_float4(0.f, 0.f, 1.f, 1.0f);
+        auto clipCoordinates3 = projectionMatrixArg * prevFrameMatrixArg * testPoint3;
+    	
+        MotionVectorsGenerationData motionVectorsGenerationData;
+        motionVectorsGenerationData.m_MotionVectorBuffer = nullptr;
+        motionVectorsGenerationData.m_ScreenResolution = make_uint2(m_Settings.renderResolution.x, m_Settings.renderResolution.y);
+        motionVectorsGenerationData.m_PrevCameraMatrix = prevFrameMatrixArg;
+        motionVectorsGenerationData.m_ProjectionMatrix = projectionMatrixArg;
+        m_MotionVectors.Update(motionVectorsGenerationData);
+    	
         //The amount of shadow rays to trace.
         unsigned numShadowRays = 0;
         m_ShadowRays.Read(&numShadowRays, sizeof(uint32_t), 0);

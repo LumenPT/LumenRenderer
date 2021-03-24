@@ -19,6 +19,7 @@ MotionVectors::~MotionVectors()
 
 void MotionVectors::Init(uint2 a_Resolution)
 {
+	m_Resolution = a_Resolution;
 	const auto numPixels = m_Resolution.x * m_Resolution.y;
 
 	const unsigned motionVectorBufferEmptySize = sizeof(MotionVectorBuffer);
@@ -38,9 +39,22 @@ void MotionVectors::Init(uint2 a_Resolution)
 
 	m_MotionVectorBuffer->Write(numPixels, 0);
 
-	MotionVectorsGenerationData motionVectorsGenerationData;
+	/*MotionVectorsGenerationData motionVectorsGenerationData;
 	motionVectorsGenerationData.m_MotionVectorBuffer = m_MotionVectorBuffer->GetDevicePtr<MotionVectorBuffer>();
 	motionVectorsGenerationData.m_ScreenResolution = m_Resolution;
 
-	GenerateMotionVectors(motionVectorsGenerationData);
+	GenerateMotionVectors(motionVectorsGenerationData);*/
+}
+
+void MotionVectors::Update(WaveFront::MotionVectorsGenerationData& a_MotionVectorsGenerationData)
+{
+	a_MotionVectorsGenerationData.m_MotionVectorBuffer = m_MotionVectorBuffer->GetDevicePtr<MotionVectorBuffer>();
+	
+	GenerateMotionVectors(a_MotionVectorsGenerationData);
+
+	/*MotionVectorsGenerationData motionVectorsGenerationData;
+	motionVectorsGenerationData.m_MotionVectorBuffer = m_MotionVectorBuffer->GetDevicePtr<MotionVectorBuffer>();
+	motionVectorsGenerationData.m_ScreenResolution = m_Resolution;
+
+	GenerateMotionVectors(motionVectorsGenerationData);*/
 }

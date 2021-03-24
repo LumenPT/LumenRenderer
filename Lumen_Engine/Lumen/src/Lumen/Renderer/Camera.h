@@ -30,6 +30,8 @@ public:
 	
 	void GetVectorData(glm::vec3& a_Eye, glm::vec3& a_U, glm::vec3& a_V, glm::vec3& a_W);
 	void GetMatrixData(glm::mat4& a_PreviousFrameMatrix, glm::mat4& a_CurrentFrameMatrix) const;
+	glm::mat4 GeCurrentProjectionMatrixData() const;
+	glm::mat4 GetProjectionMatrix() const;
 
 private:
 	void UpdateValues();
@@ -45,8 +47,8 @@ private:
 
 	glm::quat m_Rotation = glm::quat(1.f, 0.f, 0.f, 0.f);
 
-	glm::mat4 m_previousFrameMatrix;
-	glm::mat4 m_currentFrameMatrix;
+	glm::mat4 m_PreviousFrameMatrix;
+	glm::mat4 m_CurrentFrameMatrix;
 
 	float m_FocalLength = 1.0f;
 	float m_AspectRatio = 1.0f;

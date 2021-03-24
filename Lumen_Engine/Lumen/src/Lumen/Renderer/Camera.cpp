@@ -10,7 +10,7 @@ Camera::Camera() :
 	UpdateCameraVectors();
 	UpdateImagePlane();
 
-	m_previousFrameMatrix = m_currentFrameMatrix;
+	m_PreviousFrameMatrix = m_CurrentFrameMatrix;
 }
 
 Camera::Camera(glm::vec3 a_Position, glm::vec3 a_Up) :
@@ -21,7 +21,7 @@ Camera::Camera(glm::vec3 a_Position, glm::vec3 a_Up) :
 	UpdateCameraVectors();
 	UpdateImagePlane();
 
-	m_previousFrameMatrix = m_currentFrameMatrix;
+	m_PreviousFrameMatrix = m_CurrentFrameMatrix;
 }
 
 Camera::~Camera()
@@ -82,8 +82,13 @@ void Camera::GetVectorData(glm::vec3& a_Eye, glm::vec3& a_U, glm::vec3& a_V, glm
 
 void Camera::GetMatrixData(glm::mat4& a_PreviousFrameMatrix, glm::mat4& a_CurrentFrameMatrix) const
 {
-	a_PreviousFrameMatrix = a_PreviousFrameMatrix;
-	a_CurrentFrameMatrix = a_CurrentFrameMatrix;
+	a_PreviousFrameMatrix = m_PreviousFrameMatrix;
+	a_CurrentFrameMatrix = m_CurrentFrameMatrix;
+}
+
+glm::mat4 Camera::GetProjectionMatrix() const
+{
+	return glm::perspective(glm::radians(m_FovY), m_AspectRatio, 0.5f, 10000.f);
 }
 
 void Camera::UpdateValues()
@@ -100,14 +105,14 @@ void Camera::UpdateImagePlane()
 
 void Camera::UpdateCameraVectors()
 {
-	m_previousFrameMatrix = m_currentFrameMatrix;
+	m_PreviousFrameMatrix = m_CurrentFrameMatrix;
 	
-	m_currentFrameMatrix = glm::toMat4(m_Rotation);
-	m_currentFrameMatrix[3] = glm::vec4(m_Position, 1.0f);
+	m_CurrentFrameMatrix = glm::toMat4(m_Rotation);
+	m_CurrentFrameMatrix[3] = glm::vec4(m_Position, 1.0f);
 
-	m_Right = m_currentFrameMatrix[0];
-	m_Up = m_currentFrameMatrix[1];
-	m_Forward = m_currentFrameMatrix[2];
+	m_Right = m_CurrentFrameMatrix[0];
+	m_Up = m_CurrentFrameMatrix[1];
+	m_Forward = m_CurrentFrameMatrix[2];
 	
 	m_DirtyFlag = false;
 }

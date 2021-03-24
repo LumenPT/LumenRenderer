@@ -3,6 +3,7 @@
 
 #include <Optix/optix.h>
 #include <Cuda/cuda/helpers.h>
+#include <sutil/Matrix.h>
 #include <cassert>
 
 namespace WaveFront
@@ -64,7 +65,8 @@ namespace WaveFront
     {
         MotionVectorBuffer* m_MotionVectorBuffer;
         uint2 m_ScreenResolution;
-
+		sutil::Matrix4x4 m_PrevCameraMatrix;
+		sutil::Matrix4x4 m_ProjectionMatrix;
     };
 
 }
