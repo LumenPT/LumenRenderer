@@ -42,7 +42,12 @@ CPU_ON_GPU void WriteToOutput(
     }
 }
 
-CPU_ON_GPU void GenerateMotionVector(MotionVectorBuffer* a_Buffer, uint2 a_Resolution)
+CPU_ON_GPU void GenerateMotionVector(MotionVectorBuffer* a_Buffer, 
+const SurfaceData* a_CurrentSurfaceData, 
+uint2 a_Resolution, 
+sutil::Matrix4x4 m_PrevViewMatrix,
+sutil::Matrix4x4 m_ProjectionMatrix
+)
 {
     int size = a_Resolution.x * a_Resolution.y;
     int index = blockIdx.x * blockDim.x + threadIdx.x;
@@ -50,12 +55,27 @@ CPU_ON_GPU void GenerateMotionVector(MotionVectorBuffer* a_Buffer, uint2 a_Resol
 
     for (int i = index; i < size; i += stride)
     {
+		float4 currentWorldPos = make_float4(a_CurrentSurfaceData[i].m_Position, 1.0f);
+
+    	float4 clipCoordinates3 = m_ProjectionMatrix * m_PrevViewMatrix * currentWorldPos;
+        float3 ndc3 = make_float3(clipCoordinates3.x, clipCoordinates3.y, clipCoordinates3.z) / clipCoordinates3.w;
+    	float2 screenCoordinates = make_float2(
+        clipCoordinates3.x / 2.0f + 0.5f * a_Resolution.x,
+        clipCoordinates3.x / 2.0f + 0.5f * a_Resolution.y
+        );
+    	
         MotionVectorData motionVectorData;
         motionVectorData.m_Velocity = make_float2(1.f, 1.f);
 
         a_Buffer->SetMotionVectorData(motionVectorData, i);
-
+    	
         a_Buffer->m_MotionVectorBuffer[0].m_Velocity;
         //printf("x: %.6f y: %.6f \n", a_Buffer->m_MotionVectorBuffer[i].m_Velocity.x, a_Buffer->m_MotionVectorBuffer[i].m_Velocity.y);
+
+        float2 screenPos;
+    	screenPos.y = i / static_cast<int>(a_Resolution.x);
+    	screenPos.x = i - screenPos.y * a_Resolution.x;
+    	
+    	printf("screen x: %i screen y: %i prev screen x: %.6f prev screen y: %.6f \n", screenPos.x, screenPos.y, screenCoordinates.x, screenCoordinates.y);
     }
 }

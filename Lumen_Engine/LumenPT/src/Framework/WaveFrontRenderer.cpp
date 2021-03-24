@@ -386,6 +386,24 @@ namespace WaveFront
             cudaDeviceSynchronize();
             CHECKLASTCUDAERROR;
 
+        	//motion vector generation
+        	if(depth == 0)
+            {
+                glm::mat4 previousFrameMatrix, currentFrameMatrix;
+                a_Scene->m_Camera->GetMatrixData(previousFrameMatrix, currentFrameMatrix);
+                sutil::Matrix4x4 prevFrameMatrixArg = ConvertGLMtoSutilMat4(previousFrameMatrix);
+
+                glm::mat4 projectionMatrix = a_Scene->m_Camera->GetProjectionMatrix();
+                sutil::Matrix4x4 projectionMatrixArg = ConvertGLMtoSutilMat4(projectionMatrix);
+        		
+                MotionVectorsGenerationData motionVectorsGenerationData;
+                motionVectorsGenerationData.m_MotionVectorBuffer = nullptr;
+                motionVectorsGenerationData.m_ScreenResolution = make_uint2(m_Settings.renderResolution.x, m_Settings.renderResolution.y);
+                motionVectorsGenerationData.m_PrevViewMatrix = prevFrameMatrixArg.inverse();
+                motionVectorsGenerationData.m_ProjectionMatrix = projectionMatrixArg;
+                //m_MotionVectors.Update(motionVectorsGenerationData);
+            }
+        	
             //TODO add ReSTIR instance and run from shading kernel.
 
             /*
@@ -440,14 +458,15 @@ namespace WaveFront
         sutil::Matrix4x4 projectionMatrixArg = ConvertGLMtoSutilMat4(projectionMatrix);
     	
         float4 testPoint3 = make_float4(0.f, 0.f, 1.f, 1.0f);
-        auto clipCoordinates3 = projectionMatrixArg * prevFrameMatrixArg * testPoint3;
+        auto clipCoordinates3 = projectionMatrixArg * prevFrameMatrixArg.inverse() * testPoint3;
+        auto ndc3 = make_float3(clipCoordinates3.x, clipCoordinates3.y, clipCoordinates3.z) / clipCoordinates3.w;
     	
         MotionVectorsGenerationData motionVectorsGenerationData;
         motionVectorsGenerationData.m_MotionVectorBuffer = nullptr;
         motionVectorsGenerationData.m_ScreenResolution = make_uint2(m_Settings.renderResolution.x, m_Settings.renderResolution.y);
-        motionVectorsGenerationData.m_PrevCameraMatrix = prevFrameMatrixArg;
+        motionVectorsGenerationData.m_PrevViewMatrix = prevFrameMatrixArg.inverse();
         motionVectorsGenerationData.m_ProjectionMatrix = projectionMatrixArg;
-        m_MotionVectors.Update(motionVectorsGenerationData);
+        //m_MotionVectors.Update(motionVectorsGenerationData);
     	
         //The amount of shadow rays to trace.
         unsigned numShadowRays = 0;

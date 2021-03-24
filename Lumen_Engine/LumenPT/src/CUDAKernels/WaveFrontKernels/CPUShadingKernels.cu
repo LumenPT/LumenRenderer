@@ -46,7 +46,12 @@ CPU_ONLY void GenerateMotionVectors(MotionVectorsGenerationData& a_MotionVectors
     const int blockSize = 256;
     const int numBlocks = (numPixels + blockSize - 1) / blockSize;
 
-    GenerateMotionVector<<<numBlocks, blockSize>>>(a_MotionVectorsData.m_MotionVectorBuffer, a_MotionVectorsData.m_ScreenResolution);
+    GenerateMotionVector<<<numBlocks, blockSize>>>(
+    a_MotionVectorsData.m_MotionVectorBuffer, 
+    a_MotionVectorsData.a_CurrentSurfaceData, 
+    a_MotionVectorsData.m_ScreenResolution,
+    a_MotionVectorsData.m_PrevViewMatrix,
+    a_MotionVectorsData.m_ProjectionMatrix);
 
     cudaDeviceSynchronize();
 }

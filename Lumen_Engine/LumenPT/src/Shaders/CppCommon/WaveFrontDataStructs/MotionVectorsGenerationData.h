@@ -64,8 +64,9 @@ namespace WaveFront
     struct MotionVectorsGenerationData
     {
         MotionVectorBuffer* m_MotionVectorBuffer;
+		const SurfaceData* a_CurrentSurfaceData;
         uint2 m_ScreenResolution;
-		sutil::Matrix4x4 m_PrevCameraMatrix;
+		sutil::Matrix4x4 m_PrevViewMatrix;
 		sutil::Matrix4x4 m_ProjectionMatrix;
     };
 
