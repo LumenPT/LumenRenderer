@@ -1,5 +1,6 @@
 #pragma once
 #include "IntersectionData.h"
+#include "VolumetricIntersectionData.h"
 #include "IntersectionRayData.h"
 #include "ShadowRayData.h"
 #include "LightData.h"

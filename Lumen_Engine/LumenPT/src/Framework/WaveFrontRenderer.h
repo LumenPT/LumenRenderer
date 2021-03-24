@@ -75,6 +75,9 @@ namespace WaveFront
         //Intersection points passed to Optix.
         MemoryBuffer m_IntersectionData;
 
+		//Volumetric intersection data passed to Optix
+		MemoryBuffer m_VolumetricIntersectionData;
+
         //Buffer containing intersection rays.
         MemoryBuffer m_Rays;
 

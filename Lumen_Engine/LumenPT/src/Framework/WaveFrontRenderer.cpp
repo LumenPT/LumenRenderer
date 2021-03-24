@@ -77,10 +77,13 @@ namespace WaveFront
         m_ShadowRays.Write(0);
 
         //Initialize the intersection data. This one is the size of numPixels maximum.
+		//TODO: increase size of volume intersection buffer to allow multiple consecutive volumes
         m_IntersectionData.Resize(sizeof(AtomicBuffer<IntersectionData>) + sizeof(IntersectionData) * numPixels);
+		m_VolumetricIntersectionData.Resize(sizeof(AtomicBuffer <IntersectionData>) + sizeof(VolumetricIntersectionData) * numPixels);
 
-        //Reset Atomic Counter for Intersection Buffer.
+        //Reset Atomic Counter for Intersection Buffers.
         m_IntersectionData.Write(0);
+		m_VolumetricIntersectionData.Write(0);
 
         //Initialize each surface data buffer.
         for(int i = 0; i < 3; ++i)
@@ -329,6 +332,7 @@ namespace WaveFront
         const unsigned counterDefault = 0;
         m_ShadowRays.Write(counterDefault);
         m_IntersectionData.Write(counterDefault);
+		m_VolumetricIntersectionData.Write(counterDefault);
 
         //Retrieve the acceleration structure and scene data table once.
         m_OptixSystem->UpdateSBT();
@@ -342,6 +346,7 @@ namespace WaveFront
         rayLaunchParameters.m_TraceType = RayType::INTERSECTION_RAY;
         rayLaunchParameters.m_MinMaxDistance = { 0.01f, 5000.f };
         rayLaunchParameters.m_IntersectionBuffer = m_IntersectionData.GetDevicePtr<AtomicBuffer<IntersectionData>>();
+		rayLaunchParameters.m_VolumetricIntersectionBuffer = m_VolumetricIntersectionData.GetDevicePtr<AtomicBuffer<VolumetricIntersectionData>>();
         rayLaunchParameters.m_IntersectionRayBatch = m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>();
         rayLaunchParameters.m_TraversableHandle = accelerationStructure;
         rayLaunchParameters.m_ResolutionAndDepth = uint3{ m_Settings.renderResolution.x, m_Settings.renderResolution.y, m_Settings.depth };

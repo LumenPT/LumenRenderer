@@ -22,6 +22,7 @@ namespace WaveFront
         uint3 m_ResolutionAndDepth;
         AtomicBuffer<IntersectionRayData>* m_IntersectionRayBatch;
         AtomicBuffer<IntersectionData>* m_IntersectionBuffer;
+		AtomicBuffer<VolumetricIntersectionData>* m_VolumetricIntersectionBuffer;
         AtomicBuffer<ShadowRayData>* m_ShadowRayBatch;
         AtomicBuffer<RestirShadowRay>* m_ReSTIRShadowRayBatch;
         Reservoir* m_Reservoirs;
