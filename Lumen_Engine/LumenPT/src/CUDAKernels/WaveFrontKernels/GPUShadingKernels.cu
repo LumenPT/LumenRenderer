@@ -60,8 +60,8 @@ sutil::Matrix4x4 m_ProjectionMatrix
     	float4 clipCoordinates3 = m_ProjectionMatrix * m_PrevViewMatrix * currentWorldPos;
         float3 ndc3 = make_float3(clipCoordinates3.x, clipCoordinates3.y, clipCoordinates3.z) / clipCoordinates3.w;
     	float2 screenCoordinates = make_float2(
-        clipCoordinates3.x / 2.0f + 0.5f * a_Resolution.x,
-        clipCoordinates3.x / 2.0f + 0.5f * a_Resolution.y
+        ndc3.x / 2.0f + 0.5f * a_Resolution.x,
+        ndc3.x / 2.0f + 0.5f * a_Resolution.y
         );
     	
         MotionVectorData motionVectorData;
@@ -72,10 +72,13 @@ sutil::Matrix4x4 m_ProjectionMatrix
         a_Buffer->m_MotionVectorBuffer[0].m_Velocity;
         //printf("x: %.6f y: %.6f \n", a_Buffer->m_MotionVectorBuffer[i].m_Velocity.x, a_Buffer->m_MotionVectorBuffer[i].m_Velocity.y);
         
-        float2 screenPos;
-    	screenPos.y = i / static_cast<int>(a_Resolution.x);
-    	screenPos.x = i - screenPos.y * static_cast<int>(a_Resolution.x);
-    	
-    	printf("screen x: %.6f screen y: %.6f prev screen x: %.6f prev screen y: %.6f \n", screenPos.x, screenPos.y, screenCoordinates.x, screenCoordinates.y);
+        uint2 screenPos;
+    	screenPos.y = static_cast<unsigned int>(i) / a_Resolution.x;
+    	screenPos.x = static_cast<unsigned int>(i) - screenPos.y * a_Resolution.x;
+
+    	if(screenPos.x == 400 && screenPos.y == 300)
+    	{
+    		printf("screen x: %d screen y: %d prev screen x: %.6f prev screen y: %.6f \n", screenPos.x, screenPos.y, screenCoordinates.x, screenCoordinates.y);
+    	}
     }
 }
