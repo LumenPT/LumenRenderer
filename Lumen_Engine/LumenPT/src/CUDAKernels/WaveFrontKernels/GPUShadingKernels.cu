@@ -55,27 +55,28 @@ sutil::Matrix4x4 m_ProjectionMatrix
 
     for (int i = index; i < size; i += stride)
     {
-		float4 currentWorldPos = make_float4(a_CurrentSurfaceData[i].m_Position, 1.0f);
-
-    	float4 clipCoordinates3 = m_ProjectionMatrix * m_PrevViewMatrix * currentWorldPos;
-        float3 ndc = make_float3(clipCoordinates3.x, clipCoordinates3.y, clipCoordinates3.z) / clipCoordinates3.w;
-    	float2 screenCoordinates = make_float2(
-        ndc.x * 0.5f + 0.5f /** static_cast<float>(a_Resolution.x)*/,
-        ndc.y * 0.5f + 0.5f /** static_cast<float>(a_Resolution.y)*/
+		float4 currWorldPos = make_float4(a_CurrentSurfaceData[i].m_Position, 1.0f);
+        float2 currScreenCoord;
+    	currScreenCoord.y = (static_cast<unsigned int>(i) / a_Resolution.x);
+    	currScreenCoord.x = (static_cast<unsigned int>(i) - currScreenCoord.y * a_Resolution.x);
+    	currScreenCoord += make_float2(0.5f);
+    	
+    	float4 prevClipCoordinates = m_ProjectionMatrix * m_PrevViewMatrix * currWorldPos;
+        float3 prevNdc = make_float3(prevClipCoordinates.x, prevClipCoordinates.y, prevClipCoordinates.z) / prevClipCoordinates.w;
+    	float2 prevScreenCoord = make_float2(
+        (prevNdc.x * 0.5f + 0.5f) * static_cast<float>(a_Resolution.x),
+        (prevNdc.y * 0.5f + 0.5f) * static_cast<float>(a_Resolution.y)
         );
 
         MotionVectorData motionVectorData;
-        motionVectorData.m_Velocity = make_float2(1.f, 1.f);
+        motionVectorData.m_Velocity = (currScreenCoord - prevScreenCoord);
         
         a_Buffer->SetMotionVectorData(motionVectorData, i);
     	
         a_Buffer->m_MotionVectorBuffer[0].m_Velocity;
-        //printf("x: %.6f y: %.6f \n", a_Buffer->m_MotionVectorBuffer[i].m_Velocity.x, a_Buffer->m_MotionVectorBuffer[i].m_Velocity.y);
-        
-        uint2 screenPos;
-    	screenPos.y = static_cast<unsigned int>(i) / a_Resolution.x;
-    	screenPos.x = static_cast<unsigned int>(i) - screenPos.y * a_Resolution.x;
-
+        printf("x: %.6f y: %.6f \n", a_Buffer->m_MotionVectorBuffer[i].m_Velocity.x, a_Buffer->m_MotionVectorBuffer[i].m_Velocity.y);
+        //printf("curr x: %.6f curr y: %.6f prev x: %.6f prev y: %.6f \n", currScreenCoord.x, currScreenCoord.y, prevScreenCoord.x, prevScreenCoord.y);
+    	
     	//if(
         //(screenPos.x == 0 && screenPos.y == 0) ||
         //(screenPos.x == 400 && screenPos.y == 300) ||
@@ -83,7 +84,7 @@ sutil::Matrix4x4 m_ProjectionMatrix
     	//(screenPos.x == 355)
         //)
     	{
-    		printf("screen x: %d screen y: %d prev screen x: %.6f prev screen y: %.6f \n", screenPos.x, screenPos.y, screenCoordinates.x, screenCoordinates.y);
+    		//printf("screen x: %d screen y: %d prev screen x: %.6f prev screen y: %.6f \n", screenPos.x, screenPos.y, screenCoordinates.x, screenCoordinates.y);
 			//printf("screen x: %d screen y: %d prev screen x: %.6f prev screen y: %.6f \n", screenPos.x, screenPos.y, ndc.x, ndc.y);
     	}
     }
