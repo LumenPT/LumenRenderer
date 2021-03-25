@@ -90,6 +90,7 @@ file(GLOB_RECURSE CPP_HEADER_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/*.hpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/*.inl
 	${CMAKE_CURRENT_SOURCE_DIR}/src/CUDAKernels/*.cuh
+	${CMAKE_CURRENT_SOURCE_DIR}/src/Tools/*.cuh
 )
 
 #Add source files
@@ -98,6 +99,7 @@ file(GLOB_RECURSE CPP_SOURCE_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/*.c
 	${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/CUDAKernels/*.cu
+	${CMAKE_CURRENT_SOURCE_DIR}/src/Tools/*.cu
 )
 
 # Add header and source files to library

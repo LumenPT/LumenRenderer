@@ -8,7 +8,7 @@
 #include "Material.h"
 #include "Texture.h"
 #include "MemoryBuffer.h"
-#include "OutputBuffer.h"
+#include "CudaGLTexture.h"
 #include "ShaderBindingTableGen.h"
 #include "../Shaders/CppCommon/LumenPTConsts.h"
 #include "../Shaders/CppCommon/SceneDataTableAccessor.h"
@@ -65,7 +65,7 @@ OptiXRenderer::OptiXRenderer(const InitializationData& a_InitializationData)
     m_SceneDataTable = std::make_unique<SceneDataTable>();
     m_ServiceLocator.m_SceneDataTable = m_SceneDataTable.get();
 
-   // m_Scene->m_Camera->SetPosition(glm::vec3(0.f, 0.f, -50.f));
+    // m_Scene->m_Camera->SetPosition(glm::vec3(0.f, 0.f, -50.f));
 }
 
 OptiXRenderer::~OptiXRenderer()
@@ -94,9 +94,9 @@ void OptiXRenderer::InitializePipelineOptions()
     m_PipelineCompileOptions.numPayloadValues = 5;
     // What exceptions can the pipeline throw.
     m_PipelineCompileOptions.exceptionFlags = OptixExceptionFlags::OPTIX_EXCEPTION_FLAG_DEBUG
-    | OPTIX_EXCEPTION_FLAG_TRACE_DEPTH | OPTIX_EXCEPTION_FLAG_STACK_OVERFLOW;
+        | OPTIX_EXCEPTION_FLAG_TRACE_DEPTH | OPTIX_EXCEPTION_FLAG_STACK_OVERFLOW;
     // 0 corresponds to enabling custom primitives and triangles, but nothing else 
-    m_PipelineCompileOptions.usesPrimitiveTypeFlags = 0; 
+    m_PipelineCompileOptions.usesPrimitiveTypeFlags = 0;
     m_PipelineCompileOptions.usesMotionBlur = false;
     m_PipelineCompileOptions.pipelineLaunchParamsVariableName = "params";
 
@@ -197,7 +197,7 @@ void OptiXRenderer::CreatePipeline()
 OptixModule OptiXRenderer::CreateModule(const std::string& a_PtxPath)
 {
     assert(std::filesystem::exists(a_PtxPath));
-	
+
     OptixModuleCompileOptions moduleOptions = {};
     moduleOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_LINEINFO;
     moduleOptions.maxRegisterCount = OPTIX_COMPILE_DEFAULT_MAX_REGISTER_COUNT;
@@ -337,7 +337,7 @@ std::unique_ptr<AccelerationStructure> OptiXRenderer::BuildInstanceAccelerationS
 void OptiXRenderer::CreateOutputBuffer()
 {
 
-    m_OutputBuffer = std::make_unique<::OutputBuffer>(gs_ImageWidth, gs_ImageHeight);
+    m_OutputBuffer = std::make_unique<::CudaGLTexture>(gs_ImageWidth, gs_ImageHeight);
 
 }
 
@@ -381,9 +381,9 @@ void OptiXRenderer::CreateShaderBindingTable()
     missRecord.m_Data.m_Num = 2;
     missRecord.m_Data.m_Color = { 0.f, 0.f, 1.f };
 
-	//bookmark
+    //bookmark
     m_HitRecord = m_ShaderBindingTableGenerator->AddHitGroup<void>();
-    
+
     auto& hitRecord = m_HitRecord.GetRecord();
     hitRecord.m_Header = GetProgramGroupHeader("Hit");
 }
@@ -427,7 +427,7 @@ unsigned int OptiXRenderer::TraceFrame(std::shared_ptr<Lumen::ILumenScene>& a_Sc
 
     params.m_Image = m_OutputBuffer->GetDevicePointer();
     params.m_Handle = str;
-	
+
     params.m_ImageWidth = gs_ImageWidth;
     params.m_ImageHeight = gs_ImageHeight;
     params.m_VertexBuffer = vertexBuffer.GetDevicePtr<Vertex>();
@@ -605,7 +605,7 @@ std::shared_ptr<Lumen::ILumenVolume> OptiXRenderer::CreateVolume(const std::stri
 
     auto grid = volume->GetHandle()->grid<float>();
     auto bbox = grid->worldBBox();
-	
+
     nanovdb::Vec3<double> temp = bbox.min();
     float bboxMinX = bbox.min()[0];
     float bboxMinY = bbox.min()[1];
@@ -613,12 +613,12 @@ std::shared_ptr<Lumen::ILumenVolume> OptiXRenderer::CreateVolume(const std::stri
     float bboxMaxX = bbox.max()[0];
     float bboxMaxY = bbox.max()[1];
     float bboxMaxZ = bbox.max()[2];
-	
+
     aabb = { bboxMinX, bboxMinY, bboxMinZ, bboxMaxX, bboxMaxY, bboxMaxZ };
-	
+
     MemoryBuffer aabb_buffer(sizeof(OptixAabb));
     aabb_buffer.Write(aabb);
-	
+
     OptixBuildInput buildInput = {};
     buildInput.type = OPTIX_BUILD_INPUT_TYPE_CUSTOM_PRIMITIVES;
     buildInput.customPrimitiveArray.aabbBuffers = &*aabb_buffer;

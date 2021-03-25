@@ -10,8 +10,9 @@
 
 #include <memory>
 #include <string>
+#include "Glad/glad.h"
 
-
+class FrameSnapshot;
 class Camera;
 
 namespace Lumen
@@ -83,8 +84,15 @@ public:
 
 	virtual unsigned int TraceFrame(std::shared_ptr<Lumen::ILumenScene>& a_Scene) = 0;	//scene argument may be redundant... or not 
 
+
+	virtual void BeginSnapshot() = 0;
+
+	virtual std::unique_ptr<FrameSnapshot> EndSnapshot() = 0;
 	std::shared_ptr<Lumen::ILumenScene> m_Scene;
 
+	//Debug GLuint texture accessible by application
+	GLuint m_DebugTexture;
+	
 private:
 		
 };

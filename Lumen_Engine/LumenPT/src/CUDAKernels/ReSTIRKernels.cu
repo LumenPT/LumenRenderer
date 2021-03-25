@@ -397,7 +397,9 @@ __host__ void TemporalNeighbourSampling(
     const WaveFront::SurfaceData* a_CurrentPixelData,
     const WaveFront::SurfaceData* a_PreviousPixelData,
     const std::uint32_t a_Seed,
-    unsigned a_NumPixels
+    unsigned a_NumPixels,
+    uint2 a_Dimensions,
+    WaveFront::MotionVectorBuffer* a_MotionVectorBuffer
 )
 {
     const int blockSize = CUDA_BLOCK_SIZE;
@@ -406,7 +408,7 @@ __host__ void TemporalNeighbourSampling(
     //TODO pass the motion vector information in here.
 
     CombineTemporalSamplesInternal << <numBlocks, blockSize >> > (a_CurrentReservoirs, a_PreviousReservoirs,
-                                                                  a_CurrentPixelData, a_PreviousPixelData, a_Seed, a_NumPixels);
+                                                                  a_CurrentPixelData, a_PreviousPixelData, a_Seed, a_NumPixels, a_Dimensions, a_MotionVectorBuffer);
     cudaDeviceSynchronize();
     CHECKLASTCUDAERROR;
 }
@@ -418,7 +420,9 @@ __global__ void CombineTemporalSamplesInternal(
     const WaveFront::SurfaceData* a_CurrentPixelData,
     const WaveFront::SurfaceData* a_PreviousPixelData,
     const std::uint32_t a_Seed,
-    unsigned a_NumPixels
+    unsigned a_NumPixels,
+    uint2 a_Dimensions,
+    WaveFront::MotionVectorBuffer* a_MotionVectorBuffer
 )
 {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
@@ -429,8 +433,21 @@ __global__ void CombineTemporalSamplesInternal(
 
     for (int i = index; i < a_NumPixels; i += stride)
     {
-        //TODO instead look up the motion vector and use that to find the right pixel. This assumes a static scene rn.
-        const int temporalIndex = i;
+        const auto velocity = -a_MotionVectorBuffer->GetMotionVectorData(i).m_Velocity;
+        const int movedX = roundf((float)a_Dimensions.x * velocity.x);
+        const int movedY = roundf((float)a_Dimensions.y * velocity.y);
+
+        int y = i / a_Dimensions.x;
+        int x = i - (y * a_Dimensions.x);
+        y += movedY;
+        x += movedX;
+
+        //Ensure 
+        int temporalIndex = i;
+        if(y >= 0 && y < a_Dimensions.y && x >= 0 && x < a_Dimensions.x)
+        {
+            temporalIndex = PIXEL_INDEX(x, y, a_Dimensions.x);
+        }
 
         pixelPointers[0] = &a_PreviousPixelData[temporalIndex];
         pixelPointers[1] = &a_CurrentPixelData[i];

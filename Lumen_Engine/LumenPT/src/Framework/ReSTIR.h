@@ -38,7 +38,8 @@ public:
 		const std::uint32_t a_Seed,
 		const OptixTraversableHandle a_OptixSceneHandle,
 		WaveFront::AtomicBuffer<WaveFront::ShadowRayData>* a_WaveFrontShadowRayBuffer,
-        const WaveFront::OptixWrapper* a_OptixSystem
+        const WaveFront::OptixWrapper* a_OptixSystem,
+		WaveFront::MotionVectorBuffer* a_MotionVectorBuffer
 	);
 
 	/*

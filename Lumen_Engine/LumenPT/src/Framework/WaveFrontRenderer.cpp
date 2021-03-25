@@ -9,7 +9,7 @@
 #include "PTVolume.h"
 #include "Material.h"
 #include "MemoryBuffer.h"
-#include "OutputBuffer.h"
+#include "CudaGLTexture.h"
 #include "SceneDataTable.h"
 #include "../CUDAKernels/WaveFrontKernels.cuh"
 #include "../CUDAKernels/WaveFrontKernels/EmissiveLookup.cuh"
@@ -17,10 +17,29 @@
 #include "../Shaders/CppCommon/WaveFrontDataStructs.h"
 #include "CudaUtilities.h"
 #include "ReSTIR.h"
+#include "../Tools/FrameSnapshot.h"
+#include "../Tools/SnapShotProcessing.cuh"
+#include "MotionVectors.h"
 
 #include <Optix/optix_function_table_definition.h>
 #include <filesystem>
 #include <glm/gtx/compatibility.hpp>
+#include <sutil/Matrix.h>
+
+sutil::Matrix4x4 ConvertGLMtoSutilMat4(const glm::mat4& glmMat)
+{
+    float data[16];
+	
+    for (int row = 0; row < 4; ++row)
+    {
+        for (int column = 0; column < 4; ++column)
+        {
+            data[row * 4 + column] = glmMat[column][row]; //we swap column and row indices because sutil is in row major while glm is in column major
+        }
+    }
+
+    return sutil::Matrix4x4(data);
+}
 
 namespace WaveFront
 {
@@ -128,6 +147,8 @@ namespace WaveFront
 
         m_TriangleLights.Write(&lights[0], sizeof(TriangleLight) * numLights, 0);
 
+        m_MotionVectors.Init(make_uint2(m_Settings.renderResolution.x, m_Settings.renderResolution.y));
+    	
         //Set the service locator pointer to point to the m'table.
         m_Table = std::make_unique<SceneDataTable>();
         m_ServiceLocator.m_SceneDataTable = m_Table.get();
@@ -138,9 +159,27 @@ namespace WaveFront
         ReSTIRSettings rSettings;
         rSettings.width = m_Settings.renderResolution.x;
         rSettings.height = m_Settings.renderResolution.y;
+        // A null frame snapshot will not record anything when requested to.
+        m_FrameSnapshot = std::make_unique<NullFrameSnapshot>(); 
 
         m_ReSTIR = std::make_unique<ReSTIR>();
         m_ReSTIR->Initialize(rSettings);
+    }
+
+    void WaveFrontRenderer::BeginSnapshot()
+    {
+        // Replacing the snapshot with a non-null one will start recording requested features.
+        m_FrameSnapshot = std::make_unique<FrameSnapshot>();
+    }
+
+    std::unique_ptr<FrameSnapshot> WaveFrontRenderer::EndSnapshot()
+    {
+        // Move the snapshot to a temporary variable to return shortly
+        auto snap = std::move(m_FrameSnapshot);
+        // Make the snapshot a Null once again to stop recording
+        m_FrameSnapshot = std::make_unique<NullFrameSnapshot>();
+
+        return std::move(snap);
     }
 
     std::unique_ptr<MemoryBuffer> WaveFrontRenderer::InterleaveVertexData(const PrimitiveData& a_MeshData) const
@@ -382,6 +421,55 @@ namespace WaveFront
         //Set the atomic counter for primary rays to the amount of pixels.
         SetAtomicCounter<IntersectionRayData>(&m_Rays, numPixels);
 
+        //##ToolsBookmark
+        //Example of defining how to add buffers to the pixel debugger tool
+        //This lambda is NOT ran every frame, it is only ran when the output layer requests a snapshot
+        m_FrameSnapshot->AddBuffer([&]()
+        {
+            // The buffers that need to be given to the tool are provided via a map as shown below
+            // Notice that CudaGLTextures are used, as opposed to memory buffers. This is to enable the data to be used with OpenGL
+            // and thus displayed via ImGui
+            std::map<std::string, FrameSnapshot::ImageBuffer> resBuffers;
+            resBuffers["Origins"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
+                m_Settings.renderResolution.y, 3 * sizeof(float));
+
+            resBuffers["Directions"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
+                m_Settings.renderResolution.y, 3 * sizeof(float));
+
+            resBuffers["Contributions"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F ,m_Settings.renderResolution.x,
+                m_Settings.renderResolution.y, 3 * sizeof(float));
+
+            // A CUDA kernel used to separate the interleave primary ray buffer into 3 different buffers
+            // This is the main reason we use a lambda, as it needs to be defined how to interpret the data
+            SeparateIntersectionRayBufferCPU((m_Rays.GetSize() - sizeof(uint32_t)) / sizeof(IntersectionRayData),
+                m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>(),
+                resBuffers.at("Origins").m_Memory->GetDevicePtr<float3>(),
+                resBuffers.at("Directions").m_Memory->GetDevicePtr<float3>(),
+                resBuffers.at("Contributions").m_Memory->GetDevicePtr<float3>());
+
+            return resBuffers;
+        });
+
+        m_FrameSnapshot->AddBuffer([&]()
+        {
+            auto motionVectorBuffer = m_MotionVectors.GetMotionVectorBuffer();
+        	
+            std::map<std::string, FrameSnapshot::ImageBuffer> resBuffers;
+            resBuffers["Motion vector direction"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
+                m_Settings.renderResolution.y, 3 * sizeof(float));
+
+            resBuffers["Motion vector magnitude"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
+                m_Settings.renderResolution.y, 3 * sizeof(float));
+
+           SeparateMotionVectorBufferCPU(m_Settings.renderResolution.x * m_Settings.renderResolution.y,
+               motionVectorBuffer->GetDevicePtr<MotionVectorBuffer>(),
+                resBuffers.at("Motion vector direction").m_Memory->GetDevicePtr<float3>(),
+                resBuffers.at("Motion vector magnitude").m_Memory->GetDevicePtr<float3>()
+           );
+
+            return resBuffers;
+        });
+    	
         //Clear the surface data that contains information from the second last frame so that it can be reused by this frame.
         cudaMemset(m_SurfaceData[currentIndex].GetDevicePtr(), 0, sizeof(SurfaceData) * numPixels);
         cudaDeviceSynchronize();
@@ -396,8 +484,8 @@ namespace WaveFront
         m_OptixSystem->UpdateSBT();
         auto* sceneDataTableAccessor = m_Table->GetDevicePointer();
         auto accelerationStructure = std::static_pointer_cast<PTScene>(a_Scene)->GetSceneAccelerationStructure();
-         cudaDeviceSynchronize();
-            CHECKLASTCUDAERROR;
+        cudaDeviceSynchronize();
+        CHECKLASTCUDAERROR;
 
         //Pass the buffers to the optix shader for shading.
         OptixLaunchParameters rayLaunchParameters;
@@ -421,7 +509,7 @@ namespace WaveFront
         /*
          * Resolve rays and shade at every depth.
          */
-        for(unsigned depth = 0; depth < m_Settings.depth && numIntersectionRays > 0; ++depth)
+        for (unsigned depth = 0; depth < m_Settings.depth && numIntersectionRays > 0; ++depth)
         {
             //Tell Optix to resolve the primary rays that have been generated.
             m_OptixSystem->TraceRays(numIntersectionRays, rayLaunchParameters);
@@ -436,13 +524,34 @@ namespace WaveFront
 
             const auto surfaceDataBufferIndex = depth == 0 ? currentIndex : 2;   //1 and 2 are used for the first intersection and remembered for temporal use.
             ExtractSurfaceData(
-                numIntersections, 
-                m_IntersectionData.GetDevicePtr<AtomicBuffer<IntersectionData>>(), 
-                m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>(), 
-                m_SurfaceData[surfaceDataBufferIndex].GetDevicePtr<SurfaceData>(), 
+                numIntersections,
+                m_IntersectionData.GetDevicePtr<AtomicBuffer<IntersectionData>>(),
+                m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>(),
+                m_SurfaceData[surfaceDataBufferIndex].GetDevicePtr<SurfaceData>(),
                 sceneDataTableAccessor);
             cudaDeviceSynchronize();
             CHECKLASTCUDAERROR;
+
+            //motion vector generation
+            if (depth == 0)
+            {
+                glm::mat4 previousFrameMatrix, currentFrameMatrix;
+                a_Scene->m_Camera->GetMatrixData(previousFrameMatrix, currentFrameMatrix);
+                sutil::Matrix4x4 prevFrameMatrixArg = ConvertGLMtoSutilMat4(previousFrameMatrix);
+
+                glm::mat4 projectionMatrix = a_Scene->m_Camera->GetProjectionMatrix();
+                sutil::Matrix4x4 projectionMatrixArg = ConvertGLMtoSutilMat4(projectionMatrix);
+
+                MotionVectorsGenerationData motionVectorsGenerationData;
+                motionVectorsGenerationData.m_MotionVectorBuffer = nullptr;
+                motionVectorsGenerationData.a_CurrentSurfaceData = m_SurfaceData[currentIndex].GetDevicePtr<SurfaceData>();
+                motionVectorsGenerationData.m_ScreenResolution = make_uint2(m_Settings.renderResolution.x, m_Settings.renderResolution.y);
+                motionVectorsGenerationData.m_PrevViewMatrix = prevFrameMatrixArg.inverse();
+                motionVectorsGenerationData.m_ProjectionMatrix = projectionMatrixArg;
+                m_MotionVectors.Update(motionVectorsGenerationData);
+            }
+
+            //TODO add ReSTIR instance and run from shading kernel.
 
             /*
              * Call the shading kernels.
@@ -461,6 +570,7 @@ namespace WaveFront
                 WangHash(frameCount), //Use the frame count as the random seed.
                 m_ReSTIR.get(), //ReSTIR, can not be nullptr.
                 depth,  //The current depth.
+                m_MotionVectors.GetMotionVectorBuffer()->GetDevicePtr<MotionVectorBuffer>(),
                 m_PixelBufferSeparate.GetDevicePtr<float3>()
             );
 
@@ -485,7 +595,7 @@ namespace WaveFront
             //Swap the ReSTIR buffers around.
             m_ReSTIR->SwapBuffers();
         }
-
+    	
         //The amount of shadow rays to trace.
         unsigned numShadowRays = 0;
         m_ShadowRays.Read(&numShadowRays, sizeof(uint32_t), 0);
@@ -503,7 +613,7 @@ namespace WaveFront
             m_Settings.outputResolution,
             m_PixelBufferSeparate.GetDevicePtr<float3>(),
             m_PixelBufferCombined.GetDevicePtr<float3>(),
-            m_OutputBuffer.GetDevicePointer()
+            m_OutputBuffer.GetDevicePtr()
         );
 
         //Post processing using CUDA kernel.
@@ -518,8 +628,16 @@ namespace WaveFront
             m_FrameIndex = 0;
         }
 
+        a_Scene->m_Camera->UpdatePreviousFrameMatrix();
         ++frameCount;
 
+        m_DebugTexture = m_OutputBuffer.GetTexture();
+//#if defined(_DEBUG)
+        m_MotionVectors.GenerateDebugTextures();
+        //m_DebugTexture = m_MotionVectors.GetMotionVectorMagnitudeTex();
+        m_DebugTexture = m_MotionVectors.GetMotionVectorDirectionsTex();
+//#endif
+    	
         //Return the GLuint texture ID.
         return m_OutputBuffer.GetTexture();
     }

@@ -1,6 +1,7 @@
 #pragma once
 #include "../WaveFrontDataStructs.h"
 #include "../CudaDefines.h"
+#include "MotionVectorsGenerationData.h"
 #include "SurfaceDataBuffer.h"
 
 class ReSTIR;
@@ -75,6 +76,7 @@ namespace WaveFront
             const unsigned a_Seed,
             ReSTIR* a_ReSTIR,
             unsigned a_Currentdepth,
+            WaveFront::MotionVectorBuffer* a_MotionVectorBuffer,
             float3* a_Output = nullptr
         ) :
         m_ResolutionAndDepth(a_ResolutionAndDepth),
@@ -90,7 +92,8 @@ namespace WaveFront
         m_Seed(a_Seed),
         m_ReSTIR(a_ReSTIR),
         m_Output(a_Output),
-        m_ShadowRays(a_ShadowRays)
+        m_ShadowRays(a_ShadowRays),
+        m_MotionVectorBuffer(a_MotionVectorBuffer)
         {}
 
 
@@ -112,6 +115,7 @@ namespace WaveFront
         ReSTIR* m_ReSTIR;
         float3* m_Output;
         AtomicBuffer<ShadowRayData>* m_ShadowRays;
+        WaveFront::MotionVectorBuffer* m_MotionVectorBuffer;
     };
 
     struct PostProcessLaunchParameters

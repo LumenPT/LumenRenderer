@@ -70,7 +70,8 @@ CPU_ONLY void ReSTIR::Run(
 	const std::uint32_t a_Seed,
 	const OptixTraversableHandle a_OptixSceneHandle,
 	WaveFront::AtomicBuffer<WaveFront::ShadowRayData>* a_WaveFrontShadowRayBuffer,
-	const WaveFront::OptixWrapper* a_OptixSystem
+	const WaveFront::OptixWrapper* a_OptixSystem,
+	WaveFront::MotionVectorBuffer* a_MotionVectorBuffer
 )
 {
 	assert(m_SwapDirtyFlag && "SwapBuffers has to be called once per frame for ReSTIR to properly work.");
@@ -152,7 +153,9 @@ CPU_ONLY void ReSTIR::Run(
 			a_CurrentPixelData,
 			a_PreviousPixelData,
 			seed,
-			numPixels
+			numPixels,
+			dimensions,
+			a_MotionVectorBuffer
 		);
 	}
 

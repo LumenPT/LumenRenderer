@@ -20,7 +20,7 @@ CPU_ONLY void GeneratePrimaryRays(const PrimRayGenLaunchParameters& a_PrimRayGen
 /*
  *
  */
-CPU_ONLY void GenerateMotionVectors();
+CPU_ONLY void GenerateMotionVectors(MotionVectorsGenerationData& a_MotionVectorsData);
 
 /*
  * Extract the surface data for the current depth.
