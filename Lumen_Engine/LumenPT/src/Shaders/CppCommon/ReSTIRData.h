@@ -30,7 +30,7 @@ struct ReSTIRSettings
     std::uint32_t height = 0;
 
     //The amount of reservoirs used per pixel.
-    static constexpr std::uint32_t numReservoirsPerPixel = 5; //TODO 5
+    static constexpr std::uint32_t numReservoirsPerPixel = 1; //TODO 5
 
     //The amount of lights per light bag.
     static constexpr std::uint32_t numLightsPerBag = 1000;
@@ -47,7 +47,7 @@ struct ReSTIRSettings
     //The maximum distance for spatial samples.
     static constexpr std::uint32_t spatialSampleRadius = 30;
 
-    //The x and y size of the pixel grid per light bag. This indirectly determines the amount of light bags.
+    //The x and y size of the pixel grid per light bag.
     static constexpr std::uint32_t pixelGridSize = 16;
 
     //The amount of spatial iterations to perform. Previous output becomes current input.
@@ -61,7 +61,7 @@ struct ReSTIRSettings
     static constexpr bool enableSpatial = true;
 
     //Enable temporal sampling.
-    static constexpr bool enableTemporal = false;
+    static constexpr bool enableTemporal = true;
 };
 
 /*

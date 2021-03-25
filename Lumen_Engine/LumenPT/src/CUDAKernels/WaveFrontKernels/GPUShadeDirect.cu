@@ -63,8 +63,9 @@ CPU_ON_GPU void ShadeDirect(
                 pixelToLightDir /= lDistance;
                 //Normalize.
                 const float cosIn = fmax(dot(pixelToLightDir, surfaceData.m_Normal), 0.f);
-                //Lambertian term clamped between 0 and 1. SurfaceN dot ToLight
-                const float cosOut = 1.f; //This is a point light, which means that the normal is always pointing to the surface.
+
+                const float cosOut = fmax(0.f, dot(light.normal, -pixelToLightDir));
+
                 //Light normal at sample point dotted with light direction. Invert light dir for this (light to pixel instead of pixel to light)
 
                 //Light is not facing towards the surface or too close to the surface.

@@ -5,6 +5,7 @@
 #include <cuda_runtime.h>
 
 #include "../CUDAKernels/RandomUtilities.cuh"
+#include "../Shaders/CppCommon/WaveFrontDataStructs/AtomicBuffer.h"
 #include "OptixWrapper.h"
 
 
@@ -30,7 +31,7 @@ CPU_ONLY void ReSTIR::Initialize(const ReSTIRSettings& a_Settings)
 		//At most one shadow ray per reservoir. Always resize even when big enough already, because this is initialization so it should not happen often.
 		const size_t shadowRaySize = sizeof(RestirShadowRay);
 		const size_t size = static_cast<size_t>(m_Settings.width) * static_cast<size_t>(m_Settings.height) * m_Settings.numReservoirsPerPixel * shadowRaySize;
-		m_ShadowRays.Resize(size);
+		WaveFront::CreateAtomicBuffer<RestirShadowRay>(&m_ShadowRays, size);
 	}
 
 	//Reservoirs
@@ -55,9 +56,6 @@ CPU_ONLY void ReSTIR::Initialize(const ReSTIRSettings& a_Settings)
 			m_LightBags.Resize(size);
 		}
 	}
-
-	//Atomic counter buffer
-	m_Atomics.Resize(sizeof(int) * 1);
 
 	//Wait for CUDA to finish executing.
 	cudaDeviceSynchronize();
@@ -125,22 +123,21 @@ CPU_ONLY void ReSTIR::Run(
 	 * Generate shadow rays for each reservoir and resolve them.
 	 * If a shadow ray is occluded, the reservoirs weight is set to 0.
 	 */
-	const int numRaysGenerated = GenerateReSTIRShadowRays(&m_Atomics, static_cast<Reservoir*>(m_Reservoirs[currentIndex].GetDevicePtr()), m_ShadowRays.GetDevicePtr<RestirShadowRay>(), a_CurrentPixelData, numPixels);
+	const unsigned int numRaysGenerated = GenerateReSTIRShadowRays(&m_ShadowRays, static_cast<Reservoir*>(m_Reservoirs[currentIndex].GetDevicePtr()), a_CurrentPixelData, numPixels);
 
 	//Parameters for optix launch.
 	WaveFront::OptixLaunchParameters params;
 	params.m_TraversableHandle = a_OptixSceneHandle;
 	params.m_Reservoirs = static_cast<Reservoir*>(m_Reservoirs[currentIndex].GetDevicePtr());
 	params.m_ReSTIRShadowRayBatch = m_ShadowRays.GetDevicePtr<WaveFront::AtomicBuffer<RestirShadowRay>>();
-	params.m_MinMaxDistance = { 0.1f, 50000.f };	//TODO use actual numbers but idk which ones are okay ish?
+	params.m_MinMaxDistance = { 0.1f, 5000.f };	//TODO use actual numbers but idk which ones are okay ish?
 	params.m_ResolutionAndDepth = make_uint3(m_Settings.width, m_Settings.height, 1);
 	params.m_TraceType = WaveFront::RayType::RESTIR_RAY;
 
 	//Tell Optix to resolve all shadow rays, which sets reservoir weight to 0 when occluded.
 	if(numRaysGenerated > 0)
 	{
-		//TODO enable this.
-		//a_OptixSystem->TraceRays(numRaysGenerated, params);
+		a_OptixSystem->TraceRays(numRaysGenerated, params);
 	}
 
 	/*
@@ -172,16 +169,6 @@ CPU_ONLY void ReSTIR::Run(
 			seed,
 			dimensions
 		);
-
-		//////TODO debug remove
-  //      int data = 42;
-  //      int readback = -1;
-  //      void* ptr;
-  //      cudaMalloc(&ptr, sizeof(int));
-  //      cudaMemcpy(ptr, &data, sizeof(int), cudaMemcpyHostToDevice);
-  //      cudaMemcpy(&readback, ptr, sizeof(int), cudaMemcpyDeviceToHost);
-  //      bool success = (readback == 42);
-  ////      //TODO end of debug
 	}
 
 	GenerateWaveFrontShadowRays(

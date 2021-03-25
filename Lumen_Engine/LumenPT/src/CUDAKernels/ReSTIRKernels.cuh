@@ -51,10 +51,10 @@ __global__ void PickPrimarySamplesInternal(const LightBagEntry* const a_LightBag
  *
  * The amount of shadow rays that was generated will be returned as an int.
  */
-__host__ int GenerateReSTIRShadowRays(MemoryBuffer* a_AtomicCounter, Reservoir* a_Reservoirs, RestirShadowRay* a_ShadowRays, const WaveFront::SurfaceData* a_PixelData, unsigned a_NumPixels);
+__host__ unsigned int GenerateReSTIRShadowRays(MemoryBuffer* a_AtomicBuffer, Reservoir* a_Reservoirs, const WaveFront::SurfaceData* a_PixelData, unsigned a_NumPixels);
 
 //Generate a shadow ray based on the thread ID.
-__global__ void GenerateShadowRay(int* a_AtomicCounter, Reservoir* a_Reservoirs, RestirShadowRay* a_ShadowRays, const  WaveFront::SurfaceData* a_PixelData, unsigned a_NumPixels);
+__global__ void GenerateShadowRay(WaveFront::AtomicBuffer<RestirShadowRay>* a_AtomicBuffer, Reservoir* a_Reservoirs, const  WaveFront::SurfaceData* a_PixelData, unsigned a_NumPixels);
 
 /*
  * Resample spatial neighbours with an intermediate output buffer.
@@ -129,4 +129,4 @@ __device__ void Resample(LightSample* a_Input, const WaveFront::SurfaceData* a_P
  */
 __host__ void GenerateWaveFrontShadowRays(Reservoir* a_Reservoirs, const WaveFront::SurfaceData* a_PixelData, WaveFront::AtomicBuffer<WaveFront::ShadowRayData>* a_AtomicBuffer, unsigned a_NumPixels);
 
-__global__ void GenerateWaveFrontShadowRaysInternal(Reservoir* a_Reservoirs, const WaveFront::SurfaceData* a_PixelData, WaveFront::AtomicBuffer<WaveFront::ShadowRayData>* a_AtomicBuffer, unsigned a_NumPixels);
+__global__ void GenerateWaveFrontShadowRaysInternal(Reservoir* a_Reservoirs, const WaveFront::SurfaceData* a_PixelData, WaveFront::AtomicBuffer<WaveFront::ShadowRayData>* a_AtomicBuffer, unsigned a_NumPixels, unsigned a_Depth);
