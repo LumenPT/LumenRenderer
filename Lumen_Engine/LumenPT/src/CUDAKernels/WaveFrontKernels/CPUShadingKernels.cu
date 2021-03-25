@@ -50,8 +50,7 @@ CPU_ONLY void GenerateMotionVectors(MotionVectorsGenerationData& a_MotionVectors
     a_MotionVectorsData.m_MotionVectorBuffer, 
     a_MotionVectorsData.a_CurrentSurfaceData, 
     a_MotionVectorsData.m_ScreenResolution,
-    a_MotionVectorsData.m_PrevViewMatrix,
-    a_MotionVectorsData.m_ProjectionMatrix);
+        a_MotionVectorsData.m_ProjectionMatrix * a_MotionVectorsData.m_PrevViewMatrix);
 
     cudaDeviceSynchronize();
 }
