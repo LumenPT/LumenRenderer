@@ -31,7 +31,6 @@ public:
 		VectorView<glm::vec2, uint8_t> m_TexCoords;
 		VectorView<glm::vec3, uint8_t> m_Normals;
 
-		VectorView<glm::vec3, uint8_t> m_VertexBuffer; //interleaved data. May not be needed here.
 		// Perhaps temporary solution till we decide how we'll handle the indices
 		std::vector<uint8_t> m_IndexBinary;
 		size_t m_IndexSize;

@@ -12,6 +12,7 @@
 #include "OutputBuffer.h"
 #include "SceneDataTable.h"
 #include "../CUDAKernels/WaveFrontKernels.cuh"
+#include "../CUDAKernels/WaveFrontKernels/EmissiveLookup.cuh"
 #include "../Shaders/CppCommon/LumenPTConsts.h"
 #include "../Shaders/CppCommon/WaveFrontDataStructs.h"
 #include "CudaUtilities.h"
@@ -165,7 +166,7 @@ namespace WaveFront
         auto vertexBuffer = InterleaveVertexData(a_PrimitiveData);
         cudaDeviceSynchronize();
         auto err = cudaGetLastError();
-
+        
         std::vector<uint32_t> correctedIndices;
 
         if (a_PrimitiveData.m_IndexSize != 4)
@@ -178,9 +179,25 @@ namespace WaveFront
             }
 
         }
-
+        
         //printf("Index buffer Size %i \n", static_cast<int>(correctedIndices.size()));
         std::unique_ptr<MemoryBuffer> indexBuffer = std::make_unique<MemoryBuffer>(correctedIndices);
+
+        uint8_t numVertices = sizeof(vertexBuffer) / sizeof(Vertex);
+        //vertexBuffer->GetDevicePtr<Vertex>();
+        std::unique_ptr<MemoryBuffer> emissiveBuffer = std::make_unique<MemoryBuffer>((numVertices / 3) * sizeof(bool));
+        //std::unique_ptr<MemoryBuffer> indexBuffer = std::make_unique<MemoryBuffer>(a_PrimitiveData.m_IndexBinary);
+
+        //std::unique_ptr<MemoryBuffer> primMat = std::make_unique<MemoryBuffer>(a_PrimitiveData.m_Material);
+        //std::unique_ptr<MemoryBuffer> primMat = static_cast<Material*>(a_PrimitiveData.m_Material.get())->GetDeviceMaterial();
+
+        FindEmissives(vertexBuffer->GetDevicePtr<Vertex>(), emissiveBuffer->GetDevicePtr<bool>(), indexBuffer->GetDevicePtr<uint32_t>(), static_cast<Material*>(a_PrimitiveData.m_Material.get())->GetDeviceMaterial(), numVertices);
+
+        // add bool buffer pointer to device prim pointer
+
+
+        
+
 
         unsigned int geomFlags = OPTIX_GEOMETRY_FLAG_NONE;
 
@@ -204,7 +221,7 @@ namespace WaveFront
 
         auto gAccel = m_OptixSystem->BuildGeometryAccelerationStructure(buildOptions, buildInput);
 
-        auto prim = std::make_unique<PTPrimitive>(std::move(vertexBuffer), std::move(indexBuffer), std::move(gAccel));
+        auto prim = std::make_unique<PTPrimitive>(std::move(vertexBuffer), std::move(indexBuffer), std::move(emissiveBuffer), std::move(gAccel));
 
         prim->m_Material = a_PrimitiveData.m_Material;
 
@@ -213,6 +230,7 @@ namespace WaveFront
         entry.m_VertexBuffer = prim->m_VertBuffer->GetDevicePtr<Vertex>();
         entry.m_IndexBuffer = prim->m_IndexBuffer->GetDevicePtr<unsigned int>();
         entry.m_Material = static_cast<Material*>(prim->m_Material.get())->GetDeviceMaterial();
+        entry.m_IsEmissive = prim->m_BoolBuffer->GetDevicePtr<bool>();
 
         return prim;
     }
@@ -304,6 +322,19 @@ namespace WaveFront
 
     unsigned WaveFrontRenderer::TraceFrame(std::shared_ptr<Lumen::ILumenScene>& a_Scene)
     {
+        //add to lights buffer? in traceframe
+
+        //add lights to mesh in scene
+            //add mesh
+            //keep instances in scene
+            //for each instance, add all emissive triangles to light buffer with world space pos
+
+        //Get instances from scene
+            //check which instances are emissives to optimize the looping over instances
+            //inside of these instances you compare which triangles are emissive through boolean buffer
+            //add those to lights buffer in world space
+                //where to keep lights buffer?? - scene! yes!
+
         //Index of the current and last frame to access buffers.
         const auto currentIndex = m_FrameIndex;
         const auto temporalIndex = m_FrameIndex == 1 ? 0 : 1;
