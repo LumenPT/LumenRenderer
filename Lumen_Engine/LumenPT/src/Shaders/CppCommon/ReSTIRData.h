@@ -30,7 +30,7 @@ struct ReSTIRSettings
     std::uint32_t height = 0;
 
     //The amount of reservoirs used per pixel.
-    static constexpr std::uint32_t numReservoirsPerPixel = 1; //TODO 5
+    static constexpr std::uint32_t numReservoirsPerPixel = 5; //TODO 5
 
     //The amount of lights per light bag.
     static constexpr std::uint32_t numLightsPerBag = 1000;

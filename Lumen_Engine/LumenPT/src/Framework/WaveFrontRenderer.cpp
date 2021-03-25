@@ -22,7 +22,6 @@
 #include <filesystem>
 #include <glm/gtx/compatibility.hpp>
 
-
 namespace WaveFront
 {
     void WaveFrontRenderer::Init(const WaveFrontSettings& a_Settings)
@@ -87,21 +86,45 @@ namespace WaveFront
         m_TriangleLights.Resize(sizeof(TriangleLight) * numLights);
 
         //Temporary lights, stored in the buffer.
-        float3 pos1, pos2, pos3;
-        pos1 = { 150.f, 700.f, 210.f };
-        pos2 = { 150.f, 700.f, 110.f };
-        pos3 = { 90.f, 700.f, 210.f };
+        TriangleLight lights[numLights];
 
-        float i1 = 3000000.f;
-        float i2 = 300000.f;
-        float i3 = 699999.f;
+        //Intensity per light.
+        lights[0].radiance = { 200000, 200000, 200000 };
+        lights[1].radiance = { 200000, 200000, 200000 };
+        lights[2].radiance = { 200000, 200000, 200000 };
 
-        TriangleLight lights[numLights] =
+
+        //Actually set the triangle lights to have an area.
+        lights[0].p0 = {605.f, 700.f, -5.f};
+        lights[0].p1 = { 600.f, 700.f, 5.f };
+        lights[0].p2 = { 595.f, 700.f, -5.f };
+
+        lights[1].p0 = { 5.f, 700.f, -5.f };
+        lights[1].p1 = { 0.f, 700.f, 5.f };
+        lights[1].p2 = { -5.f, 700.f, -5.f };
+
+        lights[2].p0 = { -595.f, 700.f, -5.f };
+        lights[2].p1 = { -600.f, 700.f, 5.f };
+        lights[2].p2 = { -605.f, 700.f, -5.f };
+
+        //Calculate the area per light.
+        for(int i = 0; i < 3; ++i)
         {
-            {pos1, pos1, pos1, {0.f, -1.f, 0.f}, {i1, i1, i1}, 10.f},
-            {pos2, pos2, pos2, {0.f, -1.f, 0.f}, {i2, i2, i2}, 10.f},
-            {pos3, pos3, pos3, {0.f, -1.f, 0.f}, {i3, i3, i3}, 10.f}
-        };
+            float3 vec1 = (lights[i].p0 - lights[i].p1);
+            float3 vec2 = (lights[i].p0 - lights[i].p2);
+            lights[i].area = sqrt(pow((vec1.y * vec2.z - vec2.y * vec1.z), 2) + pow((vec1.x * vec2.z - vec2.x * vec1.z), 2) + pow((vec1.x * vec2.y - vec2.x * vec1.y), 2)) / 2.f;
+            printf("lol");
+        }
+
+        //Calculate the normal for each light.
+        for(int i = 0; i < 3; ++i)
+        {
+            glm::vec3 arm1 = normalize(glm::vec3(lights[i].p0.x - lights[i].p2.x, lights[i].p0.y - lights[i].p2.y, lights[i].p0.z - lights[i].p2.z));
+            glm::vec3 arm2 = normalize(glm::vec3(lights[i].p0.x - lights[i].p1.x, lights[i].p0.y - lights[i].p1.y, lights[i].p0.z - lights[i].p1.z));
+            glm::vec3 normal = normalize(glm::cross(arm2, arm1));
+            lights[i].normal = { normal.x, normal.y, normal.z };
+        }
+
 
         m_TriangleLights.Write(&lights[0], sizeof(TriangleLight) * numLights, 0);
 
@@ -339,6 +362,8 @@ namespace WaveFront
         uCuda = make_float3(u.x, u.y, u.z);
         vCuda = make_float3(v.x, v.y, v.z);
         wCuda = make_float3(w.x, w.y, w.z);
+
+        printf("Camera pos: %f %f %f\n", camPosition.x, camPosition.y, camPosition.z);
 
         //Increment framecount each frame.
         static unsigned frameCount = 0;
