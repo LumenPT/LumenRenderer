@@ -154,9 +154,6 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
             output->m_Metallic = 1;     //TODO
             output->m_Roughness = 1;    //TODO
             output->m_TransportFactor = currRay->m_Contribution;
-        
         }
-        
     }
-
 }
