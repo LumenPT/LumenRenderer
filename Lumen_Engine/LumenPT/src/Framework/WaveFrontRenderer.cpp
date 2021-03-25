@@ -398,8 +398,8 @@ namespace WaveFront
             cudaDeviceSynchronize();
             CHECKLASTCUDAERROR;
 
-        	//motion vector generation
-        	if(depth == 0)
+            //motion vector generation
+            if (depth == 0)
             {
                 glm::mat4 previousFrameMatrix, currentFrameMatrix;
                 a_Scene->m_Camera->GetMatrixData(previousFrameMatrix, currentFrameMatrix);
@@ -407,7 +407,7 @@ namespace WaveFront
 
                 glm::mat4 projectionMatrix = a_Scene->m_Camera->GetProjectionMatrix();
                 sutil::Matrix4x4 projectionMatrixArg = ConvertGLMtoSutilMat4(projectionMatrix);
-        		
+
                 MotionVectorsGenerationData motionVectorsGenerationData;
                 motionVectorsGenerationData.m_MotionVectorBuffer = nullptr;
                 motionVectorsGenerationData.a_CurrentSurfaceData = m_SurfaceData[currentIndex].GetDevicePtr<SurfaceData>();
@@ -416,7 +416,7 @@ namespace WaveFront
                 motionVectorsGenerationData.m_ProjectionMatrix = projectionMatrixArg;
                 m_MotionVectors.Update(motionVectorsGenerationData);
             }
-        	
+
             //TODO add ReSTIR instance and run from shading kernel.
 
             /*
@@ -451,35 +451,6 @@ namespace WaveFront
 
             m_IntersectionData.Write(counterDefault);
         }
-
-        glm::vec4 testPoint1(0.f, 0.f, 1.0f, 1.0f);
-        glm::mat4 previousFrameMatrix, currentFrameMatrix;
-        a_Scene->m_Camera->GetMatrixData(previousFrameMatrix, currentFrameMatrix);
-        glm::mat4 projectionMatrix = a_Scene->m_Camera->GetProjectionMatrix();
-
-        previousFrameMatrix = glm::translate(previousFrameMatrix, glm::vec3(0.f, 0.f, -1.f));
-
-        glm::vec4 clipCoordinates1 = projectionMatrix * glm::inverse(currentFrameMatrix) * testPoint1;
-        glm::vec3 ndc1 = glm::vec3(clipCoordinates1.x, clipCoordinates1.y, clipCoordinates1.z) / clipCoordinates1.w;
-
-        glm::vec4 clipCoordinates2 = projectionMatrix * glm::inverse(previousFrameMatrix) * testPoint1;
-        glm::vec3 ndc2 = glm::vec3(clipCoordinates2.x, clipCoordinates2.y, clipCoordinates2.z) / clipCoordinates2.w;
-
-        float data[] { 0.1f, 0.1f, 0.1f, 0.1f, 0.1f, 0.1f, 0.1f, 0.1f, 0.1f, 0.1f, 0.1f, 0.1f, 0.1f, 0.1f, 0.1f, 0.1f };
-
-        sutil::Matrix4x4 prevFrameMatrixArg = ConvertGLMtoSutilMat4(previousFrameMatrix);
-        sutil::Matrix4x4 projectionMatrixArg = ConvertGLMtoSutilMat4(projectionMatrix);
-    	
-        float4 testPoint3 = make_float4(0.f, 0.f, 1.f, 1.0f);
-        auto clipCoordinates3 = projectionMatrixArg * prevFrameMatrixArg.inverse() * testPoint3;
-        auto ndc3 = make_float3(clipCoordinates3.x, clipCoordinates3.y, clipCoordinates3.z) / clipCoordinates3.w;
-    	
-        MotionVectorsGenerationData motionVectorsGenerationData;
-        motionVectorsGenerationData.m_MotionVectorBuffer = nullptr;
-        motionVectorsGenerationData.m_ScreenResolution = make_uint2(m_Settings.renderResolution.x, m_Settings.renderResolution.y);
-        motionVectorsGenerationData.m_PrevViewMatrix = prevFrameMatrixArg.inverse();
-        motionVectorsGenerationData.m_ProjectionMatrix = projectionMatrixArg;
-        //m_MotionVectors.Update(motionVectorsGenerationData);
     	
         //The amount of shadow rays to trace.
         unsigned numShadowRays = 0;
