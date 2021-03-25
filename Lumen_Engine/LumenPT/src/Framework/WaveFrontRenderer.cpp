@@ -107,10 +107,22 @@ namespace WaveFront
         m_TriangleLights.Resize(sizeof(TriangleLight) * numLights);
 
         //Temporary lights, stored in the buffer.
-        TriangleLight lights[numLights] = {
-            {{0.f, 10.f, 20.f}, {0.f, 10.f, 20.f}, {0.f, 10.f, 20.f}, {0.f, 0.f, 0.f}, {100.f, 100.f, 0.f}, 0.f},
-            {{100.f, 180.f, 20.f}, {100.f, 180.f, 20.f}, {100.f, 180.f, 20.f}, {0.f, 0.f, 0.f}, {100.f, 0.f, 100.f}, 0.f},
-            {{200.f, 20.f, 110.f}, {200.f, 20.f, 110.f}, {200.f, 20.f, 110.f}, {0.f, 0.f, 0.f}, {0.f, 1000.f, 1000.f}, 0.f} };
+        float3 pos1, pos2, pos3;
+        pos1 = { 150.f, 41.f, 210.f };
+        pos2 = { 150.f, 41.f, 110.f };
+        pos3 = { 90.f, 41.f, 210.f };
+
+        float i1 = 3000000.f;
+        float i2 = 300000.f;
+        float i3 = 699999.f;
+
+        TriangleLight lights[numLights] =
+        {
+            {pos1, pos1, pos1, {0.f, 0.f, 0.f}, {i1, i1, i1}, 10.f},
+            {pos2, pos2, pos2, {0.f, 0.f, 0.f}, {i2, i2, i2}, 10.f},
+            {pos3, pos3, pos3, {0.f, 0.f, 0.f}, {i3, i3, i3}, 10.f}
+        };
+
         m_TriangleLights.Write(&lights[0], sizeof(TriangleLight) * numLights, 0);
 
         m_MotionVectors.Init(make_uint2(m_Settings.renderResolution.x, m_Settings.renderResolution.y));
