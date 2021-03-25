@@ -4,6 +4,10 @@
 
 #include <cstdint>
 
+
+
+#include "Renderer/Camera.h"
+#include "Renderer/Camera.h"
 #include "Tools/FrameSnapshot.h"
 
 class Camera;
@@ -37,6 +41,10 @@ private:
     void HandleCameraInput(Camera& a_Camera);
     void HandleSceneInput();
     void ImGuiCameraSettings();
+
+    void InitContentViewNameTable();
+    void ContentViewDropDown();
+
     std::unique_ptr<LumenRenderer> m_Renderer;
     //std::unique_ptr<LumenPT> m_LumenPT;
 
@@ -47,9 +55,34 @@ private:
     float m_CameraMouseSensitivity;
     float m_CameraMovementSpeed;
 
+    enum ContentViewMode
+    {
+        NONE = 0,
+        BYTE,
+        INT,
+        FLOAT,
+        INT2,
+        FLOAT2,
+        BYTE3,
+        INT3,
+        FLOAT3,
+        BYTE4,
+        INT4,
+        FLOAT4,
+        CONTENTVIEWMODE_COUNT
+    };
+
     std::vector<std::unique_ptr<FrameSnapshot>> m_FrameSnapshots;
     int m_CurrentSnapShotIndex;
     const std::pair<const std::string, FrameSnapshot::ImageBuffer>* m_CurrentImageBuffer;
+
+    glm::vec2 m_SnapshotUV1;
+    glm::vec2 m_SnapshotUV2;
+
+    ContentViewMode m_CurrContentView;
+    std::function<void(glm::vec2)> m_ContentViewFunc;
+    std::map<ContentViewMode, std::string> m_ContentViewNames;
+    
 
     uint32_t m_LastFrameTex;
 

@@ -337,35 +337,32 @@ namespace WaveFront
         CHECKLASTCUDAERROR;
 
         m_Rays.Write(numPixels, 0); //Set the counter to be equal to the amount of rays being shot. This is manual because the atomic is not used yet.
-       
+
+        //##ToolsBookmark
+        //Example of defining how to add buffers to the pixel debugger tool
+        //This lambda is NOT ran every frame, it is only ran when the output layer requests a snapshot
         m_FrameSnapshot->AddBuffer([&]()
         {
-            auto numElements = (m_Rays.GetSize() - sizeof(uint32_t)) / sizeof(IntersectionRayData);
+            // The buffers that need to be given to the tool are provided via a map as shown below
+            // Notice that CudaGLTextures are used, as opposed to memory buffers. This is to enable the data to be used with OpenGL
+            // and thus displayed via ImGui
             std::map<std::string, FrameSnapshot::ImageBuffer> resBuffers;
-            resBuffers["Origins"].m_Width = m_Settings.renderResolution.x;
-            resBuffers["Origins"].m_Height = m_Settings.renderResolution.y;
-            resBuffers["Origins"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x, m_Settings.renderResolution.y, 3 * sizeof(float));
+            resBuffers["Origins"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
+                m_Settings.renderResolution.y, 3 * sizeof(float));
 
-            resBuffers["Directions"].m_Width = m_Settings.renderResolution.x;
-            resBuffers["Directions"].m_Height = m_Settings.renderResolution.y;
-            resBuffers["Directions"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x, m_Settings.renderResolution.y, 3 * sizeof(float));
+            resBuffers["Directions"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
+                m_Settings.renderResolution.y, 3 * sizeof(float));
 
-            resBuffers["Contributions"].m_Width = m_Settings.renderResolution.x;
-            resBuffers["Contributions"].m_Height = m_Settings.renderResolution.y;
-            resBuffers["Contributions"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F ,m_Settings.renderResolution.x, m_Settings.renderResolution.y, 3 * sizeof(float));
+            resBuffers["Contributions"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F ,m_Settings.renderResolution.x,
+                m_Settings.renderResolution.y, 3 * sizeof(float));
 
-
-            cudaDeviceSynchronize();
-            auto er1r = cudaGetLastError();
-
+            // A CUDA kernel used to separate the interleave primary ray buffer into 3 different buffers
+            // This is the main reason we use a lambda, as it needs to be defined how to interpret the data
             SeparateIntersectionRayBufferCPU((m_Rays.GetSize() - sizeof(uint32_t)) / sizeof(IntersectionRayData),
                 m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>(),
                 resBuffers.at("Origins").m_Memory->GetDevicePtr<float3>(),
                 resBuffers.at("Directions").m_Memory->GetDevicePtr<float3>(),
                 resBuffers.at("Contributions").m_Memory->GetDevicePtr<float3>());
-
-            cudaDeviceSynchronize();
-            auto err = cudaGetLastError();
 
             return resBuffers;
         });

@@ -113,6 +113,8 @@ namespace WaveFront
         //Kamen's lookup table
         std::unique_ptr<SceneDataTable> m_Table;
 
+        // The Frame Snapshot is used to define what to record when the output layer requests that
+        // See TraceFrame() ##ToolsBookmark for example
         std::unique_ptr<FrameSnapshot> m_FrameSnapshot;
 
     };
