@@ -354,7 +354,8 @@ void OutputLayer::OnImGuiRender()
 			// Display the mouse cursor location and its contents.
             if (mouseOnImage)
             {
-				auto pxlID = glm::ivec2(mPos.x - minRect.x, mPos.y - minRect.y);
+				glm::vec2 imageSize = m_CurrentImageBuffer->second.m_Memory->GetSize();
+				auto pxlID = glm::ivec2(imageSize * mouseUV);
 
 				ImGui::Text("PixelID: [%i; %i] | UV: [%0.3f, %0.3f]", pxlID.x, pxlID.y, mouseUV.x, mouseUV.y);
 
