@@ -40,8 +40,19 @@ CPU_ONLY void GeneratePrimaryRays(const PrimRayGenLaunchParameters& a_PrimaryRay
     GeneratePrimaryRay<<<numBlocks, blockSize>>>(numRays, a_PrimaryRayGenParams.m_PrimaryRays, u, v, w, eye, dimensions, frameCount);
 }
 
-CPU_ONLY void GenerateMotionVectors()
+CPU_ONLY void GenerateMotionVectors(MotionVectorsGenerationData& a_MotionVectorsData)
 {
+    const int numPixels = a_MotionVectorsData.m_ScreenResolution.x * a_MotionVectorsData.m_ScreenResolution.y;
+    const int blockSize = 256;
+    const int numBlocks = (numPixels + blockSize - 1) / blockSize;
+
+    GenerateMotionVector<<<numBlocks, blockSize>>>(
+    a_MotionVectorsData.m_MotionVectorBuffer, 
+    a_MotionVectorsData.a_CurrentSurfaceData, 
+    a_MotionVectorsData.m_ScreenResolution,
+        a_MotionVectorsData.m_ProjectionMatrix * a_MotionVectorsData.m_PrevViewMatrix);
+
+    cudaDeviceSynchronize();
 }
 
 CPU_ONLY void ExtractSurfaceData(

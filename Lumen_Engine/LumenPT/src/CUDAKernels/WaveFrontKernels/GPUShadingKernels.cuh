@@ -100,3 +100,9 @@ CPU_ON_GPU void WriteToOutput(
     const uint2 a_Resolution,
     const float3* const a_Input,
     uchar4* a_Output);
+
+CPU_ON_GPU void GenerateMotionVector(
+    MotionVectorBuffer* a_Buffer,
+    const SurfaceData* a_CurrentSurfaceData,
+    uint2 a_Resolution,
+    sutil::Matrix4x4 a_PrevViewProjMatrix);

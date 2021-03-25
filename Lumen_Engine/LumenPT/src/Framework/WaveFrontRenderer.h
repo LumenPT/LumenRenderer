@@ -5,6 +5,7 @@
 #include "MemoryBuffer.h"
 #include "../Shaders/CppCommon/WaveFrontDataStructs.h"
 #include "PTServiceLocator.h"
+#include "MotionVectors.h"
 
 #include "Renderer/LumenRenderer.h"
 
@@ -89,6 +90,9 @@ namespace WaveFront
 
         //Triangle lights.
         MemoryBuffer m_TriangleLights;
+
+    	//Buffer containing motion vectors
+        MotionVectors m_MotionVectors;
 
         //Optix system
         std::unique_ptr<OptixWrapper> m_OptixSystem;
