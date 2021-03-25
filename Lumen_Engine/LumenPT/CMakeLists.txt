@@ -158,9 +158,6 @@ set(LUMENPT_INCLUDES
 
 # Put all libraries into a variable
 set(LUMENPT_LIBS
-	#"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Libs/Cuda/cuda.lib"
-	#"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Libs/Cuda/cudart.lib"
-	#"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Libs/Cuda/cudadevrt.lib"
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Libs/glad.lib"
 
 	libnanovdb
