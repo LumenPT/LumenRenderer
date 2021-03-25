@@ -1,4 +1,4 @@
-#include "SnapShotUninterleave.cuh"
+#include "SnapShotProcessing.cuh"
 
 #include <device_launch_parameters.h>
 

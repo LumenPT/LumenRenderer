@@ -16,7 +16,7 @@
 #include "../Shaders/CppCommon/WaveFrontDataStructs.h"
 #include "CudaUtilities.h"
 #include "../Tools/FrameSnapshot.h"
-#include "../Tools/SnapShotUninterleave.cuh"
+#include "../Tools/SnapShotProcessing.cuh"
 
 #include <Optix/optix_function_table_definition.h>
 #include <filesystem>
