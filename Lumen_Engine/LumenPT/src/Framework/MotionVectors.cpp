@@ -8,6 +8,8 @@
 #include "../../vendor/Include/sutil/vec_math.h"
 #include "../Shaders/CppCommon/WaveFrontDataStructs/MotionVectorsGenerationData.h"
 
+#include "../Tools/SnapShotProcessing.cuh"
+
 MotionVectors::MotionVectors()
 {
 	m_MotionVectorBuffer = std::make_unique<MemoryBuffer>();
@@ -19,6 +21,10 @@ MotionVectors::~MotionVectors()
 
 void MotionVectors::Init(uint2 a_Resolution)
 {
+	m_MotionVectorDirectionsTex.m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, a_Resolution.x,
+		a_Resolution.y, 3 * sizeof(float));;
+	m_MotionVectorMagnitudeTex.m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, a_Resolution.x,
+		a_Resolution.y, 3 * sizeof(float));;
 	
 	m_Resolution = a_Resolution;
 	const auto numPixels = m_Resolution.x * m_Resolution.y;
@@ -53,4 +59,15 @@ void MotionVectors::Update(WaveFront::MotionVectorsGenerationData& a_MotionVecto
 	motionVectorsGenerationData.m_ScreenResolution = m_Resolution;
 
 	GenerateMotionVectors(motionVectorsGenerationData);*/
+}
+
+void MotionVectors::GenerateDebugTextures()
+{
+	assert(m_MotionVectorBuffer && "MotionVectors not initialized");
+	
+	SeparateMotionVectorBufferCPU(m_Resolution.x * m_Resolution.y,
+		m_MotionVectorBuffer->GetDevicePtr<MotionVectorBuffer>(),
+		m_MotionVectorDirectionsTex.m_Memory->GetDevicePtr<float3>(),
+		m_MotionVectorMagnitudeTex.m_Memory->GetDevicePtr<float3>()
+	);
 }

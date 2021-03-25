@@ -390,9 +390,6 @@ namespace WaveFront
         {
             auto motionVectorBuffer = m_MotionVectors.GetMotionVectorBuffer();
         	
-            // The buffers that need to be given to the tool are provided via a map as shown below
-            // Notice that CudaGLTextures are used, as opposed to memory buffers. This is to enable the data to be used with OpenGL
-            // and thus displayed via ImGui
             std::map<std::string, FrameSnapshot::ImageBuffer> resBuffers;
             resBuffers["Motion vector direction"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
                 m_Settings.renderResolution.y, 3 * sizeof(float));
@@ -400,8 +397,6 @@ namespace WaveFront
             resBuffers["Motion vector magnitude"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
                 m_Settings.renderResolution.y, 3 * sizeof(float));
 
-            // A CUDA kernel used to separate the interleave primary ray buffer into 3 different buffers
-            // This is the main reason we use a lambda, as it needs to be defined how to interpret the data
            SeparateMotionVectorBufferCPU(m_Settings.renderResolution.x * m_Settings.renderResolution.y,
                motionVectorBuffer->GetDevicePtr<MotionVectorBuffer>(),
                 resBuffers.at("Motion vector direction").m_Memory->GetDevicePtr<float3>(),
@@ -561,6 +556,13 @@ namespace WaveFront
         a_Scene->m_Camera->UpdatePreviousFrameMatrix();
         ++frameCount;
 
+        m_DebugTexture = m_OutputBuffer.GetTexture();
+//#if defined(_DEBUG)
+        m_MotionVectors.GenerateDebugTextures();
+        //m_DebugTexture = m_MotionVectors.GetMotionVectorMagnitudeTex();
+        m_DebugTexture = m_MotionVectors.GetMotionVectorDirectionsTex();
+//#endif
+    	
         //Return the GLuint texture ID.
         return m_OutputBuffer.GetTexture();
     }

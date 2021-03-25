@@ -66,7 +66,7 @@ namespace WaveFront
         void BeginSnapshot() override;
 
         std::unique_ptr<FrameSnapshot> EndSnapshot() override;
-        //Buffers
+    	
     private:
 
         std::unique_ptr<MemoryBuffer> InterleaveVertexData(const PrimitiveData& a_MeshData) const;
