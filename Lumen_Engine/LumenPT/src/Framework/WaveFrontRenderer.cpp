@@ -9,12 +9,14 @@
 #include "PTVolume.h"
 #include "Material.h"
 #include "MemoryBuffer.h"
-#include "OutputBuffer.h"
+#include "CudaGLTexture.h"
 #include "SceneDataTable.h"
 #include "../CUDAKernels/WaveFrontKernels.cuh"
 #include "../Shaders/CppCommon/LumenPTConsts.h"
 #include "../Shaders/CppCommon/WaveFrontDataStructs.h"
 #include "CudaUtilities.h"
+#include "../Tools/FrameSnapshot.h"
+#include "../Tools/SnapShotProcessing.cuh"
 
 #include <Optix/optix_function_table_definition.h>
 #include <filesystem>
@@ -133,8 +135,25 @@ namespace WaveFront
 
         m_ServiceLocator.m_Renderer = this;
 
-        
+        // A null frame snapshot will not record anything when requested to.
+        m_FrameSnapshot = std::make_unique<NullFrameSnapshot>(); 
 
+    }
+
+    void WaveFrontRenderer::BeginSnapshot()
+    {
+        // Replacing the snapshot with a non-null one will start recording requested features.
+        m_FrameSnapshot = std::make_unique<FrameSnapshot>();
+    }
+
+    std::unique_ptr<FrameSnapshot> WaveFrontRenderer::EndSnapshot()
+    {
+        // Move the snapshot to a temporary variable to return shortly
+        auto snap = std::move(m_FrameSnapshot);
+        // Make the snapshot a Null once again to stop recording
+        m_FrameSnapshot = std::make_unique<NullFrameSnapshot>();
+
+        return std::move(snap);
     }
 
     std::unique_ptr<MemoryBuffer> WaveFrontRenderer::InterleaveVertexData(const PrimitiveData& a_MeshData) const
@@ -337,6 +356,35 @@ namespace WaveFront
 
         m_Rays.Write(numPixels, 0); //Set the counter to be equal to the amount of rays being shot. This is manual because the atomic is not used yet.
 
+        //##ToolsBookmark
+        //Example of defining how to add buffers to the pixel debugger tool
+        //This lambda is NOT ran every frame, it is only ran when the output layer requests a snapshot
+        m_FrameSnapshot->AddBuffer([&]()
+        {
+            // The buffers that need to be given to the tool are provided via a map as shown below
+            // Notice that CudaGLTextures are used, as opposed to memory buffers. This is to enable the data to be used with OpenGL
+            // and thus displayed via ImGui
+            std::map<std::string, FrameSnapshot::ImageBuffer> resBuffers;
+            resBuffers["Origins"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
+                m_Settings.renderResolution.y, 3 * sizeof(float));
+
+            resBuffers["Directions"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
+                m_Settings.renderResolution.y, 3 * sizeof(float));
+
+            resBuffers["Contributions"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F ,m_Settings.renderResolution.x,
+                m_Settings.renderResolution.y, 3 * sizeof(float));
+
+            // A CUDA kernel used to separate the interleave primary ray buffer into 3 different buffers
+            // This is the main reason we use a lambda, as it needs to be defined how to interpret the data
+            SeparateIntersectionRayBufferCPU((m_Rays.GetSize() - sizeof(uint32_t)) / sizeof(IntersectionRayData),
+                m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>(),
+                resBuffers.at("Origins").m_Memory->GetDevicePtr<float3>(),
+                resBuffers.at("Directions").m_Memory->GetDevicePtr<float3>(),
+                resBuffers.at("Contributions").m_Memory->GetDevicePtr<float3>());
+
+            return resBuffers;
+        });
+
         //Clear the surface data that contains information from the second last frame so that it can be reused by this frame.
         cudaMemset(m_SurfaceData[currentIndex].GetDevicePtr(), 0, sizeof(SurfaceData) * numPixels);
         cudaDeviceSynchronize();
@@ -469,7 +517,7 @@ namespace WaveFront
             m_Settings.outputResolution,
             m_PixelBufferSeparate.GetDevicePtr<float3>(),
             m_PixelBufferCombined.GetDevicePtr<float3>(),
-            m_OutputBuffer.GetDevicePointer()
+            m_OutputBuffer.GetDevicePtr()
         );
 
         //Post processing using CUDA kernel.

@@ -7,8 +7,19 @@
 namespace Lumen
 {
 	Input* Input::s_Instance = new WindowsInput();
-	
-	bool WindowsInput::IsKeyPressedImpl(int keycode)
+
+    void WindowsInput::ScrollCallBack(GLFWwindow*, double a_XOffset, double a_YOffset)
+    {
+		m_MouseWheelX = a_XOffset;
+		m_MouseWheelY = a_YOffset;
+    }
+
+    void WindowsInput::SetCallbacksImpl()
+    {
+		glfwSetScrollCallback(reinterpret_cast<GLFWwindow*>(LumenApp::Get().GetWindow().GetNativeWindow()), &ScrollCallBack);
+    }
+
+    bool WindowsInput::IsKeyPressedImpl(int keycode)
 	{
 		auto window = static_cast<GLFWwindow*>(LumenApp::Get().GetWindow().GetNativeWindow());
 		auto state = glfwGetKey(window, keycode);

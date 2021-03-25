@@ -1,7 +1,7 @@
 #pragma once
 #if defined(WAVEFRONT)
 #include "OptixWrapper.h"
-#include "OutputBuffer.h"
+#include "CudaGLTexture.h"
 #include "MemoryBuffer.h"
 #include "../Shaders/CppCommon/WaveFrontDataStructs.h"
 #include "PTServiceLocator.h"
@@ -16,6 +16,7 @@
 
 class SceneDataTable;
 
+class FrameSnapshot;
 namespace WaveFront
 {
     struct WaveFrontSettings
@@ -62,13 +63,16 @@ namespace WaveFront
          */
         void Init(const WaveFrontSettings& a_Settings);
 
+        void BeginSnapshot() override;
+
+        std::unique_ptr<FrameSnapshot> EndSnapshot() override;
         //Buffers
     private:
 
         std::unique_ptr<MemoryBuffer> InterleaveVertexData(const PrimitiveData& a_MeshData) const;
 
         //OpenGL buffer to write output to.
-        OutputBuffer m_OutputBuffer;
+        CudaGLTexture m_OutputBuffer;
 
         //The surface data per pixel. 0 and 1 are used for the current and previous frame. 2 is used for any other depth.
         MemoryBuffer m_SurfaceData[3];
@@ -112,6 +116,11 @@ namespace WaveFront
 
         //Kamen's lookup table
         std::unique_ptr<SceneDataTable> m_Table;
+
+        // The Frame Snapshot is used to define what to record when the output layer requests that
+        // See TraceFrame() ##ToolsBookmark for example
+        std::unique_ptr<FrameSnapshot> m_FrameSnapshot;
+
     };
 }
 #endif
