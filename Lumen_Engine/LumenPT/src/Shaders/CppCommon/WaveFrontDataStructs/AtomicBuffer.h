@@ -61,6 +61,12 @@ public:
         return &data[a_Index];
     }
 
+    GPU_ONLY const T* GetData(int a_Index) const
+    {
+        assert(a_Index <= counter);
+        return &data[a_Index];
+    }
+
     //Data
 public:
     uint32_t counter;

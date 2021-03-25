@@ -6,8 +6,8 @@ using namespace WaveFront;
 
 CPU_ON_GPU void ExtractVolumetricDataGpu(
     unsigned a_NumIntersections,
-    WaveFront::AtomicBuffer<WaveFront::IntersectionRayData>* a_Rays,
-    WaveFront::AtomicBuffer<WaveFront::VolumetricIntersectionData>* a_IntersectionData,
+    const WaveFront::AtomicBuffer<WaveFront::IntersectionRayData>* a_Rays,
+    const WaveFront::AtomicBuffer<WaveFront::VolumetricIntersectionData>* a_IntersectionData,
     WaveFront::VolumetricData* a_OutPut,
     SceneDataTableAccessor* a_SceneDataTable)
 {

@@ -26,6 +26,7 @@ include(${CMAKE_SOURCE_DIR}/cmake/functions.cmake)
 assign_source_group(${HEADER_FILES})
 assign_source_group(${SOURCE_FILES})
 
+#set_property(TARGET Sandbox PROPERTY CUDA_RESOLVE_DEVICE_SYMBOLS ON)
 set_property(TARGET Sandbox PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 set_property(TARGET Sandbox APPEND PROPERTY COMPILE_DEFINITIONS GLFW_INCLUDE_NONE)
 
