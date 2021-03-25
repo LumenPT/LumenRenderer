@@ -1,4 +1,5 @@
 #include "GPUShadingKernels.cuh"
+#include "../VolumetricKernels/GPUVolumetricShadingKernels.cuh"
 #include <device_launch_parameters.h>
 #include <sutil/vec_math.h>
 
@@ -30,6 +31,9 @@ CPU_ON_GPU void ShadeDirect(
     //i will update to a new pixel index if there is less threads than there are pixels.
     for (unsigned int i = index; i < numPixels; i += stride)
     {
+
+        //TODO add volumetricDataBuffer and separate shadow ray buffer for volumetric shadow traces.
+        VolumetricShadeDirect(a_ResolutionAndDepth, nullptr, nullptr, a_Lights, a_NumLights, a_CDF);
 
         // Get intersection.
         const SurfaceData& surfaceData = a_SurfaceDataBuffer[i];

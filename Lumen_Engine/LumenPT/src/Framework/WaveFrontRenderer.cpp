@@ -86,10 +86,15 @@ namespace WaveFront
 		m_VolumetricIntersectionData.Write(0);
 
         //Initialize each surface data buffer.
-        for(int i = 0; i < 3; ++i)
+        for(auto& surfaceDataBuffer : m_SurfaceData)
         {
             //Note; Only allocates memory and stores the size on the GPU. It does not actually fill any data in yet.
-            m_SurfaceData[i].Resize(numPixels * sizeof(SurfaceData));
+            surfaceDataBuffer.Resize(numPixels * sizeof(SurfaceData));
+        }
+
+        for(auto& volumetricDataBuffer : m_VolumetricData)
+        {
+            volumetricDataBuffer.Resize(numPixels * sizeof(VolumetricData));
         }
 
         //TODO: number of lights will be dynamic per frame but this is temporary.
@@ -375,7 +380,7 @@ namespace WaveFront
              * Calculate the surface data for this depth.
              */
             unsigned numIntersections = 0;
-            m_IntersectionData.Read(&numIntersections, sizeof(uint32_t), 0);
+            m_IntersectionData.Read(&numIntersections, sizeof(numIntersections), 0);
             const auto surfaceDataBufferIndex = depth == 0 ? currentIndex : 2;   //1 and 2 are used for the first intersection and remembered for temporal use.
             ExtractSurfaceData(
                 numIntersections, 
@@ -383,6 +388,17 @@ namespace WaveFront
                 m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>(), 
                 m_SurfaceData[surfaceDataBufferIndex].GetDevicePtr<SurfaceData>(), 
                 sceneDataTableAccessor);
+
+            unsigned numVolumeIntersections = 0;
+            m_VolumetricIntersectionData.Read(&numVolumeIntersections, sizeof(numVolumeIntersections), 0);
+            const auto volumetricDataBufferIndex = 0;
+            ExtractVolumetricData(
+                numVolumeIntersections,
+                m_VolumetricIntersectionData.GetDevicePtr<AtomicBuffer<VolumetricIntersectionData>>(),
+                m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>(),
+                m_VolumetricData[volumetricDataBufferIndex].GetDevicePtr<VolumetricData>(),
+                sceneDataTableAccessor);
+
             cudaDeviceSynchronize();
             CHECKLASTCUDAERROR;
 

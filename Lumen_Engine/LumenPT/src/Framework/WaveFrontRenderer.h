@@ -72,6 +72,9 @@ namespace WaveFront
         //The surface data per pixel. 0 and 1 are used for the current and previous frame. 2 is used for any other depth.
         MemoryBuffer m_SurfaceData[3];
 
+        //The volumetric data per pixel.
+        MemoryBuffer m_VolumetricData[1];
+
         //Intersection points passed to Optix.
         MemoryBuffer m_IntersectionData;
 

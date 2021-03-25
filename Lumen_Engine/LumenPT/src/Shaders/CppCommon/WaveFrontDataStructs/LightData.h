@@ -13,6 +13,7 @@ namespace WaveFront
         DIRECT,
         INDIRECT,
         SPECULAR,
+        VOLUMETRIC,
         NUM_CHANNELS
     };
 

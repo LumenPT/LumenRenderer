@@ -1,7 +1,7 @@
 #pragma once
 #include "../WaveFrontDataStructs.h"
 #include "../CudaDefines.h"
-#include "SurfaceDataBuffer.h"
+#include "SurfaceData.h"
 
 namespace WaveFront
 {

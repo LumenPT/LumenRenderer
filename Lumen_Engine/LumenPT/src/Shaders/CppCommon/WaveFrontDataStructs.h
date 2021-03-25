@@ -5,5 +5,6 @@
 #include "WaveFrontDataStructs/CudaKernelParamStructs.h"
 #include "WaveFrontDataStructs/OptixLaunchParams.h"
 #include "WaveFrontDataStructs/OptixShaderStructs.h"
-#include "WaveFrontDataStructs/SurfaceDataBuffer.h"
+#include "WaveFrontDataStructs/SurfaceData.h"
+#include "WaveFrontDataStructs/VolumetricData.h"
 #include "WaveFrontDataStructs/LightData.h"
