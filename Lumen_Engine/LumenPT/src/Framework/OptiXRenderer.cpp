@@ -8,7 +8,7 @@
 #include "Material.h"
 #include "Texture.h"
 #include "MemoryBuffer.h"
-#include "OutputBuffer.h"
+#include "CudaGLTexture.h"
 #include "ShaderBindingTableGen.h"
 #include "../Shaders/CppCommon/LumenPTConsts.h"
 #include "../Shaders/CppCommon/SceneDataTableAccessor.h"
@@ -337,7 +337,7 @@ std::unique_ptr<AccelerationStructure> OptiXRenderer::BuildInstanceAccelerationS
 void OptiXRenderer::CreateOutputBuffer()
 {
 
-    m_OutputBuffer = std::make_unique<::OutputBuffer>(gs_ImageWidth, gs_ImageHeight);
+    m_OutputBuffer = std::make_unique<::CudaGLTexture>(gs_ImageWidth, gs_ImageHeight);
 
 }
 

@@ -6,3 +6,4 @@
 #include "PixelBuffer.h"
 #include "ResultBuffer.h"
 #include "../ReSTIRData.h"
+#include "AtomicBuffer.h"
