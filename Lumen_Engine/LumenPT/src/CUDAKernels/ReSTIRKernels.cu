@@ -170,7 +170,7 @@ __global__ void PickPrimarySamplesInternal(const LightBagEntry* const a_LightBag
 
                 //Generate random UV coordinates. Between 0 and 1.
                 const float u = RandomFloat(seed);  //Seed is altered after each shift, which makes it work with the same uint.
-                const float v = RandomFloat(seed);
+                const float v = RandomFloat(seed) * (1.f - u);
 
                 //Generate a sample with solid angle PDF for this specific pixel.
                 LightSample lightSample;
@@ -180,10 +180,11 @@ __global__ void PickPrimarySamplesInternal(const LightBagEntry* const a_LightBag
                     lightSample.normal = light.normal;
                     lightSample.area = light.area;
 
-                    //TODO generate random point according to UV coordinates. This is taking the center for now.
-                    //TODO generate random point according to UV coordinates. This is taking the center for now.
-                    //TODO generate random point according to UV coordinates. This is taking the center for now.
-                    lightSample.position = (light.p0 + light.p1 + light.p2) / 3.f;
+                    //Generate the position on the triangle uniformly. TODO: this may not be uniform?
+                    float3 arm1 = light.p1 - light.p0;
+                    float3 arm2 = light.p2 - light.p0;
+                    lightSample.position = light.p0 + (arm1 * u) + (arm2 * v);
+                    //lightSample.position = (light.p0 + light.p1 + light.p2) / 3.f; //This takes the center.
 
                     //Calculate the PDF for this pixel and light.
                     Resample(&lightSample, pixel, &lightSample);
