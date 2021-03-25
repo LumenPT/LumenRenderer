@@ -17,6 +17,7 @@
 #include "CudaUtilities.h"
 #include "../Tools/FrameSnapshot.h"
 #include "../Tools/SnapShotProcessing.cuh"
+#include "MotionVectors.h"
 
 #include <Optix/optix_function_table_definition.h>
 #include <filesystem>
@@ -385,6 +386,31 @@ namespace WaveFront
             return resBuffers;
         });
 
+        m_FrameSnapshot->AddBuffer([&]()
+        {
+            auto motionVectorBuffer = m_MotionVectors.GetMotionVectorBuffer();
+        	
+            // The buffers that need to be given to the tool are provided via a map as shown below
+            // Notice that CudaGLTextures are used, as opposed to memory buffers. This is to enable the data to be used with OpenGL
+            // and thus displayed via ImGui
+            std::map<std::string, FrameSnapshot::ImageBuffer> resBuffers;
+            resBuffers["Motion vector direction"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
+                m_Settings.renderResolution.y, 3 * sizeof(float));
+
+            resBuffers["Motion vector magnitude"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
+                m_Settings.renderResolution.y, 3 * sizeof(float));
+
+            // A CUDA kernel used to separate the interleave primary ray buffer into 3 different buffers
+            // This is the main reason we use a lambda, as it needs to be defined how to interpret the data
+           SeparateMotionVectorBufferCPU(m_Settings.renderResolution.x * m_Settings.renderResolution.y,
+               motionVectorBuffer->GetDevicePtr<MotionVectorBuffer>(),
+                resBuffers.at("Motion vector direction").m_Memory->GetDevicePtr<float3>(),
+                resBuffers.at("Motion vector magnitude").m_Memory->GetDevicePtr<float3>()
+           );
+
+            return resBuffers;
+        });
+    	
         //Clear the surface data that contains information from the second last frame so that it can be reused by this frame.
         cudaMemset(m_SurfaceData[currentIndex].GetDevicePtr(), 0, sizeof(SurfaceData) * numPixels);
         cudaDeviceSynchronize();

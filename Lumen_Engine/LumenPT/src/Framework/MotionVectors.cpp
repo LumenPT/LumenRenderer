@@ -25,7 +25,7 @@ void MotionVectors::Init(uint2 a_Resolution)
 
 	const unsigned motionVectorBufferEmptySize = sizeof(MotionVectorBuffer);
 	const unsigned motionVectorDataStructSize = sizeof(MotionVectorData);
-	auto motionVectorBufferTotalSize =
+	size_t motionVectorBufferTotalSize =
 		static_cast<size_t>(motionVectorBufferEmptySize) +
 		static_cast<size_t>(numPixels) *
 		static_cast<size_t>(/*m_RaysPerPixel*/1) *

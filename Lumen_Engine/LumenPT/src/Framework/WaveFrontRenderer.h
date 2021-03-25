@@ -3,9 +3,9 @@
 #include "OptixWrapper.h"
 #include "CudaGLTexture.h"
 #include "MemoryBuffer.h"
+#include "MotionVectors.h"
 #include "../Shaders/CppCommon/WaveFrontDataStructs.h"
 #include "PTServiceLocator.h"
-#include "MotionVectors.h"
 
 #include "Renderer/LumenRenderer.h"
 

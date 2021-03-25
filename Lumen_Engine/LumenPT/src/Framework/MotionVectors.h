@@ -20,6 +20,8 @@ public:
 
 	void Init(uint2 a_Resolution);
 	void Update(WaveFront::MotionVectorsGenerationData& a_MotionVectorsGenerationData);
+
+	MemoryBuffer* GetMotionVectorBuffer() { return m_MotionVectorBuffer.get(); };
 	
 private:
 
