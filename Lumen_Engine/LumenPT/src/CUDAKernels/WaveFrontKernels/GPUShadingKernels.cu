@@ -74,9 +74,9 @@ sutil::Matrix4x4 a_PrevViewProjMatrix
         
         a_Buffer->SetMotionVectorData(motionVectorData, i);
     	
-        if(i == 800 * 300 + 400)
+        //if(i == 800 * 300 + 400)
         {
-	        printf("x: %.6f y: %.6f \n", a_Buffer->m_MotionVectorBuffer[i].m_Velocity.x, a_Buffer->m_MotionVectorBuffer[i].m_Velocity.y);
+	        //printf("x: %.6f y: %.6f \n", a_Buffer->m_MotionVectorBuffer[i].m_Velocity.x, a_Buffer->m_MotionVectorBuffer[i].m_Velocity.y);
             //printf("x: %.6f y: %.6f \n", currScreenPos.x, currScreenPos.y);
             //printf("x: %.6f y: %.6f \n", prevScreenPos.x, prevScreenPos.y);
         }
