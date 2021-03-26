@@ -107,6 +107,7 @@ namespace Lumen
 			std::vector<std::shared_ptr<Node>>					m_NodePool;
 			std::vector<std::shared_ptr<Lumen::ILumenMesh>>		m_MeshPool;
 			std::vector<std::shared_ptr<ILumenMaterial>>		m_MaterialPool;
+			std::vector<std::shared_ptr<ILumenScene>>			m_Scenes;
 			// Also contain materials
 				//binary material data is kinda unsigned long long
 			// Also contain textures
@@ -156,6 +157,9 @@ namespace Lumen
 
 		void LoadNodes(fx::gltf::Document& a_Doc, GLTFResource& a_Res, int a_NodeId, bool a_Root, const glm::mat4& a_TransformMat = glm::mat4(1));
 		void LoadMeshes(fx::gltf::Document& a_Doc, GLTFResource& a_Res);
+		void LoadScenes(fx::gltf::Document& a_Doc, GLTFResource& a_Res);
+		void LoadNodeAndChildren(fx::gltf::Document a_Doc, GLTFResource a_Res, ILumenScene& a_Scene, uint32_t a_NodeID, Transform a_ParentTransform = Transform());
+        Transform LoadNodeTransform(fx::gltf::Node a_Node);
 
 		//Load a texture from the given file.
 		LoadedImageInformation LoadTexture(fx::gltf::Document& a_File, int a_TextureId, const std::string& a_Path, int a_NumChannels);

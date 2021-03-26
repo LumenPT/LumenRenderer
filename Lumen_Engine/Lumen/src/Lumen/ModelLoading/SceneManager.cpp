@@ -69,6 +69,8 @@ Lumen::SceneManager::GLTFResource* Lumen::SceneManager::LoadGLTF(std::string a_F
 
 	LoadMeshes(doc, res);
 
+	LoadScenes(doc, res);
+
 	//Loop over the root nodes in every scene in this GLTF file, and then add them as instances.
 	for (int sceneId = 0; sceneId < doc.scenes.size(); ++sceneId)
 	{
@@ -339,12 +341,72 @@ void Lumen::SceneManager::LoadMeshes(fx::gltf::Document& a_Doc, GLTFResource& a_
 		meshes.push_back(m_RenderPipeline->CreateMesh(primitives));
 	}
 
+	//meshes.erase(meshes.begin());
+
 	a_Res.m_MeshPool = meshes;
 
 }
 
+void Lumen::SceneManager::LoadScenes(fx::gltf::Document& a_Doc, GLTFResource& a_Res)
+{
+    for (auto& scene : a_Doc.scenes)
+    {
+		auto lumenScene = m_RenderPipeline->CreateScene();
+
+        for (auto& rootNode : scene.nodes)
+        {
+			LoadNodeAndChildren(a_Doc, a_Res, *lumenScene, rootNode);
+        }
+
+		a_Res.m_Scenes.push_back(lumenScene);
+    }
+}
+
+void Lumen::SceneManager::LoadNodeAndChildren(fx::gltf::Document a_Doc, Lumen::SceneManager::GLTFResource a_Res, ILumenScene& a_Scene, uint32_t a_NodeID, Lumen::Transform a_ParentTransform)
+{
+	auto node = a_Doc.nodes[a_NodeID];
+	auto nodeTransform = LoadNodeTransform(node);
+
+	nodeTransform = nodeTransform * a_ParentTransform;
+
+    if (node.mesh != -1)
+    {
+		auto newMesh = a_Scene.AddMesh();
+		newMesh->SetMesh(a_Res.m_MeshPool[std::min((uint64_t)node.mesh, a_Res.m_MeshPool.size() - 1)]);
+		newMesh->m_Transform = nodeTransform;
+    }
+
+    for (auto& child : node.children)
+    {
+		LoadNodeAndChildren(a_Doc, a_Res, a_Scene, child, nodeTransform);
+    }
+}
+
+Lumen::Transform Lumen::SceneManager::LoadNodeTransform(fx::gltf::Node a_Node)
+{
+	const static glm::mat4 identity = glm::identity<glm::mat4>();
+	auto nodeMat = glm::make_mat4(a_Node.matrix.data());
+
+	Transform transform;
+
+	if (nodeMat == identity)
+	{
+		auto t = a_Node.translation;
+		auto r = a_Node.rotation;
+		auto s = a_Node.scale;
+		transform.SetPosition(glm::vec3(-t[0], t[1], t[2]));
+		transform.SetRotation(glm::quat(r[3], r[0], r[1], r[2]));
+		transform.SetScale(glm::vec3(s[0], s[1], s[2]));
+	}
+	else
+	{
+		transform = nodeMat;
+	}
+	return transform;
+}
+
 Lumen::LoadedImageInformation Lumen::SceneManager::LoadTexture(fx::gltf::Document& a_File, int a_TextureId,
-    const std::string& a_Path, int a_NumChannels)
+                                                               const std::string& a_Path, int a_NumChannels)
 {
 	assert(a_TextureId >= 0);
 
