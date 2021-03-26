@@ -12,14 +12,11 @@
 #include "CudaGLTexture.h"
 #include "SceneDataTable.h"
 #include "../CUDAKernels/WaveFrontKernels.cuh"
-#include "../CUDAKernels/WaveFrontKernels/EmissiveLookup.cuh"
 #include "../Shaders/CppCommon/LumenPTConsts.h"
 #include "../Shaders/CppCommon/WaveFrontDataStructs.h"
 #include "CudaUtilities.h"
-#include "ReSTIR.h"
 #include "../Tools/FrameSnapshot.h"
 #include "../Tools/SnapShotProcessing.cuh"
-#include "MotionVectors.h"
 
 #include <Optix/optix_function_table_definition.h>
 #include <filesystem>
@@ -85,12 +82,19 @@ namespace WaveFront
 
         //Initialize the ray buffers. Note: These are not initialized but Reset() is called when the waves start.
         const auto numPrimaryRays = numPixels;
-        const auto numShadowRays = numPixels * m_Settings.depth + (numPixels * ReSTIRSettings::numReservoirsPerPixel); //TODO: change to 2x num pixels and add safety check to resolve when full.
+        const auto numShadowRays = numPixels * m_Settings.depth; //TODO: change to 2x num pixels and add safety check to resolve when full.
+        m_Rays.Resize(sizeof(AtomicBuffer<IntersectionRayData>) + sizeof(IntersectionRayData) * numPrimaryRays);
+        m_ShadowRays.Resize(sizeof(AtomicBuffer<ShadowRayData>) + sizeof(ShadowRayData) * numShadowRays);
 
-        //Create atomic buffers. This automatically sets the counter to 0 and size to max.
-        CreateAtomicBuffer<IntersectionRayData>(&m_Rays, numPrimaryRays);
-        CreateAtomicBuffer<ShadowRayData>(&m_ShadowRays, numShadowRays);
-        CreateAtomicBuffer<IntersectionData>(&m_IntersectionData, numPixels);
+        //Reset Atomic Counters for Intersection and Shadow Rays
+        m_Rays.Write(0);
+        m_ShadowRays.Write(0);
+
+        //Initialize the intersection data. This one is the size of numPixels maximum.
+        m_IntersectionData.Resize(sizeof(AtomicBuffer<IntersectionData>) + sizeof(IntersectionData) * numPixels);
+
+        //Reset Atomic Counter for Intersection Buffer.
+        m_IntersectionData.Write(0);
 
         //Initialize each surface data buffer.
         for(int i = 0; i < 3; ++i)
@@ -105,45 +109,21 @@ namespace WaveFront
         m_TriangleLights.Resize(sizeof(TriangleLight) * numLights);
 
         //Temporary lights, stored in the buffer.
-        TriangleLight lights[numLights];
+        float3 pos1, pos2, pos3;
+        pos1 = { 150.f, 41.f, 210.f };
+        pos2 = { 150.f, 41.f, 110.f };
+        pos3 = { 90.f, 41.f, 210.f };
 
-        //Intensity per light.
-        lights[0].radiance = { 200000, 200000, 200000 };
-        lights[1].radiance = { 200000, 200000, 200000 };
-        lights[2].radiance = { 200000, 200000, 200000 };
+        float i1 = 3000000.f;
+        float i2 = 300000.f;
+        float i3 = 699999.f;
 
-
-        //Actually set the triangle lights to have an area.
-        lights[0].p0 = {605.f, 700.f, -5.f};
-        lights[0].p1 = { 600.f, 700.f, 5.f };
-        lights[0].p2 = { 595.f, 700.f, -5.f };
-
-        lights[1].p0 = { 5.f, 700.f, -5.f };
-        lights[1].p1 = { 0.f, 700.f, 5.f };
-        lights[1].p2 = { -5.f, 700.f, -5.f };
-
-        lights[2].p0 = { -595.f, 700.f, -5.f };
-        lights[2].p1 = { -600.f, 700.f, 5.f };
-        lights[2].p2 = { -605.f, 700.f, -5.f };
-
-        //Calculate the area per light.
-        for(int i = 0; i < 3; ++i)
+        TriangleLight lights[numLights] =
         {
-            float3 vec1 = (lights[i].p0 - lights[i].p1);
-            float3 vec2 = (lights[i].p0 - lights[i].p2);
-            lights[i].area = sqrt(pow((vec1.y * vec2.z - vec2.y * vec1.z), 2) + pow((vec1.x * vec2.z - vec2.x * vec1.z), 2) + pow((vec1.x * vec2.y - vec2.x * vec1.y), 2)) / 2.f;
-            printf("lol");
-        }
-
-        //Calculate the normal for each light.
-        for(int i = 0; i < 3; ++i)
-        {
-            glm::vec3 arm1 = normalize(glm::vec3(lights[i].p0.x - lights[i].p2.x, lights[i].p0.y - lights[i].p2.y, lights[i].p0.z - lights[i].p2.z));
-            glm::vec3 arm2 = normalize(glm::vec3(lights[i].p0.x - lights[i].p1.x, lights[i].p0.y - lights[i].p1.y, lights[i].p0.z - lights[i].p1.z));
-            glm::vec3 normal = normalize(glm::cross(arm2, arm1));
-            lights[i].normal = { normal.x, normal.y, normal.z };
-        }
-
+            {pos1, pos1, pos1, {0.f, 0.f, 0.f}, {i1, i1, i1}, 10.f},
+            {pos2, pos2, pos2, {0.f, 0.f, 0.f}, {i2, i2, i2}, 10.f},
+            {pos3, pos3, pos3, {0.f, 0.f, 0.f}, {i3, i3, i3}, 10.f}
+        };
 
         m_TriangleLights.Write(&lights[0], sizeof(TriangleLight) * numLights, 0);
 
@@ -155,15 +135,9 @@ namespace WaveFront
 
         m_ServiceLocator.m_Renderer = this;
 
-        //Use mostly the default values.
-        ReSTIRSettings rSettings;
-        rSettings.width = m_Settings.renderResolution.x;
-        rSettings.height = m_Settings.renderResolution.y;
         // A null frame snapshot will not record anything when requested to.
         m_FrameSnapshot = std::make_unique<NullFrameSnapshot>(); 
 
-        m_ReSTIR = std::make_unique<ReSTIR>();
-        m_ReSTIR->Initialize(rSettings);
     }
 
     void WaveFrontRenderer::BeginSnapshot()
@@ -205,7 +179,7 @@ namespace WaveFront
         auto vertexBuffer = InterleaveVertexData(a_PrimitiveData);
         cudaDeviceSynchronize();
         auto err = cudaGetLastError();
-        
+
         std::vector<uint32_t> correctedIndices;
 
         if (a_PrimitiveData.m_IndexSize != 4)
@@ -218,25 +192,9 @@ namespace WaveFront
             }
 
         }
-        
+
         //printf("Index buffer Size %i \n", static_cast<int>(correctedIndices.size()));
         std::unique_ptr<MemoryBuffer> indexBuffer = std::make_unique<MemoryBuffer>(correctedIndices);
-
-        uint8_t numVertices = sizeof(vertexBuffer) / sizeof(Vertex);
-        //vertexBuffer->GetDevicePtr<Vertex>();
-        std::unique_ptr<MemoryBuffer> emissiveBuffer = std::make_unique<MemoryBuffer>((numVertices / 3) * sizeof(bool));
-        //std::unique_ptr<MemoryBuffer> indexBuffer = std::make_unique<MemoryBuffer>(a_PrimitiveData.m_IndexBinary);
-
-        //std::unique_ptr<MemoryBuffer> primMat = std::make_unique<MemoryBuffer>(a_PrimitiveData.m_Material);
-        //std::unique_ptr<MemoryBuffer> primMat = static_cast<Material*>(a_PrimitiveData.m_Material.get())->GetDeviceMaterial();
-
-        FindEmissives(vertexBuffer->GetDevicePtr<Vertex>(), emissiveBuffer->GetDevicePtr<bool>(), indexBuffer->GetDevicePtr<uint32_t>(), static_cast<Material*>(a_PrimitiveData.m_Material.get())->GetDeviceMaterial(), numVertices);
-
-        // add bool buffer pointer to device prim pointer
-
-
-        
-
 
         unsigned int geomFlags = OPTIX_GEOMETRY_FLAG_NONE;
 
@@ -260,7 +218,7 @@ namespace WaveFront
 
         auto gAccel = m_OptixSystem->BuildGeometryAccelerationStructure(buildOptions, buildInput);
 
-        auto prim = std::make_unique<PTPrimitive>(std::move(vertexBuffer), std::move(indexBuffer), std::move(emissiveBuffer), std::move(gAccel));
+        auto prim = std::make_unique<PTPrimitive>(std::move(vertexBuffer), std::move(indexBuffer), std::move(gAccel));
 
         prim->m_Material = a_PrimitiveData.m_Material;
 
@@ -269,7 +227,6 @@ namespace WaveFront
         entry.m_VertexBuffer = prim->m_VertBuffer->GetDevicePtr<Vertex>();
         entry.m_IndexBuffer = prim->m_IndexBuffer->GetDevicePtr<unsigned int>();
         entry.m_Material = static_cast<Material*>(prim->m_Material.get())->GetDeviceMaterial();
-        entry.m_IsEmissive = prim->m_BoolBuffer->GetDevicePtr<bool>();
 
         return prim;
     }
@@ -361,19 +318,6 @@ namespace WaveFront
 
     unsigned WaveFrontRenderer::TraceFrame(std::shared_ptr<Lumen::ILumenScene>& a_Scene)
     {
-        //add to lights buffer? in traceframe
-
-        //add lights to mesh in scene
-            //add mesh
-            //keep instances in scene
-            //for each instance, add all emissive triangles to light buffer with world space pos
-
-        //Get instances from scene
-            //check which instances are emissives to optimize the looping over instances
-            //inside of these instances you compare which triangles are emissive through boolean buffer
-            //add those to lights buffer in world space
-                //where to keep lights buffer?? - scene! yes!
-
         //Index of the current and last frame to access buffers.
         const auto currentIndex = m_FrameIndex;
         const auto temporalIndex = m_FrameIndex == 1 ? 0 : 1;
@@ -392,34 +336,25 @@ namespace WaveFront
         a_Scene->m_Camera->SetAspectRatio(static_cast<float>(m_Settings.renderResolution.x) / static_cast<float>(m_Settings.renderResolution.y));
         a_Scene->m_Camera->GetVectorData(eye, u, v, w);
 
-        //Camera forward direction.
-        const float3 camForward = { w.x, w.y, w.z };
-        const float3 camPosition = { eye.x, eye.y, eye.z };
-
         float3 eyeCuda, uCuda, vCuda, wCuda;
         eyeCuda = make_float3(eye.x, eye.y, eye.z);
         uCuda = make_float3(u.x, u.y, u.z);
         vCuda = make_float3(v.x, v.y, v.z);
         wCuda = make_float3(w.x, w.y, w.z);
 
-        printf("Camera pos: %f %f %f\n", camPosition.x, camPosition.y, camPosition.z);
-
-        //Increment framecount each frame.
         static unsigned frameCount = 0;
-        ++frameCount;
 
         const WaveFront::PrimRayGenLaunchParameters::DeviceCameraData cameraData(eyeCuda, uCuda, vCuda, wCuda);
         auto rayPtr = m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>();
         const PrimRayGenLaunchParameters primaryRayGenParams(
-            uint2{m_Settings.renderResolution.x, m_Settings.renderResolution.y}, 
-            cameraData, 
-            rayPtr, frameCount);
+            uint2{ m_Settings.renderResolution.x, m_Settings.renderResolution.y },
+            cameraData,
+            rayPtr, frameCount);   //TODO what is framecount?
         GeneratePrimaryRays(primaryRayGenParams);
         cudaDeviceSynchronize();
         CHECKLASTCUDAERROR;
 
-        //Set the atomic counter for primary rays to the amount of pixels.
-        SetAtomicCounter<IntersectionRayData>(&m_Rays, numPixels);
+        m_Rays.Write(numPixels, 0); //Set the counter to be equal to the amount of rays being shot. This is manual because the atomic is not used yet.
 
         //##ToolsBookmark
         //Example of defining how to add buffers to the pixel debugger tool
@@ -450,35 +385,15 @@ namespace WaveFront
             return resBuffers;
         });
 
-        m_FrameSnapshot->AddBuffer([&]()
-        {
-            auto motionVectorBuffer = m_MotionVectors.GetMotionVectorBuffer();
-        	
-            std::map<std::string, FrameSnapshot::ImageBuffer> resBuffers;
-            resBuffers["Motion vector direction"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
-                m_Settings.renderResolution.y, 3 * sizeof(float));
-
-            resBuffers["Motion vector magnitude"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
-                m_Settings.renderResolution.y, 3 * sizeof(float));
-
-           SeparateMotionVectorBufferCPU(m_Settings.renderResolution.x * m_Settings.renderResolution.y,
-               motionVectorBuffer->GetDevicePtr<MotionVectorBuffer>(),
-                resBuffers.at("Motion vector direction").m_Memory->GetDevicePtr<float3>(),
-                resBuffers.at("Motion vector magnitude").m_Memory->GetDevicePtr<float3>()
-           );
-
-            return resBuffers;
-        });
-    	
         //Clear the surface data that contains information from the second last frame so that it can be reused by this frame.
         cudaMemset(m_SurfaceData[currentIndex].GetDevicePtr(), 0, sizeof(SurfaceData) * numPixels);
         cudaDeviceSynchronize();
         CHECKLASTCUDAERROR;
 
-        //Set the counters back to 0 for intersections and shadow rays.
+        //Set the shadow ray count to 0.
         const unsigned counterDefault = 0;
-        SetAtomicCounter<ShadowRayData>(&m_ShadowRays, counterDefault);
-        SetAtomicCounter<IntersectionData>(&m_IntersectionData, counterDefault);
+        m_ShadowRays.Write(counterDefault);
+        m_IntersectionData.Write(counterDefault);
 
         //Retrieve the acceleration structure and scene data table once.
         m_OptixSystem->UpdateSBT();
@@ -520,8 +435,7 @@ namespace WaveFront
              * Calculate the surface data for this depth.
              */
             unsigned numIntersections = 0;
-            numIntersections = GetAtomicCounter<IntersectionData>(&m_IntersectionData);
-
+            m_IntersectionData.Read(&numIntersections, sizeof(uint32_t), 0);
             const auto surfaceDataBufferIndex = depth == 0 ? currentIndex : 2;   //1 and 2 are used for the first intersection and remembered for temporal use.
             ExtractSurfaceData(
                 numIntersections,
@@ -562,20 +476,13 @@ namespace WaveFront
                 m_SurfaceData[temporalIndex].GetDevicePtr<SurfaceData>(),
                 m_ShadowRays.GetDevicePtr<AtomicBuffer<ShadowRayData>>(),
                 m_TriangleLights.GetDevicePtr<TriangleLight>(),
-                3,
-                camPosition,
-                camForward,
-                accelerationStructure,  //ReSTIR needs to check visibility early on so it does an optix launch for this scene.
-                m_OptixSystem.get(),
-                WangHash(frameCount), //Use the frame count as the random seed.
-                m_ReSTIR.get(), //ReSTIR, can not be nullptr.
-                depth,  //The current depth.
-                m_MotionVectors.GetMotionVectorBuffer()->GetDevicePtr<MotionVectorBuffer>(),
+                3,  //TODO hard coded for now but will be updated dynamically.
+                nullptr,    //TODO get CDF from ReSTIR.
                 m_PixelBufferSeparate.GetDevicePtr<float3>()
             );
 
             //Reset the atomic counter.
-            ResetAtomicBuffer<IntersectionRayData>(&m_Rays);
+            m_Rays.Write(counterDefault);
             cudaDeviceSynchronize();
 
             Shade(shadingLaunchParams);
@@ -591,9 +498,6 @@ namespace WaveFront
             CHECKLASTCUDAERROR;
 
             m_IntersectionData.Write(counterDefault);
-
-            //Swap the ReSTIR buffers around.
-            m_ReSTIR->SwapBuffers();
         }
     	
         //The amount of shadow rays to trace.
@@ -631,13 +535,6 @@ namespace WaveFront
         a_Scene->m_Camera->UpdatePreviousFrameMatrix();
         ++frameCount;
 
-        m_DebugTexture = m_OutputBuffer.GetTexture();
-//#if defined(_DEBUG)
-        m_MotionVectors.GenerateDebugTextures();
-        //m_DebugTexture = m_MotionVectors.GetMotionVectorMagnitudeTex();
-        m_DebugTexture = m_MotionVectors.GetMotionVectorDirectionsTex();
-//#endif
-    	
         //Return the GLuint texture ID.
         return m_OutputBuffer.GetTexture();
     }

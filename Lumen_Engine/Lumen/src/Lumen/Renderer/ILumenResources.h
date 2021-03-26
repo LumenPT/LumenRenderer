@@ -31,7 +31,6 @@ namespace Lumen
     public:
         virtual ~ILumenPrimitive() {};
         std::shared_ptr<ILumenMaterial> m_Material;
-        bool m_ContainEmissive;
     };
 
     class ILumenMesh
@@ -42,7 +41,6 @@ namespace Lumen
 
         std::vector<std::unique_ptr<ILumenPrimitive>> m_Primitives;
     };
-
 
     class ILumenVolume
     {

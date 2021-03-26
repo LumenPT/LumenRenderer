@@ -34,7 +34,6 @@ private:
     float4 m_DiffuseColor;
     float3 m_EmissiveColor;
     std::shared_ptr<class Texture> m_DiffuseTexture;
-    std::shared_ptr<class Texture> m_EmissiveTexture;
 
     mutable bool m_DeviceMaterialDirty;
     mutable std::unique_ptr<class MemoryBuffer> m_DeviceMemoryBuffer;

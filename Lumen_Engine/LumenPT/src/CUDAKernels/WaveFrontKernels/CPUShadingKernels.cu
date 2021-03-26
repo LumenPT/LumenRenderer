@@ -1,8 +1,6 @@
 #include "CPUShadingKernels.cuh"
 #include "GPUShadingKernels.cuh"
 #include "../../Framework/CudaUtilities.h"
-#include "../../Shaders/CppCommon/ReSTIRData.h"
-#include "../../LumenPT/src/Framework/ReSTIR.h"
 
 using namespace WaveFront;
 
@@ -59,8 +57,8 @@ CPU_ONLY void GenerateMotionVectors(MotionVectorsGenerationData& a_MotionVectors
 
 CPU_ONLY void ExtractSurfaceData(
     unsigned a_NumIntersections, 
-    AtomicBuffer<IntersectionData>* a_IntersectionData, 
-    AtomicBuffer<IntersectionRayData>* a_Rays, 
+    AtomicBuffer < IntersectionData>* a_IntersectionData, 
+    AtomicBuffer < IntersectionRayData>* a_Rays, 
     SurfaceData* a_OutPut, 
     SceneDataTableAccessor* a_SceneDataTable)
 {
@@ -99,44 +97,15 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
     /*cudaDeviceSynchronize();
       CHECKLASTCUDAERROR;*/
 
-    //Ensure that ReSTIR is loaded so that the CDF can be extracted.
-    assert(a_ShadingParams.m_ReSTIR != nullptr);
-
-    //TODO remove
-    static bool useRestir = true;
-
-    /*
-     * Run ReSTIR at the first depth.
-     */
-    if(a_ShadingParams.m_CurrentDepth == 0 && useRestir)
-    {
-        a_ShadingParams.m_ReSTIR->Run(
-            a_ShadingParams.m_CurrentSurfaceData,
-            a_ShadingParams.m_TemporalSurfaceData,
-            a_ShadingParams.m_TriangleLights,
-            a_ShadingParams.m_NumLights,
-            a_ShadingParams.m_CameraDirection,
-            a_ShadingParams.m_Seed,
-            a_ShadingParams.m_OptixSceneHandle,
-            a_ShadingParams.m_ShadowRays,
-            a_ShadingParams.m_OptixSystem,
-            a_ShadingParams.m_MotionVectorBuffer
-        );
-    }
-    else
-    {
-        CDF* cdfPtr = a_ShadingParams.m_ReSTIR->GetCdfGpuPointer();
-
-        //Generate shadow rays for direct lights.
-        ShadeDirect << <numBlocks, blockSize >> > (
-            a_ShadingParams.m_ResolutionAndDepth,
-            a_ShadingParams.m_TemporalSurfaceData,
-            a_ShadingParams.m_CurrentSurfaceData,
-            a_ShadingParams.m_ShadowRays,
-            a_ShadingParams.m_TriangleLights,
-            a_ShadingParams.m_NumLights,
-            cdfPtr);
-    }
+    //Generate shadow rays for direct lights.
+    ShadeDirect<<<numBlocks, blockSize>>>(
+        a_ShadingParams.m_ResolutionAndDepth, 
+        a_ShadingParams.m_TemporalSurfaceData, 
+        a_ShadingParams.m_CurrentSurfaceData, 
+        a_ShadingParams.m_ShadowRays, 
+        a_ShadingParams.m_TriangleLights, 
+        a_ShadingParams.m_NumLights, 
+        a_ShadingParams.m_CDF);
 
     /*DEBUGShadePrimIntersections<<<numBlocks, blockSize>>>(
         a_ShadingParams.m_ResolutionAndDepth,

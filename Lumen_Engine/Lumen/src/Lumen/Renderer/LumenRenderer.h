@@ -10,7 +10,7 @@
 
 #include <memory>
 #include <string>
-#include "Glad/glad.h"
+
 
 class FrameSnapshot;
 class Camera;
@@ -32,6 +32,7 @@ public:
 		VectorView<glm::vec2, uint8_t> m_TexCoords;
 		VectorView<glm::vec3, uint8_t> m_Normals;
 
+		VectorView<glm::vec3, uint8_t> m_VertexBuffer; //interleaved data. May not be needed here.
 		// Perhaps temporary solution till we decide how we'll handle the indices
 		std::vector<uint8_t> m_IndexBinary;
 		size_t m_IndexSize;
@@ -90,9 +91,6 @@ public:
 	virtual std::unique_ptr<FrameSnapshot> EndSnapshot() = 0;
 	std::shared_ptr<Lumen::ILumenScene> m_Scene;
 
-	//Debug GLuint texture accessible by application
-	GLuint m_DebugTexture;
-	
 private:
 		
 };
