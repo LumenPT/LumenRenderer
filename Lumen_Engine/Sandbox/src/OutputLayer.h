@@ -85,6 +85,7 @@ private:
     
 
     uint32_t m_LastFrameTex;
+    uint32_t m_SmallViewportFrameTex;
 
     inline static const char* m_VSSource = "#version 330 core \n                                                                  "
     "                                                                                                                             "
