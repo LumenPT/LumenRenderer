@@ -155,6 +155,8 @@ namespace Lumen
 
 		//std::vector<std::shared_ptr<GLTFResource>> LoadScenes(fx::gltf::Document& a_Doc, std::string a_Filepath);
 
+		void InitializeDefaultResources();
+
 		void LoadNodes(fx::gltf::Document& a_Doc, GLTFResource& a_Res, int a_NodeId, bool a_Root, const glm::mat4& a_TransformMat = glm::mat4(1));
 		void LoadMeshes(fx::gltf::Document& a_Doc, GLTFResource& a_Res);
 		void LoadScenes(fx::gltf::Document& a_Doc, GLTFResource& a_Res);
@@ -171,8 +173,11 @@ namespace Lumen
 
 		LumenRenderer* m_RenderPipeline;
 
+
 		std::vector<std::shared_ptr<Lumen::ILumenMesh>>		m_InUseMeshes;
 		std::vector<std::shared_ptr<ILumenMaterial>>		m_InUseMaterials;
+
+		std::shared_ptr<ILumenTexture> m_DefaultDiffuseTexture;
 	};
 
 

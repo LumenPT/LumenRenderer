@@ -88,6 +88,8 @@ void Lumen::SceneManager::SetPipeline(LumenRenderer& a_Renderer)
 {
 	m_RenderPipeline = &a_Renderer;
 	m_VolumeManager.SetPipeline(a_Renderer);
+
+	InitializeDefaultResources();
 }
 
 void Lumen::SceneManager::ClearUnusedAssets()
@@ -145,6 +147,12 @@ void Lumen::SceneManager::ClearUnusedAssets()
 			material.reset();
 		}
 	}
+}
+
+void Lumen::SceneManager::InitializeDefaultResources()
+{
+	uchar4 whitePixel = { 255,255,255,255 };
+	m_DefaultDiffuseTexture = m_RenderPipeline->CreateTexture(&whitePixel, 1, 1);
 }
 
 void Lumen::SceneManager::LoadNodes(fx::gltf::Document& a_Doc, GLTFResource& a_Res, int a_NodeId, bool a_Root, const glm::mat4& a_TransformMat)
@@ -367,7 +375,7 @@ void Lumen::SceneManager::LoadNodeAndChildren(fx::gltf::Document a_Doc, Lumen::S
 	auto node = a_Doc.nodes[a_NodeID];
 	auto nodeTransform = LoadNodeTransform(node);
 
-	nodeTransform = nodeTransform * a_ParentTransform;
+	nodeTransform = a_ParentTransform * nodeTransform;
 
     if (node.mesh != -1)
     {
@@ -394,7 +402,7 @@ Lumen::Transform Lumen::SceneManager::LoadNodeTransform(fx::gltf::Node a_Node)
 		auto t = a_Node.translation;
 		auto r = a_Node.rotation;
 		auto s = a_Node.scale;
-		transform.SetPosition(glm::vec3(-t[0], t[1], t[2]));
+		transform.SetPosition(glm::vec3(t[0], t[1], t[2]));
 		transform.SetRotation(glm::quat(r[3], r[0], r[1], r[2]));
 		transform.SetScale(glm::vec3(s[0], s[1], s[2]));
 	}
@@ -507,6 +515,10 @@ void Lumen::SceneManager::LoadMaterials(fx::gltf::Document& a_Doc, GLTFResource&
 
 			//Free the memory after it's uploaded.
 			stbi_image_free(info.data);
+		}
+		else
+		{
+			mat->SetDiffuseTexture(m_DefaultDiffuseTexture);
 		}
 
 		if (fxMat.emissiveFactor != std::array<float, 3>{0.0f, 0.0f, 0.0f})

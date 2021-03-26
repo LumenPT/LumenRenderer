@@ -82,11 +82,11 @@ public:
 		std::replace(p_string.begin(), p_string.end(), '\\', '/');
 		//p_string.append("/Sandbox/assets/models/Lantern.gltf");
 
-		const std::string meshPath = p_string.append("/Sandbox/assets/models/Sponza/");
+		const std::string meshPath = p_string.append("/Sandbox/assets/models/CornellBox/");
 		//Base path for meshes.
 
 		//Mesh name
-		const std::string meshName = "Sponza.gltf";
+		const std::string meshName = "cornellBox.gltf";
 
 		//p_string.append("/Sandbox/assets/models/Sponza/Sponza.gltf");
 		LMN_TRACE(p_string);
@@ -134,6 +134,9 @@ public:
 
 		auto volume = lumenPT->m_Scene->AddVolume();
 		volume->SetVolume(volumeRes->m_Volume);
+
+		lumenPT->m_Scene = res->m_Scenes[0];
+		lumenPT->m_Scene->m_Camera->SetPosition(glm::vec3(0.0f, 2.0f, 2.5f));
 	}
 
 	~Sandbox()
