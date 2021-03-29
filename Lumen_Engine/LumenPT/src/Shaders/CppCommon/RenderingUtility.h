@@ -2,6 +2,8 @@
 
 #include <cuda_runtime.h>
 #include <cuda/helpers.h>
+#include "../../src/CUDAKernels/RandomUtilities.cuh"
+
 __device__ __forceinline__ void orthgraphicProjection(float3& origin, float3& direction, int2 launchIndices, int2 screenResolution, const float3 eye, const float3 U, const float3 V, const float3 W)
 {
     origin = make_float3(static_cast<float>(launchIndices.x) / screenResolution.x, static_cast<float>(launchIndices.y) / screenResolution.y, 0.0f);
@@ -92,3 +94,13 @@ __device__ __forceinline__ float3 MicrofacetBRDF(const float3 WIN, const float3 
 
     return kd * diffuse + specular;
 }
+
+/*
+ * BRDF PDF Distribution functions to sample on the hemispere randomly.
+ */
+
+
+
+
+
+

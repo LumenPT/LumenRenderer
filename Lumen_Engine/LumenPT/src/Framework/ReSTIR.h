@@ -52,6 +52,20 @@ public:
 	 */
 	CDF* GetCdfGpuPointer() const;
 
+	/*
+	 * Get the expected vram usage of ReSTIR with the given settings and light count.
+	 * This is allocated when ReSTIR is initialized.
+	 * The Light CDF resizes based on the light count, but should have minimal impact.
+	 *
+	 * The returned value is in bytes.
+	 */
+	size_t GetExpectedGpuRamUsage(const ReSTIRSettings& a_Settings, size_t a_NumLights) const;
+
+	/*
+	 * Get the size in bytes of all allocated GPU memory owned by ReSTIR.
+	 */
+	size_t GetAllocatedGpuMemory() const;
+
 
 private:
 	ReSTIRSettings m_Settings;

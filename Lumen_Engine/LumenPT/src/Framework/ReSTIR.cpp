@@ -29,8 +29,7 @@ CPU_ONLY void ReSTIR::Initialize(const ReSTIRSettings& a_Settings)
 	//Shadow rays.
 	{
 		//At most one shadow ray per reservoir. Always resize even when big enough already, because this is initialization so it should not happen often.
-		const size_t shadowRaySize = sizeof(RestirShadowRay);
-		const size_t size = static_cast<size_t>(m_Settings.width) * static_cast<size_t>(m_Settings.height) * m_Settings.numReservoirsPerPixel * shadowRaySize;
+		const size_t size = static_cast<size_t>(m_Settings.width) * static_cast<size_t>(m_Settings.height) * m_Settings.numReservoirsPerPixel;
 		WaveFront::CreateAtomicBuffer<RestirShadowRay>(&m_ShadowRays, size);
 	}
 
@@ -200,5 +199,27 @@ void ReSTIR::SwapBuffers()
 CDF* ReSTIR::GetCdfGpuPointer() const
 {
 	return static_cast<CDF*>(m_Cdf.GetDevicePtr());
+}
+
+size_t ReSTIR::GetExpectedGpuRamUsage(const ReSTIRSettings& a_Settings, size_t a_NumLights) const
+{
+	const size_t reservoirSize = static_cast<size_t>(a_Settings.width) * static_cast<size_t>(a_Settings.height) * a_Settings.numReservoirsPerPixel * sizeof(Reservoir) * 3;
+	const size_t cdfSize = a_NumLights * sizeof(float);
+	const size_t lightBagSize = sizeof(LightBagEntry) * a_Settings.numLightsPerBag * a_Settings.numLightBags;
+	const size_t shadowRaySize = sizeof(WaveFront::AtomicBuffer<RestirShadowRay>) + (static_cast<size_t>(a_Settings.width) * static_cast<size_t>(a_Settings.height) * a_Settings.numReservoirsPerPixel * sizeof(RestirShadowRay));
+
+	return reservoirSize + cdfSize + lightBagSize + shadowRaySize;
+}
+
+size_t ReSTIR::GetAllocatedGpuMemory() const
+{
+	return
+		m_Reservoirs[0].GetSize()
+		+ m_Reservoirs[1].GetSize()
+		+ m_Reservoirs[2].GetSize()
+		+ m_Cdf.GetSize()
+		+ m_ShadowRays.GetSize()
+		+ m_LightBags.GetSize()
+    ;
 }
 #endif

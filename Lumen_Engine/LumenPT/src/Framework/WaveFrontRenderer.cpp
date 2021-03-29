@@ -132,7 +132,6 @@ namespace WaveFront
             float3 vec1 = (lights[i].p0 - lights[i].p1);
             float3 vec2 = (lights[i].p0 - lights[i].p2);
             lights[i].area = sqrt(pow((vec1.y * vec2.z - vec2.y * vec1.z), 2) + pow((vec1.x * vec2.z - vec2.x * vec1.z), 2) + pow((vec1.x * vec2.y - vec2.x * vec1.y), 2)) / 2.f;
-            printf("lol");
         }
 
         //Calculate the normal for each light.
@@ -162,8 +161,18 @@ namespace WaveFront
         // A null frame snapshot will not record anything when requested to.
         m_FrameSnapshot = std::make_unique<NullFrameSnapshot>(); 
 
+
         m_ReSTIR = std::make_unique<ReSTIR>();
+
+        //Print the expected VRam usage.
+        size_t requiredSize = m_ReSTIR->GetExpectedGpuRamUsage(rSettings, 3);
+        printf("Initializing ReSTIR. Expected VRam usage in bytes: %llu\n", requiredSize);
+
+        //Finally actually allocate memory for ReSTIR.
         m_ReSTIR->Initialize(rSettings);
+
+        size_t usedSize = m_ReSTIR->GetAllocatedGpuMemory();
+        printf("Actual bytes allocated by ReSTIR: %llu\n", usedSize);
     }
 
     void WaveFrontRenderer::BeginSnapshot()
