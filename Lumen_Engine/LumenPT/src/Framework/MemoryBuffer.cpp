@@ -68,7 +68,11 @@ void MemoryBuffer::Resize(size_t a_NewSize)
     if (m_DevPtr)
         cudaFree(m_DevPtr);
 
-    cudaMalloc(&m_DevPtr, a_NewSize);
+    auto result = cudaMalloc(&m_DevPtr, a_NewSize);
+
+    CudaCheck(result);
+
+    assert(result == cudaSuccess);
 
     m_Size = a_NewSize;
 };
