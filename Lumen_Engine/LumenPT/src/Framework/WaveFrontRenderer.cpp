@@ -17,7 +17,6 @@
 #include "CudaUtilities.h"
 #include "../Tools/FrameSnapshot.h"
 #include "../Tools/SnapShotProcessing.cuh"
-#include "MotionVectors.h"
 
 #include <Optix/optix_function_table_definition.h>
 #include <filesystem>
@@ -386,26 +385,6 @@ namespace WaveFront
             return resBuffers;
         });
 
-        m_FrameSnapshot->AddBuffer([&]()
-        {
-            auto motionVectorBuffer = m_MotionVectors.GetMotionVectorBuffer();
-        	
-            std::map<std::string, FrameSnapshot::ImageBuffer> resBuffers;
-            resBuffers["Motion vector direction"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
-                m_Settings.renderResolution.y, 3 * sizeof(float));
-
-            resBuffers["Motion vector magnitude"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
-                m_Settings.renderResolution.y, 3 * sizeof(float));
-
-           SeparateMotionVectorBufferCPU(m_Settings.renderResolution.x * m_Settings.renderResolution.y,
-               motionVectorBuffer->GetDevicePtr<MotionVectorBuffer>(),
-                resBuffers.at("Motion vector direction").m_Memory->GetDevicePtr<float3>(),
-                resBuffers.at("Motion vector magnitude").m_Memory->GetDevicePtr<float3>()
-           );
-
-            return resBuffers;
-        });
-    	
         //Clear the surface data that contains information from the second last frame so that it can be reused by this frame.
         cudaMemset(m_SurfaceData[currentIndex].GetDevicePtr(), 0, sizeof(SurfaceData) * numPixels);
         cudaDeviceSynchronize();
@@ -556,13 +535,6 @@ namespace WaveFront
         a_Scene->m_Camera->UpdatePreviousFrameMatrix();
         ++frameCount;
 
-        m_DebugTexture = m_OutputBuffer.GetTexture();
-//#if defined(_DEBUG)
-        m_MotionVectors.GenerateDebugTextures();
-        //m_DebugTexture = m_MotionVectors.GetMotionVectorMagnitudeTex();
-        m_DebugTexture = m_MotionVectors.GetMotionVectorDirectionsTex();
-//#endif
-    	
         //Return the GLuint texture ID.
         return m_OutputBuffer.GetTexture();
     }

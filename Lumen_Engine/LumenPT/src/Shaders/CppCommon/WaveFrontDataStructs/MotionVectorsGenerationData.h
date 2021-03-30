@@ -8,8 +8,7 @@
 
 namespace WaveFront
 {
-	struct SurfaceData;
-	
+
 	struct MotionVectorData
 	{
 		CPU_GPU MotionVectorData()

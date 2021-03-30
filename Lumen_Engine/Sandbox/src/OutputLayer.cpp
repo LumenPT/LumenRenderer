@@ -134,8 +134,7 @@ void OutputLayer::OnUpdate(){
 	auto texture = m_Renderer->TraceFrame(m_Renderer->m_Scene); // TRACE SUM
 	HandleSceneInput();
 	m_LastFrameTex = texture;
-	m_SmallViewportFrameTex = texture;
-	
+
 	if (recordingSnapshot)
 	{
 		m_FrameSnapshots.push_back(m_Renderer->EndSnapshot());			
@@ -217,7 +216,11 @@ void OutputLayer::OnImGuiRender()
 	{
 		ImGui::Begin("Extra Viewport for bonus swegpoints");
 
-		ImGuiUtil::DisplayImage(m_Renderer->m_DebugTexture, glm::ivec2(400, 300));
+		ImGuiUtil::DisplayImage(m_LastFrameTex, glm::ivec2(400, 300));
+
+		auto camPos = m_Renderer->m_Scene->m_Camera->GetPosition();
+
+		ImGui::Text("Camera Position: %f %f %f", camPos.x, camPos.y, camPos.z);
 
 		ImGui::End();
     }
