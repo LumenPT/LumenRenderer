@@ -122,7 +122,7 @@ set(LIBS
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Libs/Cuda/cudadevrt.lib"
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Libs/glad.lib"
 	libnanovdb
-	openvdb_static
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Libs/openvdb.lib"
 
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Libs/tbb/tbb.lib"
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Libs/tbb/tbbmalloc.lib"
@@ -139,8 +139,6 @@ set(LIBS
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Libs/OpenEXR/IlmImfUtil-2_5.lib"
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Libs/OpenEXR/IlmThread-2_5.lib"
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Libs/OpenEXR/Imath-2_5.lib"
-
-
 )
 
 #include(${CMAKE_CURRENT_SOURCE_DIR}/vendor/openvdb/openvdb/openvdb/CMakeLists.txt)
@@ -157,7 +155,7 @@ set(INCLUDES
 	"${CMAKE_CURRENT_SOURCE_DIR}/../Lumen/vendor/glm"
 	"${CMAKE_CURRENT_BINARY_DIR}/config"
 	${NANOVDB_HEADERS}
-	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/openvdb/openvdb"
+	#"${CMAKE_CURRENT_SOURCE_DIR}/vendor/openvdb/openvdb"
 )
 
 # Define the include DIRs
