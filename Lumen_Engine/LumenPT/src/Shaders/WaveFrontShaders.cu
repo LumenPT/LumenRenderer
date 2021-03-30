@@ -109,7 +109,6 @@ __device__ __forceinline__ void ShadowRaysRayGen()
         isIntersection);
 
     //3. If no hit, accumulate result in buffer
-
     if(isIntersection == 0)
     {
 

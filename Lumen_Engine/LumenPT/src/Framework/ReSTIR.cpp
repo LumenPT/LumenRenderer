@@ -81,7 +81,7 @@ CPU_ONLY void ReSTIR::Run(
 	const auto temporalIndex = currentIndex == 1 ? 0 : 1;
 
 	//The seed will be modified over time.
-	auto seed = a_Seed;
+	auto seed = WangHash(a_Seed);
 
 	const unsigned numPixels = m_Settings.width * m_Settings.height;
 	const uint2 dimensions = uint2{ m_Settings.width, m_Settings.height };
@@ -95,22 +95,13 @@ CPU_ONLY void ReSTIR::Run(
      * Resize buffers based on the amount of lights and update data.
      * This uploads all triangle lights. May want to move this to the wavefront pipeline class and instead take the pointer from it.
      */
-     //CDF
-	{
-		const auto cdfNeededSize = sizeof(CDF) + (a_NumLights * sizeof(float));
-		//Allocate enough memory for the CDF struct and the fixed sum entries.
-		if(m_Cdf.GetSize() < cdfNeededSize)
-		{
-			m_Cdf.Resize(cdfNeededSize);
-		}
 
-		//Insert the light data in the CDF.
-		FillCDF(static_cast<CDF*>(m_Cdf.GetDevicePtr()), a_Lights, a_NumLights);
-	}
+	//Update the CDF for the provided light sources.
+	BuildCDF(a_Lights, a_NumLights);
+
 	//Fill light bags with values from the CDF.
 	{
-		seed = WangHash(seed);
-		FillLightBags(m_Settings.numLightBags, m_Settings.numLightsPerBag, static_cast<CDF*>(m_Cdf.GetDevicePtr()), static_cast<LightBagEntry*>(m_LightBags.GetDevicePtr()), a_Lights, seed);
+		FillLightBags(m_Settings.numLightBags, m_Settings.numLightsPerBag, static_cast<CDF*>(m_Cdf.GetDevicePtr()), static_cast<LightBagEntry*>(m_LightBags.GetDevicePtr()), a_Lights, a_Seed);
 	}
 
 	/*
@@ -182,6 +173,26 @@ CPU_ONLY void ReSTIR::Run(
 
 	//Ensure that swap buffers is called.
 	m_SwapDirtyFlag = false;
+}
+
+void ReSTIR::BuildCDF(const WaveFront::TriangleLight* a_Lights, const unsigned a_NumLights)
+{
+	/*
+     * Resize buffers based on the amount of lights and update data.
+     * This uploads all triangle lights. May want to move this to the wavefront pipeline class and instead take the pointer from it.
+     */
+     //CDF
+	{
+		const auto cdfNeededSize = sizeof(CDF) + (a_NumLights * sizeof(float));
+		//Allocate enough memory for the CDF struct and the fixed sum entries.
+		if (m_Cdf.GetSize() < cdfNeededSize)
+		{
+			m_Cdf.Resize(cdfNeededSize);
+		}
+
+		//Insert the light data in the CDF.
+		FillCDF(static_cast<CDF*>(m_Cdf.GetDevicePtr()), a_Lights, a_NumLights);
+	}
 }
 
 void ReSTIR::SwapBuffers()

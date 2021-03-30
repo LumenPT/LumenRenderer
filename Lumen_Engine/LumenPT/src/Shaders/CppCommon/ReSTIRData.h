@@ -55,7 +55,7 @@ struct ReSTIRSettings
     static constexpr std::uint32_t numSpatialIterations = 2;
 
     //Use the biased algorithm or not. When false, the unbiased algorithm is used instead.
-    static constexpr bool enableBiased = true;
+    static constexpr bool enableBiased = false;
 
     //Enable spatial sampling.
     static constexpr bool enableSpatial = true;

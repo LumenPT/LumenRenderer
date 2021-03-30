@@ -43,6 +43,11 @@ public:
 	);
 
 	/*
+	 * Update the CDF for the given light sources.
+	 */
+	CPU_ONLY void BuildCDF(const WaveFront::TriangleLight* a_Lights, const unsigned a_NumLights);
+
+	/*
 	 * Swap the front and back buffer. This has to be called once per frame.
 	 */
 	void SwapBuffers();

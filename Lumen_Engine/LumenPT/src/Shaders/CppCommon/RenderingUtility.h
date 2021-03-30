@@ -8,6 +8,11 @@
 #include <sutil/vec_math.h>
 #include <math.h>
 #include <limits>
+#include <cassert>
+
+#ifndef __CUDA_ARCH__
+#include "glm/gtx/quaternion.hpp"
+#endif
 
 static constexpr float EPSILON = std::numeric_limits<float>::epsilon();
 
@@ -125,11 +130,17 @@ __device__ __forceinline__ float D(const float3& a_DirectionSquared, float a_Rou
 
 __device__ __forceinline__ sutil::Matrix3x3 RotateAlign(float3 a_V1, float3 a_V2)
 {
+    assert(fabsf(length(a_V1) - 1.f) < EPSILON * 4.f);
+    assert(fabsf(length(a_V2) - 1.f) < EPSILON * 4.f);
+
     /*
      * No GLM, so manually gotta do this :( Copied over from GLM.
      * Construct the quaternion rotation between the two inputs.
+     *
+     * NOTE:
+     * Optix Quaternions don't work at all. I Don't use them ever and definitely don't use any of their functionality.
      */
-    sutil::Quaternion rotation = sutil::Quaternion();
+    float4 rotation{ 0.f, 0.f, 0.f, 0.f };    //Quaternion.
     float cosTheta = dot(a_V1, a_V2);
     float3 rotationAxis;
 
@@ -150,36 +161,54 @@ __device__ __forceinline__ sutil::Matrix3x3 RotateAlign(float3 a_V1, float3 a_V2
                 rotationAxis = cross(float3{ 1.f, 0.f, 0.f }, a_V1);
 
             rotationAxis = normalize(rotationAxis);
-            rotation = sutil::Quaternion(M_PIf, rotationAxis);
+
+            const float halfPi = M_PIf * 0.5;
+            rotationAxis *= sinf(halfPi);
+            rotation.x = (cosf(halfPi));
+            rotation.y = (rotationAxis.x);
+            rotation.z = (rotationAxis.y);
+            rotation.w = (rotationAxis.z);
         }
         //Normal case.
         else
         {
-            rotation = sutil::Quaternion(a_V1, a_V2);
+            rotationAxis = cross(a_V1, a_V2);
+
+            float s = sqrtf((1.f + cosTheta) * 2.f);
+            float invs = 1.f / s;
+            rotation.x = (0.5f * s);
+            rotation.y = (rotationAxis.x * invs);
+            rotation.z = (rotationAxis.y * invs);
+            rotation.w = (rotationAxis.z * invs);
         }
     }
 
+    sutil::Matrix3x3 rotationMatrix;
+
+    float rotationxx(rotation.y * rotation.y);
+    float rotationyy(rotation.z * rotation.z);
+    float rotationzz(rotation.w * rotation.w);
+    float rotationxz(rotation.y * rotation.w);
+    float rotationxy(rotation.y * rotation.z);
+    float rotationyz(rotation.z * rotation.w);
+    float rotationwx(rotation.x * rotation.y);
+    float rotationwy(rotation.x * rotation.z);
+    float rotationwz(rotation.x * rotation.w);
+
+    rotationMatrix[0 * 3 + 0] = 1.f - 2.f * (rotationyy + rotationzz);
+    rotationMatrix[1 * 3 + 0] = 2.f * (rotationxy + rotationwz);
+    rotationMatrix[2 * 3 + 0] = 2.f * (rotationxz - rotationwy);
+
+    rotationMatrix[0 * 3 + 1] = 2.f * (rotationxy - rotationwz);
+    rotationMatrix[1 * 3 + 1] = 1.f - 2.f * (rotationxx + rotationzz);
+    rotationMatrix[2 * 3 + 1] = 2.f * (rotationyz + rotationwx);
+
+    rotationMatrix[0 * 3 + 2] = 2.f * (rotationxz + rotationwy);
+    rotationMatrix[1 * 3 + 2] = 2.f * (rotationyz - rotationwx);
+    rotationMatrix[2 * 3 + 2] = 1.f - 2.f * (rotationxx + rotationyy);
+
     //The returned matrix.
-    sutil::Matrix3x3 m;
-
-    const float qw = rotation[0];
-    const float qx = rotation[1];
-    const float qy = rotation[2];
-    const float qz = rotation[3];
-
-    m[0 * 4 + 0] = 1.0f - 2.0f * qy * qy - 2.0f * qz * qz;
-    m[0 * 4 + 1] = 2.0f * qx * qy - 2.0f * qz * qw;
-    m[0 * 4 + 2] = 2.0f * qx * qz + 2.0f * qy * qw;
-
-    m[1 * 4 + 0] = 2.0f * qx * qy + 2.0f * qz * qw;
-    m[1 * 4 + 1] = 1.0f - 2.0f * qx * qx - 2.0f * qz * qz;
-    m[1 * 4 + 2] = 2.0f * qy * qz - 2.0f * qx * qw;
-
-    m[2 * 4 + 0] = 2.0f * qx * qz - 2.0f * qy * qw;
-    m[2 * 4 + 1] = 2.0f * qy * qz + 2.0f * qx * qw;
-    m[2 * 4 + 2] = 1.0f - 2.0f * qx * qx - 2.0f * qy * qy;
-
-    return m;
+    return rotationMatrix;
 }
 
 
@@ -192,8 +221,8 @@ __device__ __forceinline__ float PDFWorldSpace(const float3& a_ViewDir, const fl
 
     const auto transform = RotateAlign(a_SurfaceNormal, float3{ 0.f, 0.f, 1.f });
 
-    const float3 localView = transform * -a_ViewDir;
-    const float3 localOut = transform * a_OutDir;
+    const float3 localView = normalize(transform * -a_ViewDir);
+    const float3 localOut = normalize(transform * a_OutDir);
 
 
     //Calculate the microfacet normal from the in and out direction.
@@ -210,25 +239,34 @@ __device__ __forceinline__ float PDFWorldSpace(const float3& a_ViewDir, const fl
     //The probability density of generating this particular normal on the surface with the incoming view direction.
     auto mfNormalPdf = (g * fmaxf(0.f, dot(localView, microFacetNormal)) * d) / localView.z; //In the paper, part of it says that this is the dot product of V.Z (Z = up). This is probably a mistake because elsewhere they write out dot() entirely, and in code samples they dividy by v.z.
 
-    assert(fabsf(dot(microFacetNormal, microFacetNormal) - 1.f) < 0.00001);
-    assert(fabsf(dot(localView, localView) - 1.f) < 0.00001);
-    assert(fabsf(dot(a_OutDir, a_OutDir) - 1.f) < 0.00001);
+    assert(fabsf(length(microFacetNormal) - 1.f) < 0.0001);
+    assert(fabsf(length(localView) - 1.f) < 0.0001);
+    assert(fabsf(length(a_OutDir) - 1.f) < 0.0001);
 
     return mfNormalPdf / (4.f * dot(localView, microFacetNormal));
 }
 
-__device__ __forceinline__ void SampleGGXVNDF(float3 a_ViewDir, float a_Roughness, float U1, float U2, float3& a_OutputDirection, float& a_OutputPdf)
+__device__ __forceinline__ void SampleGGXVNDF(const float3& a_ViewDir, float a_Roughness, float U1, float U2, float3& a_OutputDirection, float& a_OutputPdf)
 {
     //Ensure that the view direction goes towards the surface. This is all in local space, with Up = (0, 0, 1).
     //The view direction is inverted already so a view that's not larger than 0 will never actually hit the surface.
+    //This will result in a negative PDF.
     assert(a_ViewDir.z > 0.f);
+    assert(fabsf(length(a_ViewDir) - 1.f) < 0.01f);
 
     // Section 3.2: transforming the view direction to the hemisphere configuration
     float3 Vh = normalize(float3{ a_Roughness * a_ViewDir.x, a_Roughness * a_ViewDir.y, a_ViewDir.z });
 
     // Section 4.1: orthonormal basis (with special case if cross product is zero)
     float lensq = Vh.x * Vh.x + Vh.y * Vh.y;
+
+#if  defined(__CUDA_ARCH__)
     float3 T1 = lensq > 0.f ? float3{-Vh.y, Vh.x, 0.f} * rsqrtf(lensq) : float3{ 1.f, 0.f, 0.f };
+#else
+    float3 T1 = lensq > 0.f ? float3{ -Vh.y, Vh.x, 0.f } * glm::inversesqrt(lensq) : float3{ 1.f, 0.f, 0.f };
+#endif
+
+
     float3 T2 = cross(Vh, T1);
 
     // Section 4.2: parameterization of the projected area
@@ -268,11 +306,11 @@ __device__ __forceinline__ void SampleGGXVNDF(float3 a_ViewDir, float a_Roughnes
      */
 
      //Reflect the incoming direction over the retrieved normal. This gives the outgoing direction.
-    a_OutputDirection = reflect(-a_ViewDir, microFacetNormal);
+    a_OutputDirection = normalize(reflect(-a_ViewDir, microFacetNormal));
 
-    assert(fabsf(dot(microFacetNormal, microFacetNormal) - 1.f) < 0.00001);
-    assert(fabsf(dot(a_ViewDir, a_ViewDir) - 1.f) < 0.00001);
-    assert(fabsf(dot(a_OutputDirection, a_OutputDirection) - 1.f) < 0.00001);
+    assert(fabsf(length(microFacetNormal) - 1.f) < 0.01f);
+    assert(fabsf(length(a_OutputDirection) - 1.f) < 0.01f);
+    //assert(dot(a_ViewDir, microFacetNormal) > 0);
 
 
     //Use the Jacobian of the reflection to calculate the PDF for this outgoing direction.
@@ -288,7 +326,12 @@ __device__ __forceinline__ void SampleGGXVNDF(float3 a_ViewDir, float a_Roughnes
  */
 __device__ __forceinline__ void SampleHemisphere(const float3& a_ViewDirection, const float3& a_SurfaceNormal, const float a_Roughness, unsigned int a_Seed, float3& a_OutputDirection, float& a_OutputPdf)
 {
-    assert(fabsf(dot(a_ViewDirection, a_ViewDirection) - 1.f) < 0.00001);
+    //Make sure the view direction and normal are normalized.
+    assert(fabsf(length(a_ViewDirection) - 1.f) < 0.001);
+    assert(fabsf(length(a_SurfaceNormal) - 1.f) < 0.001);
+
+    //make sure that the view direction is going towards the normal.
+    assert(dot(a_ViewDirection, a_SurfaceNormal) < 0.f);
 
     a_Seed = WangHash(a_Seed);
 
@@ -300,8 +343,11 @@ __device__ __forceinline__ void SampleHemisphere(const float3& a_ViewDirection, 
     const auto inverseView = -a_ViewDirection;
 
     //Convert the view direction from world to local space. In local space, +z is up.
+    const auto transformBack = RotateAlign(float3{ 0.f, 0.f, 1.f }, a_SurfaceNormal);
     const auto transform = RotateAlign(a_SurfaceNormal, float3{ 0.f, 0.f, 1.f });
-    const float3 localView = transform * inverseView;
+    float3 localView = transform * inverseView;
+    localView.z = fmaxf(0.001f, localView.z);
+    localView = normalize(localView);
 
     //Generate a random direction on the hemisphere. This is in normal space where z is the surface normal.
     float pdf;
@@ -309,10 +355,9 @@ __device__ __forceinline__ void SampleHemisphere(const float3& a_ViewDirection, 
     SampleGGXVNDF(localView, a_Roughness, r1, r2, sample, pdf);
 
     //The sample is in local space (normal = 0,0,1). Convert to world space.
-    const auto transformBack = RotateAlign(float3{ 0.f, 0.f, 1.f }, a_SurfaceNormal);
-    const float3 sampleWorld = transformBack * sample;
+    const float3 sampleWorld = normalize(transformBack * sample);
 
-    assert(fabsf(dot(sample, sample) - 1.f) < 0.00001);
+    assert(fabsf(length(sample) - 1.f) < 0.001f);
 
     a_OutputPdf = pdf;
     a_OutputDirection = sampleWorld;

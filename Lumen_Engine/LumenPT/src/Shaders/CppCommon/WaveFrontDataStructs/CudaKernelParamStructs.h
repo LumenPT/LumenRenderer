@@ -66,6 +66,8 @@ namespace WaveFront
             const uint3& a_ResolutionAndDepth,
             const SurfaceData* a_CurrentSurfaceData,
             const SurfaceData* a_TemporalSurfaceData,
+            const AtomicBuffer<IntersectionData>* a_Intersections,
+            AtomicBuffer<IntersectionRayData>* a_RayBuffer,
             AtomicBuffer<ShadowRayData>* a_ShadowRays,
             TriangleLight* a_TriangleLights,
             std::uint32_t a_NumLights,
@@ -77,11 +79,14 @@ namespace WaveFront
             ReSTIR* a_ReSTIR,
             unsigned a_Currentdepth,
             WaveFront::MotionVectorBuffer* a_MotionVectorBuffer,
+            const unsigned a_NumIntersections,
             float3* a_Output = nullptr
-        ) :
+        )
+        :
         m_ResolutionAndDepth(a_ResolutionAndDepth),
         m_CurrentSurfaceData(a_CurrentSurfaceData),
         m_TemporalSurfaceData(a_TemporalSurfaceData),
+        m_IntersectionData(a_Intersections),
         m_TriangleLights(a_TriangleLights),
         m_NumLights(a_NumLights),
         m_CurrentDepth(a_Currentdepth),
@@ -90,6 +95,8 @@ namespace WaveFront
         m_OptixSceneHandle(a_OptixSceneHandle),
         m_OptixSystem(a_OptixSystem),
         m_Seed(a_Seed),
+        m_NumIntersections(a_NumIntersections),
+        m_RayBuffer(a_RayBuffer),
         m_ReSTIR(a_ReSTIR),
         m_Output(a_Output),
         m_ShadowRays(a_ShadowRays),
@@ -103,6 +110,7 @@ namespace WaveFront
         const uint3 m_ResolutionAndDepth;
         const SurfaceData* const m_CurrentSurfaceData;
         const SurfaceData* const m_TemporalSurfaceData;
+        const AtomicBuffer<IntersectionData>* const m_IntersectionData;
         const TriangleLight* const m_TriangleLights;
         const std::uint32_t m_NumLights;
         const unsigned m_CurrentDepth;
@@ -111,7 +119,8 @@ namespace WaveFront
         const OptixTraversableHandle m_OptixSceneHandle;
         const WaveFront::OptixWrapper* m_OptixSystem;
         const unsigned m_Seed;
-
+        const unsigned m_NumIntersections;
+        AtomicBuffer<IntersectionRayData>* m_RayBuffer;
         ReSTIR* m_ReSTIR;
         float3* m_Output;
         AtomicBuffer<ShadowRayData>* m_ShadowRays;

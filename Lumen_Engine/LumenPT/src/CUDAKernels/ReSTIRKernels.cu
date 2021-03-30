@@ -405,8 +405,6 @@ __host__ void TemporalNeighbourSampling(
     const int blockSize = CUDA_BLOCK_SIZE;
     const int numBlocks = (a_NumPixels + blockSize - 1) / blockSize;
 
-    //TODO pass the motion vector information in here.
-
     CombineTemporalSamplesInternal << <numBlocks, blockSize >> > (a_CurrentReservoirs, a_PreviousReservoirs,
                                                                   a_CurrentPixelData, a_PreviousPixelData, a_Seed, a_NumPixels, a_Dimensions, a_MotionVectorBuffer);
     cudaDeviceSynchronize();
