@@ -90,8 +90,10 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
     ShadeDirect<<<numBlocks, blockSize>>>(
         a_ShadingParams.m_ResolutionAndDepth, 
         a_ShadingParams.m_TemporalSurfaceData, 
-        a_ShadingParams.m_CurrentSurfaceData, 
-        a_ShadingParams.m_ShadowRays, 
+        a_ShadingParams.m_CurrentSurfaceData,
+        a_ShadingParams.m_VolumetricData,
+        a_ShadingParams.m_ShadowRays,
+        a_ShadingParams.m_VolumetricShadowRays,
         a_ShadingParams.m_TriangleLights, 
         a_ShadingParams.m_NumLights, 
         a_ShadingParams.m_CDF);

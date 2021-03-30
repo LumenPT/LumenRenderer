@@ -71,10 +71,12 @@ namespace WaveFront
         const auto numShadowRays = numPixels * m_Settings.depth; //TODO: change to 2x num pixels and add safety check to resolve when full.
         m_Rays.Resize(sizeof(AtomicBuffer<IntersectionRayData>) + sizeof(IntersectionRayData) * numPrimaryRays);
         m_ShadowRays.Resize(sizeof(AtomicBuffer<ShadowRayData>) + sizeof(ShadowRayData) * numShadowRays);
+        m_VolumetricShadowRays.Resize(sizeof(AtomicBuffer<ShadowRayData>) + sizeof(ShadowRayData) * m_Settings.depth);
 
         //Reset Atomic Counters for Intersection and Shadow Rays
         m_Rays.Write(0);
         m_ShadowRays.Write(0);
+        m_VolumetricShadowRays.Write(0);
 
         //Initialize the intersection data. This one is the size of numPixels maximum.
 		//TODO: increase size of volume intersection buffer to allow multiple consecutive volumes
@@ -336,6 +338,7 @@ namespace WaveFront
         //Set the shadow ray count to 0.
         const unsigned counterDefault = 0;
         m_ShadowRays.Write(counterDefault);
+        m_VolumetricShadowRays.Write(counterDefault);
         m_IntersectionData.Write(counterDefault);
 		m_VolumetricIntersectionData.Write(counterDefault);
 
@@ -411,9 +414,11 @@ namespace WaveFront
                 uint3{m_Settings.renderResolution.x, m_Settings.renderResolution.y, m_Settings.depth},
                 m_SurfaceData[currentIndex].GetDevicePtr<SurfaceData>(),
                 m_SurfaceData[temporalIndex].GetDevicePtr<SurfaceData>(),
+                m_VolumetricData[volumetricDataBufferIndex].GetDevicePtr<VolumetricData>(), //TODO
                 m_ShadowRays.GetDevicePtr<AtomicBuffer<ShadowRayData>>(),
+                m_VolumetricShadowRays.GetDevicePtr<AtomicBuffer<ShadowRayData>>(),
                 m_TriangleLights.GetDevicePtr<TriangleLight>(),
-                3,  //TODO hard coded for now but will be updated dynamically.
+                m_TriangleLights.GetSize() / sizeof(TriangleLight),  //TODO hard coded for now but will be updated dynamically.
                 nullptr,    //TODO get CDF from ReSTIR.
                 m_PixelBufferSeparate.GetDevicePtr<float3>()
             );
@@ -435,6 +440,7 @@ namespace WaveFront
             CHECKLASTCUDAERROR;
 
             m_IntersectionData.Write(counterDefault);
+            m_VolumetricIntersectionData.Write(counterDefault);
         }
 
         //The amount of shadow rays to trace.

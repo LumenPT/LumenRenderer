@@ -106,9 +106,10 @@ file(GLOB_RECURSE CUDA_SOURCE_FILES
 )
 
 set(CUDAKernels_INCLUDES
+	"${CMAKE_CURRENT_BINARY_DIR}/config"	
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Include"
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Include/Cuda"
-	"${CMAKE_CURRENT_BINARY_DIR}/config"
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Include/sutil"
 	${NANOVDB_HEADERS}
 )
 

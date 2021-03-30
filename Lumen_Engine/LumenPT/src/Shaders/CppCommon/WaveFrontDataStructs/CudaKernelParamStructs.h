@@ -2,6 +2,7 @@
 #include "../WaveFrontDataStructs.h"
 #include "../CudaDefines.h"
 #include "SurfaceData.h"
+#include "VolumetricData.h"
 
 namespace WaveFront
 {
@@ -61,7 +62,9 @@ namespace WaveFront
             const uint3& a_ResolutionAndDepth,
             const SurfaceData* a_CurrentSurfaceData,
             const SurfaceData* a_TemporalSurfaceData,
+            const VolumetricData* a_VolumetricData,
             AtomicBuffer<ShadowRayData>* a_ShadowRays,
+            AtomicBuffer<ShadowRayData>* a_VolumetricShadowRays,
             TriangleLight* a_TriangleLights,
             std::uint32_t a_NumLights,
             const CDF* const a_CDF = nullptr,
@@ -70,7 +73,9 @@ namespace WaveFront
         m_ResolutionAndDepth(a_ResolutionAndDepth),
         m_CurrentSurfaceData(a_CurrentSurfaceData),
         m_TemporalSurfaceData(a_TemporalSurfaceData),
+        m_VolumetricData(a_VolumetricData),
         m_ShadowRays(a_ShadowRays),
+        m_VolumetricShadowRays(a_VolumetricShadowRays),
         m_TriangleLights(a_TriangleLights),
         m_NumLights(a_NumLights),
         m_CDF(a_CDF),
@@ -84,12 +89,14 @@ namespace WaveFront
         const uint3 m_ResolutionAndDepth;
         const SurfaceData* const m_CurrentSurfaceData;
         const SurfaceData* const m_TemporalSurfaceData;
+        const VolumetricData* const m_VolumetricData;
         const TriangleLight* const m_TriangleLights;
         const std::uint32_t m_NumLights;
         const CDF* const m_CDF;
 
         float3* m_Output;
         AtomicBuffer<ShadowRayData>* m_ShadowRays;
+        AtomicBuffer<ShadowRayData>* m_VolumetricShadowRays;
     };
 
     struct PostProcessLaunchParameters

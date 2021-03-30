@@ -87,6 +87,9 @@ namespace WaveFront
         //Buffer containing shadow rays.
         MemoryBuffer m_ShadowRays;
 
+        //Buffer containing volumetric shadow rays.
+        MemoryBuffer m_VolumetricShadowRays;
+
         //Buffer used for output of separate channels of light.
         MemoryBuffer m_PixelBufferSeparate;
 
