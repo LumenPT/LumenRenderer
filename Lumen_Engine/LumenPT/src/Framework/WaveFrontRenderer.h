@@ -64,7 +64,9 @@ namespace WaveFront
         void Init(const WaveFrontSettings& a_Settings);
 
         void SetRenderResolution(glm::uvec2 a_NewResolution) override;
-        glm::uvec2 GetRenderResolution() override { return glm::uvec2(m_Settings.renderResolution.x, m_Settings.renderResolution.y); };
+        void SetOutputResolution(glm::uvec2 a_NewResolution) override;
+        glm::uvec2 GetRenderResolution() override; 
+        glm::uvec2 GetOutputResolution() override;
         void BeginSnapshot() override;
 
         std::unique_ptr<FrameSnapshot> EndSnapshot() override;

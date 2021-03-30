@@ -67,7 +67,8 @@ namespace WaveFront
         //Set the service locator's pointer to the OptixWrapper.
         m_ServiceLocator.m_OptixWrapper = m_OptixSystem.get();
 
-        SetRenderResolution(glm::uvec2(m_Settings.outputResolution.x, m_Settings.outputResolution.y));
+        SetOutputResolution(glm::uvec2(m_Settings.outputResolution.x, m_Settings.outputResolution.y));
+        SetRenderResolution(glm::uvec2(m_Settings.renderResolution.x, m_Settings.renderResolution.y));
 
         //TODO: number of lights will be dynamic per frame but this is temporary.
         constexpr auto numLights = 3;
@@ -111,9 +112,6 @@ namespace WaveFront
         m_Settings.renderResolution.x = a_NewResolution.x;
         m_Settings.renderResolution.y = a_NewResolution.y;
 
-        //Set up the OpenGL output buffer.
-        m_OutputBuffer.Resize(m_Settings.outputResolution.x, m_Settings.outputResolution.y);
-
         //Set up buffers.
         const unsigned numPixels = m_Settings.renderResolution.x * m_Settings.renderResolution.y;
         const unsigned numOutputChannels = static_cast<unsigned>(LightChannel::NUM_CHANNELS);
@@ -146,6 +144,34 @@ namespace WaveFront
             //Note; Only allocates memory and stores the size on the GPU. It does not actually fill any data in yet.
             m_SurfaceData[i].Resize(numPixels * sizeof(SurfaceData));
         }
+
+        //TODO: temporary until up-scaling is in place.
+        SetOutputResolution(a_NewResolution);
+
+    }
+
+    void WaveFrontRenderer::SetOutputResolution(glm::uvec2 a_NewResolution)
+    {
+
+        m_Settings.outputResolution.x = a_NewResolution.x;
+        m_Settings.outputResolution.y = a_NewResolution.y;
+
+        //Set up the OpenGL output buffer.
+        m_OutputBuffer.Resize(m_Settings.outputResolution.x, m_Settings.outputResolution.y);
+
+    }
+
+    glm::uvec2 WaveFrontRenderer::GetRenderResolution()
+    {
+
+        return glm::uvec2(m_Settings.renderResolution.x, m_Settings.renderResolution.y);
+
+    }
+
+    glm::uvec2 WaveFrontRenderer::GetOutputResolution()
+    {
+
+        return glm::uvec2(m_Settings.outputResolution.x, m_Settings.outputResolution.y);
 
     }
 

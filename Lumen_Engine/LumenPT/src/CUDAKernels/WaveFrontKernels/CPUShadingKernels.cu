@@ -30,7 +30,7 @@ CPU_ONLY void GeneratePrimaryRays(const PrimRayGenLaunchParameters& a_PrimaryRay
     const float3 v = a_PrimaryRayGenParams.m_Camera.m_Right;
     const float3 w = a_PrimaryRayGenParams.m_Camera.m_Forward;
     const float3 eye = a_PrimaryRayGenParams.m_Camera.m_Position;
-    const int2 dimensions = make_int2(a_PrimaryRayGenParams.m_Resolution.x, a_PrimaryRayGenParams.m_Resolution.y);
+    const uint2 dimensions = uint2{ a_PrimaryRayGenParams.m_Resolution.x, a_PrimaryRayGenParams.m_Resolution.y };
     const int numRays = dimensions.x * dimensions.y;
     const unsigned int frameCount = a_PrimaryRayGenParams.m_FrameCount;
 
@@ -47,9 +47,9 @@ CPU_ONLY void GenerateMotionVectors(MotionVectorsGenerationData& a_MotionVectors
     const int numBlocks = (numPixels + blockSize - 1) / blockSize;
 
     GenerateMotionVector<<<numBlocks, blockSize>>>(
-    a_MotionVectorsData.m_MotionVectorBuffer, 
-    a_MotionVectorsData.a_CurrentSurfaceData, 
-    a_MotionVectorsData.m_ScreenResolution,
+        a_MotionVectorsData.m_MotionVectorBuffer, 
+        a_MotionVectorsData.a_CurrentSurfaceData, 
+        a_MotionVectorsData.m_ScreenResolution,
         a_MotionVectorsData.m_ProjectionMatrix * a_MotionVectorsData.m_PrevViewMatrix);
 
     cudaDeviceSynchronize();
@@ -157,7 +157,7 @@ CPU_ONLY void PostProcess(const PostProcessLaunchParameters& a_PostProcessParams
     /*cudaDeviceSynchronize();
     CHECKLASTCUDAERROR;*/
 
-    //TODO This is temporary till the post-processing is  in place. Let the last stage copy it directly to the output buffer.
+    //TODO This is temporary till the post-processing is  in place. Let the last stage (dlss probably) copy it directly to the output buffer.
     WriteToOutput << <numBlocksUpscaled, blockSizeUpscaled >> > (
         a_PostProcessParams.m_OutputResolution,
         a_PostProcessParams.m_ProcessedOutput,
