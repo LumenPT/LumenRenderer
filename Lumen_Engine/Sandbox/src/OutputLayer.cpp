@@ -218,6 +218,10 @@ void OutputLayer::OnImGuiRender()
 
 		ImGuiUtil::DisplayImage(m_LastFrameTex, glm::ivec2(400, 300));
 
+		auto camPos = m_Renderer->m_Scene->m_Camera->GetPosition();
+
+		ImGui::Text("Camera Position: %f %f %f", camPos.x, camPos.y, camPos.z);
+
 		ImGui::End();
     }
 
