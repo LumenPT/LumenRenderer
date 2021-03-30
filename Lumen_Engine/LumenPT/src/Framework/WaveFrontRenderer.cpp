@@ -67,6 +67,50 @@ namespace WaveFront
         //Set the service locator's pointer to the OptixWrapper.
         m_ServiceLocator.m_OptixWrapper = m_OptixSystem.get();
 
+        SetRenderResolution(glm::uvec2(m_Settings.outputResolution.x, m_Settings.outputResolution.y));
+
+        //TODO: number of lights will be dynamic per frame but this is temporary.
+        constexpr auto numLights = 3;
+
+        m_TriangleLights.Resize(sizeof(TriangleLight) * numLights);
+
+        //Temporary lights, stored in the buffer.
+        float3 pos1, pos2, pos3;
+        pos1 = { 150.f, 41.f, 210.f };
+        pos2 = { 150.f, 41.f, 110.f };
+        pos3 = { 90.f, 41.f, 210.f };
+
+        float i1 = 3000000.f;
+        float i2 = 300000.f;
+        float i3 = 699999.f;
+
+        TriangleLight lights[numLights] =
+        {
+            {pos1, pos1, pos1, {0.f, 0.f, 0.f}, {i1, i1, i1}, 10.f},
+            {pos2, pos2, pos2, {0.f, 0.f, 0.f}, {i2, i2, i2}, 10.f},
+            {pos3, pos3, pos3, {0.f, 0.f, 0.f}, {i3, i3, i3}, 10.f}
+        };
+
+        m_TriangleLights.Write(&lights[0], sizeof(TriangleLight) * numLights, 0);
+
+        //m_MotionVectors.Init(make_uint2(m_Settings.renderResolution.x, m_Settings.renderResolution.y));
+    	
+        //Set the service locator pointer to point to the m'table.
+        m_Table = std::make_unique<SceneDataTable>();
+        m_ServiceLocator.m_SceneDataTable = m_Table.get();
+
+        m_ServiceLocator.m_Renderer = this;
+
+        // A null frame snapshot will not record anything when requested to.
+        m_FrameSnapshot = std::make_unique<NullFrameSnapshot>(); 
+
+    }   
+
+    void WaveFrontRenderer::SetRenderResolution(glm::uvec2 a_NewResolution)
+    {
+        m_Settings.renderResolution.x = a_NewResolution.x;
+        m_Settings.renderResolution.y = a_NewResolution.y;
+
         //Set up the OpenGL output buffer.
         m_OutputBuffer.Resize(m_Settings.outputResolution.x, m_Settings.outputResolution.y);
 
@@ -97,46 +141,11 @@ namespace WaveFront
         m_IntersectionData.Write(0);
 
         //Initialize each surface data buffer.
-        for(int i = 0; i < 3; ++i)
+        for (int i = 0; i < 3; ++i)
         {
             //Note; Only allocates memory and stores the size on the GPU. It does not actually fill any data in yet.
             m_SurfaceData[i].Resize(numPixels * sizeof(SurfaceData));
         }
-
-        //TODO: number of lights will be dynamic per frame but this is temporary.
-        constexpr auto numLights = 3;
-
-        m_TriangleLights.Resize(sizeof(TriangleLight) * numLights);
-
-        //Temporary lights, stored in the buffer.
-        float3 pos1, pos2, pos3;
-        pos1 = { 150.f, 41.f, 210.f };
-        pos2 = { 150.f, 41.f, 110.f };
-        pos3 = { 90.f, 41.f, 210.f };
-
-        float i1 = 3000000.f;
-        float i2 = 300000.f;
-        float i3 = 699999.f;
-
-        TriangleLight lights[numLights] =
-        {
-            {pos1, pos1, pos1, {0.f, 0.f, 0.f}, {i1, i1, i1}, 10.f},
-            {pos2, pos2, pos2, {0.f, 0.f, 0.f}, {i2, i2, i2}, 10.f},
-            {pos3, pos3, pos3, {0.f, 0.f, 0.f}, {i3, i3, i3}, 10.f}
-        };
-
-        m_TriangleLights.Write(&lights[0], sizeof(TriangleLight) * numLights, 0);
-
-        m_MotionVectors.Init(make_uint2(m_Settings.renderResolution.x, m_Settings.renderResolution.y));
-    	
-        //Set the service locator pointer to point to the m'table.
-        m_Table = std::make_unique<SceneDataTable>();
-        m_ServiceLocator.m_SceneDataTable = m_Table.get();
-
-        m_ServiceLocator.m_Renderer = this;
-
-        // A null frame snapshot will not record anything when requested to.
-        m_FrameSnapshot = std::make_unique<NullFrameSnapshot>(); 
 
     }
 

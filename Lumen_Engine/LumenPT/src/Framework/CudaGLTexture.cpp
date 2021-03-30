@@ -61,10 +61,13 @@ void CudaGLTexture::Resize(uint32_t a_Width, uint32_t a_Height)
     glBindBuffer(GL_ARRAY_BUFFER, m_PixelBuffer);
     glBufferData(GL_ARRAY_BUFFER, m_Width * m_Height * m_PixelSize, nullptr, GL_STREAM_DRAW);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
-    cudaDeviceSynchronize();
-    auto err = cudaGetLastError();
-    auto err1 = cudaGraphicsGLRegisterBuffer(&m_CudaGraphicsResource, m_PixelBuffer, cudaGraphicsMapFlagsWriteDiscard);
-    auto err2 = cudaGraphicsMapResources(1, &m_CudaGraphicsResource);
 
-    err1; err2;
+    if (m_Width != 0 && m_Height != 0)
+    {
+        cudaDeviceSynchronize();
+        auto err = cudaGetLastError();
+        auto err1 = cudaGraphicsGLRegisterBuffer(&m_CudaGraphicsResource, m_PixelBuffer, cudaGraphicsMapFlagsWriteDiscard);
+        auto err2 = cudaGraphicsMapResources(1, &m_CudaGraphicsResource);
+    }
 }
+

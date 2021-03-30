@@ -32,6 +32,8 @@ public:
 
     void OnImGuiRender() override;
 
+    void OnEvent(Lumen::Event& a_Event) override;
+
     //LumenPT* GetPipeline() { return m_LumenPT.get(); };
     LumenRenderer* GetPipeline() { return m_Renderer.get(); };
 

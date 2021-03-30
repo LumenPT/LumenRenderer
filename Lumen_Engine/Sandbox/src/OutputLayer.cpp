@@ -23,6 +23,8 @@
 
 #include "GLFW/glfw3.h"
 
+#include "Lumen/Events/ApplicationEvent.h"
+
 #include "filesystem"
 #include <iostream>
 
@@ -367,10 +369,29 @@ void OutputLayer::OnImGuiRender()
             }
 
         }
-
-
-
 		ImGui::End();
+    }
+
+	ImGui::Begin("Output doodle Shrink-inator");
+
+	auto newRes = m_Renderer->GetRenderResolution();
+
+	ImGui::DragInt2("Output image dimensions", reinterpret_cast<int*>(&newRes[0]), 0.25f, 0);
+
+    if (newRes != m_Renderer->GetRenderResolution())
+    {
+		m_Renderer->SetRenderResolution(newRes);
+    }
+
+	ImGui::End();
+}
+
+void OutputLayer::OnEvent(Lumen::Event& a_Event)
+{
+    if (a_Event.GetEventType() == Lumen::EventType::WindowResize)
+    {
+		auto resizeEvent = static_cast<Lumen::WindowResizeEvent&>(a_Event);
+		glViewport(0, 0, resizeEvent.GetWidth(), resizeEvent.GetHeight());
     }
 }
 
