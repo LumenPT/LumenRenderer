@@ -72,7 +72,7 @@ namespace WaveFront
         std::unique_ptr<MemoryBuffer> InterleaveVertexData(const PrimitiveData& a_MeshData) const;
 
         //OpenGL buffer to write output to.
-        CudaGLTexture m_OutputBuffer;
+        std::unique_ptr<CudaGLTexture> m_OutputBuffer;
 
         //The surface data per pixel. 0 and 1 are used for the current and previous frame. 2 is used for any other depth.
         MemoryBuffer m_SurfaceData[3];

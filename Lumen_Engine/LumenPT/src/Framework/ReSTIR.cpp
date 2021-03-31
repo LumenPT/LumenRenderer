@@ -1,3 +1,4 @@
+#include "Timer.h"
 #ifdef WAVEFRONT
 #include "ReSTIR.h"
 
@@ -89,7 +90,8 @@ CPU_ONLY void ReSTIR::Run(
 	//TODO: take camera position and direction into account when doing RIS.
 	//TODO: Also use light area.
 
-
+	//Timer for measuring performance.
+	Timer timer;
 
 	/*
      * Resize buffers based on the amount of lights and update data.
@@ -97,18 +99,24 @@ CPU_ONLY void ReSTIR::Run(
      */
 
 	//Update the CDF for the provided light sources.
+	timer.reset();
 	BuildCDF(a_Lights, a_NumLights);
+	printf("Building CDF time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
 
 	//Fill light bags with values from the CDF.
 	{
+		timer.reset();
 		FillLightBags(m_Settings.numLightBags, m_Settings.numLightsPerBag, static_cast<CDF*>(m_Cdf.GetDevicePtr()), static_cast<LightBagEntry*>(m_LightBags.GetDevicePtr()), a_Lights, a_Seed);
+		printf("Filling light bags time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
 	}
 
 	/*
 	 * Pick primary samples in parallel. Store the samples in the reservoirs.
 	 */
 	seed = WangHash(seed);
+	timer.reset();
 	PickPrimarySamples(static_cast<LightBagEntry*>(m_LightBags.GetDevicePtr()), static_cast<Reservoir*>(m_Reservoirs[currentIndex].GetDevicePtr()), m_Settings, a_CurrentPixelData, seed);
+	printf("Picking primary samples time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
 
 	/*
 	 * Generate shadow rays for each reservoir and resolve them.
@@ -128,7 +136,9 @@ CPU_ONLY void ReSTIR::Run(
 	//Tell Optix to resolve all shadow rays, which sets reservoir weight to 0 when occluded.
 	if(numRaysGenerated > 0)
 	{
+		timer.reset();
 		a_OptixSystem->TraceRays(numRaysGenerated, params);
+		printf("Tracing ReSTIR shadow rays time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
 	}
 
 	/*
@@ -137,6 +147,7 @@ CPU_ONLY void ReSTIR::Run(
 	if (m_Settings.enableTemporal)
 	{
 		seed = WangHash(seed);
+		timer.reset();
 		TemporalNeighbourSampling(
 			m_Reservoirs[currentIndex].GetDevicePtr<Reservoir>(),
 			m_Reservoirs[temporalIndex].GetDevicePtr<Reservoir>(),
@@ -147,6 +158,7 @@ CPU_ONLY void ReSTIR::Run(
 			dimensions,
 			a_MotionVectorBuffer
 		);
+		printf("Temporal sampling time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
 	}
 
 	/*
@@ -155,6 +167,7 @@ CPU_ONLY void ReSTIR::Run(
 	if(m_Settings.enableSpatial)
 	{
 		seed = WangHash(seed);
+		timer.reset();
 		SpatialNeighbourSampling(
 			static_cast<Reservoir*>(m_Reservoirs[currentIndex].GetDevicePtr()),
 			static_cast<Reservoir*>(m_Reservoirs[2].GetDevicePtr()), 
@@ -162,14 +175,20 @@ CPU_ONLY void ReSTIR::Run(
 			seed,
 			dimensions
 		);
+		printf("Spatial sampling time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
 	}
 
+	timer.reset();
 	GenerateWaveFrontShadowRays(
 		static_cast<Reservoir*>(m_Reservoirs[currentIndex].GetDevicePtr()),
 		a_CurrentPixelData,
 		a_WaveFrontShadowRayBuffer,
 		numPixels
 	);
+	printf("Generating wavefront shadow rays time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
+
+	//Ensure CUDA is done executing now.
+	cudaDeviceSynchronize();
 
 	//Ensure that swap buffers is called.
 	m_SwapDirtyFlag = false;

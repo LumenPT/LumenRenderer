@@ -72,7 +72,7 @@ namespace WaveFront
         m_ServiceLocator.m_OptixWrapper = m_OptixSystem.get();
 
         //Set up the OpenGL output buffer.
-        m_OutputBuffer.Resize(m_Settings.outputResolution.x, m_Settings.outputResolution.y);
+        m_OutputBuffer = std::make_unique<CudaGLTexture>(GL_RGBA8, m_Settings.outputResolution.x, m_Settings.outputResolution.y, 4);
 
         //Set up buffers.
         const unsigned numPixels = m_Settings.renderResolution.x * m_Settings.renderResolution.y;
@@ -630,7 +630,7 @@ namespace WaveFront
             m_Settings.outputResolution,
             m_PixelBufferSeparate.GetDevicePtr<float3>(),
             m_PixelBufferCombined.GetDevicePtr<float3>(),
-            m_OutputBuffer.GetDevicePtr()
+            m_OutputBuffer->GetDevicePtr()
         );
 
         //Post processing using CUDA kernel.
@@ -648,7 +648,7 @@ namespace WaveFront
         a_Scene->m_Camera->UpdatePreviousFrameMatrix();
         ++frameCount;
 
-        m_DebugTexture = m_OutputBuffer.GetTexture();
+        m_DebugTexture = m_OutputBuffer->GetTexture();
 //#if defined(_DEBUG)
         m_MotionVectors.GenerateDebugTextures();
         //m_DebugTexture = m_MotionVectors.GetMotionVectorMagnitudeTex();
@@ -656,7 +656,7 @@ namespace WaveFront
 //#endif
     	
         //Return the GLuint texture ID.
-        return m_OutputBuffer.GetTexture();
+        return m_OutputBuffer->GetTexture();
     }
 }
 #endif
