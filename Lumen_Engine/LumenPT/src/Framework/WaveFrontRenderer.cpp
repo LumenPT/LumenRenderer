@@ -535,7 +535,7 @@ namespace WaveFront
             unsigned numIntersections = 0;
             numIntersections = GetAtomicCounter<IntersectionData>(&m_IntersectionData);
 
-            const auto surfaceDataBufferIndex = depth == 0 ? currentIndex : 2;   //1 and 2 are used for the first intersection and remembered for temporal use.
+            const auto surfaceDataBufferIndex = (depth == 0 ? currentIndex : 2);   //1 and 2 are used for the first intersection and remembered for temporal use.
             ExtractSurfaceData(
                 numIntersections,
                 m_IntersectionData.GetDevicePtr<AtomicBuffer<IntersectionData>>(),

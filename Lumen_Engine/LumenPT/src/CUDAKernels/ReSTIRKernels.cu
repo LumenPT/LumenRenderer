@@ -151,15 +151,9 @@ __global__ void PickPrimarySamplesInternal(const LightBagEntry* const a_LightBag
             auto* reservoir = &a_Reservoirs[RESERVOIR_INDEX(i, reservoirIndex, a_NumReservoirsPerPixel)];
             reservoir->Reset();
 
-            seed = WangHash(seed + reservoirIndex);
-
             //Generate the amount of samples specified per reservoir.
             for (int sample = 0; sample < a_NumPrimarySamples; ++sample)
             {
-
-                //Use a seen unique to this reservoir and sample count.
-                seed = WangHash(seed + sample);
-
                 //Random number using the pixel id.
                 const float r = RandomFloat(seed);
 
@@ -191,8 +185,9 @@ __global__ void PickPrimarySamplesInternal(const LightBagEntry* const a_LightBag
                 }
 
                 //The final PDF for the light in this reservoir is the solid angle divided by the original PDF of the light being chosen based on radiance.
+                //Dividing scales the value up.
                 const auto pdf = lightSample.solidAnglePdf / initialPdf;
-                reservoir->Update(lightSample, pdf, a_Seed);
+                reservoir->Update(lightSample, pdf, WangHash(a_Seed));
             }
 
             reservoir->UpdateWeight();
@@ -289,9 +284,6 @@ __host__ void SpatialNeighbourSampling(Reservoir* a_Reservoirs, Reservoir* a_Swa
 __global__ void SpatialNeighbourSamplingInternal(Reservoir* a_Reservoirs, Reservoir* a_SwapBuffer,
     const WaveFront::SurfaceData* a_PixelData, const std::uint32_t a_Seed, uint2 a_Dimensions)
 {
-    Reservoir * const fromBuffer = a_Reservoirs;
-    Reservoir * const toBuffer = a_SwapBuffer;
-
     const unsigned numPixels = a_Dimensions.x * a_Dimensions.y;
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     int stride = blockDim.x * gridDim.x;
@@ -317,7 +309,7 @@ __global__ void SpatialNeighbourSamplingInternal(Reservoir* a_Reservoirs, Reserv
 
             for (int depth = 0; depth < ReSTIRSettings::numReservoirsPerPixel; ++depth)
             {
-                toCombineReservoirs[0] = &fromBuffer[RESERVOIR_INDEX(i, depth, ReSTIRSettings::numReservoirsPerPixel)];
+                toCombineReservoirs[0] = &a_Reservoirs[RESERVOIR_INDEX(i, depth, ReSTIRSettings::numReservoirsPerPixel)];
 
                 int count = 1;
 
@@ -338,7 +330,7 @@ __global__ void SpatialNeighbourSamplingInternal(Reservoir* a_Reservoirs, Reserv
                         //Ensure no out of bounds neighbours are selected.
                         assert(neighbourIndex < numPixels && neighbourIndex >= 0); 
 
-                        Reservoir* pickedReservoir = &fromBuffer[RESERVOIR_INDEX(neighbourIndex, depth, ReSTIRSettings::numReservoirsPerPixel)];
+                        Reservoir* pickedReservoir = &a_Reservoirs[RESERVOIR_INDEX(neighbourIndex, depth, ReSTIRSettings::numReservoirsPerPixel)];
                         const WaveFront::SurfaceData* pickedPixel = &a_PixelData[neighbourIndex];
 
                         //Only run for valid depths and non-emissive surfaces.
@@ -366,18 +358,28 @@ __global__ void SpatialNeighbourSamplingInternal(Reservoir* a_Reservoirs, Reserv
                 }
 
                 //The output location.
-                Reservoir* output = &toBuffer[RESERVOIR_INDEX(i, depth, ReSTIRSettings::numReservoirsPerPixel)];
+                Reservoir* output = &a_SwapBuffer[RESERVOIR_INDEX(i, depth, ReSTIRSettings::numReservoirsPerPixel)];
 
                 //If valid reservoirs to combine were found, combine them.
                 if (count > 1)
                 {
                     if(ReSTIRSettings::enableBiased)
                     {
-                        CombineBiased(output, count, toCombineReservoirs, toCombinePixelData, seed);
+                        CombineBiased(output, count, toCombineReservoirs, toCombinePixelData[0], seed);
+
+                        //if(i == 220000)
+                        //{
+                        //    printf("WeightsBefore:\n");
+                        //    for(int i = 0; i < count; ++i)
+                        //    {
+                        //        printf("- %i: %f SAPDF: %f\n", i, toCombineReservoirs[i]->weight, toCombineReservoirs[i]->sample.solidAnglePdf);
+                        //    }
+                        //    printf("\nWeight: %f, SampleCount: %i, WeightSum: %f, BRDFPDF: %f.\n", output->weight, output->sampleCount, output->weightSum, output->sample.solidAnglePdf);
+                        //}
                     }
                     else
                     {
-                        CombineUnbiased(output, count, toCombineReservoirs, toCombinePixelData, seed);
+                        CombineUnbiased(output, toCombinePixelData[0], count, toCombineReservoirs, toCombinePixelData, seed);
                     }
                 }
                 //Not enough reservoirs to combine, but still data needs to be passed on.
@@ -448,8 +450,10 @@ __global__ void CombineTemporalSamplesInternal(
             temporalIndex = PIXEL_INDEX(x, y, a_Dimensions.x);
         }
 
+        const WaveFront::SurfaceData* surface = &a_CurrentPixelData[i];
+
         pixelPointers[0] = &a_PreviousPixelData[temporalIndex];
-        pixelPointers[1] = &a_CurrentPixelData[i];
+        pixelPointers[1] = surface;
 
         //Ensure that the depth of both samples is valid, and then combine them at each depth.
         if (pixelPointers[0]->m_IntersectionT > 0.f && pixelPointers[1]->m_IntersectionT > 0.f && !pixelPointers[0]->m_Emissive && !pixelPointers[1]->m_Emissive)
@@ -472,26 +476,25 @@ __global__ void CombineTemporalSamplesInternal(
                 if (depthDifPct < 0.10f && angleDif > MAX_ANGLE_COS)
                 {
                     //Cap sample count at 20x current to reduce temporal influence. Would grow infinitely large otherwise.
-                    toCombine[0]->sampleCount = fminf(toCombine[0]->sampleCount, toCombine[1]->sampleCount * 20);
+                    toCombine[0]->sampleCount = min(toCombine[0]->sampleCount, toCombine[1]->sampleCount * 20);
 
                     Reservoir* output = &a_CurrentReservoirs[RESERVOIR_INDEX(i, depth, ReSTIRSettings::numReservoirsPerPixel)];
 
                     if (ReSTIRSettings::enableBiased)
                     {
-                        CombineBiased(output, 2, toCombine, pixelPointers,  WangHash(a_Seed + i));
+                        CombineBiased(output, 2, toCombine, surface, WangHash(a_Seed + i));
                     }
                     else
                     {
-                        CombineUnbiased(output, 2, toCombine, pixelPointers, WangHash(a_Seed + i));
+                        CombineUnbiased(output, surface, 2, toCombine, pixelPointers, WangHash(a_Seed + i));
                     }
                 }
-                
             }
         }
     }
 }
 
-__device__ void CombineUnbiased(Reservoir* a_OutputReservoir, int a_Count, Reservoir** a_Reservoirs,
+__device__ __inline__ void CombineUnbiased(Reservoir* a_OutputReservoir, const WaveFront::SurfaceData* a_OutputSurfaceData, int a_Count, Reservoir** a_Reservoirs,
     const WaveFront::SurfaceData** a_ToCombine, const std::uint32_t a_Seed)
 {
     //Ensure enough reservoirs are passed.
@@ -502,9 +505,10 @@ __device__ void CombineUnbiased(Reservoir* a_OutputReservoir, int a_Count, Reser
 
     for (int index = 0; index < a_Count; ++index)
     {
+        //TODO: possible optimization here: no resampling required for the pixel being merged into if applicable.
         auto* otherReservoir = a_Reservoirs[index];
         LightSample resampled;
-        Resample(&otherReservoir->sample, a_ToCombine[index], &resampled);
+        Resample(&otherReservoir->sample, a_OutputSurfaceData, &resampled);
 
         assert(otherReservoir->weight >= 0.f);
         assert(otherReservoir->sampleCount >= 0);
@@ -545,13 +549,21 @@ __device__ void CombineUnbiased(Reservoir* a_OutputReservoir, int a_Count, Reser
 
     assert(output.weight >= 0.f);
     assert(output.weightSum >= 0.f);
+    assert(output.sampleCount >= 0);
+    assert(!isnan(output.weight));
+    assert(!isnan(output.weightSum));
+    assert(!isnan(output.sample.solidAnglePdf));
+    assert(output.sample.solidAnglePdf >= 0.f);
+    assert(!isinf(output.sample.solidAnglePdf));
+    assert(!isinf(output.weight));
+    assert(!isinf(output.weightSum));
 
     //Store the output reservoir for the pixel.
     *a_OutputReservoir = output;
 }
 
-__device__ void CombineBiased(Reservoir* a_OutputReservoir, int a_Count, Reservoir** a_Reservoirs,
-    const WaveFront::SurfaceData** a_ToCombine, const std::uint32_t a_Seed)
+__device__ __inline__ void CombineBiased(Reservoir* a_OutputReservoir, int a_Count, Reservoir** a_Reservoirs,
+    const WaveFront::SurfaceData* a_SurfaceData, const std::uint32_t a_Seed)
 {
     //Ensure enough reservoirs are passed.
     assert(a_Count > 1);
@@ -563,7 +575,6 @@ __device__ void CombineBiased(Reservoir* a_OutputReservoir, int a_Count, Reservo
     //Iterate over the intersection data to combine.
     for (int i = 0; i < a_Count; ++i)
     {
-        auto* pixel = a_ToCombine[i];
         auto* reservoir = a_Reservoirs[i];
 
         assert(reservoir->weight >= 0.f);
@@ -572,7 +583,7 @@ __device__ void CombineBiased(Reservoir* a_OutputReservoir, int a_Count, Reservo
         assert(reservoir->sample.solidAnglePdf >= 0.f);
         
         LightSample resampled;
-        Resample(&(reservoir->sample), pixel, &resampled);
+        Resample(&(reservoir->sample), a_SurfaceData, &resampled);
 
         const float weight = static_cast<float>(reservoir->sampleCount) * reservoir->weight * resampled.solidAnglePdf;
 
@@ -589,7 +600,14 @@ __device__ void CombineBiased(Reservoir* a_OutputReservoir, int a_Count, Reservo
 
     assert(output.weight >= 0.f);
     assert(output.weightSum >= 0.f);
-    assert(output.weightSum >= 0);
+    assert(output.sampleCount >= 0);
+    assert(!isnan(output.weight));
+    assert(!isnan(output.weightSum));
+    assert(!isnan(output.sample.solidAnglePdf));
+    assert(output.sample.solidAnglePdf >= 0.f);
+    assert(!isinf(output.sample.solidAnglePdf));
+    assert(!isinf(output.weight));
+    assert(!isinf(output.weightSum));
 
     //Override the reservoir for the output at this depth.
     *a_OutputReservoir = output;
@@ -629,6 +647,8 @@ __device__ void Resample(LightSample* a_Input, const WaveFront::SurfaceData* a_P
     //The only thing missing from this is the scaling with the rest of the scene based on the reservoir PDF.
     const auto unshadowedPathContribution = brdf * solidAngle * cosIn * a_Output->radiance;
     a_Output->unshadowedPathContribution = unshadowedPathContribution;
+
+    assert(unshadowedPathContribution.x >= 0 && unshadowedPathContribution.y >= 0 && unshadowedPathContribution.z >= 0);
 
     //For the PDF, I take the unshadowed path contribution as a single float value. Average for now.
     //TODO: Maybe use the human eye for scaling (green weighed more).
