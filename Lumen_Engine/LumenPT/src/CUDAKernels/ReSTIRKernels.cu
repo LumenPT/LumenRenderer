@@ -282,6 +282,7 @@ __host__ void SpatialNeighbourSampling(Reservoir* a_Reservoirs, Reservoir* a_Swa
         fromBuffer = toBuffer;
         toBuffer = temp;
     }
+
 }
 
 //TODO: The bug is that it's swapping buffers per thread in the middle all over the place. Should finish first wave, then swap and continue.
@@ -588,6 +589,7 @@ __device__ void CombineBiased(Reservoir* a_OutputReservoir, int a_Count, Reservo
 
     assert(output.weight >= 0.f);
     assert(output.weightSum >= 0.f);
+    assert(output.weightSum >= 0);
 
     //Override the reservoir for the output at this depth.
     *a_OutputReservoir = output;
