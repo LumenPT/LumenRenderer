@@ -270,15 +270,15 @@ __device__ __forceinline__ void SampleGGXVNDF(const float3& a_ViewDir, float a_R
     float3 T2 = cross(Vh, T1);
 
     // Section 4.2: parameterization of the projected area
-    float r = sqrt(U1);
+    float r = sqrtf(U1);
     float phi = 2.f * M_PIf * U2;
-    float t1 = r * cos(phi);
-    float t2 = r * sin(phi);
+    float t1 = r * cosf(phi);
+    float t2 = r * sinf(phi);
     float s = 0.5f * (1.0f + Vh.z);
-    t2 = (1.f - s) * sqrt(1.f - t1 * t1) + s * t2;
+    t2 = (1.f - s) * sqrtf(1.f - t1 * t1) + s * t2;
 
     // Section 4.3: reprojection onto hemisphere
-    float3 Nh = t1 * T1 + t2 * T2 + sqrt(fmaxf(0.0f, 1.0f - t1 * t1 - t2 * t2)) * Vh;
+    float3 Nh = t1 * T1 + t2 * T2 + sqrtf(fmaxf(0.0f, 1.0f - t1 * t1 - t2 * t2)) * Vh;
 
     // Section 3.4: transforming the normal back to the ellipsoid configuration
     //The way this works: Nh.z is not scaled by the roughness. This means that mirroring surfaces will pretty much always generate the surface normal (smooth).

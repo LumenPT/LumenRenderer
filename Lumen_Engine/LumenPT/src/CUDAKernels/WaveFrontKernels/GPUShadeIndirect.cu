@@ -49,19 +49,11 @@ CPU_ON_GPU void ShadeIndirect(
         float3 pathContribution = surfaceData.m_TransportFactor * russianPdf;
 
         /*
-         * TODO: This should never happen.
-         * This means the normal is pointing away from the intersection ray.
-         * The surface should never have been hit.
-         * Path is terminated right away.
-         * TODO: Solve this elsewhere so that we don't have to have a conditional here.
-         *
-         * Note: Angles that are close to perpendicular need to be filtered out here too (that's what the epsilon is for) because of floating point inaccuracy
-         * when sampling the hemisphere. If this is not done, PDF may be 0 for a retrieved sample.
+         * If the angle is too perpendicular to the normal, discard. It's too prone to floating point error which means it can't generate a reflection
+         * some of the time.
          */
-        if(dot(surfaceData.m_Normal, surfaceData.m_IncomingRayDirection) >= -2.f*EPSILON)
+        if(dot(surfaceData.m_Normal, surfaceData.m_IncomingRayDirection) >= -3.f*EPSILON)
         {
-            //TODO: this still happens.
-            //printf("Warning: Surface with reverse normal hit at distance %f!\n", surfaceData.m_IntersectionT);
             continue;
         }
 
@@ -72,7 +64,7 @@ CPU_ON_GPU void ShadeIndirect(
 
         if(brdfPdf <= 0)
         {
-            printf("DooDoo PDF: %f\n", brdfPdf);
+            printf("Bad PDF: %f\n", brdfPdf);
         }
 
         assert(!isnan(bounceDirection.x) && !isnan(bounceDirection.y) && !isnan(bounceDirection.z));
@@ -81,32 +73,27 @@ CPU_ON_GPU void ShadeIndirect(
         assert(russianPdf >= 0.f);
 
         /*
-         * Terminate on interreflections now.
-         * Note: When looping over them and simulating, a negative PDF was sometimes encountered. Very odd.
+         * Terminate on inter-reflections. This is common for diffuse surfaces but not so much for others.
+         * The angle of incidence makes a big difference too.
+         * This could be resolved with RIS, by doing four strata on the hemisphere and taking four samples.
+         * At least three of the samples will be correct.
+         * This does however require multiple BRDF evaluations which is expensive.
+         *
+         * Because half the domain is removed, the BRDF PDF can be doubled after this passes.
          */
         if (dot(bounceDirection, surfaceData.m_Normal) <= 0.f) continue;
+
+        //Double BRDF PDF because half the domain is terminated above.
+        brdfPdf *= 2.f;
 
         /*
          * Scale the path contribution based on the PDF (over 4 PI, the entire sphere).
          * When perfectly diffuse, 1/4pi will result in exactly scaling by 4pi.
          * When mirroring, a high PDF way larger than 1 will scale down the contribution because now it comes from just one direction.
-         * TODO: Is this correct? A perfect mirror will divide by an infinitely large number. That seems counter-intuitive.
          */
-
-        ////TODO: remove
-        //const float brdfPdf = 1.f / (M_PIf * 2.f);
-        //float3 bounceDirection = normalize(float3{RandomFloat(seed) * 2.f - 1.f, RandomFloat(seed) * 2.f - 1.f, RandomFloat(seed) * 2.f - 1.f});
-        //if (dot(bounceDirection, surfaceData.m_Normal) < 0.f) bounceDirection *= -1.f;
-        //float3 pathContribution = surfaceData.m_TransportFactor;
-        //
         const auto invViewDir = -surfaceData.m_IncomingRayDirection;
         const auto brdf = MicrofacetBRDF(invViewDir, bounceDirection, surfaceData.m_Normal, surfaceData.m_Color, surfaceData.m_Metallic, surfaceData.m_Roughness);
         pathContribution *= (brdf / brdfPdf);
-
-        //if(brdfPdf <= 0 || pathContribution.x < 0 || pathContribution.y < 0 || pathContribution.z < 0)
-        //{
-        //    printf("PDF is 0. This should never be picked? Seed: %u, Dot: %f, PDF: %f, Normal: %f %f %f. InvViewDir: %f %f %f\n", oldseed, dot(invViewDir, surfaceData.m_Normal), brdfPdf, surfaceData.m_Normal.x, surfaceData.m_Normal.y, surfaceData.m_Normal.z, invViewDir.x, invViewDir.y, invViewDir.z);
-        //}
 
         assert(pathContribution.x >= 0 && pathContribution.y >= 0 && pathContribution.z >= 0);
 
