@@ -30,7 +30,7 @@ struct ReSTIRSettings
     std::uint32_t height = 0;
 
     //The amount of reservoirs used per pixel.
-    static constexpr std::uint32_t numReservoirsPerPixel = 5; //TODO 5
+    static constexpr std::uint32_t numReservoirsPerPixel = 1; //TODO 5
 
     //The amount of lights per light bag.
     static constexpr std::uint32_t numLightsPerBag = 1000;
@@ -55,7 +55,7 @@ struct ReSTIRSettings
     static constexpr std::uint32_t numSpatialIterations = 2;
 
     //Use the biased algorithm or not. When false, the unbiased algorithm is used instead.
-    static constexpr bool enableBiased = true;
+    static constexpr bool enableBiased = false;
 
     //Enable spatial sampling.
     static constexpr bool enableSpatial = true;

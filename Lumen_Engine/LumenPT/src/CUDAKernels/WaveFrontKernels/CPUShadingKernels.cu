@@ -72,23 +72,13 @@ CPU_ONLY void ExtractSurfaceData(
 
 CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
 {
+
+    auto seed = WangHash(a_ShadingParams.m_Seed);
     //TODO
     /*
      * - Implement the below functions.
      * - Access to intersection data, as well as the ray resulting in this shading for chained BRDF scaling.
      */
-
-    const int numPixels = a_ShadingParams.m_ResolutionAndDepth.x * a_ShadingParams.m_ResolutionAndDepth.y;
-    const int blockSize = 256;
-    const int numBlocks = (numPixels + blockSize - 1) / blockSize;
-
-    //Generate secondary rays.
-
-    /*ShadeIndirect<<<numBlocks,blockSize>>>(
-       a_ShadingParams.m_ResolutionAndDepth,
-       a_ShadingParams.m_CurrentRays,
-       a_ShadingParams.m_CurrentIntersections,
-       a_ShadingParams.m_SecondaryRays);*/
 
     /*cudaDeviceSynchronize();
        CHECKLASTCUDAERROR;*/
@@ -116,7 +106,7 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
             a_ShadingParams.m_TriangleLights,
             a_ShadingParams.m_NumLights,
             a_ShadingParams.m_CameraDirection,
-            a_ShadingParams.m_Seed,
+            seed,
             a_ShadingParams.m_OptixSceneHandle,
             a_ShadingParams.m_ShadowRays,
             a_ShadingParams.m_OptixSystem,
@@ -125,17 +115,50 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
     }
     else
     {
+        //Generate the CDF if ReSTIR is disabled.
+        if(a_ShadingParams.m_CurrentDepth == 0 && !useRestir)
+        {
+            a_ShadingParams.m_ReSTIR->BuildCDF(a_ShadingParams.m_TriangleLights, a_ShadingParams.m_NumLights);
+        }
+
+        const int numPixels = a_ShadingParams.m_ResolutionAndDepth.x * a_ShadingParams.m_ResolutionAndDepth.y;
+        const int blockSize = 256;
+        const int numBlocks = (numPixels + blockSize - 1) / blockSize;
         CDF* cdfPtr = a_ShadingParams.m_ReSTIR->GetCdfGpuPointer();
 
         //Generate shadow rays for direct lights.
+
         ShadeDirect << <numBlocks, blockSize >> > (
             a_ShadingParams.m_ResolutionAndDepth,
             a_ShadingParams.m_TemporalSurfaceData,
             a_ShadingParams.m_CurrentSurfaceData,
             a_ShadingParams.m_ShadowRays,
             a_ShadingParams.m_TriangleLights,
-            a_ShadingParams.m_NumLights,
+            seed,
+            a_ShadingParams.m_CurrentDepth,
             cdfPtr);
+    }
+
+    //Update the seed.
+    seed = WangHash(a_ShadingParams.m_Seed);
+
+    //Generate secondary rays only when there's a wave after this.
+    if(a_ShadingParams.m_CurrentDepth < a_ShadingParams.m_ResolutionAndDepth.z - 1)
+    {
+        const int blockSize = 256;
+        const int numBlocks = (a_ShadingParams.m_NumIntersections + blockSize - 1) / blockSize;
+
+        ShadeIndirect << <numBlocks, blockSize >> > (
+            a_ShadingParams.m_ResolutionAndDepth,
+            a_ShadingParams.m_CameraPosition,
+            a_ShadingParams.m_CurrentSurfaceData,
+            a_ShadingParams.m_IntersectionData,
+            a_ShadingParams.m_RayBuffer,
+            a_ShadingParams.m_NumIntersections,
+            a_ShadingParams.m_CurrentDepth,
+            seed);
+
+        cudaDeviceSynchronize();
     }
 
     /*DEBUGShadePrimIntersections<<<numBlocks, blockSize>>>(

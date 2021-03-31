@@ -1,3 +1,4 @@
+#include "../Shaders/CppCommon/RenderingUtility.h"
 #if defined(WAVEFRONT)
 
 #include "WaveFrontRenderer.h"
@@ -71,7 +72,7 @@ namespace WaveFront
         m_ServiceLocator.m_OptixWrapper = m_OptixSystem.get();
 
         //Set up the OpenGL output buffer.
-        m_OutputBuffer.Resize(m_Settings.outputResolution.x, m_Settings.outputResolution.y);
+        m_OutputBuffer = std::make_unique<CudaGLTexture>(GL_RGBA8, m_Settings.outputResolution.x, m_Settings.outputResolution.y, 4);
 
         //Set up buffers.
         const unsigned numPixels = m_Settings.renderResolution.x * m_Settings.renderResolution.y;
@@ -108,9 +109,9 @@ namespace WaveFront
         TriangleLight lights[numLights];
 
         //Intensity per light.
-        lights[0].radiance = { 200000, 200000, 200000 };
-        lights[1].radiance = { 200000, 200000, 200000 };
-        lights[2].radiance = { 200000, 200000, 200000 };
+        lights[0].radiance = { 20000, 20000, 20000 };
+        lights[1].radiance = { 20000, 20000, 20000 };
+        lights[2].radiance = { 20000, 20000, 20000 };
 
 
         //Actually set the triangle lights to have an area.
@@ -132,7 +133,6 @@ namespace WaveFront
             float3 vec1 = (lights[i].p0 - lights[i].p1);
             float3 vec2 = (lights[i].p0 - lights[i].p2);
             lights[i].area = sqrt(pow((vec1.y * vec2.z - vec2.y * vec1.z), 2) + pow((vec1.x * vec2.z - vec2.x * vec1.z), 2) + pow((vec1.x * vec2.y - vec2.x * vec1.y), 2)) / 2.f;
-            printf("lol");
         }
 
         //Calculate the normal for each light.
@@ -162,8 +162,18 @@ namespace WaveFront
         // A null frame snapshot will not record anything when requested to.
         m_FrameSnapshot = std::make_unique<NullFrameSnapshot>(); 
 
+
         m_ReSTIR = std::make_unique<ReSTIR>();
+
+        //Print the expected VRam usage.
+        size_t requiredSize = m_ReSTIR->GetExpectedGpuRamUsage(rSettings, 3);
+        printf("Initializing ReSTIR. Expected VRam usage in bytes: %llu\n", requiredSize);
+
+        //Finally actually allocate memory for ReSTIR.
         m_ReSTIR->Initialize(rSettings);
+
+        size_t usedSize = m_ReSTIR->GetAllocatedGpuMemory();
+        printf("Actual bytes allocated by ReSTIR: %llu\n", usedSize);
     }
 
     void WaveFrontRenderer::BeginSnapshot()
@@ -402,7 +412,7 @@ namespace WaveFront
         vCuda = make_float3(v.x, v.y, v.z);
         wCuda = make_float3(w.x, w.y, w.z);
 
-        printf("Camera pos: %f %f %f\n", camPosition.x, camPosition.y, camPosition.z);
+        //printf("Camera pos: %f %f %f\n", camPosition.x, camPosition.y, camPosition.z);
 
         //Increment framecount each frame.
         static unsigned frameCount = 0;
@@ -506,6 +516,9 @@ namespace WaveFront
         //Set the amount of rays to trace. Initially same as screen size.
         auto numIntersectionRays = numPixels;
 
+        auto seed = WangHash(frameCount);
+
+
         /*
          * Resolve rays and shade at every depth.
          */
@@ -551,15 +564,15 @@ namespace WaveFront
                 m_MotionVectors.Update(motionVectorsGenerationData);
             }
 
-            //TODO add ReSTIR instance and run from shading kernel.
-
             /*
              * Call the shading kernels.
              */
             ShadingLaunchParameters shadingLaunchParams(
                 uint3{ m_Settings.renderResolution.x, m_Settings.renderResolution.y, m_Settings.depth },
-                m_SurfaceData[currentIndex].GetDevicePtr<SurfaceData>(),
+                m_SurfaceData[surfaceDataBufferIndex].GetDevicePtr<SurfaceData>(),
                 m_SurfaceData[temporalIndex].GetDevicePtr<SurfaceData>(),
+                m_IntersectionData.GetDevicePtr<AtomicBuffer<IntersectionData>>(),
+                m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>(),
                 m_ShadowRays.GetDevicePtr<AtomicBuffer<ShadowRayData>>(),
                 m_TriangleLights.GetDevicePtr<TriangleLight>(),
                 3,
@@ -567,14 +580,15 @@ namespace WaveFront
                 camForward,
                 accelerationStructure,  //ReSTIR needs to check visibility early on so it does an optix launch for this scene.
                 m_OptixSystem.get(),
-                WangHash(frameCount), //Use the frame count as the random seed.
+                seed, //Use the frame count as the random seed.
                 m_ReSTIR.get(), //ReSTIR, can not be nullptr.
                 depth,  //The current depth.
                 m_MotionVectors.GetMotionVectorBuffer()->GetDevicePtr<MotionVectorBuffer>(),
+                numIntersectionRays,
                 m_PixelBufferSeparate.GetDevicePtr<float3>()
             );
 
-            //Reset the atomic counter.
+            //Reset the ray buffer so that indirect shading can fill it again.
             ResetAtomicBuffer<IntersectionRayData>(&m_Rays);
             cudaDeviceSynchronize();
 
@@ -583,22 +597,25 @@ namespace WaveFront
             CHECKLASTCUDAERROR;
 
             //Set the number of intersection rays to the size of the ray buffer.
-            m_Rays.Read(&numIntersectionRays, sizeof(uint32_t), 0);
+            numIntersectionRays = GetAtomicCounter<IntersectionRayData>(&m_Rays);
 
-            //Reset the atomic counters for the next wave. Also clear the surface data at depth 2 (the one that is overwritten each wave).
+            //Clear the surface data at depth 2 (the one that is overwritten each wave).
             cudaMemset(m_SurfaceData[2].GetDevicePtr(), 0, sizeof(SurfaceData) * numPixels);
             cudaDeviceSynchronize();
             CHECKLASTCUDAERROR;
 
-            m_IntersectionData.Write(counterDefault);
+            //Reset the intersection data so that the next frame can re-fill it.
+            ResetAtomicBuffer<IntersectionData>(&m_IntersectionData);
 
             //Swap the ReSTIR buffers around.
             m_ReSTIR->SwapBuffers();
+
+            //Switch up the seed.
+            seed = WangHash(frameCount);
         }
     	
         //The amount of shadow rays to trace.
-        unsigned numShadowRays = 0;
-        m_ShadowRays.Read(&numShadowRays, sizeof(uint32_t), 0);
+        unsigned numShadowRays = GetAtomicCounter<ShadowRayData>(&m_ShadowRays);
 
         if(numShadowRays > 0)
         {
@@ -613,7 +630,7 @@ namespace WaveFront
             m_Settings.outputResolution,
             m_PixelBufferSeparate.GetDevicePtr<float3>(),
             m_PixelBufferCombined.GetDevicePtr<float3>(),
-            m_OutputBuffer.GetDevicePtr()
+            m_OutputBuffer->GetDevicePtr()
         );
 
         //Post processing using CUDA kernel.
@@ -631,7 +648,7 @@ namespace WaveFront
         a_Scene->m_Camera->UpdatePreviousFrameMatrix();
         ++frameCount;
 
-        m_DebugTexture = m_OutputBuffer.GetTexture();
+        m_DebugTexture = m_OutputBuffer->GetTexture();
 //#if defined(_DEBUG)
         m_MotionVectors.GenerateDebugTextures();
         //m_DebugTexture = m_MotionVectors.GetMotionVectorMagnitudeTex();
@@ -639,7 +656,7 @@ namespace WaveFront
 //#endif
     	
         //Return the GLuint texture ID.
-        return m_OutputBuffer.GetTexture();
+        return m_OutputBuffer->GetTexture();
     }
 }
 #endif

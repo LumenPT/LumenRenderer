@@ -43,6 +43,11 @@ public:
 	);
 
 	/*
+	 * Update the CDF for the given light sources.
+	 */
+	CPU_ONLY void BuildCDF(const WaveFront::TriangleLight* a_Lights, const unsigned a_NumLights);
+
+	/*
 	 * Swap the front and back buffer. This has to be called once per frame.
 	 */
 	void SwapBuffers();
@@ -51,6 +56,20 @@ public:
 	 * Get a GPU pointer to the CDF.
 	 */
 	CDF* GetCdfGpuPointer() const;
+
+	/*
+	 * Get the expected vram usage of ReSTIR with the given settings and light count.
+	 * This is allocated when ReSTIR is initialized.
+	 * The Light CDF resizes based on the light count, but should have minimal impact.
+	 *
+	 * The returned value is in bytes.
+	 */
+	size_t GetExpectedGpuRamUsage(const ReSTIRSettings& a_Settings, size_t a_NumLights) const;
+
+	/*
+	 * Get the size in bytes of all allocated GPU memory owned by ReSTIR.
+	 */
+	size_t GetAllocatedGpuMemory() const;
 
 
 private:

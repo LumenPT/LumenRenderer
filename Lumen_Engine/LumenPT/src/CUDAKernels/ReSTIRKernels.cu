@@ -282,6 +282,7 @@ __host__ void SpatialNeighbourSampling(Reservoir* a_Reservoirs, Reservoir* a_Swa
         fromBuffer = toBuffer;
         toBuffer = temp;
     }
+
 }
 
 //TODO: The bug is that it's swapping buffers per thread in the middle all over the place. Should finish first wave, then swap and continue.
@@ -404,8 +405,6 @@ __host__ void TemporalNeighbourSampling(
 {
     const int blockSize = CUDA_BLOCK_SIZE;
     const int numBlocks = (a_NumPixels + blockSize - 1) / blockSize;
-
-    //TODO pass the motion vector information in here.
 
     CombineTemporalSamplesInternal << <numBlocks, blockSize >> > (a_CurrentReservoirs, a_PreviousReservoirs,
                                                                   a_CurrentPixelData, a_PreviousPixelData, a_Seed, a_NumPixels, a_Dimensions, a_MotionVectorBuffer);
@@ -590,6 +589,7 @@ __device__ void CombineBiased(Reservoir* a_OutputReservoir, int a_Count, Reservo
 
     assert(output.weight >= 0.f);
     assert(output.weightSum >= 0.f);
+    assert(output.weightSum >= 0);
 
     //Override the reservoir for the output at this depth.
     *a_OutputReservoir = output;

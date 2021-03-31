@@ -1,3 +1,4 @@
+#include "Timer.h"
 #ifdef WAVEFRONT
 #include "ReSTIR.h"
 
@@ -29,8 +30,7 @@ CPU_ONLY void ReSTIR::Initialize(const ReSTIRSettings& a_Settings)
 	//Shadow rays.
 	{
 		//At most one shadow ray per reservoir. Always resize even when big enough already, because this is initialization so it should not happen often.
-		const size_t shadowRaySize = sizeof(RestirShadowRay);
-		const size_t size = static_cast<size_t>(m_Settings.width) * static_cast<size_t>(m_Settings.height) * m_Settings.numReservoirsPerPixel * shadowRaySize;
+		const size_t size = static_cast<size_t>(m_Settings.width) * static_cast<size_t>(m_Settings.height) * m_Settings.numReservoirsPerPixel;
 		WaveFront::CreateAtomicBuffer<RestirShadowRay>(&m_ShadowRays, size);
 	}
 
@@ -82,7 +82,7 @@ CPU_ONLY void ReSTIR::Run(
 	const auto temporalIndex = currentIndex == 1 ? 0 : 1;
 
 	//The seed will be modified over time.
-	auto seed = a_Seed;
+	auto seed = WangHash(a_Seed);
 
 	const unsigned numPixels = m_Settings.width * m_Settings.height;
 	const uint2 dimensions = uint2{ m_Settings.width, m_Settings.height };
@@ -90,35 +90,33 @@ CPU_ONLY void ReSTIR::Run(
 	//TODO: take camera position and direction into account when doing RIS.
 	//TODO: Also use light area.
 
-
+	//Timer for measuring performance.
+	Timer timer;
 
 	/*
      * Resize buffers based on the amount of lights and update data.
      * This uploads all triangle lights. May want to move this to the wavefront pipeline class and instead take the pointer from it.
      */
-     //CDF
-	{
-		const auto cdfNeededSize = sizeof(CDF) + (a_NumLights * sizeof(float));
-		//Allocate enough memory for the CDF struct and the fixed sum entries.
-		if(m_Cdf.GetSize() < cdfNeededSize)
-		{
-			m_Cdf.Resize(cdfNeededSize);
-		}
 
-		//Insert the light data in the CDF.
-		FillCDF(static_cast<CDF*>(m_Cdf.GetDevicePtr()), a_Lights, a_NumLights);
-	}
+	//Update the CDF for the provided light sources.
+	timer.reset();
+	BuildCDF(a_Lights, a_NumLights);
+	printf("Building CDF time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
+
 	//Fill light bags with values from the CDF.
 	{
-		seed = WangHash(seed);
-		FillLightBags(m_Settings.numLightBags, m_Settings.numLightsPerBag, static_cast<CDF*>(m_Cdf.GetDevicePtr()), static_cast<LightBagEntry*>(m_LightBags.GetDevicePtr()), a_Lights, seed);
+		timer.reset();
+		FillLightBags(m_Settings.numLightBags, m_Settings.numLightsPerBag, static_cast<CDF*>(m_Cdf.GetDevicePtr()), static_cast<LightBagEntry*>(m_LightBags.GetDevicePtr()), a_Lights, a_Seed);
+		printf("Filling light bags time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
 	}
 
 	/*
 	 * Pick primary samples in parallel. Store the samples in the reservoirs.
 	 */
 	seed = WangHash(seed);
+	timer.reset();
 	PickPrimarySamples(static_cast<LightBagEntry*>(m_LightBags.GetDevicePtr()), static_cast<Reservoir*>(m_Reservoirs[currentIndex].GetDevicePtr()), m_Settings, a_CurrentPixelData, seed);
+	printf("Picking primary samples time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
 
 	/*
 	 * Generate shadow rays for each reservoir and resolve them.
@@ -138,7 +136,9 @@ CPU_ONLY void ReSTIR::Run(
 	//Tell Optix to resolve all shadow rays, which sets reservoir weight to 0 when occluded.
 	if(numRaysGenerated > 0)
 	{
+		timer.reset();
 		a_OptixSystem->TraceRays(numRaysGenerated, params);
+		printf("Tracing ReSTIR shadow rays time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
 	}
 
 	/*
@@ -147,6 +147,7 @@ CPU_ONLY void ReSTIR::Run(
 	if (m_Settings.enableTemporal)
 	{
 		seed = WangHash(seed);
+		timer.reset();
 		TemporalNeighbourSampling(
 			m_Reservoirs[currentIndex].GetDevicePtr<Reservoir>(),
 			m_Reservoirs[temporalIndex].GetDevicePtr<Reservoir>(),
@@ -157,6 +158,7 @@ CPU_ONLY void ReSTIR::Run(
 			dimensions,
 			a_MotionVectorBuffer
 		);
+		printf("Temporal sampling time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
 	}
 
 	/*
@@ -165,6 +167,7 @@ CPU_ONLY void ReSTIR::Run(
 	if(m_Settings.enableSpatial)
 	{
 		seed = WangHash(seed);
+		timer.reset();
 		SpatialNeighbourSampling(
 			static_cast<Reservoir*>(m_Reservoirs[currentIndex].GetDevicePtr()),
 			static_cast<Reservoir*>(m_Reservoirs[2].GetDevicePtr()), 
@@ -172,17 +175,43 @@ CPU_ONLY void ReSTIR::Run(
 			seed,
 			dimensions
 		);
+		printf("Spatial sampling time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
 	}
 
+	timer.reset();
 	GenerateWaveFrontShadowRays(
 		static_cast<Reservoir*>(m_Reservoirs[currentIndex].GetDevicePtr()),
 		a_CurrentPixelData,
 		a_WaveFrontShadowRayBuffer,
 		numPixels
 	);
+	printf("Generating wavefront shadow rays time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
+
+	//Ensure CUDA is done executing now.
+	cudaDeviceSynchronize();
 
 	//Ensure that swap buffers is called.
 	m_SwapDirtyFlag = false;
+}
+
+void ReSTIR::BuildCDF(const WaveFront::TriangleLight* a_Lights, const unsigned a_NumLights)
+{
+	/*
+     * Resize buffers based on the amount of lights and update data.
+     * This uploads all triangle lights. May want to move this to the wavefront pipeline class and instead take the pointer from it.
+     */
+     //CDF
+	{
+		const auto cdfNeededSize = sizeof(CDF) + (a_NumLights * sizeof(float));
+		//Allocate enough memory for the CDF struct and the fixed sum entries.
+		if (m_Cdf.GetSize() < cdfNeededSize)
+		{
+			m_Cdf.Resize(cdfNeededSize);
+		}
+
+		//Insert the light data in the CDF.
+		FillCDF(static_cast<CDF*>(m_Cdf.GetDevicePtr()), a_Lights, a_NumLights);
+	}
 }
 
 void ReSTIR::SwapBuffers()
@@ -200,5 +229,27 @@ void ReSTIR::SwapBuffers()
 CDF* ReSTIR::GetCdfGpuPointer() const
 {
 	return static_cast<CDF*>(m_Cdf.GetDevicePtr());
+}
+
+size_t ReSTIR::GetExpectedGpuRamUsage(const ReSTIRSettings& a_Settings, size_t a_NumLights) const
+{
+	const size_t reservoirSize = static_cast<size_t>(a_Settings.width) * static_cast<size_t>(a_Settings.height) * a_Settings.numReservoirsPerPixel * sizeof(Reservoir) * 3;
+	const size_t cdfSize = a_NumLights * sizeof(float);
+	const size_t lightBagSize = sizeof(LightBagEntry) * a_Settings.numLightsPerBag * a_Settings.numLightBags;
+	const size_t shadowRaySize = sizeof(WaveFront::AtomicBuffer<RestirShadowRay>) + (static_cast<size_t>(a_Settings.width) * static_cast<size_t>(a_Settings.height) * a_Settings.numReservoirsPerPixel * sizeof(RestirShadowRay));
+
+	return reservoirSize + cdfSize + lightBagSize + shadowRaySize;
+}
+
+size_t ReSTIR::GetAllocatedGpuMemory() const
+{
+	return
+		m_Reservoirs[0].GetSize()
+		+ m_Reservoirs[1].GetSize()
+		+ m_Reservoirs[2].GetSize()
+		+ m_Cdf.GetSize()
+		+ m_ShadowRays.GetSize()
+		+ m_LightBags.GetSize()
+    ;
 }
 #endif

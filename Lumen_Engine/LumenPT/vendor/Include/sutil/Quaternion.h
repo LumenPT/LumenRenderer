@@ -41,72 +41,74 @@ namespace sutil
 class Quaternion
 {
 public:
-    Quaternion()
+    SUTIL_INLINE SUTIL_HOSTDEVICE Quaternion()
     { q[0] = q[1] = q[2] = q[3] = 0.0; }
 
-    Quaternion( float w, float x, float y, float z )
+    SUTIL_INLINE SUTIL_HOSTDEVICE Quaternion( float w, float x, float y, float z )
     { q[0] = w; q[1] = x; q[2] = y; q[3] = z; }
 
-    Quaternion( const float3& from, const float3& to );
+    SUTIL_INLINE SUTIL_HOSTDEVICE Quaternion( const float3& from, const float3& to );
 
-    Quaternion( const Quaternion& a )
+    SUTIL_INLINE SUTIL_HOSTDEVICE Quaternion( const Quaternion& a )
     { q[0] = a[0];  q[1] = a[1];  q[2] = a[2];  q[3] = a[3]; }
 
-    Quaternion ( float angle, const float3& axis );
+    SUTIL_INLINE SUTIL_HOSTDEVICE Quaternion ( float angle, const float3& axis );
 
     // getters and setters
-    void setW(float _w)       { q[0] = _w; }
-    void setX(float _x)       { q[1] = _x; }
-    void setY(float _y)       { q[2] = _y; }
-    void setZ(float _z)       { q[3] = _z; }
-    float w() const           { return q[0]; }
-    float x() const           { return q[1]; }
-    float y() const           { return q[2]; }
-    float z() const           { return q[3]; }
+    SUTIL_INLINE SUTIL_HOSTDEVICE void setW(float _w)       { q[0] = _w; }
+    SUTIL_INLINE SUTIL_HOSTDEVICE void setX(float _x)       { q[1] = _x; }
+    SUTIL_INLINE SUTIL_HOSTDEVICE void setY(float _y)       { q[2] = _y; }
+    SUTIL_INLINE SUTIL_HOSTDEVICE void setZ(float _z)       { q[3] = _z; }
+    SUTIL_INLINE SUTIL_HOSTDEVICE float w() const           { return q[0]; }
+    SUTIL_INLINE SUTIL_HOSTDEVICE float x() const           { return q[1]; }
+    SUTIL_INLINE SUTIL_HOSTDEVICE float y() const           { return q[2]; }
+    SUTIL_INLINE SUTIL_HOSTDEVICE float z() const           { return q[3]; }
 
 
-    Quaternion& operator-=(const Quaternion& r)
+    SUTIL_INLINE SUTIL_HOSTDEVICE Quaternion& operator-=(const Quaternion& r)
     { q[0] -= r[0]; q[1] -= r[1]; q[2] -= r[2]; q[3] -= r[3]; return *this; }
 
-    Quaternion& operator+=(const Quaternion& r)
+    SUTIL_INLINE SUTIL_HOSTDEVICE Quaternion& operator+=(const Quaternion& r)
     { q[0] += r[0]; q[1] += r[1]; q[2] += r[2]; q[3] += r[3]; return *this; }
 
-    Quaternion& operator*=(const Quaternion& r);
+    SUTIL_INLINE SUTIL_HOSTDEVICE Quaternion& operator*=(const Quaternion& r);
 
-    Quaternion& operator/=(const float a);
+    SUTIL_INLINE SUTIL_HOSTDEVICE Quaternion& operator/=(const float a);
 
-    Quaternion conjugate()
+    SUTIL_INLINE SUTIL_HOSTDEVICE Quaternion conjugate()
     { return Quaternion( q[0], -q[1], -q[2], -q[3] ); }
 
-    void rotation( float& angle, float3& axis ) const;
-    void rotation( float& angle, float& x, float& y, float& z ) const;
-    Matrix4x4 rotationMatrix() const;
+    SUTIL_INLINE SUTIL_HOSTDEVICE void rotation( float& angle, float3& axis ) const;
+    SUTIL_INLINE SUTIL_HOSTDEVICE void rotation( float& angle, float& x, float& y, float& z ) const;
+    SUTIL_INLINE SUTIL_HOSTDEVICE Matrix4x4 rotationMatrix() const;
+    SUTIL_INLINE SUTIL_HOSTDEVICE Matrix3x3 ToMat3() const;
 
-    float& operator[](int i)      { return q[i]; }
-    float operator[](int i)const  { return q[i]; }
+    SUTIL_INLINE SUTIL_HOSTDEVICE float& operator[](int i)      { return q[i]; }
+    SUTIL_INLINE SUTIL_HOSTDEVICE float operator[](int i)const  { return q[i]; }
 
     // l2 norm
-    float norm() const
+    SUTIL_INLINE SUTIL_HOSTDEVICE float norm() const
     { return sqrtf(q[0]*q[0] + q[1]*q[1] + q[2]*q[2] + q[3]*q[3]); }
 
-    float  normalize();
+    SUTIL_INLINE SUTIL_HOSTDEVICE float  normalize();
 
 private:
     float q[4];
 };
 
 
-inline Quaternion::Quaternion( const float3& from, const float3& to )
+SUTIL_INLINE SUTIL_HOSTDEVICE  Quaternion::Quaternion( const float3& from, const float3& to )
 {
     const float3 c = cross( from, to );
     q[0] = dot(from, to);
     q[1] = c.x;
     q[2] = c.y;
     q[3] = c.z;
+    
 }
 
 
-inline Quaternion::Quaternion( float angle, const float3&  axis )
+SUTIL_INLINE SUTIL_HOSTDEVICE  Quaternion::Quaternion( float angle, const float3&  axis )
 {
     const float  n        = length( axis );
     const float  inverse  = 1.0f/n;
@@ -120,7 +122,7 @@ inline Quaternion::Quaternion( float angle, const float3&  axis )
 }
 
 
-inline Quaternion& Quaternion::operator*=(const Quaternion& r)
+SUTIL_INLINE SUTIL_HOSTDEVICE  Quaternion& Quaternion::operator*=(const Quaternion& r)
 {
 
     float w = q[0]*r[0] - q[1]*r[1] - q[2]*r[2] - q[3]*r[3];
@@ -136,7 +138,7 @@ inline Quaternion& Quaternion::operator*=(const Quaternion& r)
 }
 
 
-inline Quaternion& Quaternion::operator/=(const float a)
+SUTIL_INLINE SUTIL_HOSTDEVICE  Quaternion& Quaternion::operator/=(const float a)
 {
     float inverse = 1.0f/a;
     q[0] *= inverse;
@@ -146,7 +148,7 @@ inline Quaternion& Quaternion::operator/=(const float a)
     return *this;
 }
 
-inline void Quaternion::rotation( float& angle, float3& axis ) const
+SUTIL_INLINE SUTIL_HOSTDEVICE  void Quaternion::rotation( float& angle, float3& axis ) const
 {
     Quaternion n = *this;
     n.normalize();
@@ -156,7 +158,7 @@ inline void Quaternion::rotation( float& angle, float3& axis ) const
     angle = 2.0f * acosf(n[0]);
 }
 
-inline void Quaternion::rotation(
+SUTIL_INLINE SUTIL_HOSTDEVICE  void Quaternion::rotation(
         float& angle,
         float& x,
         float& y,
@@ -171,7 +173,7 @@ inline void Quaternion::rotation(
     angle = 2.0f * acosf(n[0]);
 }
 
-inline float Quaternion::normalize()
+SUTIL_INLINE SUTIL_HOSTDEVICE  float Quaternion::normalize()
 {
     float n = norm();
     float inverse = 1.0f/n;
@@ -183,45 +185,45 @@ inline float Quaternion::normalize()
 }
 
 
-inline Quaternion operator*(const float a, const Quaternion &r)
+SUTIL_INLINE SUTIL_HOSTDEVICE  Quaternion operator*(const float a, const Quaternion &r)
 { return Quaternion(a*r[0], a*r[1], a*r[2], a*r[3]); }
 
 
-inline Quaternion operator*(const Quaternion &r, const float a)
+SUTIL_INLINE SUTIL_HOSTDEVICE  Quaternion operator*(const Quaternion &r, const float a)
 { return Quaternion(a*r[0], a*r[1], a*r[2], a*r[3]); }
 
 
-inline Quaternion operator/(const Quaternion &r, const float a)
+SUTIL_INLINE SUTIL_HOSTDEVICE  Quaternion operator/(const Quaternion &r, const float a)
 {
     float inverse = 1.0f/a;
     return Quaternion( r[0]*inverse, r[1]*inverse, r[2]*inverse, r[3]*inverse);
 }
 
 
-inline Quaternion operator/(const float a, const Quaternion &r)
+SUTIL_INLINE SUTIL_HOSTDEVICE  Quaternion operator/(const float a, const Quaternion &r)
 {
     float inverse = 1.0f/a;
     return Quaternion( r[0]*inverse, r[1]*inverse, r[2]*inverse, r[3]*inverse);
 }
 
 
-inline Quaternion operator-(const Quaternion& l, const Quaternion& r)
+SUTIL_INLINE SUTIL_HOSTDEVICE  Quaternion operator-(const Quaternion& l, const Quaternion& r)
 { return Quaternion(l[0]-r[0], l[1]-r[1], l[2]-r[2], l[3]-r[3]); }
 
 
-inline bool operator==(const Quaternion& l, const Quaternion& r)
+SUTIL_INLINE SUTIL_HOSTDEVICE  bool operator==(const Quaternion& l, const Quaternion& r)
 { return ( l[0] == r[0] && l[1] == r[1] && l[2] == r[2] && l[3] == r[3] ); }
 
 
-inline bool operator!=(const Quaternion& l, const Quaternion& r)
+SUTIL_INLINE SUTIL_HOSTDEVICE  bool operator!=(const Quaternion& l, const Quaternion& r)
 { return !(l == r); }
 
 
-inline Quaternion operator+(const Quaternion& l, const Quaternion& r)
+SUTIL_INLINE SUTIL_HOSTDEVICE  Quaternion operator+(const Quaternion& l, const Quaternion& r)
 { return Quaternion(l[0]+r[0], l[1]+r[1], l[2]+r[2], l[3]+r[3]); }
 
 
-inline Quaternion operator*(const Quaternion& l, const Quaternion& r)
+SUTIL_INLINE SUTIL_HOSTDEVICE  Quaternion operator*(const Quaternion& l, const Quaternion& r)
 {
     float w = l[0]*r[0] - l[1]*r[1] - l[2]*r[2] - l[3]*r[3];
     float x = l[0]*r[1] + l[1]*r[0] + l[2]*r[3] - l[3]*r[2];
@@ -230,13 +232,13 @@ inline Quaternion operator*(const Quaternion& l, const Quaternion& r)
     return Quaternion( w, x, y, z );
 }
 
-inline float dot( const Quaternion& l, const Quaternion& r )
+SUTIL_INLINE SUTIL_HOSTDEVICE  float dot( const Quaternion& l, const Quaternion& r )
 {
     return l.w()*r.w() + l.x()*r.x() + l.y()*r.y() + l.z()*r.z();
 }
 
 
-inline Matrix4x4 Quaternion::rotationMatrix() const
+SUTIL_INLINE SUTIL_HOSTDEVICE  Matrix4x4 Quaternion::rotationMatrix() const
 {
     Matrix4x4 m;
 
@@ -266,6 +268,34 @@ inline Matrix4x4 Quaternion::rotationMatrix() const
     m[3*4+3] = 1.0f;
 
     return m;
+}
+
+SUTIL_INLINE SUTIL_HOSTDEVICE  Matrix3x3 Quaternion::ToMat3() const
+{
+    Matrix3x3 Result;
+    float qxx(q[1] * q[1]);
+    float qyy(q[2] * q[2]);
+    float qzz(q[3] * q[3]);
+    float qxz(q[1] * q[3]);
+    float qxy(q[1] * q[2]);
+    float qyz(q[2] * q[3]);
+    float qwx(q[0] * q[1]);
+    float qwy(q[0] * q[2]);
+    float qwz(q[0] * q[3]);
+
+    Result[0 * 3 + 0] = 1.f - 2.f * (qyy + qzz);
+    Result[1 * 3 + 0] = 2.f * (qxy + qwz);
+    Result[2 * 3 + 0] = 2.f * (qxz - qwy);
+
+    Result[0 * 3 + 1] = 2.f * (qxy - qwz);
+    Result[1 * 3 + 1] = 1.f - 2.f * (qxx + qzz);
+    Result[2 * 3 + 1] = 2.f * (qyz + qwx);
+
+    Result[0 * 3 + 2] = 2.f * (qxz + qwy);
+    Result[1 * 3 + 2] = 2.f * (qyz - qwx);
+    Result[2 * 3 + 2] = 1.f - 2.f * (qxx + qyy);
+
+    return Result;
 }
 
 } // end namespace sutil
