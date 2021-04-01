@@ -122,7 +122,8 @@ CPU_ONLY void ReSTIR::Run(
 	 * Generate shadow rays for each reservoir and resolve them.
 	 * If a shadow ray is occluded, the reservoirs weight is set to 0.
 	 */
-	const unsigned int numRaysGenerated = GenerateReSTIRShadowRays(&m_ShadowRays, static_cast<Reservoir*>(m_Reservoirs[currentIndex].GetDevicePtr()), a_CurrentPixelData, numPixels);
+	const auto numReservoirs = numPixels * m_Settings.numReservoirsPerPixel;
+	const unsigned int numRaysGenerated = GenerateReSTIRShadowRays(&m_ShadowRays, static_cast<Reservoir*>(m_Reservoirs[currentIndex].GetDevicePtr()), a_CurrentPixelData, numReservoirs);
 
 	//Parameters for optix launch.
 	WaveFront::OptixLaunchParameters params;
@@ -154,7 +155,6 @@ CPU_ONLY void ReSTIR::Run(
 			a_CurrentPixelData,
 			a_PreviousPixelData,
 			seed,
-			numPixels,
 			dimensions,
 			a_MotionVectorBuffer
 		);
