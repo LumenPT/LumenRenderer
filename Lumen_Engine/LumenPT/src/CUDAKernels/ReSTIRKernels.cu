@@ -148,9 +148,13 @@ __global__ void PickPrimarySamplesInternal(const LightBagEntry* const a_LightBag
     //Base Seed depending on pixel index.
     auto seed = WangHash(a_Seed + WangHash(index));
 
-    //First reset the reservoir to discard old data.
-    auto* reservoir = &a_Reservoirs[index];
-    reservoir->Reset();
+    //Fresh reservoir to start with.
+    Reservoir fresh;
+
+    int pickedLightIndex;
+    LightBagEntry pickedEntry;
+    WaveFront::TriangleLight light;
+    float initialPdf;
 
     //Generate the amount of samples specified per reservoir.
     for (int sample = 0; sample < a_NumPrimarySamples; ++sample)
@@ -158,10 +162,10 @@ __global__ void PickPrimarySamplesInternal(const LightBagEntry* const a_LightBag
         //Random number using the pixel id.
         const float r = RandomFloat(seed);
 
-        const int pickedLightIndex = static_cast<int>(roundf(static_cast<float>(a_NumLightsPerBag - 1) * r));
-        const LightBagEntry pickedEntry = pickedLightBag[pickedLightIndex];
-        const WaveFront::TriangleLight light = pickedEntry.light;
-        const float initialPdf = pickedEntry.pdf;
+        pickedLightIndex = static_cast<int>(roundf(static_cast<float>(a_NumLightsPerBag - 1) * r));
+        pickedEntry = pickedLightBag[pickedLightIndex];
+        light = pickedEntry.light;
+        initialPdf = pickedEntry.pdf;
 
         //Generate random UV coordinates. Between 0 and 1.
         const float u = RandomFloat(seed);  //Seed is altered after each shift, which makes it work with the same uint.
@@ -187,11 +191,15 @@ __global__ void PickPrimarySamplesInternal(const LightBagEntry* const a_LightBag
         //The final PDF for the light in this reservoir is the solid angle divided by the original PDF of the light being chosen based on radiance.
         //Dividing scales the value up.
         const auto pdf = lightSample.solidAnglePdf / initialPdf;
-        reservoir->Update(lightSample, pdf, seed);
+        fresh.Update(lightSample, pdf, seed);
     }
 
     //Finally update the reservoir weight.
-    reservoir->UpdateWeight();
+    fresh.UpdateWeight();
+
+    //Override the old reservoir.
+    auto* reservoir = &a_Reservoirs[index];
+    *reservoir = fresh;
 }
 
 __host__ unsigned int GenerateReSTIRShadowRays(MemoryBuffer* a_AtomicBuffer, Reservoir* a_Reservoirs, const WaveFront::SurfaceData* a_PixelData, unsigned a_NumPixels)
