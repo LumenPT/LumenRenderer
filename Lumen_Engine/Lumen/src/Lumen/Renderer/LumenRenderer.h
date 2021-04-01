@@ -84,6 +84,14 @@ public:
 
 	virtual unsigned int TraceFrame(std::shared_ptr<Lumen::ILumenScene>& a_Scene) = 0;	//scene argument may be redundant... or not 
 
+	virtual void SetRenderResolution(glm::uvec2 a_NewResolution) = 0;
+	virtual void SetOutputResolution(glm::uvec2 a_NewResolution) = 0;
+
+	void SetRenderResolution(uint32_t a_NewWidth, uint32_t a_NewHeight) { SetRenderResolution(glm::uvec2(a_NewWidth, a_NewHeight)); }
+	void SetOutputResolution(uint32_t a_NewWidth, uint32_t a_NewHeight) { SetOutputResolution(glm::uvec2(a_NewWidth, a_NewHeight)); }
+
+	virtual glm::uvec2 GetRenderResolution() = 0;
+	virtual glm::uvec2 GetOutputResolution() = 0;
 
 	virtual void BeginSnapshot() = 0;
 
