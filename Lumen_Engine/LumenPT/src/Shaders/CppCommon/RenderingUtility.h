@@ -100,10 +100,8 @@ __device__ __forceinline__ float3 MicrofacetBRDF(const float3 WIN, const float3 
     float denominator = 4.0 * fmax(dot(N, WIN), 0.0f) * fmax(dot(N, WOUT), 0.0f);
     const float3 specular = numerator / fmax(denominator, 0.001f);
 
-    //const float3 ks = F;
     const float3 kd = (1.0f - F) * (1.0f - metallic);
     const float3 diffuse = albedo / M_PIf;
-
     return kd * diffuse + specular;
 }
 

@@ -150,8 +150,8 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
             output->m_Normal = normalize(A->m_Normal + B->m_Normal + C->m_Normal);  //TODO untested.
             output->m_Position = currRay->m_Origin + currRay->m_Direction * currIntersection->m_IntersectionT;
             output->m_IncomingRayDirection = currRay->m_Direction;
-            output->m_Metallic = 0.f;     //TODO
-            output->m_Roughness = 1.f;    //TODO
+            output->m_Metallic = 1.f;     //TODO
+            output->m_Roughness = 0.2f;    //TODO
             output->m_TransportFactor = currRay->m_Contribution;
         }
     }

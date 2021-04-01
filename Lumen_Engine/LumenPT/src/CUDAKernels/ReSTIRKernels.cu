@@ -127,7 +127,16 @@ __global__ void PickPrimarySamplesInternal(const LightBagEntry* const a_LightBag
 
     //Seed for this thread index.
     //Seed is the same for each block so that they all get the same light bag.
-    auto lBagSeed = WangHash(a_Seed + blockIdx.x);
+
+    //This would pick the light bag index based on the block index. Multiple blocks may share a cache though.
+    //auto lBagSeed = WangHash(a_Seed + blockIdx.x);
+
+    //This picks the light bag index based on the SM id. Every SM has its own L1 cache. Multiple blocks may execute on one SM at a time.
+    //This line thus causes the L1 cache to only access a single light bag, which stops a lot of cache misses.
+    //TODO: This means that depending on the blocks per SM, a single light bag may be used for multiple rows of pixels. Ensure no artifacts occur (difference in light in interleaved rows).
+    //TODO: If this occurs, consider either changing back (performance loss) or interleaving the pixels in a way where a row of 256 pixels is actually a 16x16 area in the screen.
+    auto lBagSeed = WangHash(a_Seed + __mysmid());
+
     const float random = RandomFloat(lBagSeed);
 
     //Generate between 0 and 1, then round and pick a light bag index based on the total light bag amount.
@@ -642,6 +651,7 @@ __device__ __inline__ void Resample(LightSample* a_Input, const WaveFront::Surfa
     //The unshadowed contribution (contributed if no obstruction is between the light and surface) takes the BRDF,
     //geometry factor and solid angle into account. Also the light radiance.
     //The only thing missing from this is the scaling with the rest of the scene based on the reservoir PDF.
+    //Note: No need to multiply with transport factor because this is depth 0. It is always {1, 1, 1}.
     const auto unshadowedPathContribution = brdf * solidAngle * cosIn * a_Output->radiance;
     a_Output->unshadowedPathContribution = unshadowedPathContribution;
 
@@ -710,5 +720,12 @@ __global__ void GenerateWaveFrontShadowRaysInternal(Reservoir* a_Reservoirs, con
             }
         }
     }
+}
+
+uint32_t __mysmid()
+{
+    uint32_t smid;
+    asm volatile("mov.u32 %0, %%smid;" : "=r"(smid));
+    return smid;
 }
 
