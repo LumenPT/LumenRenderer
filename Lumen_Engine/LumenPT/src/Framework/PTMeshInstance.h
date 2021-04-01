@@ -6,20 +6,28 @@
 class PTScene;
 class PTServiceLocator;
 
+// Extension of the base class which takes API implementation details into account
 class PTMeshInstance : public Lumen::MeshInstance
 {
 public:
+    // Default constructor creates an instance without a mesh attached to it
+    // In this case the instance is not rendered because there is no geometry associated with it
     PTMeshInstance(PTServiceLocator& a_ServiceLocator);
+    // Constructor used when building a scene out of given scene data. This is necessary to convert from
+    // the base mesh instance class to this one because of the service locator requirement
     PTMeshInstance(const Lumen::MeshInstance& a_Instance, PTServiceLocator& a_ServiceLocator);
 
+    // Function that gets called when the transform is modified externally
+    // Used to notify the scene that the instance has been transformed, and an acceleration structure update is in order
     void DependencyCallback();
+
     // Function called under the hood to establish a connection between the instance and the scene
     // Necessary for the acceleration structures to be rebuilt when the transform changes
     void SetSceneRef(PTScene* a_SceneRef);
 
     void SetMesh(std::shared_ptr<Lumen::ILumenMesh> a_Mesh) override;
 
-    PTScene* m_SceneRef;
-    PTServiceLocator& m_Services;
+    PTScene* m_SceneRef; // Reference to the scene the instance is a part of
+    PTServiceLocator& m_Services; // Reference to the path tracer service locator
 
 };

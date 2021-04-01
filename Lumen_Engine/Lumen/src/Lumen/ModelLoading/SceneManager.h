@@ -148,9 +148,9 @@ namespace Lumen
 	private:
 		std::map<std::string, GLTFResource> m_LoadedScenes;
 
-		//std::vector<std::shared_ptr<Texture>> LoadTextures(fx::gltf::Document& a_Doc, std::string a_Filepath);
-		//std::vector<std::shared_ptr<Texture>> LoadMaterials(fx::gltf::Document& a_Doc, GLTFResource& a_resource);
-		//std::vector<std::shared_ptr<Texture>> LoadMeshes(fx::gltf::Document& a_Doc, std::string a_Filepath);
+		//std::vector<std::shared_ptr<PTTexture>> LoadTextures(fx::gltf::Document& a_Doc, std::string a_Filepath);
+		//std::vector<std::shared_ptr<PTTexture>> LoadMaterials(fx::gltf::Document& a_Doc, GLTFResource& a_resource);
+		//std::vector<std::shared_ptr<PTTexture>> LoadMeshes(fx::gltf::Document& a_Doc, std::string a_Filepath);
 
 		//std::vector<std::shared_ptr<GLTFResource>> LoadScenes(fx::gltf::Document& a_Doc, std::string a_Filepath);
 
