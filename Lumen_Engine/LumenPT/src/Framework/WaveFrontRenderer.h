@@ -66,7 +66,12 @@ namespace WaveFront
         void BeginSnapshot() override;
 
         std::unique_ptr<FrameSnapshot> EndSnapshot() override;
-    	
+
+
+        void SetRenderResolution(glm::uvec2 a_NewResolution) override;
+        void SetOutputResolution(glm::uvec2 a_NewResolution) override;
+        glm::uvec2 GetRenderResolution() override;
+        glm::uvec2 GetOutputResolution() override;
     private:
 
         std::unique_ptr<MemoryBuffer> InterleaveVertexData(const PrimitiveData& a_MeshData) const;

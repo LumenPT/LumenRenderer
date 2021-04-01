@@ -29,7 +29,7 @@ CPU_ON_GPU void GeneratePrimaryRay(
     float3 a_V,
     float3 a_W,
     float3 a_Eye,
-    int2 a_Dimensions,
+    uint2 a_Dimensions,
     unsigned int a_FrameCount)
 {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
