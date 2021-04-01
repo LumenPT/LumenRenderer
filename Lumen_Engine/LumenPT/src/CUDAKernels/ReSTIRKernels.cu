@@ -280,9 +280,9 @@ __host__ void SpatialNeighbourSampling(Reservoir* a_Reservoirs, Reservoir* a_Swa
      * - Maybe limit the amount of threads per block for optimal cache hits.
      * - Blocks in the same SM need to operate on the same region of pixel data.
      */
-    const unsigned numPixels = a_Dimensions.x * a_Dimensions.y;
-    const int blockSize = 256;
-    const int numBlocks = (numPixels + blockSize - 1) / blockSize;
+    const unsigned numReservoirs = a_Dimensions.x * a_Dimensions.y * ReSTIRSettings::numReservoirsPerPixel;
+    const int blockSize = CUDA_BLOCK_SIZE;
+    const int numBlocks = (numReservoirs + blockSize - 1) / blockSize;
 
     Reservoir* fromBuffer = a_Reservoirs;
     Reservoir* toBuffer = a_SwapBuffer;
@@ -290,7 +290,7 @@ __host__ void SpatialNeighbourSampling(Reservoir* a_Reservoirs, Reservoir* a_Swa
     //Synchronize between each swap, and then swap the buffers.
     for (int iteration = 0; iteration < ReSTIRSettings::numSpatialIterations; ++iteration)
     {
-        SpatialNeighbourSamplingInternal<<<numBlocks, blockSize >>>(fromBuffer, toBuffer, a_PixelData, a_Seed, a_Dimensions, numPixels);
+        SpatialNeighbourSamplingInternal<<<numBlocks, blockSize >>>(fromBuffer, toBuffer, a_PixelData, a_Seed, a_Dimensions, numReservoirs);
         cudaDeviceSynchronize();
         CHECKLASTCUDAERROR;
 
@@ -304,96 +304,196 @@ __host__ void SpatialNeighbourSampling(Reservoir* a_Reservoirs, Reservoir* a_Swa
 
 __global__ void SpatialNeighbourSamplingInternal(Reservoir* a_Reservoirs, Reservoir* a_SwapBuffer,
     const WaveFront::SurfaceData* a_PixelData, const std::uint32_t a_Seed, uint2 a_Dimensions,
-    unsigned a_NumPixels)
+    unsigned a_NumReservoirs)
 {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
-    if (index >= a_NumPixels) return;
+    if (index >= a_NumReservoirs) return;
 
     //Storage for reservoirs and pixels to be combined.
-    WaveFront::SurfaceData toCombinePixelData[ReSTIRSettings::numSpatialSamples + 1];
-    Reservoir toCombineReservoirs[ReSTIRSettings::numSpatialSamples + 1];
+    const WaveFront::SurfaceData* toCombinePixelData[ReSTIRSettings::numSpatialSamples + 1];
+    Reservoir* toCombineReservoirs[ReSTIRSettings::numSpatialSamples + 1];
 
     //The seed unique to this pixel.
     auto seed =  WangHash(a_Seed + index);
-    
-    toCombinePixelData[0] = a_PixelData[index];
 
-    for (int depth = 0; depth < ReSTIRSettings::numReservoirsPerPixel; ++depth)
+    const auto pixelIndex = index / ReSTIRSettings::numReservoirsPerPixel;
+    const auto currentDepth = index - (pixelIndex * ReSTIRSettings::numReservoirsPerPixel);
+    toCombinePixelData[0] = &a_PixelData[pixelIndex];
+
+    //Only run when there's an intersection for this pixel.
+    if (toCombinePixelData[0]->m_IntersectionT > 0.f && !toCombinePixelData[0]->m_Emissive)
     {
-        //Only run when there's an intersection for this pixel.
-        if (toCombinePixelData[0].m_IntersectionT > 0.f && !toCombinePixelData[0].m_Emissive)
+        const int y = pixelIndex / a_Dimensions.x;
+        const int x = pixelIndex - (y * a_Dimensions.x);
+
+        toCombineReservoirs[0] = &a_Reservoirs[index];
+
+        int count = 1;
+
+        for (int neighbour = 1; neighbour <= ReSTIRSettings::numSpatialSamples; ++neighbour)
         {
-            //TODO maybe store this information inside the pixel. Could calculate it once at the start of the frame.
-            const int y = index / a_Dimensions.x;
-            const int x = index - (y * a_Dimensions.x);
+            //TODO This generates a square rn. Make it within a circle.
+            const int neighbourY = round((RandomFloat(seed) * 2.f - 1.f) * static_cast<float>(ReSTIRSettings::spatialSampleRadius)) + y;
+            const int neighbourX = round((RandomFloat(seed) * 2.f - 1.f) * static_cast<float>(ReSTIRSettings::spatialSampleRadius)) + x;
 
-            const auto reservoirIndex = RESERVOIR_INDEX(index, depth, ReSTIRSettings::numReservoirsPerPixel);
-            toCombineReservoirs[0] = a_Reservoirs[reservoirIndex];
-
-            int count = 1;
-
-            for (int neighbour = 1; neighbour <= ReSTIRSettings::numSpatialSamples; ++neighbour)
+            //Only run if within image bounds.
+            if (neighbourX >= 0 && neighbourX < a_Dimensions.x && neighbourY >= 0 && neighbourY < a_Dimensions.y)
             {
-                //TODO This generates a square rn. Make it within a circle.
-                const int neighbourY = round((RandomFloat(seed) * 2.f - 1.f) * static_cast<float>(ReSTIRSettings::spatialSampleRadius)) + y;
-                const int neighbourX = round((RandomFloat(seed) * 2.f - 1.f) * static_cast<float>(ReSTIRSettings::spatialSampleRadius)) + x;
+                //Index of the neighbouring pixel in the pixel array.
+                const int neighbourIndex = PIXEL_INDEX(neighbourX, neighbourY, a_Dimensions.x);
 
-                //Only run if within image bounds.
-                if (neighbourX >= 0 && neighbourX < a_Dimensions.x && neighbourY >= 0 && neighbourY < a_Dimensions.y)
+                //Ensure no out of bounds neighbours are selected.
+                assert(neighbourIndex < a_Dimensions.x * a_Dimensions.y && neighbourIndex >= 0);
+
+                //Overwrite in the array, but don't up the counter yet.
+                toCombinePixelData[count] = &a_PixelData[neighbourIndex];
+
+                //Only run for valid depths and non-emissive surfaces.
+                if (toCombinePixelData[count]->m_IntersectionT > 0.f && !toCombinePixelData[count]->m_Emissive)
                 {
-                    //Index of the neighbouring pixel in the pixel array.
-                    const int neighbourIndex = PIXEL_INDEX(neighbourX, neighbourY, a_Dimensions.x);
+                    toCombineReservoirs[count] = &a_Reservoirs[RESERVOIR_INDEX(neighbourIndex, currentDepth, ReSTIRSettings::numReservoirsPerPixel)];
+                    //Gotta stay positive.
+                    assert(toCombineReservoirs[count].weight >= 0.f);
 
-                    //Ensure no out of bounds neighbours are selected.
-                    assert(neighbourIndex < a_Dimensions.x * a_Dimensions.y && neighbourIndex >= 0);
+                    //Discard samples that are too different.
+                    const float depth1 = toCombinePixelData[count]->m_IntersectionT;
+                    const float depth2 = toCombinePixelData[0]->m_IntersectionT;
+                    const float depthDifPct = fabs(depth1 - depth2) / ((depth1 + depth2) / 2.f);
 
-                    //Overwrite in the array, but don't up the counter yet.
-                    toCombinePixelData[count] = a_PixelData[neighbourIndex];
+                    const float angleDif = dot(toCombinePixelData[count]->m_Normal, toCombinePixelData[0]->m_Normal);	//Between 0 and 1 (0 to 90 degrees). 
+                    static constexpr float MAX_ANGLE_COS = 0.72222222223f;	//Dot product is cos of the angle. If higher than this value, it's within 25 degrees.
 
-                    //Only run for valid depths and non-emissive surfaces.
-                    if (toCombinePixelData[count].m_IntersectionT > 0.f && !toCombinePixelData[count].m_Emissive)
+                    //If the samples are similar enough, up the counter. This will means the samples are not overwritten and will be merged.
+                    if (depthDifPct < 0.10f && angleDif > MAX_ANGLE_COS)
                     {
-                        toCombineReservoirs[count] = a_Reservoirs[RESERVOIR_INDEX(neighbourIndex, depth, ReSTIRSettings::numReservoirsPerPixel)];
-                        //Gotta stay positive.
-                        assert(toCombineReservoirs[count].weight >= 0.f);
-
-                        //Discard samples that are too different.
-                        const float depth1 = toCombinePixelData[count].m_IntersectionT;
-                        const float depth2 = toCombinePixelData[0].m_IntersectionT;
-                        const float depthDifPct = fabs(depth1 - depth2) / ((depth1 + depth2) / 2.f);
-
-                        const float angleDif = dot(toCombinePixelData[count].m_Normal, toCombinePixelData[0].m_Normal);	//Between 0 and 1 (0 to 90 degrees). 
-                        static constexpr float MAX_ANGLE_COS = 0.72222222223f;	//Dot product is cos of the angle. If higher than this value, it's within 25 degrees.
-
-                        //If the samples are similar enough, up the counter. This will means the samples are not overwritten and will be merged.
-                        if (depthDifPct < 0.10f && angleDif > MAX_ANGLE_COS)
-                        {
-                            ++count;
-                        }
+                        ++count;
                     }
                 }
             }
+        }
 
-            //If valid reservoirs to combine were found, combine them.
-            if (count > 1)
+        //If valid reservoirs to combine were found, combine them.
+        if (count > 1)
+        {
+            //INLINE reservoir sampling for efficiency.
+            if (ReSTIRSettings::enableBiased)
             {
-                if (ReSTIRSettings::enableBiased)
+                long long int sampleCountSum = 0;
+                //Output reservoir.
+                Reservoir output;
+
+                //First sample needs no resampling.
+                auto* reservoir = toCombineReservoirs[0];
+                const float weight = static_cast<float>(reservoir->sampleCount) * reservoir->weight * reservoir->sample.solidAnglePdf;
+                output.Update(reservoir->sample, weight, a_Seed);
+                sampleCountSum += reservoir->sampleCount;
+
+                //Iterate over the intersection data to combine.
+                for (int i = 1; i < count; ++i)
                 {
-                    CombineBiased(&a_SwapBuffer[reservoirIndex], count, toCombineReservoirs, &toCombinePixelData[0], seed);
+                    auto* reservoir = toCombineReservoirs[i];
+                    LightSample resampled;
+                    Resample(&(reservoir->sample), toCombinePixelData[0], &resampled);
+                    const float weight = static_cast<float>(reservoir->sampleCount) * reservoir->weight * resampled.solidAnglePdf;
+                    output.Update(resampled, weight, a_Seed);
+                    sampleCountSum += reservoir->sampleCount;
                 }
-                else
-                {
-                    CombineUnbiased(&a_SwapBuffer[reservoirIndex], &toCombinePixelData[0], count, &toCombineReservoirs[0], toCombinePixelData, seed);
-                }
+
+                //Update the sample 
+                output.sampleCount = sampleCountSum;
+                output.UpdateWeight();
+
+                assert(output.weight >= 0.f);
+                assert(output.weightSum >= 0.f);
+                assert(output.sampleCount >= 0);
+                assert(!isnan(output.weight));
+                assert(!isnan(output.weightSum));
+                assert(!isnan(output.sample.solidAnglePdf));
+                assert(output.sample.solidAnglePdf >= 0.f);
+                assert(!isinf(output.sample.solidAnglePdf));
+                assert(!isinf(output.weight));
+                assert(!isinf(output.weightSum));
+
+                //Override the reservoir for the output at this depth.
+                a_SwapBuffer[index] = output;
             }
-            //Not enough reservoirs to combine, but still data needs to be passed on.
             else
             {
-                //Copy the reservoir over directly without any combining.
-                a_SwapBuffer[reservoirIndex] = toCombineReservoirs[0];
+                //Ensure enough reservoirs are passed.
+                Reservoir output;
+                int sampleCountSum = 0;
+
+                //First sample needs no resampling.
+                auto* reservoir = toCombineReservoirs[0];
+                const float weight = static_cast<float>(reservoir->sampleCount) * reservoir->weight * reservoir->sample.solidAnglePdf;
+                output.Update(reservoir->sample, weight, a_Seed);
+                sampleCountSum += reservoir->sampleCount;
+
+                //Merge the other reservoirs in.
+                for (int i = 1; i < count; ++i)
+                {
+                    auto* otherReservoir = toCombineReservoirs[i];
+                    LightSample resampled;
+                    Resample(&otherReservoir->sample, toCombinePixelData[0], &resampled);
+
+                    assert(otherReservoir->weight >= 0.f);
+                    assert(otherReservoir->sampleCount >= 0);
+                    assert(otherReservoir->weightSum >= 0.f);
+                    assert(otherReservoir->sample.solidAnglePdf >= 0.f);
+
+                    const float weight = static_cast<float>(otherReservoir->sampleCount) * otherReservoir->weight * resampled.solidAnglePdf;
+
+                    output.Update(resampled, weight, a_Seed);
+
+                    sampleCountSum += otherReservoir->sampleCount;
+                }
+
+                output.sampleCount = sampleCountSum;
+
+                //Weigh against other pixels to remove bias from their solid angle by re-sampling.
+                int correction = 0;
+
+                for (int i = 0; i < count; ++i)
+                {
+                    auto* otherPixel= toCombinePixelData[i];
+                    LightSample resampled;
+                    Resample(&output.sample, otherPixel, &resampled);
+
+                    if (resampled.solidAnglePdf > 0)
+                    {
+                        correction += a_Reservoirs[index].sampleCount;
+                    }
+                }
+
+
+                //TODO Shadow ray is shot here in ReSTIR to check visibility at every resampled pixel.
+
+                const float m = 1.f / fmaxf(static_cast<float>(correction), MINFLOAT);
+                output.weight = (1.f / fmaxf(output.sample.solidAnglePdf, MINFLOAT)) * (m * output.weightSum);
+
+                assert(output.weight >= 0.f);
+                assert(output.weightSum >= 0.f);
+                assert(output.sampleCount >= 0);
+                assert(!isnan(output.weight));
+                assert(!isnan(output.weightSum));
+                assert(!isnan(output.sample.solidAnglePdf));
+                assert(output.sample.solidAnglePdf >= 0.f);
+                assert(!isinf(output.sample.solidAnglePdf));
+                assert(!isinf(output.weight));
+                assert(!isinf(output.weightSum));
+
+                //Store the output reservoir for the pixel.
+                a_SwapBuffer[index] = output;
             }
         }
+        //Not enough reservoirs to combine, but still data needs to be passed on.
+        else
+        {
+            //Copy the reservoir over directly without any combining.
+            a_SwapBuffer[index] = *toCombineReservoirs[0];
+        }
     }
+    
 }
 
 

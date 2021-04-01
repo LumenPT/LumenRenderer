@@ -92,6 +92,7 @@ CPU_ONLY void ReSTIR::Run(
 
 	//Timer for measuring performance.
 	Timer timer;
+	Timer totalTimer;
 
 	/*
      * Resize buffers based on the amount of lights and update data.
@@ -123,7 +124,9 @@ CPU_ONLY void ReSTIR::Run(
 	 * If a shadow ray is occluded, the reservoirs weight is set to 0.
 	 */
 	const auto numReservoirs = numPixels * m_Settings.numReservoirsPerPixel;
+	timer.reset();
 	const unsigned int numRaysGenerated = GenerateReSTIRShadowRays(&m_ShadowRays, static_cast<Reservoir*>(m_Reservoirs[currentIndex].GetDevicePtr()), a_CurrentPixelData, numReservoirs);
+	if (a_DebugPrint) printf("ReSTIR Shadow Ray Generation time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
 
 	//Parameters for optix launch.
 	WaveFront::OptixLaunchParameters params;
@@ -189,6 +192,9 @@ CPU_ONLY void ReSTIR::Run(
 
 	//Ensure CUDA is done executing now.
 	cudaDeviceSynchronize();
+
+	printf("Total ReSTIR runtime: %f millis.\n", totalTimer.measure(TimeUnit::MILLIS));
+
 
 	//Ensure that swap buffers is called.
 	m_SwapDirtyFlag = false;

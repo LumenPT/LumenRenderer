@@ -111,7 +111,7 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
             a_ShadingParams.m_ShadowRays,
             a_ShadingParams.m_OptixSystem,
             a_ShadingParams.m_MotionVectorBuffer,
-            true
+            false
         );
     }
     else
