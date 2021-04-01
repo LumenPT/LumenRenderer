@@ -95,9 +95,11 @@ __global__ void FillLightBagsInternal(unsigned a_NumLightBags, unsigned a_NumLig
 
 __host__ void PickPrimarySamples(const LightBagEntry* const a_LightBags, Reservoir* a_Reservoirs, const ReSTIRSettings& a_Settings, const WaveFront::SurfaceData * const a_PixelData, const std::uint32_t a_Seed)
 {
-    //TODO ensure that each pixel grid operates within a single block, and that the L1 cache is not overwritten for each value. Optimize for cache hits.
-    //TODO correctly assign a light bag per grid through some random generation.
-
+    /*
+     * This functions uses a single light bag per block.
+     * This means that all threads within a block operate on the same light bag data in the cache.
+     * The pixel access is also optimized for cache hits per block.
+     */
     const auto numReservoirs = (a_Settings.width * a_Settings.height * a_Settings.numReservoirsPerPixel);
     const int blockSize = CUDA_BLOCK_SIZE;
     const int numBlocks = (numReservoirs + blockSize - 1) / blockSize;
@@ -105,94 +107,91 @@ __host__ void PickPrimarySamples(const LightBagEntry* const a_LightBags, Reservo
     (
         a_LightBags,
         a_Reservoirs, a_Settings.numPrimarySamples,
-        a_Settings.width * a_Settings.height,
+        numReservoirs,
+        a_Settings.numReservoirsPerPixel,
         a_Settings.numLightBags,
         a_Settings.numLightsPerBag,
-        a_Settings.numReservoirsPerPixel,
         a_PixelData,
         a_Seed);
     cudaDeviceSynchronize();
     CHECKLASTCUDAERROR;
 }
 
-__global__ void PickPrimarySamplesInternal(const LightBagEntry* const a_LightBags, Reservoir* a_Reservoirs, unsigned a_NumPrimarySamples, unsigned a_NumPixels, unsigned a_NumLightBags, unsigned a_NumLightsPerBag, unsigned a_NumReservoirsPerPixel, const WaveFront::SurfaceData * const a_PixelData, const std::uint32_t a_Seed)
+__global__ void PickPrimarySamplesInternal(const LightBagEntry* const a_LightBags, Reservoir* a_Reservoirs, unsigned a_NumPrimarySamples, unsigned a_NumReservoirs, unsigned a_NumReservoirsPerPixel, unsigned a_NumLightBags, unsigned a_NumLightsPerBag, const WaveFront::SurfaceData * const a_PixelData, const std::uint32_t a_Seed)
 {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
-    int stride = blockDim.x * gridDim.x;
+    if (index >= a_NumReservoirs)
+    {
+        return;
+    }
 
     //Seed for this thread index.
-    auto lightBagSeed = WangHash(a_Seed + blockIdx.x);    //Seed is the same for each block so that they all get the same light bag.
-    const float random = RandomFloat(lightBagSeed);
+    //Seed is the same for each block so that they all get the same light bag.
+    auto lBagSeed = WangHash(a_Seed + blockIdx.x);
+    const float random = RandomFloat(lBagSeed);
 
     //Generate between 0 and 1, then round and pick a light bag index based on the total light bag amount.
-    const int lightBagIndex = static_cast<int>(round(static_cast<float>(a_NumLightBags - 1) * random));
-
+    const int lightBagIndex = static_cast<int>(roundf(static_cast<float>(a_NumLightBags - 1) * random));
     auto* pickedLightBag = &a_LightBags[lightBagIndex * a_NumLightsPerBag];
 
-    //Loop over the pixels
-    for (int i = index; i < a_NumPixels; i += stride)
+    const auto pixelIndex = index / a_NumReservoirsPerPixel;
+
+    //The current pixel index.
+    const WaveFront::SurfaceData* pixel = &a_PixelData[pixelIndex];
+
+    //If no intersection exists at this pixel, do nothing. Emissive surfaces are also excluded.
+    if(pixel->m_IntersectionT <= 0.f || pixel->m_Emissive)
     {
-        //The current pixel index.
-        const WaveFront::SurfaceData* pixel = &a_PixelData[i];
-
-        //If no intersection exists at this pixel, do nothing. Emissive surfaces are also excluded.
-        if(pixel->m_IntersectionT <= 0.f || pixel->m_Emissive)
-        {
-            continue;
-        }
-
-        //Base Seed depending on pixel index.
-        auto seed = WangHash(a_Seed + WangHash(i));
-
-        //For every pixel, update each reservoir.
-        for (int reservoirIndex = 0; reservoirIndex < a_NumReservoirsPerPixel; ++reservoirIndex)
-        {
-            //First reset the reservoir to discard old data.
-            auto* reservoir = &a_Reservoirs[RESERVOIR_INDEX(i, reservoirIndex, a_NumReservoirsPerPixel)];
-            reservoir->Reset();
-
-            //Generate the amount of samples specified per reservoir.
-            for (int sample = 0; sample < a_NumPrimarySamples; ++sample)
-            {
-                //Random number using the pixel id.
-                const float r = RandomFloat(seed);
-
-                const int pickedLightIndex = static_cast<int>(round(static_cast<float>(a_NumLightsPerBag - 1) * r));
-                const LightBagEntry pickedEntry = pickedLightBag[pickedLightIndex];
-                const WaveFront::TriangleLight light = pickedEntry.light;
-                const float initialPdf = pickedEntry.pdf;
-
-                //Generate random UV coordinates. Between 0 and 1.
-                const float u = RandomFloat(seed);  //Seed is altered after each shift, which makes it work with the same uint.
-                const float v = RandomFloat(seed) * (1.f - u);
-
-                //Generate a sample with solid angle PDF for this specific pixel.
-                LightSample lightSample;
-                {
-                    //Fill the light with the right settings.
-                    lightSample.radiance = light.radiance;
-                    lightSample.normal = light.normal;
-                    lightSample.area = light.area;
-
-                    //Generate the position on the triangle uniformly. TODO: this may not be uniform?
-                    float3 arm1 = light.p1 - light.p0;
-                    float3 arm2 = light.p2 - light.p0;
-                    lightSample.position = light.p0 + (arm1 * u) + (arm2 * v);
-                    //lightSample.position = (light.p0 + light.p1 + light.p2) / 3.f; //This takes the center.
-
-                    //Calculate the PDF for this pixel and light.
-                    Resample(&lightSample, pixel, &lightSample);
-                }
-
-                //The final PDF for the light in this reservoir is the solid angle divided by the original PDF of the light being chosen based on radiance.
-                //Dividing scales the value up.
-                const auto pdf = lightSample.solidAnglePdf / initialPdf;
-                reservoir->Update(lightSample, pdf, WangHash(a_Seed));
-            }
-
-            reservoir->UpdateWeight();
-        }
+        return;
     }
+
+    //Base Seed depending on pixel index.
+    auto seed = WangHash(a_Seed + WangHash(index));
+
+    //First reset the reservoir to discard old data.
+    auto* reservoir = &a_Reservoirs[index];
+    reservoir->Reset();
+
+    //Generate the amount of samples specified per reservoir.
+    for (int sample = 0; sample < a_NumPrimarySamples; ++sample)
+    {
+        //Random number using the pixel id.
+        const float r = RandomFloat(seed);
+
+        const int pickedLightIndex = static_cast<int>(roundf(static_cast<float>(a_NumLightsPerBag - 1) * r));
+        const LightBagEntry pickedEntry = pickedLightBag[pickedLightIndex];
+        const WaveFront::TriangleLight light = pickedEntry.light;
+        const float initialPdf = pickedEntry.pdf;
+
+        //Generate random UV coordinates. Between 0 and 1.
+        const float u = RandomFloat(seed);  //Seed is altered after each shift, which makes it work with the same uint.
+        const float v = RandomFloat(seed) * (1.f - u);
+
+        //Generate a sample with solid angle PDF for this specific pixel.
+        LightSample lightSample;
+        {
+            //Fill the light with the right settings.
+            lightSample.radiance = light.radiance;
+            lightSample.normal = light.normal;
+            lightSample.area = light.area;
+
+            //Generate the position on the triangle uniformly. TODO: this may not be uniform?
+            float3 arm1 = light.p1 - light.p0;
+            float3 arm2 = light.p2 - light.p0;
+            lightSample.position = light.p0 + (arm1 * u) + (arm2 * v);
+
+            //Calculate the PDF for this pixel and light.
+            Resample(&lightSample, pixel, &lightSample);
+        }
+
+        //The final PDF for the light in this reservoir is the solid angle divided by the original PDF of the light being chosen based on radiance.
+        //Dividing scales the value up.
+        const auto pdf = lightSample.solidAnglePdf / initialPdf;
+        reservoir->Update(lightSample, pdf, seed);
+    }
+
+    //Finally update the reservoir weight.
+    reservoir->UpdateWeight();
 }
 
 __host__ unsigned int GenerateReSTIRShadowRays(MemoryBuffer* a_AtomicBuffer, Reservoir* a_Reservoirs, const WaveFront::SurfaceData* a_PixelData, unsigned a_NumPixels)
@@ -366,16 +365,6 @@ __global__ void SpatialNeighbourSamplingInternal(Reservoir* a_Reservoirs, Reserv
                     if(ReSTIRSettings::enableBiased)
                     {
                         CombineBiased(output, count, toCombineReservoirs, toCombinePixelData[0], seed);
-
-                        //if(i == 220000)
-                        //{
-                        //    printf("WeightsBefore:\n");
-                        //    for(int i = 0; i < count; ++i)
-                        //    {
-                        //        printf("- %i: %f SAPDF: %f\n", i, toCombineReservoirs[i]->weight, toCombineReservoirs[i]->sample.solidAnglePdf);
-                        //    }
-                        //    printf("\nWeight: %f, SampleCount: %i, WeightSum: %f, BRDFPDF: %f.\n", output->weight, output->sampleCount, output->weightSum, output->sample.solidAnglePdf);
-                        //}
                     }
                     else
                     {
@@ -613,7 +602,7 @@ __device__ __inline__ void CombineBiased(Reservoir* a_OutputReservoir, int a_Cou
     *a_OutputReservoir = output;
 }
 
-__device__ void Resample(LightSample* a_Input, const WaveFront::SurfaceData* a_PixelData, LightSample* a_Output)
+__device__ __inline__ void Resample(LightSample* a_Input, const WaveFront::SurfaceData* a_PixelData, LightSample* a_Output)
 {
     *a_Output = *a_Input;
 

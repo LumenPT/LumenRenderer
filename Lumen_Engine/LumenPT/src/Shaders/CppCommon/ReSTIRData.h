@@ -62,6 +62,11 @@ struct ReSTIRSettings
 
     //Enable temporal sampling.
     static constexpr bool enableTemporal = true;
+
+    //Enable or disable certain parts of ReSTIR TODO
+#define RESTIR_BIASED 1
+#define RESTIR_SPATIAL 1
+#define RESTIR_TEMPORAL 1
 };
 
 /*
