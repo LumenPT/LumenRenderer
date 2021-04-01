@@ -74,7 +74,7 @@ __global__ void SpatialNeighbourSamplingInternal(
     const WaveFront::SurfaceData* a_PixelData,
     const std::uint32_t a_Seed,
     uint2 a_Dimensions,
-    unsigned a_NumReservoirs
+    unsigned a_NumPixels
 );
 
 /*

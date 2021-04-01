@@ -264,9 +264,25 @@ __global__ void GenerateShadowRay(WaveFront::AtomicBuffer<RestirShadowRay>* a_At
 
 __host__ void SpatialNeighbourSampling(Reservoir* a_Reservoirs, Reservoir* a_SwapBuffer, const WaveFront::SurfaceData* a_PixelData, const std::uint32_t a_Seed, uint2 a_Dimensions)
 {
-    const unsigned numReservoirs = a_Dimensions.x * a_Dimensions.y * ReSTIRSettings::numReservoirsPerPixel;
-    const int blockSize = CUDA_BLOCK_SIZE;
-    const int numBlocks = (numReservoirs + blockSize - 1) / blockSize;
+    /*
+     * TODO:
+     * This is tricky because it's a matter of balancing local data and random access.
+     * Right now it's very slow because the amount of data locally required per neigbour is too much.
+     * This stalls the pipeline and threads in a block.
+     * Less threads per block makes this somewhat better up to a certain extent.
+     *
+     * Having everything as pointers is not ideal because now it does random access and trashes the cache.
+     *
+     * The ideal solution:
+     * - All data as pointers.
+     * - All data is located in the same place in memory.
+     * - One thread per reservoir (so also per depth).
+     * - Maybe limit the amount of threads per block for optimal cache hits.
+     * - Blocks in the same SM need to operate on the same region of pixel data.
+     */
+    const unsigned numPixels = a_Dimensions.x * a_Dimensions.y;
+    const int blockSize = 256;
+    const int numBlocks = (numPixels + blockSize - 1) / blockSize;
 
     Reservoir* fromBuffer = a_Reservoirs;
     Reservoir* toBuffer = a_SwapBuffer;
@@ -274,7 +290,7 @@ __host__ void SpatialNeighbourSampling(Reservoir* a_Reservoirs, Reservoir* a_Swa
     //Synchronize between each swap, and then swap the buffers.
     for (int iteration = 0; iteration < ReSTIRSettings::numSpatialIterations; ++iteration)
     {
-        SpatialNeighbourSamplingInternal<<<numBlocks, blockSize >>>(fromBuffer, toBuffer, a_PixelData, a_Seed, a_Dimensions, numReservoirs);
+        SpatialNeighbourSamplingInternal<<<numBlocks, blockSize >>>(fromBuffer, toBuffer, a_PixelData, a_Seed, a_Dimensions, numPixels);
         cudaDeviceSynchronize();
         CHECKLASTCUDAERROR;
 
@@ -286,13 +302,12 @@ __host__ void SpatialNeighbourSampling(Reservoir* a_Reservoirs, Reservoir* a_Swa
 
 }
 
-//TODO: The bug is that it's swapping buffers per thread in the middle all over the place. Should finish first wave, then swap and continue.
 __global__ void SpatialNeighbourSamplingInternal(Reservoir* a_Reservoirs, Reservoir* a_SwapBuffer,
     const WaveFront::SurfaceData* a_PixelData, const std::uint32_t a_Seed, uint2 a_Dimensions,
-    unsigned a_NumReservoirs)
+    unsigned a_NumPixels)
 {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
-    if (index >= a_NumReservoirs) return;
+    if (index >= a_NumPixels) return;
 
     //Storage for reservoirs and pixels to be combined.
     WaveFront::SurfaceData toCombinePixelData[ReSTIRSettings::numSpatialSamples + 1];
@@ -300,88 +315,84 @@ __global__ void SpatialNeighbourSamplingInternal(Reservoir* a_Reservoirs, Reserv
 
     //The seed unique to this pixel.
     auto seed =  WangHash(a_Seed + index);
+    
+    toCombinePixelData[0] = a_PixelData[index];
 
-    const auto pixelIndex = index / ReSTIRSettings::numReservoirsPerPixel;
-    const auto currentDepth = index - (pixelIndex * ReSTIRSettings::numReservoirsPerPixel);
-
-    toCombinePixelData[0] = a_PixelData[pixelIndex];
-
-    //Only run when there's an intersection for this pixel.
-    if (toCombinePixelData[0].m_IntersectionT > 0.f && !toCombinePixelData[0].m_Emissive)
+    for (int depth = 0; depth < ReSTIRSettings::numReservoirsPerPixel; ++depth)
     {
-        //TODO maybe store this information inside the pixel. Could calculate it once at the start of the frame.
-        const int y = pixelIndex / a_Dimensions.x;
-        const int x = pixelIndex - (y * a_Dimensions.x);
-
-        toCombineReservoirs[0] = a_Reservoirs[index];
-
-        int count = 1;
-
-        for (int neighbour = 1; neighbour <= ReSTIRSettings::numSpatialSamples; ++neighbour)
+        //Only run when there's an intersection for this pixel.
+        if (toCombinePixelData[0].m_IntersectionT > 0.f && !toCombinePixelData[0].m_Emissive)
         {
-            //TODO This generates a square rn. Make it within a circle.
-            const int neighbourY = round((RandomFloat(seed) * 2.f - 1.f) * static_cast<float>(ReSTIRSettings::spatialSampleRadius)) + y;
-            const int neighbourX = round((RandomFloat(seed) * 2.f - 1.f) * static_cast<float>(ReSTIRSettings::spatialSampleRadius)) + x;
+            //TODO maybe store this information inside the pixel. Could calculate it once at the start of the frame.
+            const int y = index / a_Dimensions.x;
+            const int x = index - (y * a_Dimensions.x);
 
-            //Only run if within image bounds.
-            if(neighbourX >= 0 && neighbourX < a_Dimensions.x && neighbourY >= 0 && neighbourY < a_Dimensions.y)
+            const auto reservoirIndex = RESERVOIR_INDEX(index, depth, ReSTIRSettings::numReservoirsPerPixel);
+            toCombineReservoirs[0] = a_Reservoirs[reservoirIndex];
+
+            int count = 1;
+
+            for (int neighbour = 1; neighbour <= ReSTIRSettings::numSpatialSamples; ++neighbour)
             {
-                //Index of the neighbouring pixel in the pixel array.
-                const int neighbourIndex = PIXEL_INDEX(neighbourX, neighbourY, a_Dimensions.x);
+                //TODO This generates a square rn. Make it within a circle.
+                const int neighbourY = round((RandomFloat(seed) * 2.f - 1.f) * static_cast<float>(ReSTIRSettings::spatialSampleRadius)) + y;
+                const int neighbourX = round((RandomFloat(seed) * 2.f - 1.f) * static_cast<float>(ReSTIRSettings::spatialSampleRadius)) + x;
 
-                //Ensure no out of bounds neighbours are selected.
-                assert(neighbourIndex < a_Dimensions.x * a_Dimensions.y && neighbourIndex >= 0); 
-
-                //Overwrite in the array, but don't up the counter yet.
-                toCombinePixelData[count] = a_PixelData[neighbourIndex];
-
-                //Only run for valid depths and non-emissive surfaces.
-                if(toCombinePixelData[count].m_IntersectionT > 0.f && !toCombinePixelData[count].m_Emissive)
+                //Only run if within image bounds.
+                if (neighbourX >= 0 && neighbourX < a_Dimensions.x && neighbourY >= 0 && neighbourY < a_Dimensions.y)
                 {
-                    toCombineReservoirs[count] = a_Reservoirs[RESERVOIR_INDEX(neighbourIndex, currentDepth, ReSTIRSettings::numReservoirsPerPixel)];
-                    //Gotta stay positive.
-                    assert(toCombineReservoirs[count].weight >= 0.f);
+                    //Index of the neighbouring pixel in the pixel array.
+                    const int neighbourIndex = PIXEL_INDEX(neighbourX, neighbourY, a_Dimensions.x);
 
-                    //Discard samples that are too different.
-                    const float depth1 = toCombinePixelData[count].m_IntersectionT;
-                    const float depth2 = toCombinePixelData[0].m_IntersectionT;
-                    const float depthDifPct = fabs(depth1 - depth2) / ((depth1 + depth2) / 2.f);
+                    //Ensure no out of bounds neighbours are selected.
+                    assert(neighbourIndex < a_Dimensions.x * a_Dimensions.y && neighbourIndex >= 0);
 
-                    const float angleDif = dot(toCombinePixelData[count].m_Normal, toCombinePixelData[0].m_Normal);	//Between 0 and 1 (0 to 90 degrees). 
-                    static constexpr float MAX_ANGLE_COS = 0.72222222223f;	//Dot product is cos of the angle. If higher than this value, it's within 25 degrees.
+                    //Overwrite in the array, but don't up the counter yet.
+                    toCombinePixelData[count] = a_PixelData[neighbourIndex];
 
-                    //If the samples are similar enough, up the counter. This will means the samples are not overwritten and will be merged.
-                    if (depthDifPct < 0.10f && angleDif > MAX_ANGLE_COS)
+                    //Only run for valid depths and non-emissive surfaces.
+                    if (toCombinePixelData[count].m_IntersectionT > 0.f && !toCombinePixelData[count].m_Emissive)
                     {
-                        ++count;
+                        toCombineReservoirs[count] = a_Reservoirs[RESERVOIR_INDEX(neighbourIndex, depth, ReSTIRSettings::numReservoirsPerPixel)];
+                        //Gotta stay positive.
+                        assert(toCombineReservoirs[count].weight >= 0.f);
+
+                        //Discard samples that are too different.
+                        const float depth1 = toCombinePixelData[count].m_IntersectionT;
+                        const float depth2 = toCombinePixelData[0].m_IntersectionT;
+                        const float depthDifPct = fabs(depth1 - depth2) / ((depth1 + depth2) / 2.f);
+
+                        const float angleDif = dot(toCombinePixelData[count].m_Normal, toCombinePixelData[0].m_Normal);	//Between 0 and 1 (0 to 90 degrees). 
+                        static constexpr float MAX_ANGLE_COS = 0.72222222223f;	//Dot product is cos of the angle. If higher than this value, it's within 25 degrees.
+
+                        //If the samples are similar enough, up the counter. This will means the samples are not overwritten and will be merged.
+                        if (depthDifPct < 0.10f && angleDif > MAX_ANGLE_COS)
+                        {
+                            ++count;
+                        }
                     }
                 }
             }
-        }
 
-        //The output location. Local for optimization.
-        Reservoir output;
-
-        //If valid reservoirs to combine were found, combine them.
-        if (count > 1)
-        {
-            if(ReSTIRSettings::enableBiased)
+            //If valid reservoirs to combine were found, combine them.
+            if (count > 1)
             {
-                CombineBiased(&output, count, toCombineReservoirs, &toCombinePixelData[0], seed);
+                if (ReSTIRSettings::enableBiased)
+                {
+                    CombineBiased(&a_SwapBuffer[reservoirIndex], count, toCombineReservoirs, &toCombinePixelData[0], seed);
+                }
+                else
+                {
+                    CombineUnbiased(&a_SwapBuffer[reservoirIndex], &toCombinePixelData[0], count, &toCombineReservoirs[0], toCombinePixelData, seed);
+                }
             }
+            //Not enough reservoirs to combine, but still data needs to be passed on.
             else
             {
-                CombineUnbiased(&output, &toCombinePixelData[0], count, &toCombineReservoirs[0], toCombinePixelData, seed);
+                //Copy the reservoir over directly without any combining.
+                a_SwapBuffer[reservoirIndex] = toCombineReservoirs[0];
             }
         }
-        //Not enough reservoirs to combine, but still data needs to be passed on.
-        else
-        {
-            //Copy the reservoir over directly without any combining.
-            output = toCombineReservoirs[0];
-        }
-
-        a_SwapBuffer[index] = output;
     }
 }
 
@@ -466,18 +477,14 @@ __global__ void CombineTemporalSamplesInternal(
             //Cap sample count at 20x current to reduce temporal influence. Would grow infinitely large otherwise.
             toCombine[0].sampleCount = min(toCombine[0].sampleCount, toCombine[1].sampleCount * 20);
 
-            Reservoir output;
-
             if (ReSTIRSettings::enableBiased)
             {
-                CombineBiased(&output, 2, &toCombine[0], &pixelPointers[1], WangHash(a_Seed + index));
+                CombineBiased(&a_CurrentReservoirs[index], 2, &toCombine[0], &pixelPointers[1], WangHash(a_Seed + index));
             }
             else
             {
-                CombineUnbiased(&output, &pixelPointers[1], 2, &toCombine[0], &pixelPointers[0], WangHash(a_Seed + index));
+                CombineUnbiased(&a_CurrentReservoirs[index], &pixelPointers[1], 2, &toCombine[0], &pixelPointers[0], WangHash(a_Seed + index));
             }
-
-            a_CurrentReservoirs[index] = output;
         }
     }
 }
