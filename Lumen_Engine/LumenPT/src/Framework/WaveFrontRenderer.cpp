@@ -109,9 +109,9 @@ namespace WaveFront
         TriangleLight lights[numLights];
 
         //Intensity per light.
-        lights[0].radiance = { 300000, 300000, 300000 };
-        lights[1].radiance = { 300000, 300000, 300000 };
-        lights[2].radiance = { 300000, 300000, 300000 };
+        lights[0].radiance = { 200000, 150000, 150000 };
+        lights[1].radiance = { 150000, 200000, 150000 };
+        lights[2].radiance = { 150000, 150000, 200000 };
 
 
         //Actually set the triangle lights to have an area.
