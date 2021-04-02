@@ -26,7 +26,9 @@ CPU_ON_GPU void DEBUGShadePrimIntersections(
 CPU_ON_GPU void WriteToOutput(
     const uint2 a_Resolution,
     const float3 * const a_Input,
-    uchar4* a_Output)
+    uchar4* a_Output,
+    const bool a_Append
+)
 {
     const unsigned int numPixels = a_Resolution.x * a_Resolution.y;
     const unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
@@ -37,8 +39,18 @@ CPU_ON_GPU void WriteToOutput(
     //TODO: It would save one copy.
     for (unsigned int i = index; i < numPixels; i += stride)
     {
-        const auto color = make_color(a_Input[i]);
-        a_Output[i] = color;
+        if(a_Append)
+        {
+            const auto color = make_color(a_Input[i]);
+            const auto oldColor = a_Output[i];
+            const float3 average = make_float3(static_cast<float>(color.x) + static_cast<float>(oldColor.x), static_cast<float>(color.y) + static_cast<float>(oldColor.y), static_cast<float>(color.z) + static_cast<float>(oldColor.z)) / 2.f;
+            a_Output[i] = make_uchar4(roundf(average.x), roundf(average.y), roundf(average.z), 255);
+        }
+        else
+        {
+            const auto color = make_color(a_Input[i]);
+            a_Output[i] = color; 
+        }
     }
 }
 

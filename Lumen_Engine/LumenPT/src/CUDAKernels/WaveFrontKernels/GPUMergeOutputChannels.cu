@@ -4,7 +4,8 @@
 CPU_ON_GPU void MergeOutputChannels(
     const uint2 a_Resolution,
     const float3* const a_Input,
-    float3* const a_Output)
+    float3* const a_Output
+)
 {
 
     const unsigned int numPixels = a_Resolution.x * a_Resolution.y;

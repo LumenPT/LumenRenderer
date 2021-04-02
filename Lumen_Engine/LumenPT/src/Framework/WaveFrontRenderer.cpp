@@ -192,6 +192,16 @@ namespace WaveFront
         return std::move(snap);
     }
 
+    void WaveFrontRenderer::SetAppendMode(bool a_Append)
+    {
+        m_Settings.appendOutput = a_Append;
+    }
+
+    bool WaveFrontRenderer::GetAppendMode() const
+    {
+        return m_Settings.appendOutput;
+    }
+
     std::unique_ptr<MemoryBuffer> WaveFrontRenderer::InterleaveVertexData(const PrimitiveData& a_MeshData) const
     {
         std::vector<Vertex> vertices;
@@ -630,7 +640,8 @@ namespace WaveFront
             m_Settings.outputResolution,
             m_PixelBufferSeparate.GetDevicePtr<float3>(),
             m_PixelBufferCombined.GetDevicePtr<float3>(),
-            m_OutputBuffer->GetDevicePtr()
+            m_OutputBuffer->GetDevicePtr(),
+            m_Settings.appendOutput
         );
 
         //Post processing using CUDA kernel.
