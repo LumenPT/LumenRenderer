@@ -85,16 +85,16 @@ public:
 	virtual unsigned int TraceFrame(std::shared_ptr<Lumen::ILumenScene>& a_Scene) = 0;	//scene argument may be redundant... or not 
 
 	/*
-	 * Set the append mode.
+	 * Set the blend mode.
 	 * When set to true, output is blended instead of overwritten.
 	 */
-	virtual void SetAppendMode(bool a_Append) = 0;
+	virtual void SetBlendMode(bool a_Blend) = 0;
 
 	/*
-	 * Get the append mode.
+	 * Get the blend mode.
 	 * When true, output is blended and not overwritten.
 	 */
-	virtual bool GetAppendMode() const = 0;
+	virtual bool GetBlendMode() const = 0;
 
 	virtual void BeginSnapshot() = 0;
 

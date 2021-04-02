@@ -36,7 +36,7 @@ namespace WaveFront
         //The maximum distance a ray can travel before terminating.
         float maxIntersectionT;
 
-        bool appendOutput;
+        bool blendOutput;
     };
 
     class WaveFrontRenderer : public LumenRenderer
@@ -74,13 +74,13 @@ namespace WaveFront
          * When true, final output is blended and not overwritten to build a higher res image over time.
          * When false, output is overwritten every frame.
          */
-        void SetAppendMode(bool a_Append) override;
+        void SetBlendMode(bool a_Blend) override;
 
         /*
          * Get the append mode.
          * When true, output is blended and not overwritten.
          */
-        bool GetAppendMode() const override;
+        bool GetBlendMode() const override;
     	
     private:
 
@@ -122,6 +122,9 @@ namespace WaveFront
         //Variables and settings.
     private:
         WaveFrontSettings m_Settings;
+
+        //Blend counter when blending is enabled.
+        unsigned m_BlendCounter;
 
         //Index of the frame, used to swap buffers.
         std::uint32_t m_FrameIndex;

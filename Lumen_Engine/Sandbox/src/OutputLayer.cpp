@@ -106,7 +106,7 @@ OutputLayer::OutputLayer()
 	settings.maxIntersectionT = 5000.f;
 	settings.renderResolution = { 800, 600 };
 	settings.outputResolution = { 800, 600 };
-	settings.appendOutput = false;	//When true will blend output instead of overwriting it (high res image over time if static scene).
+	settings.blendOutput = false;	//When true will blend output instead of overwriting it (high res image over time if static scene).
 
 	static_cast<WaveFront::WaveFrontRenderer*>(m_Renderer.get())->Init(settings);
 
@@ -475,8 +475,8 @@ void OutputLayer::HandleCameraInput(Camera& a_Camera)
 		if (std::chrono::duration_cast<std::chrono::milliseconds>(now - lastToggle).count() > 500)
 		{
 		    lastToggle = now;
-		    m_Renderer->SetAppendMode(!m_Renderer->GetAppendMode());
-			printf("Output append mode is now %s.\n", (m_Renderer->GetAppendMode() ? "on" : "off"));
+		    m_Renderer->SetBlendMode(!m_Renderer->GetBlendMode());
+			printf("Output append mode is now %s.\n", (m_Renderer->GetBlendMode() ? "on" : "off"));
 		}
 	}
 

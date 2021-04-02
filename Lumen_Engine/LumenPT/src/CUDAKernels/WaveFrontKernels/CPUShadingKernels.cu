@@ -190,7 +190,9 @@ CPU_ONLY void PostProcess(const PostProcessLaunchParameters& a_PostProcessParams
     MergeOutputChannels << <numBlocks, blockSize >> > (
         a_PostProcessParams.m_RenderResolution,
         a_PostProcessParams.m_WavefrontOutput,
-        a_PostProcessParams.m_ProcessedOutput
+        a_PostProcessParams.m_ProcessedOutput,
+        a_PostProcessParams.m_BlendOutput,
+        a_PostProcessParams.m_BlendCount
         );
 
     /*cudaDeviceSynchronize();
@@ -217,7 +219,6 @@ CPU_ONLY void PostProcess(const PostProcessLaunchParameters& a_PostProcessParams
     WriteToOutput << <numBlocksUpscaled, blockSizeUpscaled >> > (
         a_PostProcessParams.m_OutputResolution,
         a_PostProcessParams.m_ProcessedOutput,
-        a_PostProcessParams.m_FinalOutput,
-        a_PostProcessParams.m_AppendOutput
+        a_PostProcessParams.m_FinalOutput
         );
 }

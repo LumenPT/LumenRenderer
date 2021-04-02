@@ -46,6 +46,7 @@ namespace WaveFront
 {
     void WaveFrontRenderer::Init(const WaveFrontSettings& a_Settings)
     {
+        m_BlendCounter = 0;
         m_FrameIndex = 0;
         m_Settings = a_Settings;
 
@@ -192,14 +193,15 @@ namespace WaveFront
         return std::move(snap);
     }
 
-    void WaveFrontRenderer::SetAppendMode(bool a_Append)
+    void WaveFrontRenderer::SetBlendMode(bool a_Blend)
     {
-        m_Settings.appendOutput = a_Append;
+        m_Settings.blendOutput = a_Blend;
+        if (a_Blend) m_BlendCounter = 0;
     }
 
-    bool WaveFrontRenderer::GetAppendMode() const
+    bool WaveFrontRenderer::GetBlendMode() const
     {
-        return m_Settings.appendOutput;
+        return m_Settings.blendOutput;
     }
 
     std::unique_ptr<MemoryBuffer> WaveFrontRenderer::InterleaveVertexData(const PrimitiveData& a_MeshData) const
@@ -374,7 +376,7 @@ namespace WaveFront
         return std::make_shared<PTScene>(a_SceneData, m_ServiceLocator);
     }
 
-    WaveFrontRenderer::WaveFrontRenderer() : m_FrameIndex(0), m_CUDAContext(nullptr)
+    WaveFrontRenderer::WaveFrontRenderer() : m_BlendCounter(0), m_FrameIndex(0), m_CUDAContext(nullptr)
     {
 
     }
@@ -403,7 +405,13 @@ namespace WaveFront
 
         //Start by clearing the data from the previous frame.
         ResetLightChannels(m_PixelBufferSeparate.GetDevicePtr<float3>(), numPixels, static_cast<unsigned>(LightChannel::NUM_CHANNELS));
-        ResetLightChannels(m_PixelBufferCombined.GetDevicePtr<float3>(), numPixels, 1);
+
+        //Only clean the merged buffer if no blending is enabled.
+        if(!m_Settings.blendOutput)
+        {
+            ResetLightChannels(m_PixelBufferCombined.GetDevicePtr<float3>(), numPixels, 1);
+        }
+
         cudaDeviceSynchronize();
         CHECKLASTCUDAERROR;
 
@@ -641,14 +649,21 @@ namespace WaveFront
             m_PixelBufferSeparate.GetDevicePtr<float3>(),
             m_PixelBufferCombined.GetDevicePtr<float3>(),
             m_OutputBuffer->GetDevicePtr(),
-            m_Settings.appendOutput
+            m_Settings.blendOutput,
+            m_BlendCounter
         );
 
         //Post processing using CUDA kernel.
         PostProcess(postProcessLaunchParams);
         cudaDeviceSynchronize();
         CHECKLASTCUDAERROR;
-        
+
+        //If blending is enabled, increment blend counter.
+        if(m_Settings.blendOutput)
+        {
+            ++m_BlendCounter;
+        }
+
         //Change frame index 0..1
         ++m_FrameIndex;
         if(m_FrameIndex == 2)
