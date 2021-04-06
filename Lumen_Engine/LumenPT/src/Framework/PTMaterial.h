@@ -25,7 +25,7 @@ public:
     void SetDiffuseTexture(std::shared_ptr<Lumen::ILumenTexture> a_NewDiffuseTexture) override;
     void SetEmission(const glm::vec3& a_EmissiveVal = glm::vec3( 0.0f, 0.0f, 0.0f)) override;
     void SetEmissiveTexture(std::shared_ptr<Lumen::ILumenTexture> a_EmissiveTexture) override;
-
+    void SetMetalRoughnessTexture(std::shared_ptr<Lumen::ILumenTexture> a_MetalRoughnessTexture) override;
 	
     glm::vec4 GetDiffuseColor() const override;
     Lumen::ILumenTexture& GetDiffuseTexture() const override;
@@ -36,11 +36,13 @@ private:
     // Make sure to update this if you are expanding the materials beyond what already exists.
     DeviceMaterial CreateDeviceMaterial() const;
 
+private:
     // Material data is kept here instead of the base class to account for API-specific implementation details   
     float4 m_DiffuseColor;
     float3 m_EmissiveColor;
     std::shared_ptr<class PTTexture> m_DiffuseTexture;
     std::shared_ptr<class PTTexture> m_EmissiveTexture;
+    std::shared_ptr<class PTTexture> m_MetalRoughnessTexture;
 
     // A flag to keep track if the GPU representation of the material needs to be updated after something was changed
     mutable bool m_DeviceMaterialDirty;

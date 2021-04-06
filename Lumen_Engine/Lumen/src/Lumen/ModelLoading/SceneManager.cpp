@@ -152,7 +152,9 @@ void Lumen::SceneManager::ClearUnusedAssets()
 void Lumen::SceneManager::InitializeDefaultResources()
 {
 	uchar4 whitePixel = { 255,255,255,255 };
+	uchar4 diffusePixel{ 0, 255, 255, 0};
 	m_DefaultDiffuseTexture = m_RenderPipeline->CreateTexture(&whitePixel, 1, 1);
+	m_DefaultMetalRoughnessTexture = m_RenderPipeline->CreateTexture(&diffusePixel, 1, 1);
 }
 
 void Lumen::SceneManager::LoadNodes(fx::gltf::Document& a_Doc, GLTFResource& a_Res, int a_NodeId, bool a_Root, const glm::mat4& a_TransformMat)
@@ -535,6 +537,31 @@ void Lumen::SceneManager::LoadMaterials(fx::gltf::Document& a_Doc, GLTFResource&
 		{
 			// If it isn't, set the diffuse texture to a default white one
 			mat->SetDiffuseTexture(m_DefaultDiffuseTexture);
+		}
+
+		//Metallic/roughness value
+		if (fxMat.pbrMetallicRoughness.metallicRoughnessTexture.index != -1)
+		{
+			//Load the texture either from file or binary. Then create the engine texture object.
+			auto info = LoadTexture(a_Doc, fxMat.pbrMetallicRoughness.metallicRoughnessTexture.index, a_Path, 4);
+
+			//Clamp perfect mirrors to be within bounds.
+			for(int index = 0; index < info.w * info.h; ++index)
+			{
+				uchar4* data = reinterpret_cast<uchar4*>(&info.data[index * 4]);
+				data->y = std::max(data->y, static_cast<unsigned char>(1));
+			}
+
+			const auto tex = m_RenderPipeline->CreateTexture(info.data, info.w, info.h);
+			mat->SetMetalRoughnessTexture(tex);
+
+			//Free the memory after it's uploaded.
+			stbi_image_free(info.data);
+		}
+		else
+		{
+			// If it isn't, set the diffuse texture to a default white one
+			mat->SetMetalRoughnessTexture(m_DefaultMetalRoughnessTexture);
 		}
 
 		if (fxMat.emissiveFactor != std::array<float, 3>{0.0f, 0.0f, 0.0f})

@@ -27,6 +27,7 @@ struct DeviceMaterial
     NONAMESPACE::float3 m_EmissionColor;
     cudaTextureObject_t m_DiffuseTexture;
     cudaTextureObject_t m_EmissiveTexture;
+    cudaTextureObject_t m_MetalRoughnessTexture;
 };
 
 //TODO: change this naming because it is confusing, it could be name DevicePrimitiveArray or DeviceMesh
