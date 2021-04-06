@@ -1,4 +1,5 @@
 #include "../Shaders/CppCommon/RenderingUtility.h"
+#include "Timer.h"
 #if defined(WAVEFRONT)
 
 #include "WaveFrontRenderer.h"
@@ -424,6 +425,9 @@ namespace WaveFront
 
     unsigned WaveFrontRenderer::TraceFrame(std::shared_ptr<Lumen::ILumenScene>& a_Scene)
     {
+        //Timer to measure how long each frame takes.
+        Timer timer;
+
         //add to lights buffer? in traceframe
 
         //add lights to mesh in scene
@@ -721,7 +725,9 @@ namespace WaveFront
         //m_DebugTexture = m_MotionVectors.GetMotionVectorMagnitudeTex();
         m_DebugTexture = m_MotionVectors.GetMotionVectorDirectionsTex();
 //#endif
-    	
+
+        printf("Total wavefront frame time: %f ms.\n", timer.measure(TimeUnit::MILLIS));
+
         //Return the GLuint texture ID.
         return m_OutputBuffer->GetTexture();
     }
