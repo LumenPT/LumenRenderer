@@ -4,6 +4,7 @@
 #include "../Shaders/CppCommon/WaveFrontDataStructs.h"
 #include <cuda_runtime_api.h>
 #include <cuda/device_atomic_functions.h>
+#include <cassert>
 
 #include "../Framework/CudaUtilities.h"
 
@@ -353,7 +354,7 @@ __global__ void SpatialNeighbourSamplingInternal(Reservoir* a_Reservoirs, Reserv
                 {
                     toCombineReservoirs[count] = &a_Reservoirs[RESERVOIR_INDEX(neighbourIndex, currentDepth, ReSTIRSettings::numReservoirsPerPixel)];
                     //Gotta stay positive.
-                    assert(toCombineReservoirs[count].weight >= 0.f);
+                    assert(toCombineReservoirs[count]->weight >= 0.f);
 
                     //Discard samples that are too different.
                     const float depth1 = toCombinePixelData[count]->m_IntersectionT;
