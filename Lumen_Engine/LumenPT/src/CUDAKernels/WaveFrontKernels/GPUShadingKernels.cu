@@ -38,8 +38,7 @@ CPU_ON_GPU void WriteToOutput(
     //TODO: It would save one copy.
     for (unsigned int i = index; i < numPixels; i += stride)
     {
-        const auto color = make_color(a_Input[i]);
-        a_Output[i] = color; 
+        a_Output[i] = make_color(a_Input[i]);
     }
 }
 

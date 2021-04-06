@@ -69,6 +69,12 @@ namespace WaveFront
 
         std::unique_ptr<FrameSnapshot> EndSnapshot() override;
 
+
+        void SetRenderResolution(glm::uvec2 a_NewResolution) override;
+        void SetOutputResolution(glm::uvec2 a_NewResolution) override;
+        glm::uvec2 GetRenderResolution() override;
+        glm::uvec2 GetOutputResolution() override;
+
         /*
          * Set the append mode.
          * When true, final output is blended and not overwritten to build a higher res image over time.
