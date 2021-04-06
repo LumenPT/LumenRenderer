@@ -82,6 +82,12 @@ namespace WaveFront
          */
         bool GetBlendMode() const override;
     	
+
+
+        void SetRenderResolution(glm::uvec2 a_NewResolution) override;
+        void SetOutputResolution(glm::uvec2 a_NewResolution) override;
+        glm::uvec2 GetRenderResolution() override;
+        glm::uvec2 GetOutputResolution() override;
     private:
 
         std::unique_ptr<MemoryBuffer> InterleaveVertexData(const PrimitiveData& a_MeshData) const;

@@ -89,12 +89,20 @@ public:
 	 * When set to true, output is blended instead of overwritten.
 	 */
 	virtual void SetBlendMode(bool a_Blend) = 0;
+	virtual void SetRenderResolution(glm::uvec2 a_NewResolution) = 0;
+	virtual void SetOutputResolution(glm::uvec2 a_NewResolution) = 0;
 
 	/*
 	 * Get the blend mode.
 	 * When true, output is blended and not overwritten.
 	 */
 	virtual bool GetBlendMode() const = 0;
+
+	void SetRenderResolution(uint32_t a_NewWidth, uint32_t a_NewHeight) { SetRenderResolution(glm::uvec2(a_NewWidth, a_NewHeight)); }
+	void SetOutputResolution(uint32_t a_NewWidth, uint32_t a_NewHeight) { SetOutputResolution(glm::uvec2(a_NewWidth, a_NewHeight)); }
+
+	virtual glm::uvec2 GetRenderResolution() = 0;
+	virtual glm::uvec2 GetOutputResolution() = 0;
 
 	virtual void BeginSnapshot() = 0;
 
