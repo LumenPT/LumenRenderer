@@ -110,7 +110,8 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
             a_ShadingParams.m_OptixSceneHandle,
             a_ShadingParams.m_ShadowRays,
             a_ShadingParams.m_OptixSystem,
-            a_ShadingParams.m_MotionVectorBuffer
+            a_ShadingParams.m_MotionVectorBuffer,
+            false
         );
     }
     else
@@ -189,7 +190,10 @@ CPU_ONLY void PostProcess(const PostProcessLaunchParameters& a_PostProcessParams
     MergeOutputChannels << <numBlocks, blockSize >> > (
         a_PostProcessParams.m_RenderResolution,
         a_PostProcessParams.m_WavefrontOutput,
-        a_PostProcessParams.m_ProcessedOutput);
+        a_PostProcessParams.m_ProcessedOutput,
+        a_PostProcessParams.m_BlendOutput,
+        a_PostProcessParams.m_BlendCount
+        );
 
     /*cudaDeviceSynchronize();
     CHECKLASTCUDAERROR;*/
@@ -215,5 +219,6 @@ CPU_ONLY void PostProcess(const PostProcessLaunchParameters& a_PostProcessParams
     WriteToOutput << <numBlocksUpscaled, blockSizeUpscaled >> > (
         a_PostProcessParams.m_OutputResolution,
         a_PostProcessParams.m_ProcessedOutput,
-        a_PostProcessParams.m_FinalOutput);
+        a_PostProcessParams.m_FinalOutput
+        );
 }

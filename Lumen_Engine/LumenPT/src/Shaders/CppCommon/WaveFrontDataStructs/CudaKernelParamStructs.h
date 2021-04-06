@@ -135,13 +135,18 @@ namespace WaveFront
             const uint2& a_OutputResolution,
             const float3* const a_WavefrontOutput,
             float3* const a_ProcessedOutput,
-            uchar4* const a_FinalOutput)
+            uchar4* const a_FinalOutput,
+            const bool a_BlendOutput,
+            const unsigned a_BlendCount
+        )
             :
             m_RenderResolution(a_RenderResolution),
             m_OutputResolution(a_OutputResolution),
             m_WavefrontOutput(a_WavefrontOutput),
             m_ProcessedOutput(a_ProcessedOutput),
-            m_FinalOutput(a_FinalOutput)
+            m_FinalOutput(a_FinalOutput),
+            m_BlendOutput(a_BlendOutput),
+            m_BlendCount(a_BlendCount)
         {}
 
         CPU_ONLY ~PostProcessLaunchParameters() = default;
@@ -151,6 +156,8 @@ namespace WaveFront
         const float3* const m_WavefrontOutput;
         float3* const m_ProcessedOutput;
         uchar4* const m_FinalOutput;
+        const bool m_BlendOutput;
+        const unsigned m_BlendCount;
     };
 
 }

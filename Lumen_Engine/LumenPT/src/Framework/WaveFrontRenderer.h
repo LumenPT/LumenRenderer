@@ -35,6 +35,8 @@ namespace WaveFront
 
         //The maximum distance a ray can travel before terminating.
         float maxIntersectionT;
+
+        bool blendOutput;
     };
 
     class WaveFrontRenderer : public LumenRenderer
@@ -66,6 +68,20 @@ namespace WaveFront
         void BeginSnapshot() override;
 
         std::unique_ptr<FrameSnapshot> EndSnapshot() override;
+
+        /*
+         * Set the append mode.
+         * When true, final output is blended and not overwritten to build a higher res image over time.
+         * When false, output is overwritten every frame.
+         */
+        void SetBlendMode(bool a_Blend) override;
+
+        /*
+         * Get the append mode.
+         * When true, output is blended and not overwritten.
+         */
+        bool GetBlendMode() const override;
+    	
 
 
         void SetRenderResolution(glm::uvec2 a_NewResolution) override;
@@ -113,6 +129,9 @@ namespace WaveFront
     private:
         WaveFrontSettings m_Settings;
 
+        //Blend counter when blending is enabled.
+        unsigned m_BlendCounter;
+
         //Index of the frame, used to swap buffers.
         std::uint32_t m_FrameIndex;
 
@@ -128,7 +147,6 @@ namespace WaveFront
         // The Frame Snapshot is used to define what to record when the output layer requests that
         // See TraceFrame() ##ToolsBookmark for example
         std::unique_ptr<FrameSnapshot> m_FrameSnapshot;
-
     };
 }
 #endif

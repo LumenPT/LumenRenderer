@@ -81,7 +81,8 @@ CPU_ON_GPU void ShadeIndirect(
          *
          * Because half the domain is removed, the BRDF PDF can be doubled after this passes.
          */
-        if (dot(bounceDirection, surfaceData.m_Normal) <= 0.f) continue;
+        const auto bounceDotN = dot(bounceDirection, surfaceData.m_Normal);
+        if (bounceDotN <= 0.f) continue;
 
         //Double BRDF PDF because half the domain is terminated above.
         brdfPdf *= 2.f;
@@ -93,7 +94,7 @@ CPU_ON_GPU void ShadeIndirect(
          */
         const auto invViewDir = -surfaceData.m_IncomingRayDirection;
         const auto brdf = MicrofacetBRDF(invViewDir, bounceDirection, surfaceData.m_Normal, surfaceData.m_Color, surfaceData.m_Metallic, surfaceData.m_Roughness);
-        pathContribution *= (brdf / brdfPdf);
+        pathContribution *= ((brdf * bounceDotN) / brdfPdf);
 
         assert(pathContribution.x >= 0 && pathContribution.y >= 0 && pathContribution.z >= 0);
 

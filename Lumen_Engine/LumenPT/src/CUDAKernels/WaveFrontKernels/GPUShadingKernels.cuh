@@ -87,7 +87,10 @@ CPU_ON_GPU void Denoise();
 CPU_ON_GPU void MergeOutputChannels(
     const uint2 a_Resolution,
     const float3* const a_Input,
-    float3* const a_Output);
+    float3* const a_Output,
+    const bool a_BlendOutput,
+    const unsigned a_BlendCount
+);
 
 /*
  *
@@ -103,7 +106,8 @@ CPU_ON_GPU void PostProcessingEffects();
 CPU_ON_GPU void WriteToOutput(
     const uint2 a_Resolution,
     const float3* const a_Input,
-    uchar4* a_Output);
+    uchar4* a_Output
+);
 
 CPU_ON_GPU void GenerateMotionVector(
     MotionVectorBuffer* a_Buffer,

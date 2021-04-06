@@ -46,6 +46,7 @@ namespace WaveFront
 {
     void WaveFrontRenderer::Init(const WaveFrontSettings& a_Settings)
     {
+        m_BlendCounter = 0;
         m_FrameIndex = 0;
         m_Settings = a_Settings;
 
@@ -85,9 +86,9 @@ namespace WaveFront
         TriangleLight lights[numLights];
 
         //Intensity per light.
-        lights[0].radiance = { 20000, 20000, 20000 };
-        lights[1].radiance = { 20000, 20000, 20000 };
-        lights[2].radiance = { 20000, 20000, 20000 };
+        lights[0].radiance = { 200000, 150000, 150000 };
+        lights[1].radiance = { 150000, 200000, 150000 };
+        lights[2].radiance = { 150000, 150000, 200000 };
 
 
         //Actually set the triangle lights to have an area.
@@ -231,6 +232,17 @@ namespace WaveFront
 
         return glm::uvec2(m_Settings.outputResolution.x, m_Settings.outputResolution.y);
 
+    }
+
+    void WaveFrontRenderer::SetBlendMode(bool a_Blend)
+    {
+        m_Settings.blendOutput = a_Blend;
+        if (a_Blend) m_BlendCounter = 0;
+    }
+
+    bool WaveFrontRenderer::GetBlendMode() const
+    {
+        return m_Settings.blendOutput;
     }
 
     std::unique_ptr<MemoryBuffer> WaveFrontRenderer::InterleaveVertexData(const PrimitiveData& a_MeshData) const
@@ -405,7 +417,7 @@ namespace WaveFront
         return std::make_shared<PTScene>(a_SceneData, m_ServiceLocator);
     }
 
-    WaveFrontRenderer::WaveFrontRenderer() : m_FrameIndex(0), m_CUDAContext(nullptr)
+    WaveFrontRenderer::WaveFrontRenderer() : m_BlendCounter(0), m_FrameIndex(0), m_CUDAContext(nullptr)
     {
 
     }
@@ -434,7 +446,13 @@ namespace WaveFront
 
         //Start by clearing the data from the previous frame.
         ResetLightChannels(m_PixelBufferSeparate.GetDevicePtr<float3>(), numPixels, static_cast<unsigned>(LightChannel::NUM_CHANNELS));
-        ResetLightChannels(m_PixelBufferCombined.GetDevicePtr<float3>(), numPixels, 1);
+
+        //Only clean the merged buffer if no blending is enabled.
+        if(!m_Settings.blendOutput)
+        {
+            ResetLightChannels(m_PixelBufferCombined.GetDevicePtr<float3>(), numPixels, 1);
+        }
+
         cudaDeviceSynchronize();
         CHECKLASTCUDAERROR;
 
@@ -576,7 +594,7 @@ namespace WaveFront
             unsigned numIntersections = 0;
             numIntersections = GetAtomicCounter<IntersectionData>(&m_IntersectionData);
 
-            const auto surfaceDataBufferIndex = depth == 0 ? currentIndex : 2;   //1 and 2 are used for the first intersection and remembered for temporal use.
+            const auto surfaceDataBufferIndex = (depth == 0 ? currentIndex : 2);   //1 and 2 are used for the first intersection and remembered for temporal use.
             ExtractSurfaceData(
                 numIntersections,
                 m_IntersectionData.GetDevicePtr<AtomicBuffer<IntersectionData>>(),
@@ -671,14 +689,22 @@ namespace WaveFront
             m_Settings.outputResolution,
             m_PixelBufferSeparate.GetDevicePtr<float3>(),
             m_PixelBufferCombined.GetDevicePtr<float3>(),
-            m_OutputBuffer->GetDevicePtr()
+            m_OutputBuffer->GetDevicePtr(),
+            m_Settings.blendOutput,
+            m_BlendCounter
         );
 
         //Post processing using CUDA kernel.
         PostProcess(postProcessLaunchParams);
         cudaDeviceSynchronize();
         CHECKLASTCUDAERROR;
-        
+
+        //If blending is enabled, increment blend counter.
+        if(m_Settings.blendOutput)
+        {
+            ++m_BlendCounter;
+        }
+
         //Change frame index 0..1
         ++m_FrameIndex;
         if(m_FrameIndex == 2)
