@@ -11,11 +11,14 @@
 
 struct DeviceMaterial;
 
-class Material : public Lumen::ILumenMaterial
+// Pathtracer-specific implementation of the material class.
+// Used to keep the materials for the path tracer up to date and correct.
+class PTMaterial : public Lumen::ILumenMaterial
 {
 public:
-    Material();
+    PTMaterial();
 
+    // Returns a GPU pointer to a representation of the material.
     DeviceMaterial* GetDeviceMaterial() const;
 
     void SetDiffuseColor(const glm::vec4& a_NewDiffuseColor) override;
@@ -29,13 +32,18 @@ public:
 
 private:
 
+    // Conversion function from the CPU representation to the GPU representation.
+    // Make sure to update this if you are expanding the materials beyond what already exists.
     DeviceMaterial CreateDeviceMaterial() const;
 
+    // Material data is kept here instead of the base class to account for API-specific implementation details   
     float4 m_DiffuseColor;
     float3 m_EmissiveColor;
-    std::shared_ptr<class Texture> m_DiffuseTexture;
-    std::shared_ptr<class Texture> m_EmissiveTexture;
+    std::shared_ptr<class PTTexture> m_DiffuseTexture;
+    std::shared_ptr<class PTTexture> m_EmissiveTexture;
 
+    // A flag to keep track if the GPU representation of the material needs to be updated after something was changed
     mutable bool m_DeviceMaterialDirty;
+    // A small GPU memory buffer to store the GPU representation in
     mutable std::unique_ptr<class MemoryBuffer> m_DeviceMemoryBuffer;
 };

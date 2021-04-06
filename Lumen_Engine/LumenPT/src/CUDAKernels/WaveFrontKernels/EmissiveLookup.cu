@@ -1,6 +1,6 @@
 #include "EmissiveLookup.cuh"
 //#include "../../Framework/CudaUtilities.h"
-#include "../../Framework/Material.h"
+#include "../../Framework/PTMaterial.h"
 #include <sutil/vec_math.h>
 #include <cuda_runtime.h>
 

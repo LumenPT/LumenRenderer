@@ -8,12 +8,14 @@
 
 namespace Lumen
 {
+    // Interface class for textures
 	class ILumenTexture
 	{
 	public:
 		virtual ~ILumenTexture(){};
 	};
 
+    // Interface class for materials
     class ILumenMaterial
     {
     public:
@@ -26,6 +28,7 @@ namespace Lumen
         virtual ILumenTexture& GetDiffuseTexture() const = 0;
     };
 
+    // Interface class for primitives
     class ILumenPrimitive
     {
     public:
@@ -34,6 +37,7 @@ namespace Lumen
         bool m_ContainEmissive;
     };
 
+    // Interface class for meshes
     class ILumenMesh
     {
     public:
@@ -43,7 +47,7 @@ namespace Lumen
         std::vector<std::unique_ptr<ILumenPrimitive>> m_Primitives;
     };
 
-
+    // Interface class for volumes
     class ILumenVolume
     {
     public:

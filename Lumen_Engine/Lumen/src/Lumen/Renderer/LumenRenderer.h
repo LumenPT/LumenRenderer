@@ -22,10 +22,12 @@ namespace Lumen
 	class ILumenMaterial;
 }
 
+// Base class for the renderer which is used to abstract away API implementation details
 class LumenRenderer
 {
 public:
 
+	// Structu used to initialize a primitive
 	struct PrimitiveData
 	{
 		VectorView<glm::vec3, uint8_t> m_Positions;
@@ -39,6 +41,7 @@ public:
 		std::shared_ptr<Lumen::ILumenMaterial> m_Material;
 	};
 
+	// Struct used to initialize a material
 	struct MaterialData
 	{
 		glm::vec4 m_DiffuseColor;
@@ -47,6 +50,7 @@ public:
 		std::shared_ptr<Lumen::ILumenTexture> m_NormalMap;
 	};
 
+	// Struct used to initialize a scene
 	struct SceneData
 	{
 		glm::vec3 m_CameraPosition = glm::vec3(0,0,0);
@@ -57,6 +61,7 @@ public:
 		std::vector<Lumen::MeshInstance> m_InstancedMeshes;
 	};
 
+	// Struct used to initialize the renderer
 	struct InitializationData
 	{
 
@@ -75,11 +80,20 @@ public:
 	LumenRenderer(const InitializationData& a_InitializationData){};
 	virtual ~LumenRenderer() = default;
 
+	// The following functions are abstract because they are used to hide away implementation details connected to the rendering APIs.
+	// Essentially all of them need to be implemented by the child classes to match the API requirements.
+
+	// Create a primitive from the provided primitive data
 	virtual std::unique_ptr<Lumen::ILumenPrimitive> CreatePrimitive(PrimitiveData& a_MeshData) = 0;
+	// Create a mesh from the provided primitives
 	virtual std::shared_ptr<Lumen::ILumenMesh> CreateMesh(std::vector<std::unique_ptr<Lumen::ILumenPrimitive>>& a_Primitives) = 0;
+	// Create a texture from the provided texture data
 	virtual std::shared_ptr<Lumen::ILumenTexture> CreateTexture(void* a_PixelData, uint32_t a_Width, uint32_t a_Height) = 0;
+	// Create a material from the provided material data
 	virtual std::shared_ptr<Lumen::ILumenMaterial> CreateMaterial(const MaterialData& a_MaterialData) = 0;
-	virtual std::shared_ptr<Lumen::ILumenScene> CreateScene(SceneData a_SceneData);
+	// Create a scene from the provided scene data
+	virtual std::shared_ptr<Lumen::ILumenScene> CreateScene(SceneData a_SceneData = {});
+	// Create a volume from the provided file path
 	virtual std::shared_ptr<Lumen::ILumenVolume> CreateVolume(const std::string& a_FilePath) = 0;
 
 	virtual unsigned int TraceFrame(std::shared_ptr<Lumen::ILumenScene>& a_Scene) = 0;	//scene argument may be redundant... or not 
