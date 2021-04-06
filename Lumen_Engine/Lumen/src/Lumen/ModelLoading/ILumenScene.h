@@ -5,6 +5,7 @@
 
 namespace Lumen
 {
+    // Interface class for scenes
     class ILumenScene
     {
     public:
@@ -17,9 +18,14 @@ namespace Lumen
     	: m_Camera(std::make_unique<Camera>(a_CamPosition, a_CamUp)) {};
         virtual ~ILumenScene() {};
 
+        // Adds a mesh instance to the scene. Use this instead of manually adding instances to m_MeshInstances
+        // in order to ensure the instances are of the correct type.
         virtual Lumen::MeshInstance* AddMesh();
+        // Adds a volume instance to the scene. Use this instead of manually adding instances to m_VolumeInstances
+        // in order to ensure the instances are of the correct type.
         virtual Lumen::VolumeInstance* AddVolume();
 
+        // Removes all instances from the scene
         virtual void Clear();
 
         std::vector<std::unique_ptr<Lumen::MeshInstance>> m_MeshInstances;

@@ -5,10 +5,10 @@
 #include "PTPrimitive.h"
 #include "PTMesh.h"
 #include "PTScene.h"
-#include "Material.h"
-#include "Texture.h"
+#include "PTMaterial.h"
+#include "PTTexture.h"
 #include "PTVolume.h"
-#include "Material.h"
+#include "PTMaterial.h"
 #include "MemoryBuffer.h"
 #include "CudaGLTexture.h"
 #include "SceneDataTable.h"
@@ -291,9 +291,9 @@ namespace WaveFront
         //std::unique_ptr<MemoryBuffer> indexBuffer = std::make_unique<MemoryBuffer>(a_PrimitiveData.m_IndexBinary);
 
         //std::unique_ptr<MemoryBuffer> primMat = std::make_unique<MemoryBuffer>(a_PrimitiveData.m_Material);
-        //std::unique_ptr<MemoryBuffer> primMat = static_cast<Material*>(a_PrimitiveData.m_Material.get())->GetDeviceMaterial();
+        //std::unique_ptr<MemoryBuffer> primMat = static_cast<PTMaterial*>(a_PrimitiveData.m_Material.get())->GetDeviceMaterial();
 
-        FindEmissives(vertexBuffer->GetDevicePtr<Vertex>(), emissiveBuffer->GetDevicePtr<bool>(), indexBuffer->GetDevicePtr<uint32_t>(), static_cast<Material*>(a_PrimitiveData.m_Material.get())->GetDeviceMaterial(), numVertices);
+        FindEmissives(vertexBuffer->GetDevicePtr<Vertex>(), emissiveBuffer->GetDevicePtr<bool>(), indexBuffer->GetDevicePtr<uint32_t>(), static_cast<PTMaterial*>(a_PrimitiveData.m_Material.get())->GetDeviceMaterial(), numVertices);
 
         // add bool buffer pointer to device prim pointer
 
@@ -331,7 +331,7 @@ namespace WaveFront
         auto& entry = prim->m_SceneDataTableEntry.GetData();
         entry.m_VertexBuffer = prim->m_VertBuffer->GetDevicePtr<Vertex>();
         entry.m_IndexBuffer = prim->m_IndexBuffer->GetDevicePtr<unsigned int>();
-        entry.m_Material = static_cast<Material*>(prim->m_Material.get())->GetDeviceMaterial();
+        entry.m_Material = static_cast<PTMaterial*>(prim->m_Material.get())->GetDeviceMaterial();
         entry.m_IsEmissive = prim->m_BoolBuffer->GetDevicePtr<bool>();
 
         return prim;
@@ -350,13 +350,13 @@ namespace WaveFront
         uint32_t a_Width, uint32_t a_Height)
     {
         static cudaChannelFormatDesc formatDesc = cudaCreateChannelDesc<uchar4>();
-        return std::make_shared<Texture>(a_PixelData, formatDesc, a_Width, a_Height);
+        return std::make_shared<PTTexture>(a_PixelData, formatDesc, a_Width, a_Height);
     }
 
     std::shared_ptr<Lumen::ILumenMaterial> WaveFrontRenderer::CreateMaterial(
         const MaterialData& a_MaterialData)
     {
-        auto mat = std::make_shared<Material>();
+        auto mat = std::make_shared<PTMaterial>();
         mat->SetDiffuseColor(a_MaterialData.m_DiffuseColor);
         mat->SetDiffuseTexture(a_MaterialData.m_DiffuseTexture);
         mat->SetEmission(a_MaterialData.m_EmssivionVal);

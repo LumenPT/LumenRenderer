@@ -6,6 +6,8 @@
 
 class MemoryBuffer;
 
+// Wrapper class around an OptixTraversableHandle and it's GPU memory
+// Simplifies acceleration structure storage and ensures the memory is not freed prematurely
 class AccelerationStructure
 {
 public:

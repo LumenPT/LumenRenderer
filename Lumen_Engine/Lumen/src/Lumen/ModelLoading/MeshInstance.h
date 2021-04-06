@@ -4,6 +4,7 @@
 
 namespace Lumen
 {
+    // Base class for mesh instances
     class MeshInstance
     {
     public:
