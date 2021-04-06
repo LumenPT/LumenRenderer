@@ -56,6 +56,8 @@ bool SceneDataTable::UpdateStride()
 
 void SceneDataTable::PartialUpdate()
 {
+    // TODO: This is low-key scuffed, needs rewriting 
+    uint32_t indexCounter = 0;
     for (auto& entryPair : m_Entries)
     {
         auto& entry = entryPair.second;
@@ -63,21 +65,24 @@ void SceneDataTable::PartialUpdate()
         {
             entry->m_Dirty = false;
 
-            auto offset = entry->m_TableIndex * m_EntryStride;
+            auto offset = indexCounter * m_EntryStride;
 
             cudaMemcpy(reinterpret_cast<void*>(*m_GpuBuffer + offset), entry->m_RawData, entry->m_Size, cudaMemcpyHostToDevice);
+            entry->m_TableIndex = indexCounter++;
         }
     }
 }
 
 void SceneDataTable::FullRebuild()
 {
+    // Resize the buffer if it wouldn't be big enough to fit the entire data table
     auto bufferSize = m_EntryStride * m_Entries.size();
     if (m_GpuBuffer.GetSize() < bufferSize)
     {
         m_GpuBuffer.Resize(bufferSize);
     }
 
+    // Copy all entries into the buffer, assigning them new indices in the process
     uint32_t indexCounter = 0;
     for (auto& entryPair : m_Entries)
     {
