@@ -122,7 +122,11 @@ OutputLayer::~OutputLayer()
 	glDeleteProgram(m_Program);
 }
 
-void OutputLayer::OnUpdate(){
+void OutputLayer::OnUpdate()
+{
+
+	auto err = glGetError();
+
 
 	HandleCameraInput(*m_Renderer->m_Scene->m_Camera);
 
@@ -131,22 +135,34 @@ void OutputLayer::OnUpdate(){
 	if (Lumen::Input::IsKeyPressed(LMN_KEY_K))
 	{
 		recordingSnapshot = true;
-		m_Renderer->BeginSnapshot();	    
+		m_Renderer->BeginSnapshot();
 	}
 
-	auto texture = m_Renderer->TraceFrame(m_Renderer->m_Scene); // TRACE SUM
+	auto texture = m_Renderer->GetOutputTexture(); // TRACE SUM
 	HandleSceneInput();
 	m_LastFrameTex = texture;
 	m_SmallViewportFrameTex = texture;
-	
+
+	err = glGetError();
 	if (recordingSnapshot)
 	{
-		m_FrameSnapshots.push_back(m_Renderer->EndSnapshot());			
+		m_FrameSnapshots.push_back(m_Renderer->EndSnapshot());
 	}
+	if (texture)
+	{
 
-	glBindTexture(GL_TEXTURE_2D, texture);
-	glUseProgram(m_Program);
-	glDrawArrays(GL_TRIANGLES, 0, 3);
+		auto err1 = glGetError();
+
+		glBindTexture(GL_TEXTURE_2D, texture);
+		glUseProgram(m_Program);
+		glDrawArrays(GL_TRIANGLES, 0, 3);
+
+
+		glFlush();
+
+		glBindTexture(GL_TEXTURE_2D, 0);
+
+	}
 }
 
 void OutputLayer::OnImGuiRender()

@@ -13,6 +13,7 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <mutex>
 
 class SceneDataTable;
 
@@ -43,6 +44,8 @@ namespace WaveFront
     {
         //Overridden functionality.
     public:
+        void StartRendering() override;
+
         std::unique_ptr<Lumen::ILumenPrimitive> CreatePrimitive(PrimitiveData& a_PrimitiveData) override;
         std::shared_ptr<Lumen::ILumenMesh> CreateMesh(std::vector<std::unique_ptr<Lumen::ILumenPrimitive>>& a_Primitives) override;
         std::shared_ptr<Lumen::ILumenTexture> CreateTexture(void* a_PixelData, uint32_t a_Width, uint32_t a_Height) override;
@@ -57,7 +60,7 @@ namespace WaveFront
         /*
          * Render.
          */
-        unsigned TraceFrame(std::shared_ptr<Lumen::ILumenScene>& a_Scene) override;
+        unsigned GetOutputTexture() override;
 
         /*
          * Initialize the wavefront pipeline.
@@ -90,10 +93,15 @@ namespace WaveFront
     	
     private:
 
+        void TraceFrame();
+
         std::unique_ptr<MemoryBuffer> InterleaveVertexData(const PrimitiveData& a_MeshData) const;
 
         //OpenGL buffer to write output to.
         std::unique_ptr<CudaGLTexture> m_OutputBuffer;
+
+        // Intermediate buffer to store path tracing results without interfering with OpenGL rendering thread
+        MemoryBuffer m_IntermediateOutputBuffer;
 
         //The surface data per pixel. 0 and 1 are used for the current and previous frame. 2 is used for any other depth.
         MemoryBuffer m_SurfaceData[3];
@@ -140,6 +148,12 @@ namespace WaveFront
 
         //The server locator instance.
         PTServiceLocator m_ServiceLocator;
+
+        std::mutex m_OutputBufferMutex;
+        std::thread m_PathTracingThread;
+        std::condition_variable m_OutputCondition;
+
+        GLuint m_OutputTexture;
 
         //Kamen's lookup table
         std::unique_ptr<SceneDataTable> m_Table;

@@ -22,6 +22,7 @@
 #include "../Tools/SnapShotProcessing.cuh"
 #include "MotionVectors.h"
 
+#include "../../../Lumen/vendor/GLFW/include/GLFW/glfw3.h"
 #include <Optix/optix_function_table_definition.h>
 #include <filesystem>
 #include <glm/gtx/compatibility.hpp>
@@ -131,6 +132,7 @@ namespace WaveFront
         m_ServiceLocator.m_Renderer = this;
         m_FrameSnapshot = std::make_unique<NullFrameSnapshot>();
 
+
     }
 
     void WaveFrontRenderer::BeginSnapshot()
@@ -161,6 +163,8 @@ namespace WaveFront
         //Set up buffers.
         const unsigned numPixels = m_Settings.renderResolution.x * m_Settings.renderResolution.y;
         const unsigned numOutputChannels = static_cast<unsigned>(LightChannel::NUM_CHANNELS);
+
+        m_IntermediateOutputBuffer.Resize(sizeof(uchar4) * numPixels);
 
         //Allocate pixel buffer.
         m_PixelBufferSeparate.Resize(sizeof(float3) * numPixels * numOutputChannels);
@@ -245,6 +249,332 @@ namespace WaveFront
         return m_Settings.blendOutput;
     }
 
+    void WaveFrontRenderer::TraceFrame()
+    {
+
+        //add to lights buffer? in traceframe
+
+        //add lights to mesh in scene
+            //add mesh
+            //keep instances in scene
+            //for each instance, add all emissive triangles to light buffer with world space pos
+
+        //Get instances from scene
+            //check which instances are emissives to optimize the looping over instances
+            //inside of these instances you compare which triangles are emissive through boolean buffer
+            //add those to lights buffer in world space
+                //where to keep lights buffer?? - scene! yes!
+
+        //Index of the current and last frame to access buffers.
+        const auto currentIndex = m_FrameIndex;
+        const auto temporalIndex = m_FrameIndex == 1 ? 0 : 1;
+
+        //Data needed in the algorithms.
+        const uint32_t numPixels = m_Settings.renderResolution.x * m_Settings.renderResolution.y;
+
+
+        //Start by clearing the data from the previous frame.
+        ResetLightChannels(m_PixelBufferSeparate.GetDevicePtr<float3>(), numPixels, static_cast<unsigned>(LightChannel::NUM_CHANNELS));
+
+        //Only clean the merged buffer if no blending is enabled.
+        if (!m_Settings.blendOutput)
+        {
+            ResetLightChannels(m_PixelBufferCombined.GetDevicePtr<float3>(), numPixels, 1);
+        }
+
+        cudaDeviceSynchronize();
+        CHECKLASTCUDAERROR;
+
+        //Generate camera rays.
+        glm::vec3 eye, u, v, w;
+        m_Scene->m_Camera->SetAspectRatio(static_cast<float>(m_Settings.renderResolution.x) / static_cast<float>(m_Settings.renderResolution.y));
+        m_Scene->m_Camera->GetVectorData(eye, u, v, w);
+
+        //Camera forward direction.
+        const float3 camForward = { w.x, w.y, w.z };
+        const float3 camPosition = { eye.x, eye.y, eye.z };
+
+        float3 eyeCuda, uCuda, vCuda, wCuda;
+        eyeCuda = make_float3(eye.x, eye.y, eye.z);
+        uCuda = make_float3(u.x, u.y, u.z);
+        vCuda = make_float3(v.x, v.y, v.z);
+        wCuda = make_float3(w.x, w.y, w.z);
+
+        //printf("Camera pos: %f %f %f\n", camPosition.x, camPosition.y, camPosition.z);
+
+        //Increment framecount each frame.
+        static unsigned frameCount = 0;
+        ++frameCount;
+
+        const WaveFront::PrimRayGenLaunchParameters::DeviceCameraData cameraData(eyeCuda, uCuda, vCuda, wCuda);
+        auto rayPtr = m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>();
+        const PrimRayGenLaunchParameters primaryRayGenParams(
+            uint2{ m_Settings.renderResolution.x, m_Settings.renderResolution.y },
+            cameraData,
+            rayPtr, frameCount);
+        GeneratePrimaryRays(primaryRayGenParams);
+        cudaDeviceSynchronize();
+        CHECKLASTCUDAERROR;
+
+        //Set the atomic counter for primary rays to the amount of pixels.
+        SetAtomicCounter<IntersectionRayData>(&m_Rays, numPixels);
+
+        //##ToolsBookmark
+        //Example of defining how to add buffers to the pixel debugger tool
+        //This lambda is NOT ran every frame, it is only ran when the output layer requests a snapshot
+        m_FrameSnapshot->AddBuffer([&]()
+            {
+                // The buffers that need to be given to the tool are provided via a map as shown below
+                // Notice that CudaGLTextures are used, as opposed to memory buffers. This is to enable the data to be used with OpenGL
+                // and thus displayed via ImGui
+                std::map<std::string, FrameSnapshot::ImageBuffer> resBuffers;
+                resBuffers["Origins"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
+                    m_Settings.renderResolution.y, 3 * sizeof(float));
+
+                resBuffers["Directions"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
+                    m_Settings.renderResolution.y, 3 * sizeof(float));
+
+                resBuffers["Contributions"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
+                    m_Settings.renderResolution.y, 3 * sizeof(float));
+
+                // A CUDA kernel used to separate the interleave primary ray buffer into 3 different buffers
+                // This is the main reason we use a lambda, as it needs to be defined how to interpret the data
+                SeparateIntersectionRayBufferCPU((m_Rays.GetSize() - sizeof(uint32_t)) / sizeof(IntersectionRayData),
+                    m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>(),
+                    resBuffers.at("Origins").m_Memory->GetDevicePtr<float3>(),
+                    resBuffers.at("Directions").m_Memory->GetDevicePtr<float3>(),
+                    resBuffers.at("Contributions").m_Memory->GetDevicePtr<float3>());
+
+                return resBuffers;
+            });
+
+        m_FrameSnapshot->AddBuffer([&]()
+            {
+                auto motionVectorBuffer = m_MotionVectors.GetMotionVectorBuffer();
+
+                std::map<std::string, FrameSnapshot::ImageBuffer> resBuffers;
+                resBuffers["Motion vector direction"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
+                    m_Settings.renderResolution.y, 3 * sizeof(float));
+
+                resBuffers["Motion vector magnitude"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
+                    m_Settings.renderResolution.y, 3 * sizeof(float));
+
+                SeparateMotionVectorBufferCPU(m_Settings.renderResolution.x * m_Settings.renderResolution.y,
+                    motionVectorBuffer->GetDevicePtr<MotionVectorBuffer>(),
+                    resBuffers.at("Motion vector direction").m_Memory->GetDevicePtr<float3>(),
+                    resBuffers.at("Motion vector magnitude").m_Memory->GetDevicePtr<float3>()
+                );
+
+                return resBuffers;
+            });
+
+        //Clear the surface data that contains information from the second last frame so that it can be reused by this frame.
+        cudaMemset(m_SurfaceData[currentIndex].GetDevicePtr(), 0, sizeof(SurfaceData) * numPixels);
+        cudaDeviceSynchronize();
+        CHECKLASTCUDAERROR;
+
+        //Set the counters back to 0 for intersections and shadow rays.
+        const unsigned counterDefault = 0;
+        SetAtomicCounter<ShadowRayData>(&m_ShadowRays, counterDefault);
+        SetAtomicCounter<IntersectionData>(&m_IntersectionData, counterDefault);
+
+        //Retrieve the acceleration structure and scene data table once.
+        m_OptixSystem->UpdateSBT();
+        auto* sceneDataTableAccessor = m_Table->GetDevicePointer();
+        auto accelerationStructure = std::static_pointer_cast<PTScene>(m_Scene)->GetSceneAccelerationStructure();
+        cudaDeviceSynchronize();
+        CHECKLASTCUDAERROR;
+
+        //Pass the buffers to the optix shader for shading.
+        OptixLaunchParameters rayLaunchParameters;
+        rayLaunchParameters.m_TraceType = RayType::INTERSECTION_RAY;
+        rayLaunchParameters.m_MinMaxDistance = { 0.01f, 5000.f };
+        rayLaunchParameters.m_IntersectionBuffer = m_IntersectionData.GetDevicePtr<AtomicBuffer<IntersectionData>>();
+        rayLaunchParameters.m_IntersectionRayBatch = m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>();
+        rayLaunchParameters.m_TraversableHandle = accelerationStructure;
+        rayLaunchParameters.m_ResolutionAndDepth = uint3{ m_Settings.renderResolution.x, m_Settings.renderResolution.y, m_Settings.depth };
+
+        //The settings for shadow ray resolving.
+        OptixLaunchParameters shadowRayLaunchParameters;
+        shadowRayLaunchParameters = rayLaunchParameters;
+        shadowRayLaunchParameters.m_ResultBuffer = m_PixelBufferSeparate.GetDevicePtr<float3>();
+        shadowRayLaunchParameters.m_ShadowRayBatch = m_ShadowRays.GetDevicePtr<AtomicBuffer<ShadowRayData>>();
+        shadowRayLaunchParameters.m_TraceType = RayType::SHADOW_RAY;
+
+        //Set the amount of rays to trace. Initially same as screen size.
+        auto numIntersectionRays = numPixels;
+
+        auto seed = WangHash(frameCount);
+
+
+        /*
+         * Resolve rays and shade at every depth.
+         */
+        for (unsigned depth = 0; depth < m_Settings.depth && numIntersectionRays > 0; ++depth)
+        {
+            //Tell Optix to resolve the primary rays that have been generated.
+            m_OptixSystem->TraceRays(numIntersectionRays, rayLaunchParameters);
+            cudaDeviceSynchronize();
+            CHECKLASTCUDAERROR;
+
+            /*
+             * Calculate the surface data for this depth.
+             */
+            unsigned numIntersections = 0;
+            numIntersections = GetAtomicCounter<IntersectionData>(&m_IntersectionData);
+
+            const auto surfaceDataBufferIndex = (depth == 0 ? currentIndex : 2);   //1 and 2 are used for the first intersection and remembered for temporal use.
+            ExtractSurfaceData(
+                numIntersections,
+                m_IntersectionData.GetDevicePtr<AtomicBuffer<IntersectionData>>(),
+                m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>(),
+                m_SurfaceData[surfaceDataBufferIndex].GetDevicePtr<SurfaceData>(),
+                sceneDataTableAccessor);
+            cudaDeviceSynchronize();
+            CHECKLASTCUDAERROR;
+
+            //motion vector generation
+            if (depth == 0)
+            {
+                glm::mat4 previousFrameMatrix, currentFrameMatrix;
+                m_Scene->m_Camera->GetMatrixData(previousFrameMatrix, currentFrameMatrix);
+                sutil::Matrix4x4 prevFrameMatrixArg = ConvertGLMtoSutilMat4(previousFrameMatrix);
+
+                glm::mat4 projectionMatrix = m_Scene->m_Camera->GetProjectionMatrix();
+                sutil::Matrix4x4 projectionMatrixArg = ConvertGLMtoSutilMat4(projectionMatrix);
+
+                MotionVectorsGenerationData motionVectorsGenerationData;
+                motionVectorsGenerationData.m_MotionVectorBuffer = nullptr;
+                motionVectorsGenerationData.a_CurrentSurfaceData = m_SurfaceData[currentIndex].GetDevicePtr<SurfaceData>();
+                motionVectorsGenerationData.m_ScreenResolution = make_uint2(m_Settings.renderResolution.x, m_Settings.renderResolution.y);
+                motionVectorsGenerationData.m_PrevViewMatrix = prevFrameMatrixArg.inverse();
+                motionVectorsGenerationData.m_ProjectionMatrix = projectionMatrixArg;
+                m_MotionVectors.Update(motionVectorsGenerationData);
+            }
+
+            /*
+             * Call the shading kernels.
+             */
+            ShadingLaunchParameters shadingLaunchParams(
+                uint3{ m_Settings.renderResolution.x, m_Settings.renderResolution.y, m_Settings.depth },
+                m_SurfaceData[surfaceDataBufferIndex].GetDevicePtr<SurfaceData>(),
+                m_SurfaceData[temporalIndex].GetDevicePtr<SurfaceData>(),
+                m_IntersectionData.GetDevicePtr<AtomicBuffer<IntersectionData>>(),
+                m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>(),
+                m_ShadowRays.GetDevicePtr<AtomicBuffer<ShadowRayData>>(),
+                m_TriangleLights.GetDevicePtr<TriangleLight>(),
+                3,
+                camPosition,
+                camForward,
+                accelerationStructure,  //ReSTIR needs to check visibility early on so it does an optix launch for this scene.
+                m_OptixSystem.get(),
+                seed, //Use the frame count as the random seed.
+                m_ReSTIR.get(), //ReSTIR, can not be nullptr.
+                depth,  //The current depth.
+                m_MotionVectors.GetMotionVectorBuffer()->GetDevicePtr<MotionVectorBuffer>(),
+                numIntersectionRays,
+                m_PixelBufferSeparate.GetDevicePtr<float3>()
+            );
+
+            //Reset the ray buffer so that indirect shading can fill it again.
+            ResetAtomicBuffer<IntersectionRayData>(&m_Rays);
+            cudaDeviceSynchronize();
+
+            Shade(shadingLaunchParams);
+            cudaDeviceSynchronize();
+            CHECKLASTCUDAERROR;
+
+            //Set the number of intersection rays to the size of the ray buffer.
+            numIntersectionRays = GetAtomicCounter<IntersectionRayData>(&m_Rays);
+
+            //Clear the surface data at depth 2 (the one that is overwritten each wave).
+            cudaMemset(m_SurfaceData[2].GetDevicePtr(), 0, sizeof(SurfaceData) * numPixels);
+            cudaDeviceSynchronize();
+            CHECKLASTCUDAERROR;
+
+            //Reset the intersection data so that the next frame can re-fill it.
+            ResetAtomicBuffer<IntersectionData>(&m_IntersectionData);
+
+            //Swap the ReSTIR buffers around.
+            m_ReSTIR->SwapBuffers();
+
+            //Switch up the seed.
+            seed = WangHash(frameCount);
+        }
+
+        //The amount of shadow rays to trace.
+        unsigned numShadowRays = GetAtomicCounter<ShadowRayData>(&m_ShadowRays);
+
+        if (numShadowRays > 0)
+        {
+            //Tell optix to resolve the shadow rays.
+            m_OptixSystem->TraceRays(numShadowRays, shadowRayLaunchParameters);
+            cudaDeviceSynchronize();
+            CHECKLASTCUDAERROR;
+        }
+
+        PostProcessLaunchParameters postProcessLaunchParams(
+            m_Settings.renderResolution,
+            m_Settings.outputResolution,
+            m_PixelBufferSeparate.GetDevicePtr<float3>(),
+            m_PixelBufferCombined.GetDevicePtr<float3>(),
+            m_IntermediateOutputBuffer.GetDevicePtr<uchar4>(),
+            m_Settings.blendOutput,
+            m_BlendCounter
+        );
+    
+        //Post processing using CUDA kernel.
+        PostProcess(postProcessLaunchParams);
+        cudaDeviceSynchronize();
+        CHECKLASTCUDAERROR;
+
+        // Critical scope for updating the output texture
+        {
+            std::unique_lock guard(m_OutputBufferMutex); // Take ownership of the mutex, locking it
+
+            // Perform a GPU to GPU copy, from the intermediate output buffer to the real output buffer
+            cudaMemcpy(m_OutputBuffer->GetDevicePtr<void>(), m_IntermediateOutputBuffer.GetDevicePtr(),
+                m_IntermediateOutputBuffer.GetSize(), cudaMemcpyKind::cudaMemcpyDeviceToDevice);
+
+            std::vector<uchar4> v(m_IntermediateOutputBuffer.GetSize());
+            cudaMemcpy(v.data(), m_IntermediateOutputBuffer.GetDevicePtr<void>(), v.size(), cudaMemcpyDeviceToHost);
+
+            printf("copy");
+
+            cudaDeviceSynchronize();
+
+            m_OutputTexture = m_OutputBuffer->GetTexture();
+            // Once the memcpy is complete, the lock guard releases the mutex
+        }
+        // The display thread might wait on the memcpy that was just performed.
+        // We bump the thread by calling notify all on the same condition_variable it uses
+        m_OutputCondition.notify_all(); 
+
+        //If blending is enabled, increment blend counter.
+        if (m_Settings.blendOutput)
+        {
+            ++m_BlendCounter;
+        }
+
+        //Change frame index 0..1
+        ++m_FrameIndex;
+        if (m_FrameIndex == 2)
+        {
+            m_FrameIndex = 0;
+        }
+
+        m_Scene->m_Camera->UpdatePreviousFrameMatrix();
+        ++frameCount;
+
+
+        // TODO: Weird debug code. Yeet?
+        m_DebugTexture = m_OutputTexture;
+        //#if defined(_DEBUG)
+        m_MotionVectors.GenerateDebugTextures();
+        //m_DebugTexture = m_MotionVectors.GetMotionVectorMagnitudeTex();
+        m_DebugTexture = m_MotionVectors.GetMotionVectorDirectionsTex();
+    }
+
     std::unique_ptr<MemoryBuffer> WaveFrontRenderer::InterleaveVertexData(const PrimitiveData& a_MeshData) const
     {
         std::vector<Vertex> vertices;
@@ -259,6 +589,23 @@ namespace WaveFront
                 v.m_Normal = make_float3(a_MeshData.m_Normals[i].x, a_MeshData.m_Normals[i].y, a_MeshData.m_Normals[i].z);
         }
         return std::make_unique<MemoryBuffer>(vertices);
+    }
+
+    void WaveFrontRenderer::StartRendering()
+    {
+        auto err = glGetError();
+        m_PathTracingThread = std::thread([&]()
+            {
+                if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+                {
+                    std::cout << "Failed to initialize GLAD" << std::endl;
+                    return -1;
+                }
+                auto err1 = glGetError();
+
+                while(true)
+                    TraceFrame();
+            });
     }
 
     std::unique_ptr<Lumen::ILumenPrimitive> WaveFrontRenderer::CreatePrimitive(PrimitiveData& a_PrimitiveData)
@@ -422,308 +769,15 @@ namespace WaveFront
 
     }
 
-    unsigned WaveFrontRenderer::TraceFrame(std::shared_ptr<Lumen::ILumenScene>& a_Scene)
+    unsigned WaveFrontRenderer::GetOutputTexture()
     {
-        //add to lights buffer? in traceframe
-
-        //add lights to mesh in scene
-            //add mesh
-            //keep instances in scene
-            //for each instance, add all emissive triangles to light buffer with world space pos
-
-        //Get instances from scene
-            //check which instances are emissives to optimize the looping over instances
-            //inside of these instances you compare which triangles are emissive through boolean buffer
-            //add those to lights buffer in world space
-                //where to keep lights buffer?? - scene! yes!
-
-        //Index of the current and last frame to access buffers.
-        const auto currentIndex = m_FrameIndex;
-        const auto temporalIndex = m_FrameIndex == 1 ? 0 : 1;
-
-        //Data needed in the algorithms.
-        const uint32_t numPixels = m_Settings.renderResolution.x * m_Settings.renderResolution.y;
-
-        //Start by clearing the data from the previous frame.
-        ResetLightChannels(m_PixelBufferSeparate.GetDevicePtr<float3>(), numPixels, static_cast<unsigned>(LightChannel::NUM_CHANNELS));
-
-        //Only clean the merged buffer if no blending is enabled.
-        if(!m_Settings.blendOutput)
-        {
-            ResetLightChannels(m_PixelBufferCombined.GetDevicePtr<float3>(), numPixels, 1);
-        }
-
-        cudaDeviceSynchronize();
-        CHECKLASTCUDAERROR;
-
-        //Generate camera rays.
-        glm::vec3 eye, u, v, w;
-        a_Scene->m_Camera->SetAspectRatio(static_cast<float>(m_Settings.renderResolution.x) / static_cast<float>(m_Settings.renderResolution.y));
-        a_Scene->m_Camera->GetVectorData(eye, u, v, w);
-
-        //Camera forward direction.
-        const float3 camForward = { w.x, w.y, w.z };
-        const float3 camPosition = { eye.x, eye.y, eye.z };
-
-        float3 eyeCuda, uCuda, vCuda, wCuda;
-        eyeCuda = make_float3(eye.x, eye.y, eye.z);
-        uCuda = make_float3(u.x, u.y, u.z);
-        vCuda = make_float3(v.x, v.y, v.z);
-        wCuda = make_float3(w.x, w.y, w.z);
-
-        //printf("Camera pos: %f %f %f\n", camPosition.x, camPosition.y, camPosition.z);
-
-        //Increment framecount each frame.
-        static unsigned frameCount = 0;
-        ++frameCount;
-
-        const WaveFront::PrimRayGenLaunchParameters::DeviceCameraData cameraData(eyeCuda, uCuda, vCuda, wCuda);
-        auto rayPtr = m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>();
-        const PrimRayGenLaunchParameters primaryRayGenParams(
-            uint2{m_Settings.renderResolution.x, m_Settings.renderResolution.y}, 
-            cameraData, 
-            rayPtr, frameCount);
-        GeneratePrimaryRays(primaryRayGenParams);
-        cudaDeviceSynchronize();
-        CHECKLASTCUDAERROR;
-
-        //Set the atomic counter for primary rays to the amount of pixels.
-        SetAtomicCounter<IntersectionRayData>(&m_Rays, numPixels);
-
-        //##ToolsBookmark
-        //Example of defining how to add buffers to the pixel debugger tool
-        //This lambda is NOT ran every frame, it is only ran when the output layer requests a snapshot
-        m_FrameSnapshot->AddBuffer([&]()
-        {
-            // The buffers that need to be given to the tool are provided via a map as shown below
-            // Notice that CudaGLTextures are used, as opposed to memory buffers. This is to enable the data to be used with OpenGL
-            // and thus displayed via ImGui
-            std::map<std::string, FrameSnapshot::ImageBuffer> resBuffers;
-            resBuffers["Origins"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
-                m_Settings.renderResolution.y, 3 * sizeof(float));
-
-            resBuffers["Directions"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
-                m_Settings.renderResolution.y, 3 * sizeof(float));
-
-            resBuffers["Contributions"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F ,m_Settings.renderResolution.x,
-                m_Settings.renderResolution.y, 3 * sizeof(float));
-
-            // A CUDA kernel used to separate the interleave primary ray buffer into 3 different buffers
-            // This is the main reason we use a lambda, as it needs to be defined how to interpret the data
-            SeparateIntersectionRayBufferCPU((m_Rays.GetSize() - sizeof(uint32_t)) / sizeof(IntersectionRayData),
-                m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>(),
-                resBuffers.at("Origins").m_Memory->GetDevicePtr<float3>(),
-                resBuffers.at("Directions").m_Memory->GetDevicePtr<float3>(),
-                resBuffers.at("Contributions").m_Memory->GetDevicePtr<float3>());
-
-            return resBuffers;
-        });
-
-        m_FrameSnapshot->AddBuffer([&]()
-        {
-            auto motionVectorBuffer = m_MotionVectors.GetMotionVectorBuffer();
-        	
-            std::map<std::string, FrameSnapshot::ImageBuffer> resBuffers;
-            resBuffers["Motion vector direction"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
-                m_Settings.renderResolution.y, 3 * sizeof(float));
-
-            resBuffers["Motion vector magnitude"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
-                m_Settings.renderResolution.y, 3 * sizeof(float));
-
-           SeparateMotionVectorBufferCPU(m_Settings.renderResolution.x * m_Settings.renderResolution.y,
-               motionVectorBuffer->GetDevicePtr<MotionVectorBuffer>(),
-                resBuffers.at("Motion vector direction").m_Memory->GetDevicePtr<float3>(),
-                resBuffers.at("Motion vector magnitude").m_Memory->GetDevicePtr<float3>()
-           );
-
-            return resBuffers;
-        });
-    	
-        //Clear the surface data that contains information from the second last frame so that it can be reused by this frame.
-        cudaMemset(m_SurfaceData[currentIndex].GetDevicePtr(), 0, sizeof(SurfaceData) * numPixels);
-        cudaDeviceSynchronize();
-        CHECKLASTCUDAERROR;
-
-        //Set the counters back to 0 for intersections and shadow rays.
-        const unsigned counterDefault = 0;
-        SetAtomicCounter<ShadowRayData>(&m_ShadowRays, counterDefault);
-        SetAtomicCounter<IntersectionData>(&m_IntersectionData, counterDefault);
-
-        //Retrieve the acceleration structure and scene data table once.
-        m_OptixSystem->UpdateSBT();
-        auto* sceneDataTableAccessor = m_Table->GetDevicePointer();
-        auto accelerationStructure = std::static_pointer_cast<PTScene>(a_Scene)->GetSceneAccelerationStructure();
-        cudaDeviceSynchronize();
-        CHECKLASTCUDAERROR;
-
-        //Pass the buffers to the optix shader for shading.
-        OptixLaunchParameters rayLaunchParameters;
-        rayLaunchParameters.m_TraceType = RayType::INTERSECTION_RAY;
-        rayLaunchParameters.m_MinMaxDistance = { 0.01f, 5000.f };
-        rayLaunchParameters.m_IntersectionBuffer = m_IntersectionData.GetDevicePtr<AtomicBuffer<IntersectionData>>();
-        rayLaunchParameters.m_IntersectionRayBatch = m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>();
-        rayLaunchParameters.m_TraversableHandle = accelerationStructure;
-        rayLaunchParameters.m_ResolutionAndDepth = uint3{ m_Settings.renderResolution.x, m_Settings.renderResolution.y, m_Settings.depth };
-
-        //The settings for shadow ray resolving.
-        OptixLaunchParameters shadowRayLaunchParameters;
-        shadowRayLaunchParameters = rayLaunchParameters;
-        shadowRayLaunchParameters.m_ResultBuffer = m_PixelBufferSeparate.GetDevicePtr<float3>();
-        shadowRayLaunchParameters.m_ShadowRayBatch = m_ShadowRays.GetDevicePtr<AtomicBuffer<ShadowRayData>>();
-        shadowRayLaunchParameters.m_TraceType = RayType::SHADOW_RAY;
-
-        //Set the amount of rays to trace. Initially same as screen size.
-        auto numIntersectionRays = numPixels;
-
-        auto seed = WangHash(frameCount);
-
-
-        /*
-         * Resolve rays and shade at every depth.
-         */
-        for (unsigned depth = 0; depth < m_Settings.depth && numIntersectionRays > 0; ++depth)
-        {
-            //Tell Optix to resolve the primary rays that have been generated.
-            m_OptixSystem->TraceRays(numIntersectionRays, rayLaunchParameters);
-            cudaDeviceSynchronize();
-            CHECKLASTCUDAERROR;
-
-            /*
-             * Calculate the surface data for this depth.
-             */
-            unsigned numIntersections = 0;
-            numIntersections = GetAtomicCounter<IntersectionData>(&m_IntersectionData);
-
-            const auto surfaceDataBufferIndex = (depth == 0 ? currentIndex : 2);   //1 and 2 are used for the first intersection and remembered for temporal use.
-            ExtractSurfaceData(
-                numIntersections,
-                m_IntersectionData.GetDevicePtr<AtomicBuffer<IntersectionData>>(),
-                m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>(),
-                m_SurfaceData[surfaceDataBufferIndex].GetDevicePtr<SurfaceData>(),
-                sceneDataTableAccessor);
-            cudaDeviceSynchronize();
-            CHECKLASTCUDAERROR;
-
-            //motion vector generation
-            if (depth == 0)
-            {
-                glm::mat4 previousFrameMatrix, currentFrameMatrix;
-                a_Scene->m_Camera->GetMatrixData(previousFrameMatrix, currentFrameMatrix);
-                sutil::Matrix4x4 prevFrameMatrixArg = ConvertGLMtoSutilMat4(previousFrameMatrix);
-
-                glm::mat4 projectionMatrix = a_Scene->m_Camera->GetProjectionMatrix();
-                sutil::Matrix4x4 projectionMatrixArg = ConvertGLMtoSutilMat4(projectionMatrix);
-
-                MotionVectorsGenerationData motionVectorsGenerationData;
-                motionVectorsGenerationData.m_MotionVectorBuffer = nullptr;
-                motionVectorsGenerationData.a_CurrentSurfaceData = m_SurfaceData[currentIndex].GetDevicePtr<SurfaceData>();
-                motionVectorsGenerationData.m_ScreenResolution = make_uint2(m_Settings.renderResolution.x, m_Settings.renderResolution.y);
-                motionVectorsGenerationData.m_PrevViewMatrix = prevFrameMatrixArg.inverse();
-                motionVectorsGenerationData.m_ProjectionMatrix = projectionMatrixArg;
-                m_MotionVectors.Update(motionVectorsGenerationData);
-            }
-
-            /*
-             * Call the shading kernels.
-             */
-            ShadingLaunchParameters shadingLaunchParams(
-                uint3{ m_Settings.renderResolution.x, m_Settings.renderResolution.y, m_Settings.depth },
-                m_SurfaceData[surfaceDataBufferIndex].GetDevicePtr<SurfaceData>(),
-                m_SurfaceData[temporalIndex].GetDevicePtr<SurfaceData>(),
-                m_IntersectionData.GetDevicePtr<AtomicBuffer<IntersectionData>>(),
-                m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>(),
-                m_ShadowRays.GetDevicePtr<AtomicBuffer<ShadowRayData>>(),
-                m_TriangleLights.GetDevicePtr<TriangleLight>(),
-                3,
-                camPosition,
-                camForward,
-                accelerationStructure,  //ReSTIR needs to check visibility early on so it does an optix launch for this scene.
-                m_OptixSystem.get(),
-                seed, //Use the frame count as the random seed.
-                m_ReSTIR.get(), //ReSTIR, can not be nullptr.
-                depth,  //The current depth.
-                m_MotionVectors.GetMotionVectorBuffer()->GetDevicePtr<MotionVectorBuffer>(),
-                numIntersectionRays,
-                m_PixelBufferSeparate.GetDevicePtr<float3>()
-            );
-
-            //Reset the ray buffer so that indirect shading can fill it again.
-            ResetAtomicBuffer<IntersectionRayData>(&m_Rays);
-            cudaDeviceSynchronize();
-
-            Shade(shadingLaunchParams);
-            cudaDeviceSynchronize();
-            CHECKLASTCUDAERROR;
-
-            //Set the number of intersection rays to the size of the ray buffer.
-            numIntersectionRays = GetAtomicCounter<IntersectionRayData>(&m_Rays);
-
-            //Clear the surface data at depth 2 (the one that is overwritten each wave).
-            cudaMemset(m_SurfaceData[2].GetDevicePtr(), 0, sizeof(SurfaceData) * numPixels);
-            cudaDeviceSynchronize();
-            CHECKLASTCUDAERROR;
-
-            //Reset the intersection data so that the next frame can re-fill it.
-            ResetAtomicBuffer<IntersectionData>(&m_IntersectionData);
-
-            //Swap the ReSTIR buffers around.
-            m_ReSTIR->SwapBuffers();
-
-            //Switch up the seed.
-            seed = WangHash(frameCount);
-        }
-    	
-        //The amount of shadow rays to trace.
-        unsigned numShadowRays = GetAtomicCounter<ShadowRayData>(&m_ShadowRays);
-
-        if(numShadowRays > 0)
-        {
-            //Tell optix to resolve the shadow rays.
-            m_OptixSystem->TraceRays(numShadowRays, shadowRayLaunchParameters);
-            cudaDeviceSynchronize();
-            CHECKLASTCUDAERROR;
-        }
-
-        PostProcessLaunchParameters postProcessLaunchParams(
-            m_Settings.renderResolution,
-            m_Settings.outputResolution,
-            m_PixelBufferSeparate.GetDevicePtr<float3>(),
-            m_PixelBufferCombined.GetDevicePtr<float3>(),
-            m_OutputBuffer->GetDevicePtr(),
-            m_Settings.blendOutput,
-            m_BlendCounter
-        );
-
-        //Post processing using CUDA kernel.
-        PostProcess(postProcessLaunchParams);
-        cudaDeviceSynchronize();
-        CHECKLASTCUDAERROR;
-
-        //If blending is enabled, increment blend counter.
-        if(m_Settings.blendOutput)
-        {
-            ++m_BlendCounter;
-        }
-
-        //Change frame index 0..1
-        ++m_FrameIndex;
-        if(m_FrameIndex == 2)
-        {
-            m_FrameIndex = 0;
-        }
-
-        a_Scene->m_Camera->UpdatePreviousFrameMatrix();
-        ++frameCount;
-
-        m_DebugTexture = m_OutputBuffer->GetTexture();
-//#if defined(_DEBUG)
-        m_MotionVectors.GenerateDebugTextures();
-        //m_DebugTexture = m_MotionVectors.GetMotionVectorMagnitudeTex();
-        m_DebugTexture = m_MotionVectors.GetMotionVectorDirectionsTex();
-//#endif
-    	
-        //Return the GLuint texture ID.
-        return m_OutputBuffer->GetTexture();
+        //TraceFrame();
+        //while (!m_OutputBufferMutex.try_lock())
+        //{
+        //    //printf("locked");
+        //}
+        std::unique_lock<std::mutex> lock(m_OutputBufferMutex);
+        return m_OutputTexture;
     }
 }
 #endif

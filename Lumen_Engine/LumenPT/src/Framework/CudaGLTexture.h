@@ -19,6 +19,15 @@ public:
 
     template<typename T = uchar4>
     T* GetDevicePtr() {
+        m_TextureDirty = true;
+        size_t size;
+        void* ptr;
+        cudaGraphicsResourceGetMappedPointer(&ptr, &size, m_CudaGraphicsResource);
+        return reinterpret_cast<T*>(ptr);
+    };
+
+    template<typename T = uchar4>
+    const T* GetConstDevicePtr() const {
         size_t size;
         void* ptr;
         cudaGraphicsResourceGetMappedPointer(&ptr, &size, m_CudaGraphicsResource);
@@ -66,6 +75,8 @@ private:
     GLuint m_PixelBuffer;
     GLuint m_Texture;
     GLuint m_Format;
+
+    bool m_TextureDirty;
 
     cudaGraphicsResource* m_CudaGraphicsResource;
 

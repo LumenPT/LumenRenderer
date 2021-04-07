@@ -75,6 +75,8 @@ public:
 	LumenRenderer(const InitializationData& a_InitializationData){};
 	virtual ~LumenRenderer() = default;
 
+	virtual void StartRendering() = 0;
+
 	virtual std::unique_ptr<Lumen::ILumenPrimitive> CreatePrimitive(PrimitiveData& a_MeshData) = 0;
 	virtual std::shared_ptr<Lumen::ILumenMesh> CreateMesh(std::vector<std::unique_ptr<Lumen::ILumenPrimitive>>& a_Primitives) = 0;
 	virtual std::shared_ptr<Lumen::ILumenTexture> CreateTexture(void* a_PixelData, uint32_t a_Width, uint32_t a_Height) = 0;
@@ -82,7 +84,7 @@ public:
 	virtual std::shared_ptr<Lumen::ILumenScene> CreateScene(SceneData a_SceneData);
 	virtual std::shared_ptr<Lumen::ILumenVolume> CreateVolume(const std::string& a_FilePath) = 0;
 
-	virtual unsigned int TraceFrame(std::shared_ptr<Lumen::ILumenScene>& a_Scene) = 0;	//scene argument may be redundant... or not 
+	virtual unsigned int GetOutputTexture() = 0;	//scene argument may be redundant... or not
 
 	virtual void SetRenderResolution(glm::uvec2 a_NewResolution) = 0;
 	virtual void SetOutputResolution(glm::uvec2 a_NewResolution) = 0;
