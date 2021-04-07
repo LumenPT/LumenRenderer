@@ -12,7 +12,8 @@
 #include "Lumen/Input.h"
 #include "Lumen/ModelLoading/SceneManager.h"
 #include "Lumen/KeyCodes.h"
-#include "Lumen/Events/ApplicationEvent.h" 
+#include "Lumen/Events/ApplicationEvent.h"
+#include "Lumen/GLTaskSystem.h"
 
 #include "Tools/FrameSnapshot.h"
 
@@ -39,49 +40,54 @@ OutputLayer::OutputLayer()
     , m_ContentViewFunc([](glm::vec2){})
 {
 	InitContentViewNameTable();
+	//auto task = GLTaskSystem::AddTask([this]()
+		{
+			auto vs = glCreateShader(GL_VERTEX_SHADER);
+			auto fs = glCreateShader(GL_FRAGMENT_SHADER);
 
-	auto vs = glCreateShader(GL_VERTEX_SHADER);
-	auto fs = glCreateShader(GL_FRAGMENT_SHADER);
+			glShaderSource(vs, 1, &m_VSSource, nullptr);
+			glCompileShader(vs);
 
-	glShaderSource(vs, 1, &m_VSSource, nullptr);
-	glCompileShader(vs);
+			int success;
+			char infoLog[512];
+			glGetShaderiv(vs, GL_COMPILE_STATUS, &success);
+			if (!success)
+			{
+				glGetShaderInfoLog(vs, 512, NULL, infoLog);
+				std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n" << infoLog << std::endl;
+			};
 
-	int success;
-	char infoLog[512];
-	glGetShaderiv(vs, GL_COMPILE_STATUS, &success);
-	if (!success)
-	{
-		glGetShaderInfoLog(vs, 512, NULL, infoLog);
-		std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n" << infoLog << std::endl;
-	};
+			glShaderSource(fs, 1, &m_FSSource, nullptr);
+			glCompileShader(fs);
+			glGetShaderiv(fs, GL_COMPILE_STATUS, &success);
+			if (!success)
+			{
+				glGetShaderInfoLog(fs, 512, NULL, infoLog);
+				std::cout << "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n" << infoLog << std::endl;
+			};
 
-	glShaderSource(fs, 1, &m_FSSource, nullptr);
-	glCompileShader(fs);
-	glGetShaderiv(fs, GL_COMPILE_STATUS, &success);
-	if (!success)
-	{
-		glGetShaderInfoLog(fs, 512, NULL, infoLog);
-		std::cout << "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n" << infoLog << std::endl;
-	};
+			auto program = glCreateProgram();
 
-	auto program = glCreateProgram();
+			glAttachShader(program, vs);
+			glAttachShader(program, fs);
 
-	glAttachShader(program, vs);
-	glAttachShader(program, fs);
+			glLinkProgram(program);
 
-	glLinkProgram(program);
+			glGetProgramiv(program, GL_LINK_STATUS, &success);
+			if (!success)
+			{
+				glGetProgramInfoLog(program, 512, nullptr, infoLog);
+				std::cout << "ERROR::PROGRAM::LINKING_FAILED\n" << infoLog << std::endl;
+			}
 
-	glGetProgramiv(program, GL_LINK_STATUS, &success);
-    if (!success)
-    {
-		glGetProgramInfoLog(program, 512, nullptr, infoLog);
-		std::cout << "ERROR::PROGRAM::LINKING_FAILED\n" << infoLog << std::endl;
-    }
+			glDeleteShader(vs);
+			glDeleteShader(fs);
 
-	glDeleteShader(vs);
-	glDeleteShader(fs);
+			m_Program = program;
+		};
 
-	m_Program = program;
+	//GLTaskSystem::WaitOnTask(task);
+	
 
 	LumenRenderer::InitializationData init{};
 	init.m_RenderResolution = { 800, 600 };
@@ -125,9 +131,6 @@ OutputLayer::~OutputLayer()
 void OutputLayer::OnUpdate()
 {
 
-	auto err = glGetError();
-
-
 	HandleCameraInput(*m_Renderer->m_Scene->m_Camera);
 
 	bool recordingSnapshot = false;
@@ -143,25 +146,22 @@ void OutputLayer::OnUpdate()
 	m_LastFrameTex = texture;
 	m_SmallViewportFrameTex = texture;
 
-	err = glGetError();
 	if (recordingSnapshot)
 	{
 		m_FrameSnapshots.push_back(m_Renderer->EndSnapshot());
 	}
 	if (texture)
 	{
+		//GLTaskSystem::AddTask([&]()
+		{
+			auto err1 = glGetError();
 
-		auto err1 = glGetError();
+			glBindTexture(GL_TEXTURE_2D, texture);
+			glUseProgram(m_Program);
+			glDrawArrays(GL_TRIANGLES, 0, 3);
 
-		glBindTexture(GL_TEXTURE_2D, texture);
-		glUseProgram(m_Program);
-		glDrawArrays(GL_TRIANGLES, 0, 3);
-
-
-		glFlush();
-
-		glBindTexture(GL_TEXTURE_2D, 0);
-
+			glBindTexture(GL_TEXTURE_2D, 0);
+		};
 	}
 }
 

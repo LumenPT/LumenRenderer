@@ -21,6 +21,8 @@
 #include "../Tools/FrameSnapshot.h"
 #include "../Tools/SnapShotProcessing.cuh"
 #include "MotionVectors.h"
+//#include "Lumen/Window.h"
+#include "Lumen/LumenApp.h"
 
 #include "../../../Lumen/vendor/GLFW/include/GLFW/glfw3.h"
 #include <Optix/optix_function_table_definition.h>
@@ -536,14 +538,8 @@ namespace WaveFront
             cudaMemcpy(m_OutputBuffer->GetDevicePtr<void>(), m_IntermediateOutputBuffer.GetDevicePtr(),
                 m_IntermediateOutputBuffer.GetSize(), cudaMemcpyKind::cudaMemcpyDeviceToDevice);
 
-            std::vector<uchar4> v(m_IntermediateOutputBuffer.GetSize());
-            cudaMemcpy(v.data(), m_IntermediateOutputBuffer.GetDevicePtr<void>(), v.size(), cudaMemcpyDeviceToHost);
-
-            printf("copy");
-
             cudaDeviceSynchronize();
 
-            m_OutputTexture = m_OutputBuffer->GetTexture();
             // Once the memcpy is complete, the lock guard releases the mutex
         }
         // The display thread might wait on the memcpy that was just performed.
@@ -568,11 +564,10 @@ namespace WaveFront
 
 
         // TODO: Weird debug code. Yeet?
-        m_DebugTexture = m_OutputTexture;
+        //m_DebugTexture = m_OutputTexture;
         //#if defined(_DEBUG)
         m_MotionVectors.GenerateDebugTextures();
         //m_DebugTexture = m_MotionVectors.GetMotionVectorMagnitudeTex();
-        m_DebugTexture = m_MotionVectors.GetMotionVectorDirectionsTex();
     }
 
     std::unique_ptr<MemoryBuffer> WaveFrontRenderer::InterleaveVertexData(const PrimitiveData& a_MeshData) const
@@ -593,19 +588,20 @@ namespace WaveFront
 
     void WaveFrontRenderer::StartRendering()
     {
+        auto baseContext = Lumen::LumenApp::Get().GetWindow().GetNativeWindow();
+
+        glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+        m_GLContext = glfwCreateWindow(1, 1, "Path tracing context", NULL, reinterpret_cast<GLFWwindow*>(baseContext));
+
         auto err = glGetError();
         m_PathTracingThread = std::thread([&]()
             {
-                if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
-                {
-                    std::cout << "Failed to initialize GLAD" << std::endl;
-                    return -1;
-                }
-                auto err1 = glGetError();
-
-                while(true)
+                //glfwMakeContextCurrent(m_GLContext);
+                while (!m_StopRendering)
                     TraceFrame();
-            });
+
+                glfwDestroyWindow(m_GLContext);
+            });       
     }
 
     std::unique_ptr<Lumen::ILumenPrimitive> WaveFrontRenderer::CreatePrimitive(PrimitiveData& a_PrimitiveData)
@@ -615,7 +611,6 @@ namespace WaveFront
         auto vertexBuffer = InterleaveVertexData(a_PrimitiveData);
         cudaDeviceSynchronize();
         auto err = cudaGetLastError();
-        
         std::vector<uint32_t> correctedIndices;
 
         if (a_PrimitiveData.m_IndexSize != 4)
@@ -765,19 +760,15 @@ namespace WaveFront
     }
 
     WaveFrontRenderer::WaveFrontRenderer() : m_BlendCounter(0), m_FrameIndex(0), m_CUDAContext(nullptr)
+        , m_StopRendering(false)
     {
 
     }
 
     unsigned WaveFrontRenderer::GetOutputTexture()
-    {
-        //TraceFrame();
-        //while (!m_OutputBufferMutex.try_lock())
-        //{
-        //    //printf("locked");
-        //}
+    {        
         std::unique_lock<std::mutex> lock(m_OutputBufferMutex);
-        return m_OutputTexture;
+        return m_OutputBuffer->GetTexture();
     }
 }
 #endif

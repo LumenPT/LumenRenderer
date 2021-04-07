@@ -152,6 +152,8 @@ namespace WaveFront
         std::mutex m_OutputBufferMutex;
         std::thread m_PathTracingThread;
         std::condition_variable m_OutputCondition;
+        class GLFWwindow* m_GLContext;
+        bool m_StopRendering;
 
         GLuint m_OutputTexture;
 
@@ -161,6 +163,7 @@ namespace WaveFront
         // The Frame Snapshot is used to define what to record when the output layer requests that
         // See TraceFrame() ##ToolsBookmark for example
         std::unique_ptr<FrameSnapshot> m_FrameSnapshot;
+
     };
 }
 #endif

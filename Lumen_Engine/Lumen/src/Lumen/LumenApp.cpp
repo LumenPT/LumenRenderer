@@ -2,6 +2,7 @@
 #include "LumenApp.h"
 #include "Layer.h"
 #include "ImGui/ImGuiLayer.h"
+#include "GLTaskSystem.h"
 
 #include "ModelLoading/SceneManager.h"
 
@@ -37,11 +38,12 @@ namespace Lumen
 		m_LayerServices.m_SceneManager = m_SceneManager.get();
 
 		Input::SetCallbacks();
-
+		GLTaskSystem::Initialize(reinterpret_cast<GLFWwindow*>(m_Window->GetNativeWindow()));
 	}
 
 	LumenApp::~LumenApp()
 	{
+		GLTaskSystem::Destroy();
 		m_SceneManager.reset();
 	}
 
