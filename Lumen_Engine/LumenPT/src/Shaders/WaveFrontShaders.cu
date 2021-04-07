@@ -81,13 +81,17 @@ __device__ __forceinline__ void IntersectionRaysRayGen()
 
 
     //TODO: implement volumetric trace and storing of data.
-    /*unsigned int volIntersectionPtr_Up = 0;
+    WaveFront::VolumetricIntersectionData volIntersection{};
+    volIntersection.m_RayArrayIndex = idx;
+    volIntersection.m_PixelIndex = rayData.m_PixelIndex;
+
+    unsigned int volIntersectionPtr_Up = 0;
     unsigned int volIntersectionPtr_Low = 0;
 
-    PackPointer(&volIntersection, volIntersectionPtr_Up, volIntersectionPtr_Low);*/
+    PackPointer(&volIntersection, volIntersectionPtr_Up, volIntersectionPtr_Low);
 
     //Volumetric trace
-    /*optixTrace(
+    optixTrace(
         scene,
         rayData.m_Origin,
         rayData.m_Direction,
@@ -98,11 +102,11 @@ __device__ __forceinline__ void IntersectionRaysRayGen()
         OPTIX_RAY_FLAG_NONE,
         0,
         0,
-        0
+        0,
         volIntersectionPtr_Up,
-        volIntersectionPtr_Low);*/
+        volIntersectionPtr_Low);
 
-    
+    launchParams.m_VolumetricIntersectionBuffer->Add(&volIntersection);
 
     return;
 

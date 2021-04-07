@@ -4,6 +4,7 @@
 
 #include <Optix/optix.h>
 #include <Cuda/cuda/helpers.h>
+#include "../SceneDataTableAccessor.h"
 
 namespace WaveFront
 {
@@ -25,6 +26,7 @@ namespace WaveFront
 		AtomicBuffer<VolumetricIntersectionData>* m_VolumetricIntersectionBuffer;
         AtomicBuffer<ShadowRayData>* m_ShadowRayBatch;
         AtomicBuffer<RestirShadowRay>* m_ReSTIRShadowRayBatch;
+        SceneDataTableAccessor* m_SceneData;
         Reservoir* m_Reservoirs;
         float3* m_ResultBuffer;
         float2 m_MinMaxDistance;

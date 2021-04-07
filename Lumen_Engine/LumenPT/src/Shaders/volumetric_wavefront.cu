@@ -5,6 +5,9 @@
 #include "../../vendor/Include/Optix/optix_device.h"
 
 #include <cstdio>
+#include "CppCommon/VolumeStructs.h"
+#include "../../vendor/openvdb/nanovdb/nanovdb/util/GridHandle.h"
+#include "../../vendor/openvdb/nanovdb/nanovdb/util/Ray.h"
 
 extern "C"
 {
@@ -18,7 +21,7 @@ extern "C"
 extern "C"
 __global__ void __closesthit__Volumetric()
 {
-
+    //TODO put all necessary data inside the volumetricIntersectionData struct (Unpack pointer to the struct from first two payloads)
     return;
 }
 
@@ -32,8 +35,37 @@ __global__ void __anyhit__Volumetric()
 extern "C"
 __global__ void __intersection__Volumetric()
 {
-    optixReportIntersection(1.f, 0, 
-        0, 0);
+
+    const unsigned int instanceId = optixGetInstanceId();
+
+    DeviceVolume* volume = launchParams.m_SceneData->GetTableEntry<DeviceVolume>(instanceId);
+    const nanovdb::FloatGrid* pGrid = volume->m_Grid;
+
+    auto& grid = *pGrid;
+    const float3 ray_orig = optixGetObjectRayOrigin();
+    const float3 ray_dir = optixGetObjectRayDirection();
+    const float  ray_tmin = optixGetRayTmin();
+    const float  ray_tmax = optixGetRayTmax();
+
+    nanovdb::Ray<float> wRay(
+        nanovdb::Vec3<float>(ray_orig.x, ray_orig.y, ray_orig.z),
+        nanovdb::Vec3<float>(ray_dir.x, ray_dir.y, ray_dir.z),
+        ray_tmin,
+        ray_tmax
+    );
+
+    nanovdb::Ray<float> iRay = wRay.worldToIndexF(grid);
+
+    {
+    	auto bbox = grid.tree().bbox();
+    
+    
+        if (iRay.clip(bbox) == true)
+        {
+            optixReportIntersection(1.f, 0);
+        }
+    
+    }
 
     return;
 }

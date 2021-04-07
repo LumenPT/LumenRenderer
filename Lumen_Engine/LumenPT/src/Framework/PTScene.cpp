@@ -101,7 +101,7 @@ void PTScene::UpdateSceneAccelerationStructure()
             inst.traversableHandle = ptVolume->m_AccelerationStructure->m_TraversableHandle;
             inst.sbtOffset = 1;
             inst.visibilityMask = OptixVisibilityMask(0b00000010);
-            inst.instanceId = instanceID++;
+            inst.instanceId = ptVolume->m_SceneDataTableEntry.m_TableIndex;
             inst.flags = OPTIX_INSTANCE_FLAG_NONE;
 
             auto transformMat = glm::transpose(ptvi.m_Transform.GetTransformationMatrix());
