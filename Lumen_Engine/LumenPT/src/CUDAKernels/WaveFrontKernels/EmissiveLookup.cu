@@ -74,8 +74,6 @@ CPU_ON_GPU void FindEmissives(const Vertex* a_Vertices, bool* a_EmissiveBools, c
     }
 }
 
-
-
 CPU_ON_GPU void AddToLightBuffer(
     const Vertex* a_Vertices, const uint32_t* a_Indices, 
     const bool* a_Emissives, const uint8_t a_VertexBufferSize, 

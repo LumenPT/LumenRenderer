@@ -81,7 +81,8 @@ namespace WaveFront
         //TODO: number of lights will be dynamic per frame but this is temporary.
         constexpr auto numLights = 3;
 
-        m_TriangleLights.Resize(sizeof(TriangleLight) * numLights);
+        m_TriangleLights.Resize(1000000); //go crazy
+        //m_TriangleLights.Resize(sizeof(TriangleLight) * numLights);
 
         //Temporary lights, stored in the buffer.
         TriangleLight lights[numLights];
@@ -438,31 +439,23 @@ namespace WaveFront
         //Timer to measure how long each frame takes.
         Timer timer;
 
-        //add lights to mesh in scene
-            //add mesh
-            //keep instances in scene
-            //for each instance, add all emissive triangles to light buffer with world space pos
-
-        //Get instances from scene
-            //check which instances are emissives to optimize the looping over instances
-            //inside of these instances you compare which triangles are emissive through boolean buffer
-            //add those to lights buffer in world space
-                //where to keep lights buffer?? - scene! yes!
-        auto trianglePtr = m_TriangleLights.GetDevicePtr<AtomicBuffer<WaveFront::TriangleLight>>();
-
-        //ResetAtomicBuffer<WaveFront::TriangleLight>(trianglePtr);
-
+        ResetAtomicBuffer<WaveFront::TriangleLight>(&m_TriangleLights);
 
         for (auto& meshInstance : a_Scene->m_MeshInstances)
         {
+            auto trianglePtr = m_TriangleLights.GetDevicePtr<AtomicBuffer<WaveFront::TriangleLight>>();
+
             if (meshInstance->GetMesh()->GetEmissiveness()) 
             {
                 sutil::Matrix4x4 instanceTransform = ConvertGLMtoSutilMat4(meshInstance->m_Transform.GetTransformationMatrix());
 
                 for (auto& prim : meshInstance->GetMesh()->m_Primitives)
                 {
-                    
                     auto ptPrim = std::static_pointer_cast<PTPrimitive>(prim);
+                    
+                    //ptPrim->m_VertBuffer->GetDevicePtr<Vertex>();
+                    //ptPrim->m_IndexBuffer->GetDevicePtr<uint32_t>();
+                    //ptPrim->m_BoolBuffer->GetDevicePtr<bool>();
 
                     //call cuda kernel with data from ptPrim. Unpack emissive triangles, store in lightsbuffer
                     AddToLightBuffer(
@@ -479,6 +472,7 @@ namespace WaveFront
                 continue;
             }
         }
+
 
         //Index of the current and last frame to access buffers.
         const auto currentIndex = m_FrameIndex;
