@@ -298,11 +298,11 @@ namespace WaveFront
         std::unique_ptr<MemoryBuffer> emissiveBuffer = std::make_unique<MemoryBuffer>((numVertices / 3) * sizeof(bool)); //might be wrong
 
         unsigned int numLights = 0; //number of emissive triangles in this primitive
-        FindEmissives(vertexBuffer->GetDevicePtr<Vertex>(), 
-            emissiveBuffer->GetDevicePtr<bool>(), 
-            indexBuffer->GetDevicePtr<uint32_t>(), 
-            static_cast<Material*>(a_PrimitiveData.m_Material.get())->GetDeviceMaterial(), 
-            numVertices, numLights);
+        //FindEmissives(vertexBuffer->GetDevicePtr<Vertex>(), 
+        //    emissiveBuffer->GetDevicePtr<bool>(), 
+        //    indexBuffer->GetDevicePtr<uint32_t>(), 
+        //    static_cast<Material*>(a_PrimitiveData.m_Material.get())->GetDeviceMaterial(), 
+        //    numVertices, numLights);
 
         unsigned int geomFlags = OPTIX_GEOMETRY_FLAG_NONE;
 
