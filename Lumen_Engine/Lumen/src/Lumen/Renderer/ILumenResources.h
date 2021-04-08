@@ -8,12 +8,14 @@
 
 namespace Lumen
 {
+    // Interface class for textures
 	class ILumenTexture
 	{
 	public:
 		virtual ~ILumenTexture(){};
 	};
 
+    // Interface class for materials
     class ILumenMaterial
     {
     public:
@@ -21,11 +23,13 @@ namespace Lumen
         virtual void SetDiffuseTexture(std::shared_ptr<ILumenTexture> a_NewDiffuseTexture) = 0;
         virtual void SetEmission(const glm::vec3& a_EmssivionVal = glm::vec3(1.0f, 1.0f, 1.0f)) = 0;
         virtual void SetEmissiveTexture(std::shared_ptr<ILumenTexture> a_EmissiveTexture) = 0;
+        virtual void SetMetalRoughnessTexture(std::shared_ptr<ILumenTexture> a_MetalRoughnessTexture) = 0;
     	
         virtual glm::vec4 GetDiffuseColor() const = 0;
         virtual ILumenTexture& GetDiffuseTexture() const = 0;
     };
 
+    // Interface class for primitives
     class ILumenPrimitive
     {
     public:
@@ -34,6 +38,7 @@ namespace Lumen
         bool m_ContainEmissive;
     };
 
+    // Interface class for meshes
     class ILumenMesh
     {
     public:
@@ -43,7 +48,7 @@ namespace Lumen
         std::vector<std::unique_ptr<ILumenPrimitive>> m_Primitives;
     };
 
-
+    // Interface class for volumes
     class ILumenVolume
     {
     public:

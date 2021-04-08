@@ -401,6 +401,18 @@ void OutputLayer::OnImGuiRender()
 
 	ImGui::End();
 
+	ImGui::Begin("Testing");
+
+	if (ImGui::BeginMenu("My Menu"))
+	{	    
+		ImGui::MenuItem("Item 1");
+		ImGui::MenuItem("Item 2");
+		ImGui::MenuItem("Item 3");
+		ImGui::EndMenu();
+	}
+
+	ImGui::End();
+
 }
 
 void OutputLayer::OnEvent(Lumen::Event& a_Event)

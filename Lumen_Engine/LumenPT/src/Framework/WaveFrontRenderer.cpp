@@ -1,14 +1,15 @@
 #include "../Shaders/CppCommon/RenderingUtility.h"
+#include "Timer.h"
 #if defined(WAVEFRONT)
 
 #include "WaveFrontRenderer.h"
 #include "PTPrimitive.h"
 #include "PTMesh.h"
 #include "PTScene.h"
-#include "Material.h"
-#include "Texture.h"
+#include "PTMaterial.h"
+#include "PTTexture.h"
 #include "PTVolume.h"
-#include "Material.h"
+#include "PTMaterial.h"
 #include "MemoryBuffer.h"
 #include "CudaGLTexture.h"
 #include "SceneDataTable.h"
@@ -134,6 +135,7 @@ namespace WaveFront
         //Set the service locator pointer to point to the m'table.
         m_Table = std::make_unique<SceneDataTable>();
         m_ServiceLocator.m_SceneDataTable = m_Table.get();
+        CHECKLASTCUDAERROR;
 
         m_ServiceLocator.m_Renderer = this;
         m_FrameSnapshot = std::make_unique<NullFrameSnapshot>();
@@ -207,6 +209,8 @@ namespace WaveFront
 
     void WaveFrontRenderer::TraceFrame()
     {
+        CHECKLASTCUDAERROR;
+
         bool recordingSnapshot = m_StartSnapshot;
         if (m_StartSnapshot)
         {
@@ -271,9 +275,11 @@ namespace WaveFront
 
         //Data needed in the algorithms.
         const uint32_t numPixels = m_Settings.renderResolution.x * m_Settings.renderResolution.y;
+        CHECKLASTCUDAERROR;
 
         //TODO: Is this the best spot to stall the rendering thread to update resources? I've no clue.
         WaitForDeferredCalls();
+        CHECKLASTCUDAERROR;
 
 
         //Start by clearing the data from the previous frame.
@@ -528,7 +534,7 @@ namespace WaveFront
             m_Settings.outputResolution,
             m_PixelBufferSeparate.GetDevicePtr<float3>(),
             m_PixelBufferCombined.GetDevicePtr<float3>(),
-            m_IntermediateOutputBuffer.GetDevicePtr<uchar4>(),
+            m_OutputBuffer->GetDevicePtr<uchar4>(),
             m_Settings.blendOutput,
             m_BlendCounter
         );
@@ -542,14 +548,18 @@ namespace WaveFront
         {
             std::unique_lock guard(m_OutputBufferMutex); // Take ownership of the mutex, locking it
 
+            auto err = cudaGetLastError();
+
             // Perform a GPU to GPU copy, from the intermediate output buffer to the real output buffer
-            cudaMemcpy(m_OutputBuffer->GetDevicePtr<void>(), m_IntermediateOutputBuffer.GetDevicePtr(),
+            auto err1 = cudaMemcpy(m_OutputBuffer->GetDevicePtr<void>(), m_IntermediateOutputBuffer.GetDevicePtr(),
                 m_IntermediateOutputBuffer.GetSize(), cudaMemcpyKind::cudaMemcpyDeviceToDevice);
 
             cudaDeviceSynchronize();
 
             // Once the memcpy is complete, the lock guard releases the mutex
         }
+        CHECKLASTCUDAERROR;
+
         // The display thread might wait on the memcpy that was just performed.
         // We bump the thread by calling notify all on the same condition_variable it uses
         m_OutputCondition.notify_all(); 
@@ -578,6 +588,7 @@ namespace WaveFront
         //m_DebugTexture = m_MotionVectors.GetMotionVectorMagnitudeTex();
 
         m_SnapshotReady = recordingSnapshot;
+        CHECKLASTCUDAERROR;
 
     }
 
@@ -657,7 +668,8 @@ namespace WaveFront
         //std::unique_ptr<MemoryBuffer> primMat = std::make_unique<MemoryBuffer>(a_PrimitiveData.m_Material);
         //std::unique_ptr<MemoryBuffer> primMat = static_cast<Material*>(a_PrimitiveData.m_Material.get())->GetDeviceMaterial();
 
-        FindEmissives(vertexBuffer->GetDevicePtr<Vertex>(), emissiveBuffer->GetDevicePtr<bool>(), indexBuffer->GetDevicePtr<uint32_t>(), static_cast<Material*>(a_PrimitiveData.m_Material.get())->GetDeviceMaterial(), numVertices);
+        FindEmissives(vertexBuffer->GetDevicePtr<Vertex>(), emissiveBuffer->GetDevicePtr<bool>(), indexBuffer->GetDevicePtr<uint32_t>(),
+            static_cast<PTMaterial*>(a_PrimitiveData.m_Material.get())->GetDeviceMaterial(), numVertices);
 
         // add bool buffer pointer to device prim pointer
 
@@ -695,7 +707,7 @@ namespace WaveFront
         auto& entry = prim->m_SceneDataTableEntry.GetData();
         entry.m_VertexBuffer = prim->m_VertBuffer->GetDevicePtr<Vertex>();
         entry.m_IndexBuffer = prim->m_IndexBuffer->GetDevicePtr<unsigned int>();
-        entry.m_Material = static_cast<Material*>(prim->m_Material.get())->GetDeviceMaterial();
+        entry.m_Material = static_cast<PTMaterial*>(prim->m_Material.get())->GetDeviceMaterial();
         entry.m_IsEmissive = prim->m_BoolBuffer->GetDevicePtr<bool>();
 
         return prim;
@@ -714,13 +726,13 @@ namespace WaveFront
         uint32_t a_Width, uint32_t a_Height)
     {
         static cudaChannelFormatDesc formatDesc = cudaCreateChannelDesc<uchar4>();
-        return std::make_shared<Texture>(a_PixelData, formatDesc, a_Width, a_Height);
+        return std::make_shared<PTTexture>(a_PixelData, formatDesc, a_Width, a_Height);
     }
 
     std::shared_ptr<Lumen::ILumenMaterial> WaveFrontRenderer::CreateMaterial(
         const MaterialData& a_MaterialData)
     {
-        auto mat = std::make_shared<Material>();
+        auto mat = std::make_shared<PTMaterial>();
         mat->SetDiffuseColor(a_MaterialData.m_DiffuseColor);
         mat->SetDiffuseTexture(a_MaterialData.m_DiffuseTexture);
         mat->SetEmission(a_MaterialData.m_EmssivionVal);

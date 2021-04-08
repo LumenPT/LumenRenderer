@@ -4,6 +4,7 @@
 #include "../Shaders/CppCommon/WaveFrontDataStructs.h"
 #include <cuda_runtime_api.h>
 #include <cuda/device_atomic_functions.h>
+#include <cassert>
 
 #include "../Framework/CudaUtilities.h"
 
