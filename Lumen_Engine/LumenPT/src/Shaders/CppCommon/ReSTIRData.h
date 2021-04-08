@@ -15,7 +15,7 @@
 
 #include "../../CUDAKernels/RandomUtilities.cuh"
 
-constexpr float MINFLOAT = std::numeric_limits<float>::min();
+constexpr float MINFLOAT = std::numeric_limits<float>::epsilon();
 
 /*
  * All configurable settings for ReSTIR.
@@ -30,38 +30,43 @@ struct ReSTIRSettings
     std::uint32_t height = 0;
 
     //The amount of reservoirs used per pixel.
-    static constexpr std::uint32_t numReservoirsPerPixel = 1; //TODO 5
+    static constexpr std::uint32_t numReservoirsPerPixel = 1; //Default 5
 
     //The amount of lights per light bag.
-    static constexpr std::uint32_t numLightsPerBag = 1000;
+    static constexpr std::uint32_t numLightsPerBag = 1000;  //Default 1000
 
     //The total amount of light bags to generate.
-    static constexpr std::uint32_t numLightBags = 50;
+    static constexpr std::uint32_t numLightBags = 50;   //Default 50
 
     //The amount of initial samples to take each frame.
-    static constexpr std::uint32_t numPrimarySamples = 32;
+    static constexpr std::uint32_t numPrimarySamples = 32;  //Default 32
 
     //The amount of spatial neighbours to consider.
-    static constexpr std::uint32_t numSpatialSamples = 5;
+    static constexpr std::uint32_t numSpatialSamples = 5;   //Default 5    
 
     //The maximum distance for spatial samples.
-    static constexpr std::uint32_t spatialSampleRadius = 30;
+    static constexpr std::uint32_t spatialSampleRadius = 30;    //Default 30
 
     //The x and y size of the pixel grid per light bag.
-    static constexpr std::uint32_t pixelGridSize = 16;
+    static constexpr std::uint32_t pixelGridSize = 16;      //Default 16
 
     //The amount of spatial iterations to perform. Previous output becomes current input.
     //This has to be an even number so that the final results end up in the right buffer.
-    static constexpr std::uint32_t numSpatialIterations = 2;
+    static constexpr std::uint32_t numSpatialIterations = 2;    //Default 2
 
     //Use the biased algorithm or not. When false, the unbiased algorithm is used instead.
-    static constexpr bool enableBiased = false;
+    static constexpr bool enableBiased = true;  //Default true
 
     //Enable spatial sampling.
-    static constexpr bool enableSpatial = true;
+    static constexpr bool enableSpatial = true; //Default true
 
     //Enable temporal sampling.
-    static constexpr bool enableTemporal = true;
+    static constexpr bool enableTemporal = true;    //Default true
+
+    //Enable or disable certain parts of ReSTIR TODO
+#define RESTIR_BIASED 1
+#define RESTIR_SPATIAL 1
+#define RESTIR_TEMPORAL 1
 };
 
 /*

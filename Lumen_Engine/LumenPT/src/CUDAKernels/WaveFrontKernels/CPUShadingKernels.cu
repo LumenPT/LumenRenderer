@@ -110,7 +110,8 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
             a_ShadingParams.m_OptixSceneHandle,
             a_ShadingParams.m_ShadowRays,
             a_ShadingParams.m_OptixSystem,
-            a_ShadingParams.m_MotionVectorBuffer
+            a_ShadingParams.m_MotionVectorBuffer,
+            false
         );
     }
     else
@@ -122,7 +123,7 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
         }
 
         const int numPixels = a_ShadingParams.m_ResolutionAndDepth.x * a_ShadingParams.m_ResolutionAndDepth.y;
-        const int blockSize = 256;
+        const int blockSize = 512;
         const int numBlocks = (numPixels + blockSize - 1) / blockSize;
         CDF* cdfPtr = a_ShadingParams.m_ReSTIR->GetCdfGpuPointer();
 
@@ -145,7 +146,7 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
     //Generate secondary rays only when there's a wave after this.
     if(a_ShadingParams.m_CurrentDepth < a_ShadingParams.m_ResolutionAndDepth.z - 1)
     {
-        const int blockSize = 256;
+        const int blockSize = 512;
         const int numBlocks = (a_ShadingParams.m_NumIntersections + blockSize - 1) / blockSize;
 
         ShadeIndirect << <numBlocks, blockSize >> > (
@@ -161,10 +162,12 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
         cudaDeviceSynchronize();
     }
 
-    /*DEBUGShadePrimIntersections<<<numBlocks, blockSize>>>(
-        a_ShadingParams.m_ResolutionAndDepth,
-        a_ShadingParams.m_CurrentSurfaceData,
-        a_ShadingParams.m_Output);*/
+    //const int blockSize = 512;
+    //const int numBlocks = (a_ShadingParams.m_NumIntersections + blockSize - 1) / blockSize;
+    //DEBUGShadePrimIntersections<<<numBlocks, blockSize>>>(
+    //    a_ShadingParams.m_ResolutionAndDepth,
+    //    a_ShadingParams.m_CurrentSurfaceData,
+    //    a_ShadingParams.m_Output);
 }
 
 CPU_ONLY void PostProcess(const PostProcessLaunchParameters& a_PostProcessParams)
@@ -189,7 +192,10 @@ CPU_ONLY void PostProcess(const PostProcessLaunchParameters& a_PostProcessParams
     MergeOutputChannels << <numBlocks, blockSize >> > (
         a_PostProcessParams.m_RenderResolution,
         a_PostProcessParams.m_WavefrontOutput,
-        a_PostProcessParams.m_ProcessedOutput);
+        a_PostProcessParams.m_ProcessedOutput,
+        a_PostProcessParams.m_BlendOutput,
+        a_PostProcessParams.m_BlendCount
+        );
 
     /*cudaDeviceSynchronize();
     CHECKLASTCUDAERROR;*/
@@ -215,5 +221,6 @@ CPU_ONLY void PostProcess(const PostProcessLaunchParameters& a_PostProcessParams
     WriteToOutput << <numBlocksUpscaled, blockSizeUpscaled >> > (
         a_PostProcessParams.m_OutputResolution,
         a_PostProcessParams.m_ProcessedOutput,
-        a_PostProcessParams.m_FinalOutput);
+        a_PostProcessParams.m_FinalOutput
+        );
 }

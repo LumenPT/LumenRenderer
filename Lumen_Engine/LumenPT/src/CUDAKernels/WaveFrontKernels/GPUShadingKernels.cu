@@ -26,7 +26,8 @@ CPU_ON_GPU void DEBUGShadePrimIntersections(
 CPU_ON_GPU void WriteToOutput(
     const uint2 a_Resolution,
     const float3 * const a_Input,
-    uchar4* a_Output)
+    uchar4* a_Output
+)
 {
     const unsigned int numPixels = a_Resolution.x * a_Resolution.y;
     const unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;

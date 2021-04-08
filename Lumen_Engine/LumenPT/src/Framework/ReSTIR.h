@@ -39,7 +39,8 @@ public:
 		const OptixTraversableHandle a_OptixSceneHandle,
 		WaveFront::AtomicBuffer<WaveFront::ShadowRayData>* a_WaveFrontShadowRayBuffer,
         const WaveFront::OptixWrapper* a_OptixSystem,
-		WaveFront::MotionVectorBuffer* a_MotionVectorBuffer
+		WaveFront::MotionVectorBuffer* a_MotionVectorBuffer,
+		bool a_DebugPrint = false
 	);
 
 	/*

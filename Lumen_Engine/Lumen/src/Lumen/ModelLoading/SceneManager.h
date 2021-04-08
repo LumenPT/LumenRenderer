@@ -185,6 +185,12 @@ namespace Lumen
 
 		// Default white texture to use in scenarios when the material's diffuse texture is not specified
 		std::shared_ptr<ILumenTexture> m_DefaultDiffuseTexture;
+
+		//Default metallic roughness texture in case the metallic roughness is not specified.
+		std::shared_ptr<ILumenTexture> m_DefaultMetalRoughnessTexture;
+
+		//The default normal texture in case none is specified.
+		std::shared_ptr<ILumenTexture> m_DefaultNormalTexture;
 	};
 
 

@@ -33,6 +33,7 @@ public:
 		VectorView<glm::vec3, uint8_t> m_Positions;
 		VectorView<glm::vec2, uint8_t> m_TexCoords;
 		VectorView<glm::vec3, uint8_t> m_Normals;
+		VectorView<glm::vec4, uint8_t> m_Tangents;
 
 		// Perhaps temporary solution till we decide how we'll handle the indices
 		std::vector<uint8_t> m_IndexBinary;
@@ -98,8 +99,19 @@ public:
 
 	virtual unsigned int TraceFrame(std::shared_ptr<Lumen::ILumenScene>& a_Scene) = 0;	//scene argument may be redundant... or not 
 
+	/*
+	 * Set the blend mode.
+	 * When set to true, output is blended instead of overwritten.
+	 */
+	virtual void SetBlendMode(bool a_Blend) = 0;
 	virtual void SetRenderResolution(glm::uvec2 a_NewResolution) = 0;
 	virtual void SetOutputResolution(glm::uvec2 a_NewResolution) = 0;
+
+	/*
+	 * Get the blend mode.
+	 * When true, output is blended and not overwritten.
+	 */
+	virtual bool GetBlendMode() const = 0;
 
 	void SetRenderResolution(uint32_t a_NewWidth, uint32_t a_NewHeight) { SetRenderResolution(glm::uvec2(a_NewWidth, a_NewHeight)); }
 	void SetOutputResolution(uint32_t a_NewWidth, uint32_t a_NewHeight) { SetOutputResolution(glm::uvec2(a_NewWidth, a_NewHeight)); }

@@ -103,11 +103,12 @@ OutputLayer::OutputLayer()
 	m_Renderer = std::make_unique<WaveFront::WaveFrontRenderer>();
 
 	WaveFront::WaveFrontSettings settings{};
-	settings.depth = 3;
+	settings.depth = 5;
 	settings.minIntersectionT = 0.1f;
 	settings.maxIntersectionT = 5000.f;
 	settings.renderResolution = { 800, 600 };
 	settings.outputResolution = { 800, 600 };
+	settings.blendOutput = false;	//When true will blend output instead of overwriting it (high res image over time if static scene).
 
 	static_cast<WaveFront::WaveFrontRenderer*>(m_Renderer.get())->Init(settings);
 
@@ -498,6 +499,20 @@ void OutputLayer::HandleCameraInput(Camera& a_Camera)
 	if (Lumen::Input::IsKeyPressed(LMN_KEY_E))
 	{
 		movementDirection += glm::normalize(V) * movementSpeed;
+	}
+
+	//Toggle between merging and not merging output.
+	static std::chrono::time_point<std::chrono::steady_clock> lastToggle = std::chrono::high_resolution_clock::now();
+	if (Lumen::Input::IsKeyPressed(LMN_KEY_P))
+	{
+		//Don't spam it, just toggle once every 500 millis.
+		auto now = std::chrono::high_resolution_clock::now();
+		if (std::chrono::duration_cast<std::chrono::milliseconds>(now - lastToggle).count() > 500)
+		{
+		    lastToggle = now;
+		    m_Renderer->SetBlendMode(!m_Renderer->GetBlendMode());
+			printf("Output append mode is now %s.\n", (m_Renderer->GetBlendMode() ? "on" : "off"));
+		}
 	}
 
 	if(glm::length(movementDirection))

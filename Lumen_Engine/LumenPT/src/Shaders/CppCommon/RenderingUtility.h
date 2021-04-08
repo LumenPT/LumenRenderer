@@ -100,10 +100,8 @@ __device__ __forceinline__ float3 MicrofacetBRDF(const float3 WIN, const float3 
     float denominator = 4.0 * fmax(dot(N, WIN), 0.0f) * fmax(dot(N, WOUT), 0.0f);
     const float3 specular = numerator / fmax(denominator, 0.001f);
 
-    //const float3 ks = F;
     const float3 kd = (1.0f - F) * (1.0f - metallic);
     const float3 diffuse = albedo / M_PIf;
-
     return kd * diffuse + specular;
 }
 
@@ -327,8 +325,8 @@ __device__ __forceinline__ void SampleGGXVNDF(const float3& a_ViewDir, float a_R
 __device__ __forceinline__ void SampleHemisphere(const float3& a_ViewDirection, const float3& a_SurfaceNormal, const float a_Roughness, unsigned int a_Seed, float3& a_OutputDirection, float& a_OutputPdf)
 {
     //Make sure the view direction and normal are normalized.
-    assert(fabsf(length(a_ViewDirection) - 1.f) < 0.001);
-    assert(fabsf(length(a_SurfaceNormal) - 1.f) < 0.001);
+    assert(fabsf(length(a_ViewDirection) - 1.f) < 0.001f);
+    assert(fabsf(length(a_SurfaceNormal) - 1.f) < 0.001f);
 
     //make sure that the view direction is going towards the normal.
     assert(dot(a_ViewDirection, a_SurfaceNormal) < 0.f);
