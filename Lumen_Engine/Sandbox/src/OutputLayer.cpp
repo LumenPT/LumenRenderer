@@ -12,7 +12,8 @@
 #include "Lumen/Input.h"
 #include "Lumen/ModelLoading/SceneManager.h"
 #include "Lumen/KeyCodes.h"
-#include "Lumen/Events/ApplicationEvent.h" 
+#include "Lumen/Events/ApplicationEvent.h"
+#include "Lumen/GLTaskSystem.h"
 
 #include "Tools/FrameSnapshot.h"
 
@@ -28,6 +29,8 @@
 #include "filesystem"
 #include <iostream>
 
+#include "../../LumenPT/src/Framework/CudaUtilities.h"
+
 OutputLayer::OutputLayer()
 	: m_CameraMovementSpeed(300.0f)
 	, m_CameraMouseSensitivity(0.2f)
@@ -39,49 +42,54 @@ OutputLayer::OutputLayer()
     , m_ContentViewFunc([](glm::vec2){})
 {
 	InitContentViewNameTable();
+	//auto task = GLTaskSystem::AddTask([this]()
+		{
+			auto vs = glCreateShader(GL_VERTEX_SHADER);
+			auto fs = glCreateShader(GL_FRAGMENT_SHADER);
 
-	auto vs = glCreateShader(GL_VERTEX_SHADER);
-	auto fs = glCreateShader(GL_FRAGMENT_SHADER);
+			glShaderSource(vs, 1, &m_VSSource, nullptr);
+			glCompileShader(vs);
 
-	glShaderSource(vs, 1, &m_VSSource, nullptr);
-	glCompileShader(vs);
+			int success;
+			char infoLog[512];
+			glGetShaderiv(vs, GL_COMPILE_STATUS, &success);
+			if (!success)
+			{
+				glGetShaderInfoLog(vs, 512, NULL, infoLog);
+				std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n" << infoLog << std::endl;
+			};
 
-	int success;
-	char infoLog[512];
-	glGetShaderiv(vs, GL_COMPILE_STATUS, &success);
-	if (!success)
-	{
-		glGetShaderInfoLog(vs, 512, NULL, infoLog);
-		std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n" << infoLog << std::endl;
-	};
+			glShaderSource(fs, 1, &m_FSSource, nullptr);
+			glCompileShader(fs);
+			glGetShaderiv(fs, GL_COMPILE_STATUS, &success);
+			if (!success)
+			{
+				glGetShaderInfoLog(fs, 512, NULL, infoLog);
+				std::cout << "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n" << infoLog << std::endl;
+			};
 
-	glShaderSource(fs, 1, &m_FSSource, nullptr);
-	glCompileShader(fs);
-	glGetShaderiv(fs, GL_COMPILE_STATUS, &success);
-	if (!success)
-	{
-		glGetShaderInfoLog(fs, 512, NULL, infoLog);
-		std::cout << "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n" << infoLog << std::endl;
-	};
+			auto program = glCreateProgram();
 
-	auto program = glCreateProgram();
+			glAttachShader(program, vs);
+			glAttachShader(program, fs);
 
-	glAttachShader(program, vs);
-	glAttachShader(program, fs);
+			glLinkProgram(program);
 
-	glLinkProgram(program);
+			glGetProgramiv(program, GL_LINK_STATUS, &success);
+			if (!success)
+			{
+				glGetProgramInfoLog(program, 512, nullptr, infoLog);
+				std::cout << "ERROR::PROGRAM::LINKING_FAILED\n" << infoLog << std::endl;
+			}
 
-	glGetProgramiv(program, GL_LINK_STATUS, &success);
-    if (!success)
-    {
-		glGetProgramInfoLog(program, 512, nullptr, infoLog);
-		std::cout << "ERROR::PROGRAM::LINKING_FAILED\n" << infoLog << std::endl;
-    }
+			glDeleteShader(vs);
+			glDeleteShader(fs);
 
-	glDeleteShader(vs);
-	glDeleteShader(fs);
+			m_Program = program;
+		};
 
-	m_Program = program;
+	//GLTaskSystem::WaitOnTask(task);
+	
 
 	LumenRenderer::InitializationData init{};
 	init.m_RenderResolution = { 800, 600 };
@@ -112,6 +120,8 @@ OutputLayer::OutputLayer()
 
 	static_cast<WaveFront::WaveFrontRenderer*>(m_Renderer.get())->Init(settings);
 
+	CHECKLASTCUDAERROR;
+
 #else
 	m_Renderer = std::make_unique<OptiXRenderer>(init);
 #endif
@@ -122,8 +132,9 @@ OutputLayer::~OutputLayer()
 	glDeleteProgram(m_Program);
 }
 
-void OutputLayer::OnUpdate(){
-
+void OutputLayer::OnUpdate()
+{
+	m_Renderer->PerformDeferredOperations();
 	HandleCameraInput(*m_Renderer->m_Scene->m_Camera);
 
 	bool recordingSnapshot = false;
@@ -131,22 +142,32 @@ void OutputLayer::OnUpdate(){
 	if (Lumen::Input::IsKeyPressed(LMN_KEY_K))
 	{
 		recordingSnapshot = true;
-		m_Renderer->BeginSnapshot();	    
+		m_Renderer->BeginSnapshot();
 	}
 
-	auto texture = m_Renderer->TraceFrame(m_Renderer->m_Scene); // TRACE SUM
+	auto texture = m_Renderer->GetOutputTexture(); // TRACE SUM
 	HandleSceneInput();
 	m_LastFrameTex = texture;
 	m_SmallViewportFrameTex = texture;
-	
-	if (recordingSnapshot)
-	{
-		m_FrameSnapshots.push_back(m_Renderer->EndSnapshot());			
-	}
 
-	glBindTexture(GL_TEXTURE_2D, texture);
-	glUseProgram(m_Program);
-	glDrawArrays(GL_TRIANGLES, 0, 3);
+	auto snap = std::move(m_Renderer->EndSnapshot());
+	if (snap)
+	{
+	    m_FrameSnapshots.push_back(std::move(snap));
+	}
+	if (texture)
+	{
+		//GLTaskSystem::AddTask([&]()
+		{
+			auto err1 = glGetError();
+
+			glBindTexture(GL_TEXTURE_2D, texture);
+			glUseProgram(m_Program);
+			glDrawArrays(GL_TRIANGLES, 0, 3);
+
+			glBindTexture(GL_TEXTURE_2D, 0);
+		};
+	}
 }
 
 void OutputLayer::OnImGuiRender()
