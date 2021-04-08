@@ -14,11 +14,41 @@ GPU_ONLY void VolumetricShadeDirect(
     const CDF* const a_CDF,
 	float3* a_Output)
 {
-	if (a_VolumetricDataBuffer[a_PixelIndex].m_EntryIntersectionT > 0.1f)
+	const auto& intersection = a_VolumetricDataBuffer[a_PixelIndex];
+
+	//if (intersection.m_EntryIntersectionT > 0.1f)
+	//{
+	//	printf("Entry: %u Exit: %u", intersection.m_EntryIntersectionT, in)
+	//}
+
+	if (intersection.m_ExitIntersectionT > intersection.m_EntryIntersectionT)
 	{
+		//printf("HA");
+		const int MAX_STEPS = 1000;
+		const float STEP_SIZE = 1.0f;
+		const float HARDCODED_DENSITY_PER_STEP = 0.005f;
+		const float VOLUME_COLOR_R = 1.0f;
+		const float VOLUME_COLOR_G = 1.0f;
+		const float VOLUME_COLOR_B = 1.0f;
+
+		float distance = intersection.m_ExitIntersectionT - intersection.m_EntryIntersectionT;
+		int necessarySteps = int(distance / STEP_SIZE);
+		int nSteps = min(necessarySteps, MAX_STEPS);
+		float accumulatedDensity = 0.0f;
+
+		for (int i = 0; i < nSteps && accumulatedDensity < 1.0f; i++)
+		{
+			//Volumetric sampling code goes here
+			accumulatedDensity += HARDCODED_DENSITY_PER_STEP;
+		}
+
+		float r = accumulatedDensity;
+		float g = accumulatedDensity;
+		float b = accumulatedDensity;
+
 		a_Output[a_PixelIndex
 			* static_cast<unsigned>(LightChannel::NUM_CHANNELS)
-			+ static_cast<unsigned>(LightChannel::VOLUMETRIC)] = make_float3(-1.0f, -1.0f, -1.0f);
+			+ static_cast<unsigned>(LightChannel::VOLUMETRIC)] = make_float3(r, g, b);
 	}
     return;
 }

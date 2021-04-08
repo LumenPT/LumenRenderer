@@ -96,7 +96,7 @@ __device__ __forceinline__ void IntersectionRaysRayGen()
         rayData.m_Origin,
         rayData.m_Direction,
         launchParams.m_MinMaxDistance.x,
-        launchParams.m_MinMaxDistance.y,
+        min(launchParams.m_MinMaxDistance.y, intersection.m_IntersectionT),
         0.f,
         OptixVisibilityMask(0b00000010),
         OPTIX_RAY_FLAG_NONE,

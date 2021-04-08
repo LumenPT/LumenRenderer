@@ -76,27 +76,16 @@ __global__ void __intersection__Volumetric()
 
     nanovdb::Ray<float> iRay = wRay.worldToIndexF(grid);
 
-    {
-		nanovdb::Coord ijk;
-		float v;
-		float t;
-		if (nanovdb::ZeroCrossing(iRay, grid.tree().getAccessor(), ijk, v, t))
+    {	
+		auto bbox = grid.worldBBox();
+		float t0;	//volume entry point
+		float t1;	//volume exit point
+		if (wRay.intersects(bbox, t0, t1) && t0 < optixGetRayTmax())
 		{
-			optixReportIntersection(1.0f, 0,
-				float_as_int(1.0f),
-				float_as_int(2.0f));
+			optixReportIntersection(t0, 0,
+				float_as_int(t0),
+				float_as_int(t1));
 		}
-
-		
-		//auto bbox = grid.worldBBox();
-		//float t0;	//volume entry point
-		//float t1;	//volume exit point
-		//if (wRay.intersects(bbox, t0, t1))
-		//{
-		//	optixReportIntersection(t0, 0,
-		//		float_as_int(t0),
-		//		float_as_int(t1));
-		//}
 		
     }
 
