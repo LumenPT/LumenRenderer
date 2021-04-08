@@ -57,6 +57,8 @@ private:
     float m_CameraMouseSensitivity;
     float m_CameraMovementSpeed;
 
+    std::unique_ptr<class ModelLoaderWidget> m_ModelLoaderWidget;
+
     enum ContentViewMode
     {
         NONE = 0,
