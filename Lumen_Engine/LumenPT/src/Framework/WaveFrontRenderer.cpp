@@ -340,7 +340,7 @@ namespace WaveFront
 
         //Resize lights buffer by adding number of triangle lights to its current size
         unsigned int currBufferSize = sizeof(m_TriangleLights); //needs to be done per instance of prim
-        m_TriangleLights.Resize((sizeof(TriangleLight) * numLights) + currBufferSize);
+        //m_TriangleLights.Resize((sizeof(TriangleLight) * numLights) + currBufferSize);
 
         return prim;
     }
