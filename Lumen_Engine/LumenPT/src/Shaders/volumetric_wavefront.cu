@@ -8,6 +8,7 @@
 #include "CppCommon/VolumeStructs.h"
 #include "../../vendor/openvdb/nanovdb/nanovdb/util/GridHandle.h"
 #include "../../vendor/openvdb/nanovdb/nanovdb/util/Ray.h"
+#include "../../vendor/openvdb/nanovdb/nanovdb/util/HDDA.h"
 
 extern "C"
 {
@@ -76,15 +77,27 @@ __global__ void __intersection__Volumetric()
     nanovdb::Ray<float> iRay = wRay.worldToIndexF(grid);
 
     {
-		auto bbox = grid.worldBBox();
-		float t0;	//volume entry point
-		float t1;	//volume exit point
-		if (wRay.intersects(bbox, t0, t1))
+		nanovdb::Coord ijk;
+		float v;
+		float t;
+		if (nanovdb::ZeroCrossing(iRay, grid.tree().getAccessor(), ijk, v, t))
 		{
-			optixReportIntersection(t0, 0,
-				float_as_int(t0),
-				float_as_int(t1));
+			optixReportIntersection(1.0f, 0,
+				float_as_int(1.0f),
+				float_as_int(2.0f));
 		}
+
+		
+		//auto bbox = grid.worldBBox();
+		//float t0;	//volume entry point
+		//float t1;	//volume exit point
+		//if (wRay.intersects(bbox, t0, t1))
+		//{
+		//	optixReportIntersection(t0, 0,
+		//		float_as_int(t0),
+		//		float_as_int(t1));
+		//}
+		
     }
 
     return;

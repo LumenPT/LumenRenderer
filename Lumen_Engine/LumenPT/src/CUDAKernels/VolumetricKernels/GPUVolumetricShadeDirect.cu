@@ -14,7 +14,7 @@ GPU_ONLY void VolumetricShadeDirect(
     const CDF* const a_CDF,
 	float3* a_Output)
 {
-	if (a_VolumetricDataBuffer[a_PixelIndex].m_EntryIntersectionT > 1.0f)
+	if (a_VolumetricDataBuffer[a_PixelIndex].m_EntryIntersectionT > 0.1f)
 	{
 		a_Output[a_PixelIndex
 			* static_cast<unsigned>(LightChannel::NUM_CHANNELS)
