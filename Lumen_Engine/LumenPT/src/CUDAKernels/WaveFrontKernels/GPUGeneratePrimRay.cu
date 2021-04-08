@@ -92,42 +92,9 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
             assert(devicePrimitive.m_IndexBuffer != nullptr);
             assert(devicePrimitive.m_VertexBuffer != nullptr);
 
-            //if (devicePrimitive == nullptr ||
-            //    devicePrimitive.m_IndexBuffer == nullptr ||
-            //    devicePrimitive.m_VertexBuffer == nullptr ||
-            //    devicePrimitive.m_Material == nullptr)
-            //{
-
-            //    if (!devicePrimitive)
-            //    {
-            //        printf("Error, primitive: %p \n", devicePrimitive);
-            //    }
-            //    else
-            //    {
-            //        printf("Error, found nullptr in primitive variables: \n\tm_IndexBuffer: %p \n\tm_VertexBuffer: %p \n\tm_Material: %p\n",
-            //               devicePrimitive->m_IndexBuffer,
-            //               devicePrimitive->m_VertexBuffer,
-            //               devicePrimitive->m_Material);
-            //    }
-
-            //    //Set to debug color purple.
-            //    a_OutPut[surfaceDataIndex].m_Color = make_float3(1.f, 0.f, 1.f);
-            //    return;
-            //}
-
-            /*printf("VertexIndex: %i, Primitive: %p, m_IndexBuffer: %p, m_VertexBuffer: %p \n",
-                vertexIndex,
-                primitive,
-                primitive->m_IndexBuffer,
-                primitive->m_VertexBuffer);*/
-
             const unsigned int vertexIndexA = devicePrimitive.m_IndexBuffer[vertexIndex + 0];
             const unsigned int vertexIndexB = devicePrimitive.m_IndexBuffer[vertexIndex + 1];
             const unsigned int vertexIndexC = devicePrimitive.m_IndexBuffer[vertexIndex + 2];
-
-            //printf("VertexA Index: %i\n", vertexIndexA);
-            //printf("VertexB Index: %i\n", vertexIndexB);
-            //printf("VertexC Index: %i\n", vertexIndexC);
 
             const Vertex* A = &devicePrimitive.m_VertexBuffer[vertexIndexA];
             const Vertex* B = &devicePrimitive.m_VertexBuffer[vertexIndexB];
@@ -142,11 +109,52 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
             const DeviceMaterial* material = devicePrimitive.m_Material;
 
             //TODO extract different textures (emissive, diffuse, metallic, roughness).
+            const float4 normalMap = tex2D<float4>(material->m_NormalTexture, texCoords.x, texCoords.y);
             const float4 textureColor = tex2D<float4>(material->m_DiffuseTexture, texCoords.x, texCoords.y);
             const float3 finalColor = make_float3(textureColor * material->m_DiffuseColor);
             const float4 metalRoughness = tex2D<float4>(material->m_MetalRoughnessTexture, texCoords.x, texCoords.y);
             const float metal = metalRoughness.z;
             const float roughness = metalRoughness.y;
+
+            //Calculate the surface normal based on the texture and normal provided.
+
+            //TODO: weigh based on barycentrics instead.
+            float3 vertexNormal = normalize(A->m_Normal + B->m_Normal + C->m_Normal);
+
+
+            //TODO base on barycentric instead
+            //const float3 tangent = normalize(
+            //    make_float3(
+            //        A->m_Tangent.x + B->m_Tangent.x + C->m_Tangent.x,
+            //        A->m_Tangent.y + B->m_Tangent.y + C->m_Tangent.y,
+            //        A->m_Tangent.z + B->m_Tangent.z + C->m_Tangent.z
+            //   ));
+            const float3 tangent = normalize(make_float3(A->m_Tangent.x, A->m_Tangent.y, A->m_Tangent.z) * -A->m_Tangent.w);
+
+            //Tangent nan? How?
+            assert(!isnan(length(tangent)));
+
+            //tangent = normalize(tangent - dot(tangent, vertexNormal) * vertexNormal);
+
+            float3 biTangent = normalize(cross(vertexNormal, tangent) * -A->m_Tangent.w);
+
+
+            //TODO: This is in mesh space, not instance transformed space.
+            //TODO: Get the transform of the mesh to get this to world space.
+            sutil::Matrix3x3 tbn
+            {
+                tangent.x, biTangent.x, vertexNormal.x,
+                tangent.y, biTangent.y, vertexNormal.y,
+                tangent.z, biTangent.z, vertexNormal.z
+            };
+
+            ////Calculate the normal based on the vertex normal, tangent, bitangent and normal texture.
+            //float3 actualNormal = make_float3(normalMap.x, normalMap.y, normalMap.z);
+            //actualNormal = actualNormal * 2.f - 1.f;
+            //actualNormal = normalize(actualNormal);
+            //actualNormal = normalize(tbn * actualNormal);
+
+            //assert(fabsf(length(actualNormal) - 1.f) < 0.001f);
 
             //Can't have perfect specular surfaces. 0 is never acceptable.
             assert(roughness > 0.f && roughness <= 1.f);
@@ -155,9 +163,9 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
             SurfaceData output;
             output.m_Index = currIntersection.m_PixelIndex;
             output.m_Emissive = false; //TODO set based on whether or not a light was hit.
-            output.m_Color = finalColor;
             output.m_IntersectionT = currIntersection.m_IntersectionT;
-            output.m_Normal = normalize(A->m_Normal + B->m_Normal + C->m_Normal);
+            output.m_Normal = vertexNormal; //TODO: use normal mapping.
+            output.m_Color = finalColor;
             output.m_Position = currRay.m_Origin + currRay.m_Direction * currIntersection.m_IntersectionT;
             output.m_IncomingRayDirection = currRay.m_Direction;
             output.m_Metallic = metal;

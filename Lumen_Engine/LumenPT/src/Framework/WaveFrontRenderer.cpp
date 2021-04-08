@@ -94,9 +94,9 @@ namespace WaveFront
         TriangleLight lights[numLights];
 
         //Intensity per light.
-        lights[0].radiance = { 200000, 150000, 150000 };
-        lights[1].radiance = { 150000, 200000, 150000 };
-        lights[2].radiance = { 150000, 150000, 200000 };
+        lights[0].radiance = { 150000, 150000, 150000 };
+        lights[1].radiance = { 150000, 150000, 150000 };
+        lights[2].radiance = { 150000, 150000, 105000 };
 
 
         //Actually set the triangle lights to have an area.
@@ -231,6 +231,7 @@ namespace WaveFront
             //inside of these instances you compare which triangles are emissive through boolean buffer
             //add those to lights buffer in world space
                 //where to keep lights buffer?? - scene! yes!
+        auto trianglePtr = m_TriangleLights.GetDevicePtr<AtomicBuffer<WaveFront::TriangleLight>>();
 
         bool resizeBuffers = false, resizeOutputBuffer = false;
         {
