@@ -32,15 +32,29 @@ namespace Lumen
         virtual ~ILumenPrimitive() {};
         std::shared_ptr<ILumenMaterial> m_Material;
         bool m_ContainEmissive;
+        unsigned int m_NumLights;   //number of triangles covered by emissive mat
     };
 
     class ILumenMesh
     {
     public:
         ILumenMesh(std::vector<std::unique_ptr<ILumenPrimitive>>& a_Primitives)
-            : m_Primitives(std::move(a_Primitives)) {};
+            : m_Primitives(std::move(a_Primitives)) 
+        {
+            for (auto& prim : a_Primitives)
+            {
+                if (prim->m_ContainEmissive)
+                {
+                    m_Emissive = true;
+                    break;
+                }
+            }
+        };
 
         std::vector<std::unique_ptr<ILumenPrimitive>> m_Primitives;
+        const bool& GetEmissiveness() { return m_Emissive; };
+    private:
+        bool m_Emissive;
     };
 
 

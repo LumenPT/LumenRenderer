@@ -226,27 +226,20 @@ namespace WaveFront
             {
                 correctedIndices.push_back(indexView[i]);
             }
-
         }
         
         //printf("Index buffer Size %i \n", static_cast<int>(correctedIndices.size()));
         std::unique_ptr<MemoryBuffer> indexBuffer = std::make_unique<MemoryBuffer>(correctedIndices);
 
         uint8_t numVertices = sizeof(vertexBuffer) / sizeof(Vertex);
-        //vertexBuffer->GetDevicePtr<Vertex>();
-        std::unique_ptr<MemoryBuffer> emissiveBuffer = std::make_unique<MemoryBuffer>((numVertices / 3) * sizeof(bool));
-        //std::unique_ptr<MemoryBuffer> indexBuffer = std::make_unique<MemoryBuffer>(a_PrimitiveData.m_IndexBinary);
+        std::unique_ptr<MemoryBuffer> emissiveBuffer = std::make_unique<MemoryBuffer>((numVertices / 3) * sizeof(bool)); //might be wrong
 
-        //std::unique_ptr<MemoryBuffer> primMat = std::make_unique<MemoryBuffer>(a_PrimitiveData.m_Material);
-        //std::unique_ptr<MemoryBuffer> primMat = static_cast<Material*>(a_PrimitiveData.m_Material.get())->GetDeviceMaterial();
-
-        FindEmissives(vertexBuffer->GetDevicePtr<Vertex>(), emissiveBuffer->GetDevicePtr<bool>(), indexBuffer->GetDevicePtr<uint32_t>(), static_cast<Material*>(a_PrimitiveData.m_Material.get())->GetDeviceMaterial(), numVertices);
-
-        // add bool buffer pointer to device prim pointer
-
-
-        
-
+        unsigned int numLights = 0; //number of emissive triangles in this primitive
+        FindEmissives(vertexBuffer->GetDevicePtr<Vertex>(), 
+            emissiveBuffer->GetDevicePtr<bool>(), 
+            indexBuffer->GetDevicePtr<uint32_t>(), 
+            static_cast<Material*>(a_PrimitiveData.m_Material.get())->GetDeviceMaterial(), 
+            numVertices, numLights);
 
         unsigned int geomFlags = OPTIX_GEOMETRY_FLAG_NONE;
 
@@ -270,16 +263,21 @@ namespace WaveFront
 
         auto gAccel = m_OptixSystem->BuildGeometryAccelerationStructure(buildOptions, buildInput);
 
-        auto prim = std::make_unique<PTPrimitive>(std::move(vertexBuffer), std::move(indexBuffer), std::move(emissiveBuffer), std::move(gAccel));
-
+        std::unique_ptr<PTPrimitive> prim = std::make_unique<PTPrimitive>(std::move(vertexBuffer), std::move(indexBuffer), std::move(emissiveBuffer), std::move(gAccel));
         prim->m_Material = a_PrimitiveData.m_Material;
-
         prim->m_SceneDataTableEntry = m_Table->AddEntry<DevicePrimitive>();
+        prim->m_ContainEmissive = numLights > 0 ? true : false;
+        prim->m_NumLights = numLights;
+
         auto& entry = prim->m_SceneDataTableEntry.GetData();
         entry.m_VertexBuffer = prim->m_VertBuffer->GetDevicePtr<Vertex>();
         entry.m_IndexBuffer = prim->m_IndexBuffer->GetDevicePtr<unsigned int>();
         entry.m_Material = static_cast<Material*>(prim->m_Material.get())->GetDeviceMaterial();
         entry.m_IsEmissive = prim->m_BoolBuffer->GetDevicePtr<bool>();
+
+        //Resize lights buffer by adding number of triangle lights to its current size
+        unsigned int currBufferSize = sizeof(m_TriangleLights); //needs to be done per instance of prim
+        m_TriangleLights.Resize((sizeof(TriangleLight) * numLights) + currBufferSize);
 
         return prim;
     }
@@ -371,8 +369,6 @@ namespace WaveFront
 
     unsigned WaveFrontRenderer::TraceFrame(std::shared_ptr<Lumen::ILumenScene>& a_Scene)
     {
-        //add to lights buffer? in traceframe
-
         //add lights to mesh in scene
             //add mesh
             //keep instances in scene
@@ -383,6 +379,38 @@ namespace WaveFront
             //inside of these instances you compare which triangles are emissive through boolean buffer
             //add those to lights buffer in world space
                 //where to keep lights buffer?? - scene! yes!
+        auto trianglePtr = m_TriangleLights.GetDevicePtr<AtomicBuffer<WaveFront::TriangleLight>>();
+
+        //ResetAtomicBuffer<WaveFront::TriangleLight>(trianglePtr);
+
+
+        for (auto& meshInstance : a_Scene->m_MeshInstances)
+        {
+            if (meshInstance->GetMesh()->GetEmissiveness()) 
+            {
+                sutil::Matrix4x4 instanceTransform = ConvertGLMtoSutilMat4(meshInstance->m_Transform.GetTransformationMatrix());
+
+
+                for (auto& prim : meshInstance->GetMesh()->m_Primitives)
+                {
+                    //go check for emissive triangles or whatever
+                    //probably dont wanna pointer cast this much at runtime but for now it'll do
+                    //std::shared_ptr<PTPrimitive> ptPrim = std::static_pointer_cast<PTPrimitive>(prim);
+
+                    //call cuda kernel with data from ptPrim. Unpack emissive triangles, store in lightsbuffer
+                    //AddToLightBuffer(ptPrim->m_VertBuffer,
+                    //    ptPrim->m_IndexBuffer,
+                    //    ptPrim->m_BoolBuffer,
+                    //    sizeof(ptPrim->m_VertBuffer) / sizeof(Vertex),
+                    //    trianglePtr,
+                    //    instanceTransform);
+                }
+            }
+            else
+            {
+                continue;
+            }
+        }
 
         //Index of the current and last frame to access buffers.
         const auto currentIndex = m_FrameIndex;

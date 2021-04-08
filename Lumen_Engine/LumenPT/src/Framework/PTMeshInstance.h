@@ -21,5 +21,4 @@ public:
 
     PTScene* m_SceneRef;
     PTServiceLocator& m_Services;
-
 };
