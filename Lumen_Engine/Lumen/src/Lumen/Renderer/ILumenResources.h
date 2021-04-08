@@ -45,7 +45,7 @@ namespace Lumen
     class ILumenMesh
     {
     public:
-        ILumenMesh(std::vector<std::unique_ptr<ILumenPrimitive>>& a_Primitives)
+        ILumenMesh(std::vector<std::shared_ptr<ILumenPrimitive>>& a_Primitives)
             : m_Primitives(std::move(a_Primitives)) 
         {
             for (auto& prim : a_Primitives)
@@ -58,7 +58,7 @@ namespace Lumen
             }
         };
 
-        std::vector<std::unique_ptr<ILumenPrimitive>> m_Primitives;
+        std::vector<std::shared_ptr<ILumenPrimitive>> m_Primitives;
         const bool& GetEmissiveness() { return m_Emissive; };
     private:
         bool m_Emissive;

@@ -298,11 +298,14 @@ namespace WaveFront
         std::unique_ptr<MemoryBuffer> emissiveBuffer = std::make_unique<MemoryBuffer>((numVertices / 3) * sizeof(bool)); //might be wrong
 
         unsigned int numLights = 0; //number of emissive triangles in this primitive
-        //FindEmissives(vertexBuffer->GetDevicePtr<Vertex>(), 
-        //    emissiveBuffer->GetDevicePtr<bool>(), 
-        //    indexBuffer->GetDevicePtr<uint32_t>(), 
-        //    static_cast<Material*>(a_PrimitiveData.m_Material.get())->GetDeviceMaterial(), 
-        //    numVertices, numLights);
+        
+        FindEmissives(vertexBuffer->GetDevicePtr<Vertex>(), 
+            emissiveBuffer->GetDevicePtr<bool>(), 
+            indexBuffer->GetDevicePtr<uint32_t>(), 
+            static_cast<PTMaterial*>(a_PrimitiveData.m_Material.get())->GetDeviceMaterial(),
+            numVertices, 
+            numLights
+        );
 
         unsigned int geomFlags = OPTIX_GEOMETRY_FLAG_NONE;
 
@@ -340,13 +343,13 @@ namespace WaveFront
 
         //Resize lights buffer by adding number of triangle lights to its current size
         unsigned int currBufferSize = sizeof(m_TriangleLights); //needs to be done per instance of prim
-        m_TriangleLights.Resize((sizeof(TriangleLight) * numLights) + currBufferSize);
+        //m_TriangleLights.Resize((sizeof(TriangleLight) * numLights) + currBufferSize);
 
         return prim;
     }
 
     std::shared_ptr<Lumen::ILumenMesh> WaveFrontRenderer::CreateMesh(
-        std::vector<std::unique_ptr<Lumen::ILumenPrimitive>>& a_Primitives)
+        std::vector<std::shared_ptr<Lumen::ILumenPrimitive>>& a_Primitives)
     {
         //TODO Let optix build the medium level acceleration structure and return the mesh handle for it.
 
@@ -456,20 +459,19 @@ namespace WaveFront
             {
                 sutil::Matrix4x4 instanceTransform = ConvertGLMtoSutilMat4(meshInstance->m_Transform.GetTransformationMatrix());
 
-
                 for (auto& prim : meshInstance->GetMesh()->m_Primitives)
                 {
-                    //go check for emissive triangles or whatever
-                    //probably dont wanna pointer cast this much at runtime but for now it'll do
-                    //std::shared_ptr<PTPrimitive> ptPrim = std::static_pointer_cast<PTPrimitive>(prim);
+                    
+                    auto ptPrim = std::static_pointer_cast<PTPrimitive>(prim);
 
                     //call cuda kernel with data from ptPrim. Unpack emissive triangles, store in lightsbuffer
-                    //AddToLightBuffer(ptPrim->m_VertBuffer,
-                    //    ptPrim->m_IndexBuffer,
-                    //    ptPrim->m_BoolBuffer,
-                    //    sizeof(ptPrim->m_VertBuffer) / sizeof(Vertex),
-                    //    trianglePtr,
-                    //    instanceTransform);
+                    AddToLightBuffer(
+                        ptPrim->m_VertBuffer->GetDevicePtr<Vertex>(),
+                        ptPrim->m_IndexBuffer->GetDevicePtr<uint32_t>(),
+                        ptPrim->m_BoolBuffer->GetDevicePtr<bool>(),
+                        sizeof(ptPrim->m_VertBuffer) / sizeof(Vertex),
+                        trianglePtr,
+                        instanceTransform);
                 }
             }
             else

@@ -33,10 +33,10 @@ struct ReSTIRSettings
     static constexpr std::uint32_t numReservoirsPerPixel = 1; //Default 5
 
     //The amount of lights per light bag.
-    static constexpr std::uint32_t numLightsPerBag = 1000;  //Default 1000
+    static constexpr std::uint32_t numLightsPerBag = 10;  //Default 1000
 
     //The total amount of light bags to generate.
-    static constexpr std::uint32_t numLightBags = 50;   //Default 50
+    static constexpr std::uint32_t numLightBags = 10;   //Default 50
 
     //The amount of initial samples to take each frame.
     static constexpr std::uint32_t numPrimarySamples = 32;  //Default 32

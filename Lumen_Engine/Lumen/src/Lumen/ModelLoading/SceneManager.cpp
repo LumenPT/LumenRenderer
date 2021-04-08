@@ -295,7 +295,7 @@ void Lumen::SceneManager::LoadMeshes(fx::gltf::Document& a_Doc, GLTFResource& a_
 	for (auto& fxMesh : a_Doc.meshes)
 	{
 		// List of primitives in the mesh to fill out
-		std::vector<std::unique_ptr<Lumen::ILumenPrimitive>> primitives;
+		std::vector<std::shared_ptr<Lumen::ILumenPrimitive>> primitives;
 		// For each primitive in mesh
 		for (auto& fxPrim : fxMesh.primitives)
 		{
