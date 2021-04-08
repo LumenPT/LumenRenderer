@@ -29,6 +29,8 @@
 #include "filesystem"
 #include <iostream>
 
+#include "../../LumenPT/src/Framework/CudaUtilities.h"
+
 OutputLayer::OutputLayer()
 	: m_CameraMovementSpeed(300.0f)
 	, m_CameraMouseSensitivity(0.2f)
@@ -117,6 +119,8 @@ OutputLayer::OutputLayer()
 	settings.blendOutput = false;	//When true will blend output instead of overwriting it (high res image over time if static scene).
 
 	static_cast<WaveFront::WaveFrontRenderer*>(m_Renderer.get())->Init(settings);
+
+	CHECKLASTCUDAERROR;
 
 #else
 	m_Renderer = std::make_unique<OptiXRenderer>(init);

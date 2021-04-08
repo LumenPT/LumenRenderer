@@ -234,6 +234,8 @@ namespace WaveFront
 
         bool resizeBuffers = false, resizeOutputBuffer = false;
         {
+            CHECKLASTCUDAERROR;
+
             // Lock the settings mutex while we copy its data
             std::lock_guard lock(m_SettingsUpdateMutex);
 
@@ -267,6 +269,7 @@ namespace WaveFront
                     m_OutputBuffer->Resize(m_IntermediateSettings.outputResolution.x, m_IntermediateSettings.outputResolution.y);
                 });
         }
+        CHECKLASTCUDAERROR;
 
 
         //Index of the current and last frame to access buffers.
@@ -534,7 +537,7 @@ namespace WaveFront
             m_Settings.outputResolution,
             m_PixelBufferSeparate.GetDevicePtr<float3>(),
             m_PixelBufferCombined.GetDevicePtr<float3>(),
-            m_OutputBuffer->GetDevicePtr<uchar4>(),
+            m_IntermediateOutputBuffer.GetDevicePtr<uchar4>(),
             m_Settings.blendOutput,
             m_BlendCounter
         );
@@ -628,6 +631,11 @@ namespace WaveFront
 
     void WaveFrontRenderer::PerformDeferredOperations()
     {
+        CHECKLASTCUDAERROR;
+
+        m_OutputBuffer->Map(); // Honestly, curse OpenGL
+        CHECKLASTCUDAERROR;
+
         while (!m_DeferredOpenGLCalls.empty())
         {
             m_DeferredOpenGLCalls.front()();
@@ -667,9 +675,11 @@ namespace WaveFront
 
         //std::unique_ptr<MemoryBuffer> primMat = std::make_unique<MemoryBuffer>(a_PrimitiveData.m_Material);
         //std::unique_ptr<MemoryBuffer> primMat = static_cast<Material*>(a_PrimitiveData.m_Material.get())->GetDeviceMaterial();
-
-        FindEmissives(vertexBuffer->GetDevicePtr<Vertex>(), emissiveBuffer->GetDevicePtr<bool>(), indexBuffer->GetDevicePtr<uint32_t>(),
-            static_cast<PTMaterial*>(a_PrimitiveData.m_Material.get())->GetDeviceMaterial(), numVertices);
+        CHECKLASTCUDAERROR;
+        // TODO: @Jochem might wanna uncomment this at some point idk
+        //FindEmissives(vertexBuffer->GetDevicePtr<Vertex>(), emissiveBuffer->GetDevicePtr<bool>(), indexBuffer->GetDevicePtr<uint32_t>(),
+        //    static_cast<PTMaterial*>(a_PrimitiveData.m_Material.get())->GetDeviceMaterial(), numVertices);
+        CHECKLASTCUDAERROR;
 
         // add bool buffer pointer to device prim pointer
 
@@ -709,6 +719,7 @@ namespace WaveFront
         entry.m_IndexBuffer = prim->m_IndexBuffer->GetDevicePtr<unsigned int>();
         entry.m_Material = static_cast<PTMaterial*>(prim->m_Material.get())->GetDeviceMaterial();
         entry.m_IsEmissive = prim->m_BoolBuffer->GetDevicePtr<bool>();
+        CHECKLASTCUDAERROR;
 
         return prim;
     }
@@ -736,6 +747,9 @@ namespace WaveFront
         mat->SetDiffuseColor(a_MaterialData.m_DiffuseColor);
         mat->SetDiffuseTexture(a_MaterialData.m_DiffuseTexture);
         mat->SetEmission(a_MaterialData.m_EmssivionVal);
+
+        CHECKLASTCUDAERROR;
+
         return mat;
     }
 
@@ -784,6 +798,7 @@ namespace WaveFront
         buildInput.customPrimitiveArray.numSbtRecords = 1;
 
         std::static_pointer_cast<PTVolume>(volume)->m_AccelerationStructure = m_OptixSystem->BuildGeometryAccelerationStructure(buildOptions, buildInput);
+        CHECKLASTCUDAERROR;
 
         return volume;
     }
@@ -811,6 +826,7 @@ namespace WaveFront
 
     void WaveFrontRenderer::ResizeBuffers()
     {
+        CHECKLASTCUDAERROR;
 
         ////Set up the OpenGL output buffer.
         //m_OutputBuffer->Resize(m_Settings.outputResolution.x, m_Settings.outputResolution.y);
@@ -858,8 +874,10 @@ namespace WaveFront
         size_t requiredSize = m_ReSTIR->GetExpectedGpuRamUsage(rSettings, 3);
         printf("Initializing ReSTIR. Expected VRam usage in bytes: %llu\n", requiredSize);
 
+        CHECKLASTCUDAERROR;
         //Finally actually allocate memory for ReSTIR.
         m_ReSTIR->Initialize(rSettings);
+
 
         size_t usedSize = m_ReSTIR->GetAllocatedGpuMemory();
         printf("Actual bytes allocated by ReSTIR: %llu\n", usedSize);

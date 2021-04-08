@@ -25,22 +25,14 @@ public:
     template<typename T = uchar4>
     T* GetDevicePtr() {
         m_TextureDirty = true;
-        size_t size;
-        void* ptr;
-        // Map and Unmap the resources before getting the GPU pointer.
-        // Leaving the resources mapped is considered prone to undefined behaviour if the memory is used by the graphics API.
-        cudaGraphicsMapResources(1, &m_CudaGraphicsResource);
-        cudaGraphicsResourceGetMappedPointer(&ptr, &size, m_CudaGraphicsResource);
-        cudaGraphicsUnmapResources(1, &m_CudaGraphicsResource);
-        return reinterpret_cast<T*>(ptr);
+        Map();
+        return reinterpret_cast<T*>(m_CudaPtr);
     };
 
     template<typename T = uchar4>
     const T* GetConstDevicePtr() const {
-        size_t size;
-        void* ptr;
-        cudaGraphicsResourceGetMappedPointer(&ptr, &size, m_CudaGraphicsResource);
-        return reinterpret_cast<T*>(ptr);
+        Map();
+        return reinterpret_cast<T*>(m_CudaPtr);
     };
 
     // Returns the OpenGL texture handle for use in output pipeline or ImGui.
@@ -82,9 +74,15 @@ public:
     // Returns the dimensions of the texture
     glm::ivec2 GetSize() const { return glm::ivec2(m_Width, m_Height); }
 
+    void Map() const;
+    void Unmap() const;
 private:
 
     void UpdateTexture();
+
+
+    mutable void* m_CudaPtr;
+    mutable cudaGraphicsResource* m_CudaGraphicsResource; // Cuda handle to allow using the OpenGL pixel buffer with CUDA.
 
     uint32_t m_Width; // PTTexture Width
     uint32_t m_Height; // PTTexture Height
@@ -95,6 +93,5 @@ private:
     GLuint m_Format; // The OpenGL format to use for the texture. Defaults to GL_RGBA8
 
     bool m_TextureDirty;
-    cudaGraphicsResource* m_CudaGraphicsResource; // Cuda handle to allow using the OpenGL pixel buffer with CUDA.
 
 };

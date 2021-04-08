@@ -16,6 +16,7 @@ CudaGLTexture::CudaGLTexture(GLuint a_Format, uint32_t a_Width, uint32_t a_Heigh
     : m_Format(a_Format)
     , m_PixelSize(a_PixelSize)
     , m_Texture(true)
+    , m_CudaPtr(nullptr)
 {
     // The pixel buffer and texture handles are generated only once during construction
     // Afterwards they are only repopulated with different data when necessary
@@ -32,9 +33,11 @@ CudaGLTexture::~CudaGLTexture()
 
 GLuint CudaGLTexture::GetTexture()
 {
+    //Unmap();
     // The texture is updated every time it is requested
     // TODO: Limit the update frequency to only when the pixel buffer was changed.
     UpdateTexture();
+
     return m_Texture;
 }
 
@@ -75,9 +78,29 @@ void CudaGLTexture::UpdateTexture()
     }
 }
 
+void CudaGLTexture::Unmap() const
+{
+    if (m_CudaPtr)
+    {
+        cudaGraphicsUnmapResources(1, &m_CudaGraphicsResource);
+        m_CudaPtr = nullptr;
+    }
+}
+
+void CudaGLTexture::Map() const
+{
+    if (!m_CudaPtr)
+    {
+        auto err = cudaGraphicsMapResources(1, &m_CudaGraphicsResource);
+        size_t size;
+        err = cudaGraphicsResourceGetMappedPointer(&m_CudaPtr, &size, m_CudaGraphicsResource);
+    }
+}
+
 
 void CudaGLTexture::Resize(uint32_t a_Width, uint32_t a_Height)
 {
+    Unmap();
     m_Width = a_Width;
     m_Height = a_Height;
 
@@ -93,5 +116,6 @@ void CudaGLTexture::Resize(uint32_t a_Width, uint32_t a_Height)
         // Register the pixel buffer with CUDA, essentially allowing CUDA to work with it
         // cudaGraphicsMapFlagsWriteDiscard specifies that CUDA will exclusively write to the buffer, so its previous contents are discarded
         cudaGraphicsGLRegisterBuffer(&m_CudaGraphicsResource, m_PixelBuffer, cudaGraphicsMapFlagsWriteDiscard);        
+        Map();
     }
 }
