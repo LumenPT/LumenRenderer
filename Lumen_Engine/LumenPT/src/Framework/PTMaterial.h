@@ -26,7 +26,8 @@ public:
     void SetEmission(const glm::vec3& a_EmissiveVal = glm::vec3( 0.0f, 0.0f, 0.0f)) override;
     void SetEmissiveTexture(std::shared_ptr<Lumen::ILumenTexture> a_EmissiveTexture) override;
     void SetMetalRoughnessTexture(std::shared_ptr<Lumen::ILumenTexture> a_MetalRoughnessTexture) override;
-	
+    void SetNormalTexture(std::shared_ptr<Lumen::ILumenTexture> a_NormalTexture) override;
+
     glm::vec4 GetDiffuseColor() const override;
     Lumen::ILumenTexture& GetDiffuseTexture() const override;
 
@@ -43,6 +44,7 @@ private:
     std::shared_ptr<class PTTexture> m_DiffuseTexture;
     std::shared_ptr<class PTTexture> m_EmissiveTexture;
     std::shared_ptr<class PTTexture> m_MetalRoughnessTexture;
+    std::shared_ptr<class PTTexture> m_NormalTexture;
 
     // A flag to keep track if the GPU representation of the material needs to be updated after something was changed
     mutable bool m_DeviceMaterialDirty;

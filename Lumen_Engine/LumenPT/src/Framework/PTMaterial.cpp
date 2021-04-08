@@ -61,6 +61,12 @@ void PTMaterial::SetMetalRoughnessTexture(std::shared_ptr<Lumen::ILumenTexture> 
     m_DeviceMaterialDirty = true;
 }
 
+void PTMaterial::SetNormalTexture(std::shared_ptr<Lumen::ILumenTexture> a_NormalTexture)
+{
+    m_NormalTexture = *reinterpret_cast<std::shared_ptr<PTTexture>*>(&a_NormalTexture);
+    m_DeviceMaterialDirty = true;
+}
+
 glm::vec4 PTMaterial::GetDiffuseColor() const
 {
     return glm::vec4(m_DiffuseColor.x, m_DiffuseColor.y, m_DiffuseColor.z, m_DiffuseColor.w);
@@ -79,6 +85,9 @@ DeviceMaterial PTMaterial::CreateDeviceMaterial() const
 
     //Should always have a default loaded.
     m.m_MetalRoughnessTexture = **m_MetalRoughnessTexture;
+
+    //Should always be default loaded
+    m.m_NormalTexture = **m_NormalTexture;
 
 
     if (m_DiffuseTexture)

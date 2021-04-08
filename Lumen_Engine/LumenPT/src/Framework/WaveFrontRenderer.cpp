@@ -87,9 +87,9 @@ namespace WaveFront
         TriangleLight lights[numLights];
 
         //Intensity per light.
-        lights[0].radiance = { 200000, 150000, 150000 };
-        lights[1].radiance = { 150000, 200000, 150000 };
-        lights[2].radiance = { 150000, 150000, 200000 };
+        lights[0].radiance = { 150000, 150000, 150000 };
+        lights[1].radiance = { 150000, 150000, 150000 };
+        lights[2].radiance = { 150000, 150000, 105000 };
 
 
         //Actually set the triangle lights to have an area.
@@ -258,14 +258,14 @@ namespace WaveFront
                 v.m_UVCoord = make_float2(a_MeshData.m_TexCoords[i].x, a_MeshData.m_TexCoords[i].y);
             if (!a_MeshData.m_Normals.Empty())
                 v.m_Normal = make_float3(a_MeshData.m_Normals[i].x, a_MeshData.m_Normals[i].y, a_MeshData.m_Normals[i].z);
+            if (!a_MeshData.m_Tangents.Empty())
+                v.m_Tangent = make_float4(a_MeshData.m_Tangents[i].x, a_MeshData.m_Tangents[i].y, a_MeshData.m_Tangents[i].z, a_MeshData.m_Tangents[i].w);
         }
         return std::make_unique<MemoryBuffer>(vertices);
     }
 
     std::unique_ptr<Lumen::ILumenPrimitive> WaveFrontRenderer::CreatePrimitive(PrimitiveData& a_PrimitiveData)
     {
-        //TODO let optix build the acceleration structure and return the handle.
-
         auto vertexBuffer = InterleaveVertexData(a_PrimitiveData);
         cudaDeviceSynchronize();
         auto err = cudaGetLastError();
@@ -280,7 +280,15 @@ namespace WaveFront
             {
                 correctedIndices.push_back(indexView[i]);
             }
-
+        }
+        //Gotta copy over even when they are 32 bit.
+        else
+        {
+            VectorView<uint32_t, uint8_t> indexView(a_PrimitiveData.m_IndexBinary);
+            for (size_t i = 0; i < indexView.Size(); i++)
+            {
+                correctedIndices.push_back(indexView[i]);
+            }
         }
         
         //printf("Index buffer Size %i \n", static_cast<int>(correctedIndices.size()));

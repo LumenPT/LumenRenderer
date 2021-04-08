@@ -33,6 +33,7 @@ public:
 		VectorView<glm::vec3, uint8_t> m_Positions;
 		VectorView<glm::vec2, uint8_t> m_TexCoords;
 		VectorView<glm::vec3, uint8_t> m_Normals;
+		VectorView<glm::vec4, uint8_t> m_Tangents;
 
 		// Perhaps temporary solution till we decide how we'll handle the indices
 		std::vector<uint8_t> m_IndexBinary;

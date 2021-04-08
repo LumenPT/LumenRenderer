@@ -325,8 +325,8 @@ __device__ __forceinline__ void SampleGGXVNDF(const float3& a_ViewDir, float a_R
 __device__ __forceinline__ void SampleHemisphere(const float3& a_ViewDirection, const float3& a_SurfaceNormal, const float a_Roughness, unsigned int a_Seed, float3& a_OutputDirection, float& a_OutputPdf)
 {
     //Make sure the view direction and normal are normalized.
-    assert(fabsf(length(a_ViewDirection) - 1.f) < 0.001);
-    assert(fabsf(length(a_SurfaceNormal) - 1.f) < 0.001);
+    assert(fabsf(length(a_ViewDirection) - 1.f) < 0.001f);
+    assert(fabsf(length(a_SurfaceNormal) - 1.f) < 0.001f);
 
     //make sure that the view direction is going towards the normal.
     assert(dot(a_ViewDirection, a_SurfaceNormal) < 0.f);

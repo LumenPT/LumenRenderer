@@ -153,8 +153,10 @@ void Lumen::SceneManager::InitializeDefaultResources()
 {
 	uchar4 whitePixel = { 255,255,255,255 };
 	uchar4 diffusePixel{ 0, 255, 255, 0};
+	uchar4 normal = { 128, 128, 255, 0 };
 	m_DefaultDiffuseTexture = m_RenderPipeline->CreateTexture(&whitePixel, 1, 1);
 	m_DefaultMetalRoughnessTexture = m_RenderPipeline->CreateTexture(&diffusePixel, 1, 1);
+	m_DefaultNormalTexture = m_RenderPipeline->CreateTexture(&normal, 1, 1);
 }
 
 void Lumen::SceneManager::LoadNodes(fx::gltf::Document& a_Doc, GLTFResource& a_Res, int a_NodeId, bool a_Root, const glm::mat4& a_TransformMat)
@@ -298,7 +300,7 @@ void Lumen::SceneManager::LoadMeshes(fx::gltf::Document& a_Doc, GLTFResource& a_
 		for (auto& fxPrim : fxMesh.primitives)
 		{
 			// Extract the binary data of the primitive
-			std::vector<uint8_t> posBinary, texBinary, norBinary;
+			std::vector<uint8_t> posBinary, texBinary, norBinary, tanBinary;
 			// For each attribute in the primitive
 			for (auto& fxAttribute : fxPrim.attributes)
 			{
@@ -323,19 +325,120 @@ void Lumen::SceneManager::LoadMeshes(fx::gltf::Document& a_Doc, GLTFResource& a_
 				{
 					norBinary = LoadBinary(a_Doc, fxAttribute.second);
 				}
+				else if (fxAttribute.first == "TANGENT")
+				{
+					tanBinary = LoadBinary(a_Doc, fxAttribute.second);
+				}
+
 			}
 
 			// Get binary data for the primitive's indices if those are included
 			auto indexBufferAcc = a_Doc.accessors[fxPrim.indices];
-			auto indexBin = LoadBinary(a_Doc, fxPrim.indices);
+			std::vector<unsigned char> indexBin = LoadBinary(a_Doc, fxPrim.indices);
 			auto indexSize = GetComponentSize(indexBufferAcc); // indices are are always a single component
 			assert(indexSize <= 4);
+
+			assert(fxPrim.mode == fx::gltf::Primitive::Mode::Triangles);
+
+			VectorView<glm::vec3, uint8_t> vertexView(posBinary);
+			VectorView<glm::vec2, uint8_t> texView(texBinary);
+			VectorView<uint32_t, uint8_t> indexView32(indexBin);
+			VectorView<uint16_t, uint8_t> indexView16(indexBin);
+			VectorView<glm::vec3, uint8_t> normalView(norBinary);
+
+			//If no tangents were loaded, generate them.
+			if (tanBinary.empty())
+			{
+				const auto numIndices = indexBin.size() / indexSize;
+				tanBinary.resize(numIndices * sizeof(glm::vec4));
+
+				VectorView<glm::vec4, uint8_t> tangentView(tanBinary);
+
+				////Invert the V coordinates
+				for(auto i = 0; i < texView.Size(); ++i)
+				{
+					texView[i].y = 1.f - texView[i].y;
+				}
+
+				//Loop over every triangle in the index buffer.
+				for (auto index = 0u; index < numIndices; index += 3)
+				{
+					//Retrieve the indices from the index buffer.
+					unsigned int index1;
+					unsigned int index2;
+					unsigned int index3;
+
+					if (indexSize == 2)
+					{
+						index1 = indexView16[index + 0];
+						index2 = indexView16[index + 1];
+						index3 = indexView16[index + 2];
+					}
+					else
+					{
+						index1 = indexView32[index + 0];
+						index2 = indexView32[index + 1];
+						index3 = indexView32[index + 2];
+					}
+
+					//Can't have a triangle that has two points the same. That's called a line.
+					if(index1 == index2 || index2 == index3 || index3 == index1)
+					{
+						printf("Warning: Invalid vertex indices found.\n");
+					}
+
+					//Thanks to opengl-tutorial.com
+					const glm::vec3* v0 = &vertexView[index1];
+					const glm::vec3* v1 = &vertexView[index2];
+					const glm::vec3* v2 = &vertexView[index3];
+					glm::vec2* uv0 = &texView[index1];
+					glm::vec2* uv1 = &texView[index2];
+					glm::vec2* uv2 = &texView[index3];
+
+					glm::vec3 deltaPos1 = *v1 - *v0;
+					glm::vec3 deltaPos2 = *v2 - *v0;
+
+					glm::vec2 deltaUV1 = *uv1 - *uv0;
+					glm::vec2 deltaUV2 = *uv2 - *uv0;
+
+					float cross = deltaUV1.x * deltaUV2.y - deltaUV1.y * deltaUV2.x;
+
+					//If cross is 0, it means the texture coordinates are a single point for two corners.
+				    assert(cross != 0);
+
+					float r = 1.0f / cross;
+
+					glm::vec3 tangent = glm::vec3((deltaPos1 * deltaUV2.y - deltaPos2 * deltaUV1.y) * r);
+
+					assert(!isnan(tangent.x));
+					assert(!isnan(tangent.y));
+					assert(!isnan(tangent.z));
+					assert(glm::length(glm::vec3(tangent.x, tangent.y, tangent.z)) > 0.f);
+					//
+					if(isnan(tangent.x) || isnan(tangent.y) || isnan(tangent.z) || isinf(tangent.x) || isinf(tangent.y) || isinf(tangent.z))
+					{
+						tangent = glm::vec3(1.f, 0.f, 0.f);
+					}
+
+					//Normalize the tangent.
+					tangent = glm::normalize(tangent);
+
+					auto tanVec4 = glm::vec4(tangent, 1.f);
+
+					//Put in the output buffer. Same tangent for every vertex that was processed.
+					tangentView[index1] = tanVec4;
+					tangentView[index2] = tanVec4;
+					tangentView[index3] = tanVec4;
+				}
+			}
+
 
 			// Fill out the primitive data struct and make a primitive through the renderer
 			LumenRenderer::PrimitiveData primitiveData;
 			primitiveData.m_Positions = posBinary;
 			primitiveData.m_TexCoords = texBinary;
 			primitiveData.m_Normals = norBinary;
+			primitiveData.m_Tangents = tanBinary;
 
 			primitiveData.m_IndexBinary = indexBin;
 			primitiveData.m_IndexSize = indexSize;
@@ -560,8 +663,23 @@ void Lumen::SceneManager::LoadMaterials(fx::gltf::Document& a_Doc, GLTFResource&
 		}
 		else
 		{
-			// If it isn't, set the diffuse texture to a default white one
 			mat->SetMetalRoughnessTexture(m_DefaultMetalRoughnessTexture);
+		}
+
+		//Normal map
+		if (fxMat.normalTexture.index != -1)
+		{
+			//Load the texture either from file or binary. Then create the engine texture object.
+			auto info = LoadTexture(a_Doc, fxMat.normalTexture.index, a_Path, 4);
+			const auto tex = m_RenderPipeline->CreateTexture(info.data, info.w, info.h);
+			mat->SetNormalTexture(tex);
+
+			//Free the memory after it's uploaded.
+			stbi_image_free(info.data);
+		}
+		else
+		{
+			mat->SetNormalTexture(m_DefaultNormalTexture);
 		}
 
 		if (fxMat.emissiveFactor != std::array<float, 3>{0.0f, 0.0f, 0.0f})
@@ -629,6 +747,9 @@ uint32_t Lumen::SceneManager::GetComponentCount(fx::gltf::Accessor& a_Accessor)
 	case fx::gltf::Accessor::Type::Vec3:
 		return 3;
 		break;
+	case fx::gltf::Accessor::Type::Vec4:
+		return 4;
+		break;
 	case fx::gltf::Accessor::Type::Mat2:
 		return 4;
 		break;
@@ -640,6 +761,7 @@ uint32_t Lumen::SceneManager::GetComponentCount(fx::gltf::Accessor& a_Accessor)
 		break;
 	default:
 		LMN_ASSERT(0 && "Failed to load GLTF file");
+		assert(0);
 		return 0;
 	}
 }

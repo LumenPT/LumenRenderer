@@ -188,6 +188,9 @@ namespace Lumen
 
 		//Default metallic roughness texture in case the metallic roughness is not specified.
 		std::shared_ptr<ILumenTexture> m_DefaultMetalRoughnessTexture;
+
+		//The default normal texture in case none is specified.
+		std::shared_ptr<ILumenTexture> m_DefaultNormalTexture;
 	};
 
 
