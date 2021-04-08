@@ -51,6 +51,7 @@ namespace WaveFront
         //Public functionality
     public:
         WaveFrontRenderer();
+        ~WaveFrontRenderer() override;
 
         /*
          * Render.

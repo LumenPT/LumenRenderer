@@ -44,6 +44,21 @@ sutil::Matrix4x4 ConvertGLMtoSutilMat4(const glm::mat4& glmMat)
 
 namespace WaveFront
 {
+
+    WaveFrontRenderer::WaveFrontRenderer()
+        :
+        m_FrameIndex(0),
+        m_CUDAContext(nullptr)
+    {
+
+    }
+
+    WaveFrontRenderer::~WaveFrontRenderer()
+    {
+        m_Scene.reset();
+    }
+
+
     void WaveFrontRenderer::Init(const WaveFrontSettings& a_Settings)
     {
         m_FrameIndex = 0;
@@ -405,10 +420,7 @@ namespace WaveFront
         return std::make_shared<PTScene>(a_SceneData, m_ServiceLocator);
     }
 
-    WaveFrontRenderer::WaveFrontRenderer() : m_FrameIndex(0), m_CUDAContext(nullptr)
-    {
-
-    }
+    
 
     unsigned WaveFrontRenderer::TraceFrame(std::shared_ptr<Lumen::ILumenScene>& a_Scene)
     {
@@ -699,5 +711,6 @@ namespace WaveFront
         //Return the GLuint texture ID.
         return m_OutputBuffer->GetTexture();
     }
+
 }
 #endif

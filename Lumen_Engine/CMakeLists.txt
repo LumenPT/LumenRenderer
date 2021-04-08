@@ -11,6 +11,7 @@ set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 
+option(COMPILE_TESTS "Compile tests project" OFF)
 option(USE_WAVEFRONT "Use the Wavefront rendering pipeline?" ON)
 
 add_subdirectory("Lumen/vendor/GLFW")
@@ -48,5 +49,16 @@ add_subdirectory ("Lumen")
 add_subdirectory ("LumenPT")
 	#Sandbox
 add_subdirectory ("Sandbox")
+	#Tests
+add_subdirectory("Tests")
 
-set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT "Sandbox")	
+
+if(${COMPILE_TESTS})
+	#set_property(DIRECTORY "Tests" PROPERTY EXCLUDE_FROM_ALL OFF)
+	#set_property(DIRECTORY "Sandbox" PROPERTY EXCLUDE_FROM_ALL ON)
+	set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT "Tests")
+else()
+	#set_property(DIRECTORY "Sandbox" PROPERTY EXCLUDE_FROM_ALL OFF)
+	#set_property(DIRECTORY "Tests" PROPERTY EXCLUDE_FROM_ALL ON)
+	set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT "Sandbox")
+endif()
