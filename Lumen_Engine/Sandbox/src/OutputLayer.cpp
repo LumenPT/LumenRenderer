@@ -130,7 +130,7 @@ OutputLayer::~OutputLayer()
 
 void OutputLayer::OnUpdate()
 {
-
+	m_Renderer->PerformDeferredOperations();
 	HandleCameraInput(*m_Renderer->m_Scene->m_Camera);
 
 	bool recordingSnapshot = false;
@@ -146,9 +146,10 @@ void OutputLayer::OnUpdate()
 	m_LastFrameTex = texture;
 	m_SmallViewportFrameTex = texture;
 
-	if (recordingSnapshot)
+	auto snap = std::move(m_Renderer->EndSnapshot());
+	if (snap)
 	{
-		m_FrameSnapshots.push_back(m_Renderer->EndSnapshot());
+	    m_FrameSnapshots.push_back(std::move(snap));
 	}
 	if (texture)
 	{

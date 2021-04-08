@@ -49,11 +49,11 @@ public:
 
 	struct SceneData
 	{
-		glm::vec3 m_CameraPosition = glm::vec3(0,0,0);
-		glm::vec3 m_CameraUp = glm::vec3(0,1,0);
+		glm::vec3 m_CameraPosition = glm::vec3(0, 0, 0);
+		glm::vec3 m_CameraUp = glm::vec3(0, 1, 0);
 		glm::mat4 m_CameraTrans = glm::mat4(1);
 		//Camera m_Camera;
-		
+
 		std::vector<Lumen::MeshInstance> m_InstancedMeshes;
 	};
 
@@ -71,11 +71,12 @@ public:
 
 	};
 
-	LumenRenderer(){};
-	LumenRenderer(const InitializationData& a_InitializationData){};
+	LumenRenderer() {};
+	LumenRenderer(const InitializationData& a_InitializationData) {};
 	virtual ~LumenRenderer() = default;
 
 	virtual void StartRendering() = 0;
+	virtual void PerformDeferredOperations() {};
 
 	virtual std::unique_ptr<Lumen::ILumenPrimitive> CreatePrimitive(PrimitiveData& a_MeshData) = 0;
 	virtual std::shared_ptr<Lumen::ILumenMesh> CreateMesh(std::vector<std::unique_ptr<Lumen::ILumenPrimitive>>& a_Primitives) = 0;

@@ -53,6 +53,10 @@ namespace WaveFront
         m_FrameIndex = 0;
         m_Settings = a_Settings;
 
+        // The intermediate settings are used to get the values to display via ImGui
+        // Thus initializing them to the same values as the real settings will ensure ImGui displays the correct data
+        m_IntermediateSettings = m_Settings;
+
         //Init CUDA
         cudaFree(0);
         m_CUDAContext = 0;
@@ -78,8 +82,8 @@ namespace WaveFront
 
         //Set up the OpenGL output buffer.
         m_OutputBuffer = std::make_unique<CudaGLTexture>(GL_RGBA8, m_Settings.outputResolution.x, m_Settings.outputResolution.y, 4);
-        SetRenderResolution(glm::uvec2(m_Settings.outputResolution.x, m_Settings.outputResolution.y));
-
+        //SetRenderResolution(glm::uvec2(m_Settings.outputResolution.x, m_Settings.outputResolution.y));
+        ResizeBuffers();
         //TODO: number of lights will be dynamic per frame but this is temporary.
         constexpr auto numLights = 3;
 
@@ -139,120 +143,77 @@ namespace WaveFront
 
     void WaveFrontRenderer::BeginSnapshot()
     {
-        // Replacing the snapshot with a non-null one will start recording requested features.
-        m_FrameSnapshot = std::make_unique<FrameSnapshot>();
+        m_StartSnapshot = true;
     }
 
     std::unique_ptr<FrameSnapshot> WaveFrontRenderer::EndSnapshot()
     {
-        // Move the snapshot to a temporary variable to return shortly
-        auto snap = std::move(m_FrameSnapshot);
-        // Make the snapshot a Null once again to stop recording
-        m_FrameSnapshot = std::make_unique<NullFrameSnapshot>();
-
-        return std::move(snap);
+        if (m_SnapshotReady)
+        {
+            // Move the snapshot to a temporary variable to return shortly
+            auto snap = std::move(m_FrameSnapshot);
+            // Make the snapshot a Null once again to stop recording
+            m_FrameSnapshot = std::make_unique<NullFrameSnapshot>();
+            m_SnapshotReady = false;
+            return std::move(snap);
+        }
+        return nullptr;
     }
 
     void WaveFrontRenderer::SetRenderResolution(glm::uvec2 a_NewResolution)
     {
-        m_Settings.renderResolution.x = a_NewResolution.x;
-        m_Settings.renderResolution.y = a_NewResolution.y;
 
+        std::unique_lock lock(m_SettingsUpdateMutex);
 
-        ////Set up the OpenGL output buffer.
-        //m_OutputBuffer->Resize(m_Settings.outputResolution.x, m_Settings.outputResolution.y);
+        m_IntermediateSettings.renderResolution.x = a_NewResolution.x;
+        m_IntermediateSettings.renderResolution.y = a_NewResolution.y;
 
-        //Set up buffers.
-        const unsigned numPixels = m_Settings.renderResolution.x * m_Settings.renderResolution.y;
-        const unsigned numOutputChannels = static_cast<unsigned>(LightChannel::NUM_CHANNELS);
-
-        m_IntermediateOutputBuffer.Resize(sizeof(uchar4) * numPixels);
-
-        //Allocate pixel buffer.
-        m_PixelBufferSeparate.Resize(sizeof(float3) * numPixels * numOutputChannels);
-
-        //Single channel pixel buffer.
-        m_PixelBufferCombined.Resize(sizeof(float3) * numPixels);
-
-        //Initialize the ray buffers. Note: These are not initialized but Reset() is called when the waves start.
-        const auto numPrimaryRays = numPixels;
-        const auto numShadowRays = numPixels * m_Settings.depth + (numPixels * ReSTIRSettings::numReservoirsPerPixel); //TODO: change to 2x num pixels and add safety check to resolve when full.
-
-        //Create atomic buffers. This automatically sets the counter to 0 and size to max.
-        CreateAtomicBuffer<IntersectionRayData>(&m_Rays, numPrimaryRays);
-        CreateAtomicBuffer<ShadowRayData>(&m_ShadowRays, numShadowRays);
-        CreateAtomicBuffer<IntersectionData>(&m_IntersectionData, numPixels);
-
-        //Initialize each surface data buffer.
-        for (int i = 0; i < 3; ++i)
-        {
-            //Note; Only allocates memory and stores the size on the GPU. It does not actually fill any data in yet.
-            m_SurfaceData[i].Resize(numPixels * sizeof(SurfaceData));
-        }
-
-
-        m_MotionVectors.Init(make_uint2(m_Settings.renderResolution.x, m_Settings.renderResolution.y));
-
-        //Use mostly the default values.
-        ReSTIRSettings rSettings;
-        rSettings.width = m_Settings.renderResolution.x;
-        rSettings.height = m_Settings.renderResolution.y;
-        // A null frame snapshot will not record anything when requested to.   
-
-        m_ReSTIR = std::make_unique<ReSTIR>();
-
-        //Print the expected VRam usage.
-        size_t requiredSize = m_ReSTIR->GetExpectedGpuRamUsage(rSettings, 3);
-        printf("Initializing ReSTIR. Expected VRam usage in bytes: %llu\n", requiredSize);
-
-        //Finally actually allocate memory for ReSTIR.
-        m_ReSTIR->Initialize(rSettings);
-
-        size_t usedSize = m_ReSTIR->GetAllocatedGpuMemory();
-        printf("Actual bytes allocated by ReSTIR: %llu\n", usedSize);
-
-        SetOutputResolution(a_NewResolution);
+        // Call the internal version of this function which does not involve mutex locking
+        SetOutputResolutionInternal(a_NewResolution);
     }
 
 
     void WaveFrontRenderer::SetOutputResolution(glm::uvec2 a_NewResolution)
     {
-
-        m_Settings.outputResolution.x = a_NewResolution.x;
-        m_Settings.outputResolution.y = a_NewResolution.y;
-
-        //Set up the OpenGL output buffer. 
-        m_OutputBuffer->Resize(m_Settings.outputResolution.x, m_Settings.outputResolution.y);
-
+        std::lock_guard lock(m_SettingsUpdateMutex);
+        m_IntermediateSettings.outputResolution.x = a_NewResolution.x;
+        m_IntermediateSettings.outputResolution.y = a_NewResolution.y;
     }
 
     glm::uvec2 WaveFrontRenderer::GetRenderResolution()
     {
 
-        return glm::uvec2(m_Settings.renderResolution.x, m_Settings.renderResolution.y);
+        return glm::uvec2(m_IntermediateSettings.renderResolution.x, m_IntermediateSettings.renderResolution.y);
 
     }
 
     glm::uvec2 WaveFrontRenderer::GetOutputResolution()
     {
 
-        return glm::uvec2(m_Settings.outputResolution.x, m_Settings.outputResolution.y);
+        return glm::uvec2(m_IntermediateSettings.outputResolution.x, m_IntermediateSettings.outputResolution.y);
 
     }
 
     void WaveFrontRenderer::SetBlendMode(bool a_Blend)
     {
-        m_Settings.blendOutput = a_Blend;
+        m_IntermediateSettings.blendOutput = a_Blend;
         if (a_Blend) m_BlendCounter = 0;
     }
 
     bool WaveFrontRenderer::GetBlendMode() const
     {
-        return m_Settings.blendOutput;
+        return m_IntermediateSettings.blendOutput;
     }
 
     void WaveFrontRenderer::TraceFrame()
     {
+        bool recordingSnapshot = m_StartSnapshot;
+        if (m_StartSnapshot)
+        {
+            // Replacing the snapshot with a non-null one will start recording requested features.
+            m_FrameSnapshot = std::make_unique<FrameSnapshot>();
+            m_StartSnapshot = false;
+        }
 
         //add to lights buffer? in traceframe
 
@@ -267,12 +228,52 @@ namespace WaveFront
             //add those to lights buffer in world space
                 //where to keep lights buffer?? - scene! yes!
 
+        bool resizeBuffers = false, resizeOutputBuffer = false;
+        {
+            // Lock the settings mutex while we copy its data
+            std::lock_guard lock(m_SettingsUpdateMutex);
+
+            // Also check if the render resolution or output resolution have changed,
+            // since those would require resizing buffers in this frame
+            if (m_Settings.renderResolution.x != m_IntermediateSettings.renderResolution.x ||
+                m_Settings.renderResolution.y != m_IntermediateSettings.renderResolution.y)
+            {
+                resizeBuffers = true;
+            }
+
+            if (m_Settings.outputResolution.x != m_IntermediateSettings.outputResolution.x ||
+                m_Settings.outputResolution.y != m_IntermediateSettings.outputResolution.y)
+            {
+                resizeOutputBuffer = true;
+            }
+
+            m_Settings = m_IntermediateSettings;
+        }
+
+        if (resizeBuffers)
+        {
+            m_DeferredOpenGLCalls.push([this]() {ResizeBuffers(); });
+        }
+
+        if (resizeOutputBuffer)
+        {
+            //Set up the OpenGL output buffer.
+            m_DeferredOpenGLCalls.push([this]()
+                {
+                    m_OutputBuffer->Resize(m_IntermediateSettings.outputResolution.x, m_IntermediateSettings.outputResolution.y);
+                });
+        }
+
+
         //Index of the current and last frame to access buffers.
         const auto currentIndex = m_FrameIndex;
         const auto temporalIndex = m_FrameIndex == 1 ? 0 : 1;
 
         //Data needed in the algorithms.
         const uint32_t numPixels = m_Settings.renderResolution.x * m_Settings.renderResolution.y;
+
+        //TODO: Is this the best spot to stall the rendering thread to update resources? I've no clue.
+        WaitForDeferredCalls();
 
 
         //Start by clearing the data from the previous frame.
@@ -330,15 +331,19 @@ namespace WaveFront
                 // Notice that CudaGLTextures are used, as opposed to memory buffers. This is to enable the data to be used with OpenGL
                 // and thus displayed via ImGui
                 std::map<std::string, FrameSnapshot::ImageBuffer> resBuffers;
-                resBuffers["Origins"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
-                    m_Settings.renderResolution.y, 3 * sizeof(float));
 
-                resBuffers["Directions"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
-                    m_Settings.renderResolution.y, 3 * sizeof(float));
+                m_DeferredOpenGLCalls.push([&]() {
+                    resBuffers["Origins"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
+                        m_Settings.renderResolution.y, 3 * sizeof(float));
 
-                resBuffers["Contributions"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
-                    m_Settings.renderResolution.y, 3 * sizeof(float));
+                    resBuffers["Directions"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
+                        m_Settings.renderResolution.y, 3 * sizeof(float));
 
+                    resBuffers["Contributions"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
+                        m_Settings.renderResolution.y, 3 * sizeof(float));
+                    });
+
+                WaitForDeferredCalls();
                 // A CUDA kernel used to separate the interleave primary ray buffer into 3 different buffers
                 // This is the main reason we use a lambda, as it needs to be defined how to interpret the data
                 SeparateIntersectionRayBufferCPU((m_Rays.GetSize() - sizeof(uint32_t)) / sizeof(IntersectionRayData),
@@ -355,11 +360,14 @@ namespace WaveFront
                 auto motionVectorBuffer = m_MotionVectors.GetMotionVectorBuffer();
 
                 std::map<std::string, FrameSnapshot::ImageBuffer> resBuffers;
-                resBuffers["Motion vector direction"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
-                    m_Settings.renderResolution.y, 3 * sizeof(float));
+                m_DeferredOpenGLCalls.push([&]() {
+                    resBuffers["Motion vector direction"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
+                        m_Settings.renderResolution.y, 3 * sizeof(float));
 
-                resBuffers["Motion vector magnitude"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
-                    m_Settings.renderResolution.y, 3 * sizeof(float));
+                    resBuffers["Motion vector magnitude"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
+                        m_Settings.renderResolution.y, 3 * sizeof(float));
+                    });
+                WaitForDeferredCalls();
 
                 SeparateMotionVectorBufferCPU(m_Settings.renderResolution.x * m_Settings.renderResolution.y,
                     motionVectorBuffer->GetDevicePtr<MotionVectorBuffer>(),
@@ -568,6 +576,9 @@ namespace WaveFront
         //#if defined(_DEBUG)
         m_MotionVectors.GenerateDebugTextures();
         //m_DebugTexture = m_MotionVectors.GetMotionVectorMagnitudeTex();
+
+        m_SnapshotReady = recordingSnapshot;
+
     }
 
     std::unique_ptr<MemoryBuffer> WaveFrontRenderer::InterleaveVertexData(const PrimitiveData& a_MeshData) const
@@ -602,6 +613,17 @@ namespace WaveFront
 
                 glfwDestroyWindow(m_GLContext);
             });       
+    }
+
+    void WaveFrontRenderer::PerformDeferredOperations()
+    {
+        while (!m_DeferredOpenGLCalls.empty())
+        {
+            m_DeferredOpenGLCalls.front()();
+            m_DeferredOpenGLCalls.pop();
+        }
+
+        m_OGLCallCondition.notify_all();
     }
 
     std::unique_ptr<Lumen::ILumenPrimitive> WaveFrontRenderer::CreatePrimitive(PrimitiveData& a_PrimitiveData)
@@ -759,8 +781,12 @@ namespace WaveFront
         return std::make_shared<PTScene>(a_SceneData, m_ServiceLocator);
     }
 
-    WaveFrontRenderer::WaveFrontRenderer() : m_BlendCounter(0), m_FrameIndex(0), m_CUDAContext(nullptr)
+    WaveFrontRenderer::WaveFrontRenderer() : m_BlendCounter(0)
+        , m_FrameIndex(0)
+        , m_CUDAContext(nullptr)
         , m_StopRendering(false)
+        , m_StartSnapshot(false)
+        , m_SnapshotReady(false)
     {
 
     }
@@ -770,5 +796,82 @@ namespace WaveFront
         std::unique_lock<std::mutex> lock(m_OutputBufferMutex);
         return m_OutputBuffer->GetTexture();
     }
+
+    void WaveFrontRenderer::ResizeBuffers()
+    {
+
+        ////Set up the OpenGL output buffer.
+        //m_OutputBuffer->Resize(m_Settings.outputResolution.x, m_Settings.outputResolution.y);
+
+        //Set up buffers.
+        const unsigned numPixels = m_Settings.renderResolution.x * m_Settings.renderResolution.y;
+        const unsigned numOutputChannels = static_cast<unsigned>(LightChannel::NUM_CHANNELS);
+
+        //CheckCudaLastErr();
+        m_IntermediateOutputBuffer.Resize(sizeof(uchar4) * numPixels);
+
+        //Allocate pixel buffer.
+        m_PixelBufferSeparate.Resize(sizeof(float3) * numPixels * numOutputChannels);
+
+        //Single channel pixel buffer.
+        m_PixelBufferCombined.Resize(sizeof(float3) * numPixels);
+
+        //Initialize the ray buffers. Note: These are not initialized but Reset() is called when the waves start.
+        const auto numPrimaryRays = numPixels;
+        const auto numShadowRays = numPixels * m_Settings.depth + (numPixels * ReSTIRSettings::numReservoirsPerPixel); //TODO: change to 2x num pixels and add safety check to resolve when full.
+
+        //Create atomic buffers. This automatically sets the counter to 0 and size to max.
+        CreateAtomicBuffer<IntersectionRayData>(&m_Rays, numPrimaryRays);
+        CreateAtomicBuffer<ShadowRayData>(&m_ShadowRays, numShadowRays);
+        CreateAtomicBuffer<IntersectionData>(&m_IntersectionData, numPixels);
+
+        //Initialize each surface data buffer.
+        for (int i = 0; i < 3; ++i)
+        {
+            //Note; Only allocates memory and stores the size on the GPU. It does not actually fill any data in yet.
+            m_SurfaceData[i].Resize(numPixels * sizeof(SurfaceData));
+        }
+
+        m_MotionVectors.Init(make_uint2(m_Settings.renderResolution.x, m_Settings.renderResolution.y));
+
+        //Use mostly the default values.
+        ReSTIRSettings rSettings;
+        rSettings.width = m_Settings.renderResolution.x;
+        rSettings.height = m_Settings.renderResolution.y;
+        // A null frame snapshot will not record anything when requested to.   
+
+        m_ReSTIR = std::make_unique<ReSTIR>();
+
+        //Print the expected VRam usage.
+        size_t requiredSize = m_ReSTIR->GetExpectedGpuRamUsage(rSettings, 3);
+        printf("Initializing ReSTIR. Expected VRam usage in bytes: %llu\n", requiredSize);
+
+        //Finally actually allocate memory for ReSTIR.
+        m_ReSTIR->Initialize(rSettings);
+
+        size_t usedSize = m_ReSTIR->GetAllocatedGpuMemory();
+        printf("Actual bytes allocated by ReSTIR: %llu\n", usedSize);
+    }
+
+    void WaveFrontRenderer::SetOutputResolutionInternal(glm::uvec2 a_NewResolution)
+    {
+        m_IntermediateSettings.outputResolution.x = a_NewResolution.x;
+        m_IntermediateSettings.outputResolution.y = a_NewResolution.y;
+    }
+
+    void WaveFrontRenderer::WaitForDeferredCalls()
+    {
+        if (!m_DeferredOpenGLCalls.empty())
+        {            
+            std::mutex mutex;
+            std::unique_lock lock(mutex);
+
+            m_OGLCallCondition.wait(lock, [this]()
+            {
+                    return m_DeferredOpenGLCalls.empty();
+            });
+        }
+    }
+
 }
 #endif

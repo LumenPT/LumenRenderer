@@ -14,6 +14,7 @@
 #include <vector>
 #include <memory>
 #include <mutex>
+#include <queue>
 
 class SceneDataTable;
 
@@ -45,6 +46,7 @@ namespace WaveFront
         //Overridden functionality.
     public:
         void StartRendering() override;
+        void PerformDeferredOperations() override;
 
         std::unique_ptr<Lumen::ILumenPrimitive> CreatePrimitive(PrimitiveData& a_PrimitiveData) override;
         std::shared_ptr<Lumen::ILumenMesh> CreateMesh(std::vector<std::unique_ptr<Lumen::ILumenPrimitive>>& a_Primitives) override;
@@ -97,6 +99,11 @@ namespace WaveFront
 
         std::unique_ptr<MemoryBuffer> InterleaveVertexData(const PrimitiveData& a_MeshData) const;
 
+        void ResizeBuffers();
+
+        void SetOutputResolutionInternal(glm::uvec2 a_NewResolution);
+        void WaitForDeferredCalls(); // Stalls the thread until all calls that are deferred to other treads are performed
+
         //OpenGL buffer to write output to.
         std::unique_ptr<CudaGLTexture> m_OutputBuffer;
 
@@ -135,7 +142,12 @@ namespace WaveFront
 
         //Variables and settings.
     private:
-        WaveFrontSettings m_Settings;
+        WaveFrontSettings m_Settings; // Settings to use while rendering
+        WaveFrontSettings m_IntermediateSettings; // Settings used to make changes from other threads without affecting the rendering process
+        std::mutex m_SettingsUpdateMutex;
+
+        std::queue<std::function<void()>> m_DeferredOpenGLCalls;
+        std::condition_variable m_OGLCallCondition;
 
         //Blend counter when blending is enabled.
         unsigned m_BlendCounter;
@@ -163,6 +175,8 @@ namespace WaveFront
         // The Frame Snapshot is used to define what to record when the output layer requests that
         // See TraceFrame() ##ToolsBookmark for example
         std::unique_ptr<FrameSnapshot> m_FrameSnapshot;
+        bool m_SnapshotReady;
+        bool m_StartSnapshot;
 
     };
 }
