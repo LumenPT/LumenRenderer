@@ -118,7 +118,7 @@ private:
     RecordHandle<MissData>      m_MissRecord;
     RecordHandle<void>       m_HitRecord;
 
-    std::unique_ptr<class Texture> m_Texture;
+    std::unique_ptr<class PTTexture> m_Texture;
 
     std::map<std::string, OptixProgramGroup> m_ProgramGroups;
 
@@ -165,7 +165,7 @@ std::unique_ptr<AccelerationStructure> OptiXRenderer::BuildGeometryAccelerationS
 
     // Extras which are not necessary, but are here for documentation purposes
     buildInput.triangleArray.primitiveIndexOffset = 0; // Defines an offset when accessing the primitive index offset in the hit shaders
-    // If the input contains multiple primitives, each with a different Material, we can specify offsets for their SBT records here
+    // If the input contains multiple primitives, each with a different PTMaterial, we can specify offsets for their SBT records here
     // This could be used as a replacement for the 3-layer acceleration structure we considered earlier
     buildInput.triangleArray.sbtIndexOffsetBuffer = 0;
     buildInput.triangleArray.sbtIndexOffsetSizeInBytes = 0;

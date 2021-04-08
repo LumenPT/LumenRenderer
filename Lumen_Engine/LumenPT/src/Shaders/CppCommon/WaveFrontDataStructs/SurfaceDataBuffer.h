@@ -32,12 +32,8 @@ namespace WaveFront
         m_TransportFactor(a_TransportFactor)
         {}
 
-
-
-        GPU_ONLY float3 GetRayOrigin() const
-        {
-            
-        }
+        //Default constructor.
+        CPU_GPU SurfaceData() = default;
 
         //The index of the pixel that this surface data belongs to.
         unsigned m_Index;

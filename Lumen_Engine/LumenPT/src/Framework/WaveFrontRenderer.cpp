@@ -1,14 +1,15 @@
 #include "../Shaders/CppCommon/RenderingUtility.h"
+#include "Timer.h"
 #if defined(WAVEFRONT)
 
 #include "WaveFrontRenderer.h"
 #include "PTPrimitive.h"
 #include "PTMesh.h"
 #include "PTScene.h"
-#include "Material.h"
-#include "Texture.h"
+#include "PTMaterial.h"
+#include "PTTexture.h"
 #include "PTVolume.h"
-#include "Material.h"
+#include "PTMaterial.h"
 #include "MemoryBuffer.h"
 #include "CudaGLTexture.h"
 #include "SceneDataTable.h"
@@ -46,6 +47,7 @@ namespace WaveFront
 {
     void WaveFrontRenderer::Init(const WaveFrontSettings& a_Settings)
     {
+        m_BlendCounter = 0;
         m_FrameIndex = 0;
         m_Settings = a_Settings;
 
@@ -71,34 +73,10 @@ namespace WaveFront
         //Set the service locator's pointer to the OptixWrapper.
         m_ServiceLocator.m_OptixWrapper = m_OptixSystem.get();
 
+
         //Set up the OpenGL output buffer.
         m_OutputBuffer = std::make_unique<CudaGLTexture>(GL_RGBA8, m_Settings.outputResolution.x, m_Settings.outputResolution.y, 4);
-
-        //Set up buffers.
-        const unsigned numPixels = m_Settings.renderResolution.x * m_Settings.renderResolution.y;
-        const unsigned numOutputChannels = static_cast<unsigned>(LightChannel::NUM_CHANNELS);
-
-        //Allocate pixel buffer.
-        m_PixelBufferSeparate.Resize(sizeof(float3) * numPixels * numOutputChannels);
-
-        //Single channel pixel buffer.
-        m_PixelBufferCombined.Resize(sizeof(float3) * numPixels);
-
-        //Initialize the ray buffers. Note: These are not initialized but Reset() is called when the waves start.
-        const auto numPrimaryRays = numPixels;
-        const auto numShadowRays = numPixels * m_Settings.depth + (numPixels * ReSTIRSettings::numReservoirsPerPixel); //TODO: change to 2x num pixels and add safety check to resolve when full.
-
-        //Create atomic buffers. This automatically sets the counter to 0 and size to max.
-        CreateAtomicBuffer<IntersectionRayData>(&m_Rays, numPrimaryRays);
-        CreateAtomicBuffer<ShadowRayData>(&m_ShadowRays, numShadowRays);
-        CreateAtomicBuffer<IntersectionData>(&m_IntersectionData, numPixels);
-
-        //Initialize each surface data buffer.
-        for(int i = 0; i < 3; ++i)
-        {
-            //Note; Only allocates memory and stores the size on the GPU. It does not actually fill any data in yet.
-            m_SurfaceData[i].Resize(numPixels * sizeof(SurfaceData));
-        }
+        SetRenderResolution(glm::uvec2(m_Settings.outputResolution.x, m_Settings.outputResolution.y));
 
         //TODO: number of lights will be dynamic per frame but this is temporary.
         constexpr auto numLights = 3;
@@ -109,9 +87,9 @@ namespace WaveFront
         TriangleLight lights[numLights];
 
         //Intensity per light.
-        lights[0].radiance = { 20000, 20000, 20000 };
-        lights[1].radiance = { 20000, 20000, 20000 };
-        lights[2].radiance = { 20000, 20000, 20000 };
+        lights[0].radiance = { 150000, 150000, 150000 };
+        lights[1].radiance = { 150000, 150000, 150000 };
+        lights[2].radiance = { 150000, 150000, 105000 };
 
 
         //Actually set the triangle lights to have an area.
@@ -147,33 +125,13 @@ namespace WaveFront
 
         m_TriangleLights.Write(&lights[0], sizeof(TriangleLight) * numLights, 0);
 
-        m_MotionVectors.Init(make_uint2(m_Settings.renderResolution.x, m_Settings.renderResolution.y));
-    	
         //Set the service locator pointer to point to the m'table.
         m_Table = std::make_unique<SceneDataTable>();
         m_ServiceLocator.m_SceneDataTable = m_Table.get();
 
         m_ServiceLocator.m_Renderer = this;
+        m_FrameSnapshot = std::make_unique<NullFrameSnapshot>();
 
-        //Use mostly the default values.
-        ReSTIRSettings rSettings;
-        rSettings.width = m_Settings.renderResolution.x;
-        rSettings.height = m_Settings.renderResolution.y;
-        // A null frame snapshot will not record anything when requested to.
-        m_FrameSnapshot = std::make_unique<NullFrameSnapshot>(); 
-
-
-        m_ReSTIR = std::make_unique<ReSTIR>();
-
-        //Print the expected VRam usage.
-        size_t requiredSize = m_ReSTIR->GetExpectedGpuRamUsage(rSettings, 3);
-        printf("Initializing ReSTIR. Expected VRam usage in bytes: %llu\n", requiredSize);
-
-        //Finally actually allocate memory for ReSTIR.
-        m_ReSTIR->Initialize(rSettings);
-
-        size_t usedSize = m_ReSTIR->GetAllocatedGpuMemory();
-        printf("Actual bytes allocated by ReSTIR: %llu\n", usedSize);
     }
 
     void WaveFrontRenderer::BeginSnapshot()
@@ -192,6 +150,102 @@ namespace WaveFront
         return std::move(snap);
     }
 
+    void WaveFrontRenderer::SetRenderResolution(glm::uvec2 a_NewResolution)
+    {
+        m_Settings.renderResolution.x = a_NewResolution.x;
+        m_Settings.renderResolution.y = a_NewResolution.y;
+
+
+        ////Set up the OpenGL output buffer.
+        //m_OutputBuffer->Resize(m_Settings.outputResolution.x, m_Settings.outputResolution.y);
+
+        //Set up buffers.
+        const unsigned numPixels = m_Settings.renderResolution.x * m_Settings.renderResolution.y;
+        const unsigned numOutputChannels = static_cast<unsigned>(LightChannel::NUM_CHANNELS);
+
+        //Allocate pixel buffer.
+        m_PixelBufferSeparate.Resize(sizeof(float3) * numPixels * numOutputChannels);
+
+        //Single channel pixel buffer.
+        m_PixelBufferCombined.Resize(sizeof(float3) * numPixels);
+
+        //Initialize the ray buffers. Note: These are not initialized but Reset() is called when the waves start.
+        const auto numPrimaryRays = numPixels;
+        const auto numShadowRays = numPixels * m_Settings.depth + (numPixels * ReSTIRSettings::numReservoirsPerPixel); //TODO: change to 2x num pixels and add safety check to resolve when full.
+
+        //Create atomic buffers. This automatically sets the counter to 0 and size to max.
+        CreateAtomicBuffer<IntersectionRayData>(&m_Rays, numPrimaryRays);
+        CreateAtomicBuffer<ShadowRayData>(&m_ShadowRays, numShadowRays);
+        CreateAtomicBuffer<IntersectionData>(&m_IntersectionData, numPixels);
+
+        //Initialize each surface data buffer.
+        for (int i = 0; i < 3; ++i)
+        {
+            //Note; Only allocates memory and stores the size on the GPU. It does not actually fill any data in yet.
+            m_SurfaceData[i].Resize(numPixels * sizeof(SurfaceData));
+        }
+
+
+        m_MotionVectors.Init(make_uint2(m_Settings.renderResolution.x, m_Settings.renderResolution.y));
+
+        //Use mostly the default values.
+        ReSTIRSettings rSettings;
+        rSettings.width = m_Settings.renderResolution.x;
+        rSettings.height = m_Settings.renderResolution.y;
+        // A null frame snapshot will not record anything when requested to.   
+
+        m_ReSTIR = std::make_unique<ReSTIR>();
+
+        //Print the expected VRam usage.
+        size_t requiredSize = m_ReSTIR->GetExpectedGpuRamUsage(rSettings, 3);
+        printf("Initializing ReSTIR. Expected VRam usage in bytes: %llu\n", requiredSize);
+
+        //Finally actually allocate memory for ReSTIR.
+        m_ReSTIR->Initialize(rSettings);
+
+        size_t usedSize = m_ReSTIR->GetAllocatedGpuMemory();
+        printf("Actual bytes allocated by ReSTIR: %llu\n", usedSize);
+
+        SetOutputResolution(a_NewResolution);
+    }
+
+
+    void WaveFrontRenderer::SetOutputResolution(glm::uvec2 a_NewResolution)
+    {
+
+        m_Settings.outputResolution.x = a_NewResolution.x;
+        m_Settings.outputResolution.y = a_NewResolution.y;
+
+        //Set up the OpenGL output buffer. 
+        m_OutputBuffer->Resize(m_Settings.outputResolution.x, m_Settings.outputResolution.y);
+
+    }
+
+    glm::uvec2 WaveFrontRenderer::GetRenderResolution()
+    {
+
+        return glm::uvec2(m_Settings.renderResolution.x, m_Settings.renderResolution.y);
+
+    }
+
+    glm::uvec2 WaveFrontRenderer::GetOutputResolution()
+    {
+
+        return glm::uvec2(m_Settings.outputResolution.x, m_Settings.outputResolution.y);
+
+    }
+
+    void WaveFrontRenderer::SetBlendMode(bool a_Blend)
+    {
+        m_Settings.blendOutput = a_Blend;
+        if (a_Blend) m_BlendCounter = 0;
+    }
+
+    bool WaveFrontRenderer::GetBlendMode() const
+    {
+        return m_Settings.blendOutput;
+    }
+
     std::unique_ptr<MemoryBuffer> WaveFrontRenderer::InterleaveVertexData(const PrimitiveData& a_MeshData) const
     {
         std::vector<Vertex> vertices;
@@ -204,14 +258,14 @@ namespace WaveFront
                 v.m_UVCoord = make_float2(a_MeshData.m_TexCoords[i].x, a_MeshData.m_TexCoords[i].y);
             if (!a_MeshData.m_Normals.Empty())
                 v.m_Normal = make_float3(a_MeshData.m_Normals[i].x, a_MeshData.m_Normals[i].y, a_MeshData.m_Normals[i].z);
+            if (!a_MeshData.m_Tangents.Empty())
+                v.m_Tangent = make_float4(a_MeshData.m_Tangents[i].x, a_MeshData.m_Tangents[i].y, a_MeshData.m_Tangents[i].z, a_MeshData.m_Tangents[i].w);
         }
         return std::make_unique<MemoryBuffer>(vertices);
     }
 
     std::unique_ptr<Lumen::ILumenPrimitive> WaveFrontRenderer::CreatePrimitive(PrimitiveData& a_PrimitiveData)
     {
-        //TODO let optix build the acceleration structure and return the handle.
-
         auto vertexBuffer = InterleaveVertexData(a_PrimitiveData);
         cudaDeviceSynchronize();
         auto err = cudaGetLastError();
@@ -222,6 +276,15 @@ namespace WaveFront
         {
             VectorView<uint16_t, uint8_t> indexView(a_PrimitiveData.m_IndexBinary);
 
+            for (size_t i = 0; i < indexView.Size(); i++)
+            {
+                correctedIndices.push_back(indexView[i]);
+            }
+        }
+        //Gotta copy over even when they are 32 bit.
+        else
+        {
+            VectorView<uint32_t, uint8_t> indexView(a_PrimitiveData.m_IndexBinary);
             for (size_t i = 0; i < indexView.Size(); i++)
             {
                 correctedIndices.push_back(indexView[i]);
@@ -272,7 +335,7 @@ namespace WaveFront
         auto& entry = prim->m_SceneDataTableEntry.GetData();
         entry.m_VertexBuffer = prim->m_VertBuffer->GetDevicePtr<Vertex>();
         entry.m_IndexBuffer = prim->m_IndexBuffer->GetDevicePtr<unsigned int>();
-        entry.m_Material = static_cast<Material*>(prim->m_Material.get())->GetDeviceMaterial();
+        entry.m_Material = static_cast<PTMaterial*>(prim->m_Material.get())->GetDeviceMaterial();
         entry.m_IsEmissive = prim->m_BoolBuffer->GetDevicePtr<bool>();
 
         //Resize lights buffer by adding number of triangle lights to its current size
@@ -295,13 +358,13 @@ namespace WaveFront
         uint32_t a_Width, uint32_t a_Height)
     {
         static cudaChannelFormatDesc formatDesc = cudaCreateChannelDesc<uchar4>();
-        return std::make_shared<Texture>(a_PixelData, formatDesc, a_Width, a_Height);
+        return std::make_shared<PTTexture>(a_PixelData, formatDesc, a_Width, a_Height);
     }
 
     std::shared_ptr<Lumen::ILumenMaterial> WaveFrontRenderer::CreateMaterial(
         const MaterialData& a_MaterialData)
     {
-        auto mat = std::make_shared<Material>();
+        auto mat = std::make_shared<PTMaterial>();
         mat->SetDiffuseColor(a_MaterialData.m_DiffuseColor);
         mat->SetDiffuseTexture(a_MaterialData.m_DiffuseTexture);
         mat->SetEmission(a_MaterialData.m_EmssivionVal);
@@ -362,13 +425,16 @@ namespace WaveFront
         return std::make_shared<PTScene>(a_SceneData, m_ServiceLocator);
     }
 
-    WaveFrontRenderer::WaveFrontRenderer() : m_FrameIndex(0), m_CUDAContext(nullptr)
+    WaveFrontRenderer::WaveFrontRenderer() : m_BlendCounter(0), m_FrameIndex(0), m_CUDAContext(nullptr)
     {
 
     }
 
     unsigned WaveFrontRenderer::TraceFrame(std::shared_ptr<Lumen::ILumenScene>& a_Scene)
     {
+        //Timer to measure how long each frame takes.
+        Timer timer;
+
         //add lights to mesh in scene
             //add mesh
             //keep instances in scene
@@ -421,7 +487,13 @@ namespace WaveFront
 
         //Start by clearing the data from the previous frame.
         ResetLightChannels(m_PixelBufferSeparate.GetDevicePtr<float3>(), numPixels, static_cast<unsigned>(LightChannel::NUM_CHANNELS));
-        ResetLightChannels(m_PixelBufferCombined.GetDevicePtr<float3>(), numPixels, 1);
+
+        //Only clean the merged buffer if no blending is enabled.
+        if(!m_Settings.blendOutput)
+        {
+            ResetLightChannels(m_PixelBufferCombined.GetDevicePtr<float3>(), numPixels, 1);
+        }
+
         cudaDeviceSynchronize();
         CHECKLASTCUDAERROR;
 
@@ -658,14 +730,22 @@ namespace WaveFront
             m_Settings.outputResolution,
             m_PixelBufferSeparate.GetDevicePtr<float3>(),
             m_PixelBufferCombined.GetDevicePtr<float3>(),
-            m_OutputBuffer->GetDevicePtr()
+            m_OutputBuffer->GetDevicePtr(),
+            m_Settings.blendOutput,
+            m_BlendCounter
         );
 
         //Post processing using CUDA kernel.
         PostProcess(postProcessLaunchParams);
         cudaDeviceSynchronize();
         CHECKLASTCUDAERROR;
-        
+
+        //If blending is enabled, increment blend counter.
+        if(m_Settings.blendOutput)
+        {
+            ++m_BlendCounter;
+        }
+
         //Change frame index 0..1
         ++m_FrameIndex;
         if(m_FrameIndex == 2)
@@ -682,7 +762,9 @@ namespace WaveFront
         //m_DebugTexture = m_MotionVectors.GetMotionVectorMagnitudeTex();
         m_DebugTexture = m_MotionVectors.GetMotionVectorDirectionsTex();
 //#endif
-    	
+
+        printf("Total wavefront frame time: %f ms.\n", timer.measure(TimeUnit::MILLIS));
+
         //Return the GLuint texture ID.
         return m_OutputBuffer->GetTexture();
     }

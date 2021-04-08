@@ -77,7 +77,7 @@ CPU_ON_GPU void ShadeDirect(
             auto unshadowedPathContribution = brdf * solidAngle * cosIn * light.radiance;
 
             //Scale by the PDF of this light to compensate for all other lights not being picked.
-            unshadowedPathContribution *= (1.f/pdf);
+            unshadowedPathContribution *= ((1.f/pdf) * surfaceData.m_TransportFactor);
 
             /*
              * NOTE: Channel is Indirect because this runs at greater depth. This is direct light for an indirect bounce.

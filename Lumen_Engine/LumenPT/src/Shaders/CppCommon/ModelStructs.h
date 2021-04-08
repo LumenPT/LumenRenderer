@@ -16,6 +16,7 @@ struct Vertex
     NONAMESPACE::float3 m_Position;
     NONAMESPACE::float2 m_UVCoord;
     NONAMESPACE::float3 m_Normal;
+    NONAMESPACE::float4 m_Tangent;
     // Can be expanded with additional per-vertex attributes that we need
 };
 
@@ -27,6 +28,8 @@ struct DeviceMaterial
     NONAMESPACE::float3 m_EmissionColor;
     cudaTextureObject_t m_DiffuseTexture;
     cudaTextureObject_t m_EmissiveTexture;
+    cudaTextureObject_t m_MetalRoughnessTexture;
+    cudaTextureObject_t m_NormalTexture;
 };
 
 //TODO: change this naming because it is confusing, it could be name DevicePrimitiveArray or DeviceMesh
