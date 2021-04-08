@@ -1,21 +1,39 @@
 #pragma once
 #include <filesystem>
+#include "Lumen/ModelLoading/SceneManager.h"
 
 class ModelLoaderWidget
 {
 public:
 
-    ModelLoaderWidget();
+    ModelLoaderWidget(Lumen::SceneManager& a_SceneManager);
 
     void Display();
 
 private:
 
-    void DirectoryNavigator();
+    enum class State
+    {
+        Directory,
+        Loading,
+        ModelLoaded
+    } m_State;
 
-    bool IsDoubleClicked(std::filesystem::path a_Path);
+    void DirectoryNagivation();
+    void DirectoryNavigatorHeader();
+
+    void LoadModel();
+
+    void ModelSelection();
+
+    bool IsDoubleClicked(std::filesystem::path a_Path);    
 
     std::filesystem::path m_SelectedPath;
     std::filesystem::path m_FirstClick;
+
+    Lumen::SceneManager& m_SceneManager;
+    Lumen::SceneManager::GLTFResource* m_LoadedResource;
+    std::filesystem::path m_PathToOpen;
+    std::string m_AdditionalMessage;
 };
 
