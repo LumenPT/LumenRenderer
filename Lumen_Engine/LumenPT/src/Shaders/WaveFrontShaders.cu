@@ -131,12 +131,14 @@ __device__ __forceinline__ void ShadowRaysRayGen()
         launchParams.m_MinMaxDistance.x,
         rayData.m_MaxDistance,
         0.f,
-        OptixVisibilityMask(255),
+        OptixVisibilityMask(0b00000001),
         OPTIX_RAY_FLAG_NONE,
         0,
         1,
         0,
         isIntersection);
+
+	//TODO: volumetric shadows
 
     //3. If no hit, accumulate result in buffer
 

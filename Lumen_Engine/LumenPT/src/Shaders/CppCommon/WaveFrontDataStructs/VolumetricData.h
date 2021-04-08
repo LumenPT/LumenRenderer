@@ -23,6 +23,8 @@ namespace WaveFront
 
         float3 m_IncomingRayDirection;
 
+		const nanovdb::FloatGrid* m_VolumeGrid;
+
     };
 
 }

@@ -16,12 +16,31 @@ extern "C"
 
 }
 
+template<typename T>
+__device__ __forceinline__ static T* UnpackPointer(unsigned int a_Upper, unsigned int a_Lower)
+{
 
+	const unsigned long long ptr = static_cast<unsigned long long>(a_Upper) << 32 | a_Lower;
+
+	return reinterpret_cast<T*>(ptr);
+
+}
 
 extern "C"
 __global__ void __closesthit__Volumetric()
-{
-    //TODO put all necessary data inside the volumetricIntersectionData struct (Unpack pointer to the struct from first two payloads)
+{	
+	WaveFront::VolumetricIntersectionData* intersection = UnpackPointer<WaveFront::VolumetricIntersectionData>(optixGetPayload_0(), optixGetPayload_1());
+
+	if (optixGetPayload_0() > 0)
+	{
+		DeviceVolume* volume = launchParams.m_SceneData->GetTableEntry<DeviceVolume>(optixGetInstanceId());
+		const nanovdb::FloatGrid* pGrid = volume->m_Grid;
+
+		intersection->m_EntryT = uint_as_float(optixGetAttribute_0());
+		intersection->m_ExitT = uint_as_float(optixGetAttribute_1());
+		intersection->m_VolumeGrid = pGrid;
+	}
+
     return;
 }
 
@@ -57,14 +76,15 @@ __global__ void __intersection__Volumetric()
     nanovdb::Ray<float> iRay = wRay.worldToIndexF(grid);
 
     {
-    	auto bbox = grid.tree().bbox();
-    
-    
-        if (iRay.clip(bbox) == true)
-        {
-            optixReportIntersection(1.f, 0);
-        }
-    
+		auto bbox = grid.worldBBox();
+		float t0;	//volume entry point
+		float t1;	//volume exit point
+		if (wRay.intersects(bbox, t0, t1))
+		{
+			optixReportIntersection(t0, 0,
+				float_as_int(t0),
+				float_as_int(t1));
+		}
     }
 
     return;

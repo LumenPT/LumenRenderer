@@ -13,7 +13,8 @@ CPU_ON_GPU void ShadeDirect(
     AtomicBuffer<ShadowRayData>* const a_VolumetricShadowRays,
     const TriangleLight* const a_Lights,
     const unsigned int a_NumLights,
-    const CDF* const a_CDF)
+    const CDF* const a_CDF,
+	float3* a_Output)
 {
 
     const unsigned int numPixels = a_ResolutionAndDepth.x * a_ResolutionAndDepth.y;
@@ -34,7 +35,7 @@ CPU_ON_GPU void ShadeDirect(
     {
 
         //TODO: return some form of light transform factor after resolving the distances in the volume.
-        VolumetricShadeDirect(a_ResolutionAndDepth, a_VolumetricDataBuffer, a_VolumetricShadowRays, a_Lights, a_NumLights, a_CDF);
+        VolumetricShadeDirect(i, a_ResolutionAndDepth, a_VolumetricDataBuffer, a_VolumetricShadowRays, a_Lights, a_NumLights, a_CDF, a_Output);
 
         // Get intersection.
         const SurfaceData& surfaceData = a_SurfaceDataBuffer[i];

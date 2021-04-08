@@ -12,9 +12,11 @@ CPU_ON_GPU void ExtractVolumetricDataGpu(
     SceneDataTableAccessor* a_SceneDataTable);
 
 GPU_ONLY void VolumetricShadeDirect(
+	unsigned int a_PixelIndex,
     const uint3 a_ResolutionAndDepth,
     const WaveFront::VolumetricData* a_VolumetricDataBuffer,
     WaveFront::AtomicBuffer<WaveFront::ShadowRayData>* const a_ShadowRays,
     const WaveFront::TriangleLight* const a_Lights,
     const unsigned int a_NumLights,
-    const CDF* const a_CDF = nullptr);
+    const CDF* const a_CDF = nullptr,
+	float3* a_Output = nullptr);

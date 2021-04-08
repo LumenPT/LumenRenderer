@@ -96,7 +96,8 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
         a_ShadingParams.m_VolumetricShadowRays,
         a_ShadingParams.m_TriangleLights, 
         a_ShadingParams.m_NumLights, 
-        a_ShadingParams.m_CDF);
+        a_ShadingParams.m_CDF,
+		a_ShadingParams.m_Output);
 
     /*DEBUGShadePrimIntersections<<<numBlocks, blockSize>>>(
         a_ShadingParams.m_ResolutionAndDepth,

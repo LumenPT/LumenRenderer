@@ -46,7 +46,8 @@ CPU_ON_GPU void ShadeDirect(
     AtomicBuffer<ShadowRayData>* const a_VolumetricShadowRays,
     const TriangleLight* const a_Lights,
     const unsigned int a_NumLights,
-    const CDF* const a_CDF = nullptr );
+    const CDF* const a_CDF = nullptr,
+	float3* a_Output = nullptr);
 
 /*
  *

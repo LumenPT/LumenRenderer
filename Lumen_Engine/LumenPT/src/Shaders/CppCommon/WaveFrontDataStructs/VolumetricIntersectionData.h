@@ -27,7 +27,7 @@ namespace WaveFront
 			float a_IntersectionT,
 			float a_EntryT,
 			float a_ExitT,
-			nanovdb::Grid<float>* a_VolumeGrid,
+			nanovdb::FloatGrid* a_VolumeGrid,
 			unsigned int a_PrimitiveIndex,
 			unsigned int a_InstanceId,
 			unsigned int a_PixelIndex)
@@ -66,6 +66,6 @@ namespace WaveFront
 		float m_ExitT;
 
 		//Pointer to intersected volume as represented by a nanovdb grid of float type
-		nanovdb::Grid<float>* m_VolumeGrid;
+		const nanovdb::FloatGrid* m_VolumeGrid;
 	};
 }
