@@ -6,8 +6,9 @@
 
 namespace fs = std::filesystem;
 
-ModelLoaderWidget::ModelLoaderWidget(Lumen::SceneManager& a_SceneManager)
+ModelLoaderWidget::ModelLoaderWidget(Lumen::SceneManager& a_SceneManager, std::shared_ptr<Lumen::ILumenScene>& a_SceneRef)
     : m_SceneManager(a_SceneManager)
+    , m_SceneRef(a_SceneRef)
     , m_State(State::Directory)
 {
 	m_SelectedPath = fs::current_path();
@@ -72,10 +73,42 @@ void ModelLoaderWidget::DirectoryNavigatorHeader()
 
 void ModelLoaderWidget::LoadModel()
 {
+    if (m_PathToOpen.extension() == ".gltf")
+    {
+		m_LoadedResource = m_SceneManager.LoadGLTF(m_PathToOpen.filename().string(), m_PathToOpen.parent_path().string() + "\\");
+		m_State = State::ModelLoaded;
+		m_AdditionalMessage = "";
+    }
+	else
+	{
+		m_AdditionalMessage = "Loading of " + m_PathToOpen.extension().string() + " files is not supported yet.";
+		m_State = State::Directory;
+	}
 }
 
 void ModelLoaderWidget::ModelSelection()
 {
+	ImGui::Text("Model loaded, implementing more shite");
+
+	if (!m_LoadedResource->m_Scenes.empty() && ImGui::ListBoxHeader("Loaded scenes"))
+	{
+
+		for (size_t i = 0; i < m_LoadedResource->m_Scenes.size(); i++)
+		{
+			ImGui::Text(m_LoadedResource->m_Scenes[i]->m_Name.c_str());
+				//m_SceneRef = m_LoadedResource->m_Scenes[i];
+		}
+		ImGui::ListBoxFooter();
+    }
+
+
+	
+
+	if (ImGui::Button("Return to directory view"))
+	{
+		m_State = State::Directory;
+		m_LoadedResource = nullptr;
+	}
 }
 
 void ModelLoaderWidget::DirectoryNagivation()
@@ -110,7 +143,7 @@ void ModelLoaderWidget::DirectoryNagivation()
 			if (IsDoubleClicked(selectedDir))
 				m_SelectedPath = selectedDir.path();
 		}
-		else
+		else if (!selectedDir.path().empty())
 		{
 		    if (IsDoubleClicked(selectedDir))
 		    {

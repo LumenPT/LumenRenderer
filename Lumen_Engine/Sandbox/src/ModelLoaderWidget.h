@@ -6,7 +6,7 @@ class ModelLoaderWidget
 {
 public:
 
-    ModelLoaderWidget(Lumen::SceneManager& a_SceneManager);
+    ModelLoaderWidget(Lumen::SceneManager& a_SceneManager, std::shared_ptr<Lumen::ILumenScene>& a_SceneRef);
 
     void Display();
 
@@ -27,6 +27,8 @@ private:
     void ModelSelection();
 
     bool IsDoubleClicked(std::filesystem::path a_Path);    
+
+    std::shared_ptr<Lumen::ILumenScene>& m_SceneRef;
 
     std::filesystem::path m_SelectedPath;
     std::filesystem::path m_FirstClick;

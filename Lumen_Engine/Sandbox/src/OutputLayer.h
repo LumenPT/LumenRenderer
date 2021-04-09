@@ -26,7 +26,7 @@ public:
     OutputLayer();
     ~OutputLayer();
 
-    void OnAttach() override { InitializeScenePresets(); };
+    void OnAttach() override;
 
     void OnUpdate() override;
 

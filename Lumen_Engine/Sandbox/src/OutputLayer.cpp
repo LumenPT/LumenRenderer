@@ -122,7 +122,6 @@ OutputLayer::OutputLayer()
 
 	CHECKLASTCUDAERROR;
 
-	m_ModelLoaderWidget = std::make_unique<ModelLoaderWidget>();
 #else
 	m_Renderer = std::make_unique<OptiXRenderer>(init);
 #endif
@@ -131,6 +130,12 @@ OutputLayer::OutputLayer()
 OutputLayer::~OutputLayer()
 {										    
 	glDeleteProgram(m_Program);
+}
+
+void OutputLayer::OnAttach()
+{
+	InitializeScenePresets();
+	m_ModelLoaderWidget = std::make_unique<ModelLoaderWidget>(*m_LayerServices->m_SceneManager, m_Renderer->m_Scene);
 }
 
 void OutputLayer::OnUpdate()
