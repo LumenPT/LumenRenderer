@@ -23,3 +23,5 @@ CPU_ON_GPU void AddToLightBuffer(
 	WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights, 
 	sutil::Matrix4x4 a_TransformMat
 );
+
+//CPU_ON_GPU void AddToLightBuffer2();

@@ -82,17 +82,24 @@ public:
 		std::replace(p_string.begin(), p_string.end(), '\\', '/');
 		//p_string.append("/Sandbox/assets/models/Lantern.gltf");
 
+		std::filesystem::path p2 = std::filesystem::current_path();
+		std::string p_string2{ p2.string() };
+		std::replace(p_string2.begin(), p_string2.end(), '\\', '/');
+
 		const std::string meshPath = p_string.append("/Sandbox/assets/models/Sponza/");
+		const std::string meshPath2 = p_string2.append("/Sandbox/assets/models/BoomBox/glTF/");
 		//Base path for meshes.
 
 		//Mesh name
 		const std::string meshName = "Sponza.gltf";
+		const std::string meshName2 = "BoomBox.gltf";
 
 		//p_string.append("/Sandbox/assets/models/Sponza/Sponza.gltf");
 		LMN_TRACE(p_string);
 
 	    m_SceneManager->SetPipeline(*m_ContextLayer->GetPipeline());
 		auto res = m_SceneManager->LoadGLTF(meshName, meshPath);
+		auto res2 = m_SceneManager->LoadGLTF(meshName2, meshPath2);
 
 		auto lumenPT = m_ContextLayer->GetPipeline();
 
@@ -112,6 +119,17 @@ public:
 			}
 		}
 
+		for (auto& node : res2->m_NodePool)
+		{
+			auto meshId = node->m_MeshID;
+			//if (meshId >= 0)
+			{
+				auto mesh = lumenPT->m_Scene->AddMesh();
+				mesh->SetMesh(res->m_MeshPool[meshId]);
+				mesh->m_Transform.CopyTransform(*node->m_LocalTransform);
+			}
+		}
+
 		lumenPT->m_Scene = lumenPT->CreateScene(scData);
 		auto mesh = lumenPT->m_Scene->AddMesh();
 		mesh->SetMesh(res->m_MeshPool[0]);
@@ -119,11 +137,10 @@ public:
 		mesh->m_Transform.SetPosition(glm::vec3(0.f, 0.f, 15.0f));
 		mesh->m_Transform.SetScale(glm::vec3(1.0f));
 
-		//for (size_t i = 0; i < 10; i++)
-		//{
-		//	//load lantern yay
-		//}
-		
+		auto mesh2 = lumenPT->m_Scene->AddMesh();
+		mesh2->SetMesh(res2->m_MeshPool[0]);
+		mesh2->m_Transform.SetPosition(glm::vec3(0.f, 5.f, 15.0f));
+		mesh2->m_Transform.SetScale(glm::vec3(10.0f));
 		//meshLight->m_Transform.SetPosition(glm::vec3(0.f, 0.f, 15.0f));
 		//meshLight->m_Transform.SetScale(glm::vec3(1.0f));
 

@@ -1,8 +1,12 @@
 #include "EmissiveLookup.cuh"
-//#include "../../Framework/CudaUtilities.h"
+#include "../../Framework/CudaUtilities.h"
 #include "../../Framework/PTMaterial.h"
 #include <sutil/vec_math.h>
 #include <cuda_runtime.h>
+#include <cuda_runtime_api.h>
+#include <cuda/device_atomic_functions.h>
+#include <cassert>
+
 
 CPU_ON_GPU void FindEmissives(const Vertex* a_Vertices, bool* a_EmissiveBools, const uint32_t* a_Indices, const DeviceMaterial* a_Mat, const uint8_t a_VertexBufferSize, unsigned int& a_NumLights)
 {
@@ -75,14 +79,23 @@ CPU_ON_GPU void FindEmissives(const Vertex* a_Vertices, bool* a_EmissiveBools, c
 }
 
 CPU_ON_GPU void AddToLightBuffer(
-    const Vertex* a_Vertices, const uint32_t* a_Indices, 
-    const bool* a_Emissives, const uint8_t a_VertexBufferSize, 
+    const Vertex* a_Vertices,
+    const uint32_t* a_Indices,
+    const bool* a_Emissives,
+    const uint8_t a_VertexBufferSize,
     WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights,
     sutil::Matrix4x4 a_TransformMat)
 {
+    assert(sizeof(a_Vertices) <= 0);
+
+    printf("Constructing lights buffer");
+
+    cudaDeviceSynchronize();
+
     //Loop over triangles in primitive
     for (unsigned int i = 0; i < a_VertexBufferSize; i+=3)
     {
+
         //check first vertex of triangle to see if its in emissive buffer
         if (a_Emissives[i - 2] == true)
         //if (i % 3 == 0 && a_Emissives[i - 2] == true)
@@ -126,4 +139,38 @@ CPU_ON_GPU void AddToLightBuffer(
             //Dont know how many lights have already been added to buffer.
         }
     }
+    //cudaDeviceSynchronize();
+
 }
+
+//CPU_ON_GPU void AddToLightBuffer2()
+//{
+//    /*WaveFront::TriangleLight* light;
+//
+//    light->p0 = { 75.f, 75.f, 75.f };
+//    light->p1 = { 100.f,75.f, 100.f };
+//    light->p2 = { 25.f, 100.f, 25.f };
+//
+//    light->radiance = { 2000, 2000, 2000 };
+//    light->normal = {0.f, -1.f, 0.f};
+//
+//    float3 vec1 = light->p0 - light->p1;
+//    float3 vec2 = light->p0 - light->p2;
+//
+//    light->area = sqrtf(
+//        pow((vec1.y * vec2.z - vec2.y * vec1.z), 2) +
+//        pow((vec1.x * vec2.z - vec2.x * vec1.z), 2) +
+//        pow((vec1.x * vec2.y - vec2.x * vec1.y), 2)
+//    ) / 2.0f;
+//
+//    light->area = sqrtf(
+//        pow((vec1.y * vec2.z - vec2.y * vec1.z), 2) +
+//        pow((vec1.x * vec2.z - vec2.x * vec1.z), 2) +
+//        pow((vec1.x * vec2.y - vec2.x * vec1.y), 2)
+//    ) / 2.0f;
+//
+//    a_Lights->Add(light);*/
+//    cudaDeviceSynchronize();
+//    printf("calling AddToLightBuffer2\n");
+//
+//}

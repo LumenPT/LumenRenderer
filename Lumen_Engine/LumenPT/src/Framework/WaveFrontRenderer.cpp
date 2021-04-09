@@ -439,11 +439,13 @@ namespace WaveFront
         //Timer to measure how long each frame takes.
         Timer timer;
 
+
         ResetAtomicBuffer<WaveFront::TriangleLight>(&m_TriangleLights);
+
+        auto trianglePtr = m_TriangleLights.GetDevicePtr<AtomicBuffer<WaveFront::TriangleLight>>();
 
         for (auto& meshInstance : a_Scene->m_MeshInstances)
         {
-            auto trianglePtr = m_TriangleLights.GetDevicePtr<AtomicBuffer<WaveFront::TriangleLight>>();
 
             if (meshInstance->GetMesh()->GetEmissiveness()) 
             {
@@ -457,12 +459,18 @@ namespace WaveFront
                     //ptPrim->m_IndexBuffer->GetDevicePtr<uint32_t>();
                     //ptPrim->m_BoolBuffer->GetDevicePtr<bool>();
 
+                    printf("%f\n", ptPrim->m_VertBuffer->GetSize());
+                    printf("%f\n", ptPrim->m_IndexBuffer->GetSize());
+                    printf("%f\n", ptPrim->m_BoolBuffer->GetSize());
+
+                    //AddToLightBuffer2();
+
                     //call cuda kernel with data from ptPrim. Unpack emissive triangles, store in lightsbuffer
                     AddToLightBuffer(
                         ptPrim->m_VertBuffer->GetDevicePtr<Vertex>(),
                         ptPrim->m_IndexBuffer->GetDevicePtr<uint32_t>(),
                         ptPrim->m_BoolBuffer->GetDevicePtr<bool>(),
-                        sizeof(ptPrim->m_VertBuffer) / sizeof(Vertex),
+                        ptPrim->m_VertBuffer->GetSize(),
                         trianglePtr,
                         instanceTransform);
                 }
@@ -759,7 +767,7 @@ namespace WaveFront
         m_DebugTexture = m_MotionVectors.GetMotionVectorDirectionsTex();
 //#endif
 
-        printf("Total wavefront frame time: %f ms.\n", timer.measure(TimeUnit::MILLIS));
+        //printf("Total wavefront frame time: %f ms.\n", timer.measure(TimeUnit::MILLIS));
 
         //Return the GLuint texture ID.
         return m_OutputBuffer->GetTexture();
