@@ -221,6 +221,7 @@ namespace WaveFront
 
         //add to lights buffer? in traceframe
 
+        Timer timer;
         //add lights to mesh in scene
             //add mesh
             //keep instances in scene
