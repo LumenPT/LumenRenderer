@@ -22,7 +22,7 @@ void SceneDataTable::UpdateTable()
     {
         // Otherwise, the cheaper, partial rebuild can be performed which only touches writes into entries which have been modified
         // TODO: Partial update is broken, needs to be reimplemented correctly
-        PartialUpdate();
+        FullRebuild();
     }
 }
 

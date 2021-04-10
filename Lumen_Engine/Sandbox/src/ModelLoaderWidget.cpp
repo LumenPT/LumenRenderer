@@ -17,7 +17,7 @@ ModelLoaderWidget::ModelLoaderWidget(Lumen::SceneManager& a_SceneManager, std::s
 void ModelLoaderWidget::Display()
 {
 	ImGui::SetNextWindowSize(ImVec2(550.0f, 600.0f));
-	ImGui::Begin("Testing");
+	ImGui::Begin("Model and File loader");
 
     switch (m_State)
     {
@@ -92,15 +92,69 @@ void ModelLoaderWidget::ModelSelection()
 
 	if (!m_LoadedResource->m_Scenes.empty() && ImGui::ListBoxHeader("Loaded scenes"))
 	{
-
+		auto menuRect = ImGui::GetItemRectSize();
 		for (size_t i = 0; i < m_LoadedResource->m_Scenes.size(); i++)
 		{
 			ImGui::Text(m_LoadedResource->m_Scenes[i]->m_Name.c_str());
+
+			auto rMin = ImGui::GetItemRectMin();
+			auto rMax = ImGui::GetItemRectMax();
+
+			ImVec2 min = rMin;
+			ImVec2 max = ImVec2(rMin.x + menuRect.x, rMax.y + 5);
+
+			if (ImGui::IsMouseHoveringRect(min, max))
+			{
+				ImGui::SameLine();
+				ImGui::SetCursorPosX(menuRect.x - 80.0f);
+				ImGui::PushItemWidth(80.0f);
+				if (ImGui::Button("Set scene"))
+				{
+					m_SceneRef = m_LoadedResource->m_Scenes[i];
+					m_AdditionalMessage = "Scene successfully set to " + m_LoadedResource->m_Scenes[i]->m_Name;
+				}
+			}
 				//m_SceneRef = m_LoadedResource->m_Scenes[i];
 		}
 		ImGui::ListBoxFooter();
     }
 
+	TransformSpecifier();
+
+	if (!m_LoadedResource->m_MeshPool.empty() && ImGui::ListBoxHeader("Loaded Meshes"))
+	{
+		auto menuRect = ImGui::GetItemRectSize();
+
+		for (size_t i = 0; i < m_LoadedResource->m_MeshPool.size(); i++)
+		{
+			ImGui::Text("Mesh %llu", i);
+
+			auto rMin = ImGui::GetItemRectMin();
+			auto rMax = ImGui::GetItemRectMax();
+
+			ImVec2 min = rMin;
+			ImVec2 max = ImVec2(rMin.x + menuRect.x, rMax.y + 5);
+
+			if (ImGui::IsMouseHoveringRect(min, max))
+			{
+				ImGui::SameLine();
+				ImGui::SetCursorPosX(menuRect.x - 80.0f);
+				ImGui::PushItemWidth(80.0f);
+				if (ImGui::Button("Add Mesh"))
+				{
+					auto m = m_SceneRef->AddMesh();
+
+					m->SetMesh(m_LoadedResource->m_MeshPool[i]);
+					m->m_Transform = m_TransformToApply;
+                    if (m_ResetTransformOnMeshAdded)
+					    m_TransformToApply = Lumen::Transform();
+
+					m_AdditionalMessage = "Mesh successfully added to the scene.";
+				}
+			}
+		}
+		ImGui::ListBoxFooter();
+	}
 
 	
 
@@ -108,6 +162,33 @@ void ModelLoaderWidget::ModelSelection()
 	{
 		m_State = State::Directory;
 		m_LoadedResource = nullptr;
+	}
+}
+
+void ModelLoaderWidget::TransformSpecifier()
+{
+	glm::vec3 t, r, s;
+	t = m_TransformToApply.GetPosition();
+	r = m_TransformToApply.GetRotationEuler();
+	s = m_TransformToApply.GetScale();
+
+	ImGui::Checkbox("Reset transform after adding mesh", &m_ResetTransformOnMeshAdded);
+	ImGui::DragFloat3("Position", &t[0]);
+	ImGui::DragFloat3("Rotation", &r[0]);
+	ImGui::DragFloat3("Scale", &s[0]);
+	m_TransformToApply.SetPosition(t);
+	m_TransformToApply.SetScale(s);
+
+	auto deltaRotation = r - m_TransformToApply.GetRotationEuler();
+
+	glm::quat deltaQuat = glm::quat(glm::radians(deltaRotation));
+	if (ImGui::Button("Reset Rotation"))
+	{
+		m_TransformToApply.SetRotation(glm::vec3(0.0f));
+	}
+	else
+	{
+		m_TransformToApply.Rotate(deltaQuat);
 	}
 }
 
