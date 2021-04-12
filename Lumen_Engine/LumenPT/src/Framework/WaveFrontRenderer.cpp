@@ -295,18 +295,25 @@ namespace WaveFront
         //printf("Index buffer Size %i \n", static_cast<int>(correctedIndices.size()));
         std::unique_ptr<MemoryBuffer> indexBuffer = std::make_unique<MemoryBuffer>(correctedIndices);
 
-        uint8_t numVertices = sizeof(vertexBuffer) / sizeof(Vertex);
-        std::unique_ptr<MemoryBuffer> emissiveBuffer = std::make_unique<MemoryBuffer>((numVertices / 3) * sizeof(bool)); //might be wrong
+        uint8_t numIndices = correctedIndices.size();
+        std::unique_ptr<MemoryBuffer> emissiveBuffer = std::make_unique<MemoryBuffer>((numIndices / 3) * sizeof(bool)); //might be wrong
 
         unsigned int numLights = 0; //number of emissive triangles in this primitive
-        
-        FindEmissivesWrap(vertexBuffer->GetDevicePtr<Vertex>(), 
+
+        cudaDeviceSynchronize();
+        CHECKLASTCUDAERROR;
+
+        FindEmissivesWrap(
+            vertexBuffer->GetDevicePtr<Vertex>(),
+            indexBuffer->GetDevicePtr<uint32_t>(),
             emissiveBuffer->GetDevicePtr<bool>(), 
-            indexBuffer->GetDevicePtr<uint32_t>(), 
             static_cast<PTMaterial*>(a_PrimitiveData.m_Material.get())->GetDeviceMaterial(),
-            numVertices, 
+            numIndices, 
             numLights
         );
+
+        cudaDeviceSynchronize();
+        CHECKLASTCUDAERROR;
 
         unsigned int geomFlags = OPTIX_GEOMETRY_FLAG_NONE;
 
@@ -465,7 +472,7 @@ namespace WaveFront
 
                     //AddToLightBuffer2();
                     cudaDeviceSynchronize();
-
+                    CHECKLASTCUDAERROR;
 
                     //call cuda kernel with data from ptPrim. Unpack emissive triangles, store in lightsbuffer
                     AddToLightBufferWrap(
@@ -477,6 +484,7 @@ namespace WaveFront
                         instanceTransform);
 
                     cudaDeviceSynchronize();
+                    CHECKLASTCUDAERROR;
 
                 }
             }
@@ -767,9 +775,9 @@ namespace WaveFront
 
         m_DebugTexture = m_OutputBuffer->GetTexture();
 //#if defined(_DEBUG)
-        m_MotionVectors.GenerateDebugTextures();
+        //m_MotionVectors.GenerateDebugTextures();
         //m_DebugTexture = m_MotionVectors.GetMotionVectorMagnitudeTex();
-        m_DebugTexture = m_MotionVectors.GetMotionVectorDirectionsTex();
+        //m_DebugTexture = m_MotionVectors.GetMotionVectorDirectionsTex();
 //#endif
 
         //printf("Total wavefront frame time: %f ms.\n", timer.measure(TimeUnit::MILLIS));

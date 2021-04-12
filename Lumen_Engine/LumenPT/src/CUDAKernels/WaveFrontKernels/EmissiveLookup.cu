@@ -10,26 +10,26 @@
 
 CPU_ONLY void FindEmissivesWrap(
     const Vertex* a_Vertices,
-    bool* a_EmissiveBools,
     const uint32_t* a_Indices,
+    bool* a_Emissives,
     const DeviceMaterial* a_Mat,
-    const uint8_t a_VertexBufferSize,
+    const uint8_t a_IndexBufferSize,
     unsigned int& a_NumLights)
 {
     unsigned int* numLightsPtr;
     cudaMalloc(&numLightsPtr, sizeof(unsigned int));
 
-    FindEmissives <<<1, 1>>> (a_Vertices, a_EmissiveBools, a_Indices, a_Mat, a_VertexBufferSize, numLightsPtr);
+    FindEmissives <<<1, 1>>> (a_Vertices, a_Indices, a_Emissives, a_Mat, a_IndexBufferSize, numLightsPtr);
     cudaDeviceSynchronize();
     cudaMemcpy(&a_NumLights, numLightsPtr, sizeof(unsigned int), cudaMemcpyDeviceToHost);
 }
 
 CPU_ON_GPU void FindEmissives(
-    const Vertex* a_Vertices, 
-    bool* a_EmissiveBools, 
-    const uint32_t* a_Indices, 
-    const DeviceMaterial* a_Mat, 
-    const uint8_t a_VertexBufferSize, 
+    const Vertex* a_Vertices,
+    const uint32_t* a_Indices,
+    bool* a_Emissives,
+    const DeviceMaterial* a_Mat,
+    const uint8_t a_IndexBufferSize,
     unsigned int* a_NumLights)
 {
     //const auto devMat = a_Mat->GetDeviceMaterial();
@@ -38,14 +38,13 @@ CPU_ON_GPU void FindEmissives(
     //find texture coordinates on this triangle (rather than just vertices
     //sample texture at area of triangle through UVs
 
-    for (unsigned int i = 0; i < a_VertexBufferSize; i++)
+    for (unsigned int baseIndex = 0; baseIndex < a_IndexBufferSize; baseIndex+=3)
     {
-        if (i % 3 == 0) 
-        {
+
             //looped over 3 vertices, construct triangle
-            const Vertex& vert0 = a_Vertices[i - 2];
-            const Vertex& vert1 = a_Vertices[i - 1];
-            const Vertex& vert2 = a_Vertices[i];
+            const Vertex& vert0 = a_Vertices[baseIndex + 0];
+            const Vertex& vert1 = a_Vertices[baseIndex + 1];
+            const Vertex& vert2 = a_Vertices[baseIndex + 2];
             
             //calculate triangle area using Heron's formula
             //const float a = sqrtf(
@@ -75,19 +74,16 @@ CPU_ON_GPU void FindEmissives(
             emissCol *= chanEmissCol;
 
             float3 emission = make_float3(diffCol.x * emissCol.x, diffCol.y * emissCol.y, diffCol.z * emissCol.z);
-            float3 nullVec = make_float3(0, 0, 0);
 
             //if diffuse is not transparent and emission is not 0
             if (diffCol.w != 0.0f && emission.x != 0.0f && emission.y != 0.0f && emission.z != 0.0f)
             {
-                a_EmissiveBools[i - 2] = true;
+                a_Emissives[baseIndex / 3] = true;
                 a_NumLights++;
                 continue;
             }
 
-            a_EmissiveBools[i - 2] = false;
-            continue;
-        }
+            a_Emissives[baseIndex / 3] = false;
 
         //const Vertex& vertex = a_Vertices[i];
         //
@@ -104,18 +100,18 @@ CPU_ONLY void AddToLightBufferWrap(
     const Vertex* a_Vertices,
     const uint32_t* a_Indices,
     const bool* a_Emissives,
-    const uint8_t a_VertexBufferSize,
+    const uint8_t a_IndexBufferSize,
     WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights,
     sutil::Matrix4x4 a_TransformMat)
 {
-    AddToLightBuffer <<<1, 1>>> (a_Vertices, a_Indices, a_Emissives, a_VertexBufferSize, a_Lights, a_TransformMat);
+    AddToLightBuffer <<<1, 1>>> (a_Vertices, a_Indices, a_Emissives, a_IndexBufferSize, a_Lights, a_TransformMat);
 }
 
 CPU_ON_GPU void AddToLightBuffer(
     const Vertex* a_Vertices,
     const uint32_t* a_Indices,
     const bool* a_Emissives,
-    const uint8_t a_VertexBufferSize,
+    const uint8_t a_IndexBufferSize,
     WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights,
     sutil::Matrix4x4 a_TransformMat)
 {
@@ -125,16 +121,16 @@ CPU_ON_GPU void AddToLightBuffer(
 
 
     //Loop over triangles in primitive
-    for (unsigned int i = 0; i < a_VertexBufferSize; i+=3)
+    for (unsigned int baseIndex = 0; baseIndex < a_IndexBufferSize; baseIndex+=3)
     {
 
         //check first vertex of triangle to see if its in emissive buffer
-        if (a_Emissives[i - 2] == true)
+        if (a_Emissives[baseIndex / 3] == true)
         //if (i % 3 == 0 && a_Emissives[i - 2] == true)
         {
-            const Vertex& vert0 = a_Vertices[i - 2];
-            const Vertex& vert1 = a_Vertices[i - 1];
-            const Vertex& vert2 = a_Vertices[i];
+            const Vertex& vert0 = a_Vertices[baseIndex + 0];
+            const Vertex& vert1 = a_Vertices[baseIndex + 1];
+            const Vertex& vert2 = a_Vertices[baseIndex + 2];
 
             //check if normal is here
             float4 tempWorldPos;
