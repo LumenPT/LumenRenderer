@@ -32,8 +32,7 @@ public:
 	CPU_ONLY void Run(
 		const WaveFront::SurfaceData * const a_CurrentPixelData,
 		const WaveFront::SurfaceData * const a_PreviousPixelData,
-		const WaveFront::TriangleLight* a_Lights,
-		const unsigned a_NumLights,
+		const MemoryBuffer const* a_Lights,
 	    const float3& a_CameraPosition,
 		const std::uint32_t a_Seed,
 		const OptixTraversableHandle a_OptixSceneHandle,
@@ -46,7 +45,7 @@ public:
 	/*
 	 * Update the CDF for the given light sources.
 	 */
-	CPU_ONLY void BuildCDF(const WaveFront::TriangleLight* a_Lights, const unsigned a_NumLights);
+	CPU_ONLY void BuildCDF(const MemoryBuffer const* a_Lights);
 
 	/*
 	 * Swap the front and back buffer. This has to be called once per frame.

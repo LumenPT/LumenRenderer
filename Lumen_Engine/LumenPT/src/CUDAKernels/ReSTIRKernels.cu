@@ -33,7 +33,7 @@ __global__ void ResetReservoirInternal(int a_NumReservoirs, Reservoir* a_Reservo
     }
 }
 
-__host__ void FillCDF(CDF* a_Cdf, const WaveFront::TriangleLight* a_Lights, unsigned a_LightCount)
+__host__ void FillCDF(CDF* a_Cdf, const WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights, unsigned a_LightCount)
 {
     //TODO: This is not efficient single threaded.
     //TODO: Use this: https://developer.nvidia.com/gpugems/gpugems3/part-vi-gpu-computing/chapter-39-parallel-prefix-sum-scan-cuda
@@ -54,17 +54,22 @@ __global__ void ResetCDF(CDF* a_Cdf)
     a_Cdf->Reset();
 }
 
-__global__ void FillCDFInternal(CDF* a_Cdf, const WaveFront::TriangleLight* a_Lights, unsigned a_LightCount)
+__global__ void FillCDFInternal(CDF* a_Cdf, const WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights, unsigned a_LightCount)
 {
     for (int i = 0; i < a_LightCount; ++i)
     {
         //Weight is the average illumination for now. Could take camera into account.
-        const float3 radiance = a_Lights[i].radiance;
+        const float3 radiance = a_Lights->GetData(i)->radiance;
+
+        //printf("Radiance: %f, %f, %f LightCount: %i \n", radiance.x, radiance.y, radiance.z, a_LightCount);
+
+        assert(radiance.x >= 0.f && radiance.y >= 0.f && radiance.z >= 0.f && "Radiance needs to be positive, no taking away the light in the soul");
+
         a_Cdf->Insert((radiance.x + radiance.y + radiance.z) / 3.f);
     }
 }
 
-__host__ void FillLightBags(unsigned a_NumLightBags, unsigned a_NumLightsPerBag, CDF* a_Cdf, LightBagEntry* a_LightBagPtr, const WaveFront::TriangleLight* a_Lights, const std::uint32_t a_Seed)
+__host__ void FillLightBags(unsigned a_NumLightBags, unsigned a_NumLightsPerBag, CDF* a_Cdf, LightBagEntry* a_LightBagPtr, const WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights, const std::uint32_t a_Seed)
 {
     const unsigned numLightsTotal = a_NumLightBags * a_NumLightsPerBag;
     const int blockSize = CUDA_BLOCK_SIZE;
@@ -74,7 +79,7 @@ __host__ void FillLightBags(unsigned a_NumLightBags, unsigned a_NumLightsPerBag,
     CHECKLASTCUDAERROR;
 }
 
-__global__ void FillLightBagsInternal(unsigned a_NumLightBags, unsigned a_NumLightsPerBag, CDF* a_Cdf, LightBagEntry* a_LightBagPtr, const WaveFront::TriangleLight* a_Lights, const std::uint32_t a_Seed)
+__global__ void FillLightBagsInternal(unsigned a_NumLightBags, unsigned a_NumLightsPerBag, CDF* a_Cdf, LightBagEntry* a_LightBagPtr, const WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights, const std::uint32_t a_Seed)
 {
     const unsigned numLightsTotal = a_NumLightBags * a_NumLightsPerBag;
     int index = blockIdx.x * blockDim.x + threadIdx.x;
@@ -90,7 +95,7 @@ __global__ void FillLightBagsInternal(unsigned a_NumLightBags, unsigned a_NumLig
         unsigned lIndex;
         float pdf;
         a_Cdf->Get(random, lIndex, pdf);
-        a_LightBagPtr[i] = LightBagEntry{a_Lights[lIndex], pdf};
+        a_LightBagPtr[i] = LightBagEntry{*a_Lights->GetData(lIndex), pdf};
     }
 }
 

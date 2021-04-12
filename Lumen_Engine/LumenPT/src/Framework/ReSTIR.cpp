@@ -63,8 +63,7 @@ CPU_ONLY void ReSTIR::Initialize(const ReSTIRSettings& a_Settings)
 CPU_ONLY void ReSTIR::Run(
 	const WaveFront::SurfaceData* const a_CurrentPixelData,
 	const WaveFront::SurfaceData* const a_PreviousPixelData,
-	const WaveFront::TriangleLight* a_Lights,
-	const unsigned a_NumLights,
+	const MemoryBuffer const* a_Lights,
 	const float3& a_CameraPosition,
 	const std::uint32_t a_Seed,
 	const OptixTraversableHandle a_OptixSceneHandle,
@@ -101,13 +100,13 @@ CPU_ONLY void ReSTIR::Run(
 
 	//Update the CDF for the provided light sources.
 	timer.reset();
-	BuildCDF(a_Lights, a_NumLights);
+	BuildCDF(a_Lights);
 	if(a_DebugPrint) printf("Building CDF time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
 
 	//Fill light bags with values from the CDF.
 	{
 		timer.reset();
-		FillLightBags(m_Settings.numLightBags, m_Settings.numLightsPerBag, static_cast<CDF*>(m_Cdf.GetDevicePtr()), static_cast<LightBagEntry*>(m_LightBags.GetDevicePtr()), a_Lights, a_Seed);
+		FillLightBags(m_Settings.numLightBags, m_Settings.numLightsPerBag, static_cast<CDF*>(m_Cdf.GetDevicePtr()), static_cast<LightBagEntry*>(m_LightBags.GetDevicePtr()), a_Lights->GetDevicePtr<WaveFront::AtomicBuffer<WaveFront::TriangleLight>>(), a_Seed);
 		if (a_DebugPrint) printf("Filling light bags time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
 	}
 
@@ -200,7 +199,7 @@ CPU_ONLY void ReSTIR::Run(
 	m_SwapDirtyFlag = false;
 }
 
-void ReSTIR::BuildCDF(const WaveFront::TriangleLight* a_Lights, const unsigned a_NumLights)
+void ReSTIR::BuildCDF(const MemoryBuffer const* a_Lights)
 {
 	/*
      * Resize buffers based on the amount of lights and update data.
@@ -208,7 +207,8 @@ void ReSTIR::BuildCDF(const WaveFront::TriangleLight* a_Lights, const unsigned a
      */
      //CDF
 	{
-		const auto cdfNeededSize = sizeof(CDF) + (a_NumLights * sizeof(float));
+		const auto numLights = WaveFront::GetAtomicCounter<WaveFront::TriangleLight>(a_Lights);
+		const auto cdfNeededSize = sizeof(CDF) + (numLights * sizeof(float));
 		//Allocate enough memory for the CDF struct and the fixed sum entries.
 		if (m_Cdf.GetSize() < cdfNeededSize)
 		{
@@ -216,7 +216,7 @@ void ReSTIR::BuildCDF(const WaveFront::TriangleLight* a_Lights, const unsigned a
 		}
 
 		//Insert the light data in the CDF.
-		FillCDF(static_cast<CDF*>(m_Cdf.GetDevicePtr()), a_Lights, a_NumLights);
+		FillCDF(static_cast<CDF*>(m_Cdf.GetDevicePtr()), a_Lights->GetDevicePtr<WaveFront::AtomicBuffer<WaveFront::TriangleLight>>(), numLights);
 	}
 }
 

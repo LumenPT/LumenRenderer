@@ -9,7 +9,7 @@ CPU_ON_GPU void ShadeDirect(
     const SurfaceData* a_TemporalSurfaceDatBuffer,
     const SurfaceData* a_SurfaceDataBuffer,
     AtomicBuffer<ShadowRayData>* const a_ShadowRays,
-    const TriangleLight* const a_Lights,
+    const AtomicBuffer<TriangleLight>* const a_Lights,
     const unsigned a_Seed,
     const unsigned a_CurrentDepth,
     const CDF* const a_CDF
@@ -36,7 +36,7 @@ CPU_ON_GPU void ShadeDirect(
             float pdf;
             a_CDF->Get(RandomFloat(seed), index, pdf);
 
-            auto light = a_Lights[index];
+            auto& light = *a_Lights->GetData(index);
 
             //Pick random point on light.
             const float u = RandomFloat(seed);

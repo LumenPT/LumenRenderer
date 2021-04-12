@@ -29,7 +29,9 @@ public:
     void SetNormalTexture(std::shared_ptr<Lumen::ILumenTexture> a_NormalTexture) override;
 
     glm::vec4 GetDiffuseColor() const override;
+    glm::vec3 GetEmissiveColor() const override;
     Lumen::ILumenTexture& GetDiffuseTexture() const override;
+    Lumen::ILumenTexture& GetEmissiveTexture() const override;
 
 private:
 
@@ -40,7 +42,7 @@ private:
 private:
     // Material data is kept here instead of the base class to account for API-specific implementation details   
     float4 m_DiffuseColor;
-    float3 m_EmissiveColor;
+    float4 m_EmissiveColor;
     std::shared_ptr<class PTTexture> m_DiffuseTexture;
     std::shared_ptr<class PTTexture> m_EmissiveTexture;
     std::shared_ptr<class PTTexture> m_MetalRoughnessTexture;

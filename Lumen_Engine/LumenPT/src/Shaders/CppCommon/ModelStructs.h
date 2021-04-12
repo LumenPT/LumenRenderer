@@ -24,8 +24,19 @@ struct Vertex
 // Common material struct meant as a way to access a model's material on the GPU
 struct DeviceMaterial
 {
+
+    DeviceMaterial()
+        :
+    m_DiffuseColor({0.f, 0.f, 0.f, 0.f}),
+    m_EmissionColor({0.f, 0.f, 0.f, 0.f}),
+    m_DiffuseTexture(0),
+    m_EmissiveTexture(0),
+    m_MetalRoughnessTexture(0),
+    m_NormalTexture(0)
+    {}
+
     NONAMESPACE::float4 m_DiffuseColor;
-    NONAMESPACE::float3 m_EmissionColor;
+    NONAMESPACE::float4 m_EmissionColor;
     cudaTextureObject_t m_DiffuseTexture;
     cudaTextureObject_t m_EmissiveTexture;
     cudaTextureObject_t m_MetalRoughnessTexture;

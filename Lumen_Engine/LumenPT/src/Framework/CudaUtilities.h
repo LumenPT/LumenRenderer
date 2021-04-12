@@ -36,7 +36,7 @@ inline void CheckCudaErr(const cudaError& a_err)
 
         std::fprintf(
             stderr,
-            "Optix error occured: %s \n Description: %s",
+            "CUDA error occured: %s \n Description: %s",
             errorName.c_str(),
             errorMessage.c_str());
 

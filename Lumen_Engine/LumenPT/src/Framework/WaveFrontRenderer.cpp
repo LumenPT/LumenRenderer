@@ -81,8 +81,7 @@ namespace WaveFront
         //TODO: number of lights will be dynamic per frame but this is temporary.
         constexpr auto numLights = 3;
 
-        m_TriangleLights.Resize(1000000); //go crazy
-        //m_TriangleLights.Resize(sizeof(TriangleLight) * numLights);
+        CreateAtomicBuffer<WaveFront::TriangleLight>(&m_TriangleLights, 1000000);
 
         //Temporary lights, stored in the buffer.
         TriangleLight lights[numLights];
@@ -124,7 +123,7 @@ namespace WaveFront
         }
 
 
-        m_TriangleLights.Write(&lights[0], sizeof(TriangleLight) * numLights, 0);
+        //m_TriangleLights.Write(&lights[0], sizeof(TriangleLight) * numLights, 0);
 
         //Set the service locator pointer to point to the m'table.
         m_Table = std::make_unique<SceneDataTable>();
@@ -295,25 +294,33 @@ namespace WaveFront
         //printf("Index buffer Size %i \n", static_cast<int>(correctedIndices.size()));
         std::unique_ptr<MemoryBuffer> indexBuffer = std::make_unique<MemoryBuffer>(correctedIndices);
 
-        uint8_t numIndices = correctedIndices.size();
+        uint32_t numIndices = correctedIndices.size();
         std::unique_ptr<MemoryBuffer> emissiveBuffer = std::make_unique<MemoryBuffer>((numIndices / 3) * sizeof(bool)); //might be wrong
 
         unsigned int numLights = 0; //number of emissive triangles in this primitive
 
-        cudaDeviceSynchronize();
-        CHECKLASTCUDAERROR;
+        auto emissiveColor = std::static_pointer_cast<PTMaterial>(a_PrimitiveData.m_Material)->GetEmissiveColor();
+        if(emissiveColor != glm::vec3(0.f))
+        {
 
-        FindEmissivesWrap(
-            vertexBuffer->GetDevicePtr<Vertex>(),
-            indexBuffer->GetDevicePtr<uint32_t>(),
-            emissiveBuffer->GetDevicePtr<bool>(), 
-            static_cast<PTMaterial*>(a_PrimitiveData.m_Material.get())->GetDeviceMaterial(),
-            numIndices, 
-            numLights
-        );
+            cudaDeviceSynchronize();
+            CHECKLASTCUDAERROR;
 
-        cudaDeviceSynchronize();
-        CHECKLASTCUDAERROR;
+            FindEmissivesWrap(
+                vertexBuffer->GetDevicePtr<Vertex>(),
+                indexBuffer->GetDevicePtr<uint32_t>(),
+                emissiveBuffer->GetDevicePtr<bool>(),
+                std::static_pointer_cast<PTMaterial>(a_PrimitiveData.m_Material)->GetDeviceMaterial(),
+                numIndices,
+                numLights
+            );
+
+            cudaDeviceSynchronize();
+            CHECKLASTCUDAERROR;
+
+        }
+
+        
 
         unsigned int geomFlags = OPTIX_GEOMETRY_FLAG_NONE;
 
@@ -346,11 +353,11 @@ namespace WaveFront
         auto& entry = prim->m_SceneDataTableEntry.GetData();
         entry.m_VertexBuffer = prim->m_VertBuffer->GetDevicePtr<Vertex>();
         entry.m_IndexBuffer = prim->m_IndexBuffer->GetDevicePtr<unsigned int>();
-        entry.m_Material = static_cast<PTMaterial*>(prim->m_Material.get())->GetDeviceMaterial();
+        entry.m_Material = std::static_pointer_cast<PTMaterial>(prim->m_Material)->GetDeviceMaterial();
         entry.m_IsEmissive = prim->m_BoolBuffer->GetDevicePtr<bool>();
 
         //Resize lights buffer by adding number of triangle lights to its current size
-        unsigned int currBufferSize = sizeof(m_TriangleLights); //needs to be done per instance of prim
+        // int currBufferSize = sizeof(m_TriangleLights); //needs to be done per instance of prim
         //m_TriangleLights.Resize((sizeof(TriangleLight) * numLights) + currBufferSize);
 
         return prim;
@@ -449,7 +456,7 @@ namespace WaveFront
 
         ResetAtomicBuffer<WaveFront::TriangleLight>(&m_TriangleLights);
 
-        auto trianglePtr = m_TriangleLights.GetDevicePtr<AtomicBuffer<WaveFront::TriangleLight>>();
+        auto lightBuffer = m_TriangleLights.GetDevicePtr<AtomicBuffer<WaveFront::TriangleLight>>();
 
         for (auto& meshInstance : a_Scene->m_MeshInstances)
         {
@@ -461,30 +468,25 @@ namespace WaveFront
                 for (auto& prim : meshInstance->GetMesh()->m_Primitives)
                 {
                     auto ptPrim = std::static_pointer_cast<PTPrimitive>(prim);
-                    
-                    //ptPrim->m_VertBuffer->GetDevicePtr<Vertex>();
-                    //ptPrim->m_IndexBuffer->GetDevicePtr<uint32_t>();
-                    //ptPrim->m_BoolBuffer->GetDevicePtr<bool>();
 
-                    printf("Vertex buffer size %d\n", ptPrim->m_VertBuffer->GetSize());
-                    printf("Index buffer size %d\n", ptPrim->m_IndexBuffer->GetSize());
-                    printf("Emissive vertices size %d\n", ptPrim->m_BoolBuffer->GetSize());
-
-                    //AddToLightBuffer2();
-                    cudaDeviceSynchronize();
-                    CHECKLASTCUDAERROR;
+                    /*printf("Vertex buffer size %llu\n", ptPrim->m_VertBuffer->GetSize());
+                    printf("Index buffer size %llu\n", ptPrim->m_IndexBuffer->GetSize());
+                    printf("Emissive vertices size %llu\n", ptPrim->m_BoolBuffer->GetSize());*/
+                    /*cudaDeviceSynchronize();
+                    CHECKLASTCUDAERROR;*/
 
                     //call cuda kernel with data from ptPrim. Unpack emissive triangles, store in lightsbuffer
                     AddToLightBufferWrap(
                         ptPrim->m_VertBuffer->GetDevicePtr<Vertex>(),
                         ptPrim->m_IndexBuffer->GetDevicePtr<uint32_t>(),
                         ptPrim->m_BoolBuffer->GetDevicePtr<bool>(),
-                        ptPrim->m_VertBuffer->GetSize(),
-                        trianglePtr,
+                        std::static_pointer_cast<PTMaterial>(ptPrim->m_Material)->GetDeviceMaterial(),
+                        ptPrim->m_IndexBuffer->GetSize() / sizeof(uint32_t),
+                        lightBuffer,
                         instanceTransform);
 
-                    cudaDeviceSynchronize();
-                    CHECKLASTCUDAERROR;
+                    /*cudaDeviceSynchronize();
+                    CHECKLASTCUDAERROR;*/
 
                 }
             }
@@ -494,6 +496,9 @@ namespace WaveFront
             }
         }
 
+        //Don't render if there is no light in the scene as everything will be black anyway.
+        const unsigned int numLightsInScene = GetAtomicCounter<WaveFront::TriangleLight>(&m_TriangleLights);
+        if(numLightsInScene == 0){ return m_OutputBuffer->GetTexture(); }
 
         //Index of the current and last frame to access buffers.
         const auto currentIndex = m_FrameIndex;
@@ -691,7 +696,7 @@ namespace WaveFront
                 m_IntersectionData.GetDevicePtr<AtomicBuffer<IntersectionData>>(),
                 m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>(),
                 m_ShadowRays.GetDevicePtr<AtomicBuffer<ShadowRayData>>(),
-                m_TriangleLights.GetDevicePtr<TriangleLight>(),
+                &m_TriangleLights,
                 3,
                 camPosition,
                 camForward,

@@ -104,7 +104,6 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
             a_ShadingParams.m_CurrentSurfaceData,
             a_ShadingParams.m_TemporalSurfaceData,
             a_ShadingParams.m_TriangleLights,
-            a_ShadingParams.m_NumLights,
             a_ShadingParams.m_CameraDirection,
             seed,
             a_ShadingParams.m_OptixSceneHandle,
@@ -119,7 +118,7 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
         //Generate the CDF if ReSTIR is disabled.
         if(a_ShadingParams.m_CurrentDepth == 0 && !useRestir)
         {
-            a_ShadingParams.m_ReSTIR->BuildCDF(a_ShadingParams.m_TriangleLights, a_ShadingParams.m_NumLights);
+            a_ShadingParams.m_ReSTIR->BuildCDF(a_ShadingParams.m_TriangleLights);
         }
 
         const int numPixels = a_ShadingParams.m_ResolutionAndDepth.x * a_ShadingParams.m_ResolutionAndDepth.y;
@@ -134,7 +133,7 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
             a_ShadingParams.m_TemporalSurfaceData,
             a_ShadingParams.m_CurrentSurfaceData,
             a_ShadingParams.m_ShadowRays,
-            a_ShadingParams.m_TriangleLights,
+            a_ShadingParams.m_TriangleLights->GetDevicePtr<AtomicBuffer<TriangleLight>>(),
             seed,
             a_ShadingParams.m_CurrentDepth,
             cdfPtr);

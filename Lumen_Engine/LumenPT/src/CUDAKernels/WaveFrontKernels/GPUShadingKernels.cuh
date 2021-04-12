@@ -42,7 +42,7 @@ CPU_ON_GPU void ShadeDirect(
     const SurfaceData* a_TemporalSurfaceDatBuffer,
     const SurfaceData* a_SurfaceDataBuffer,
     AtomicBuffer<ShadowRayData>* const a_ShadowRays,
-    const TriangleLight* const a_Lights,
+    const AtomicBuffer<TriangleLight>* const a_Lights,
     const unsigned a_Seed,
     const unsigned a_CurrentDepth,
     const CDF* const a_CDF = nullptr
