@@ -61,6 +61,7 @@ CPU_ONLY void ReSTIR::Initialize(const ReSTIRSettings& a_Settings)
 }
 
 CPU_ONLY void ReSTIR::Run(
+	float3* a_OutputChannels,
 	const WaveFront::SurfaceData* const a_CurrentPixelData,
 	const WaveFront::SurfaceData* const a_PreviousPixelData,
 	const MemoryBuffer const* a_Lights,
@@ -112,10 +113,11 @@ CPU_ONLY void ReSTIR::Run(
 
 	/*
 	 * Pick primary samples in parallel. Store the samples in the reservoirs.
+	 * This also resolves directly hitting lights with the camera.
 	 */
 	seed = WangHash(seed);
 	timer.reset();
-	PickPrimarySamples(static_cast<LightBagEntry*>(m_LightBags.GetDevicePtr()), static_cast<Reservoir*>(m_Reservoirs[currentIndex].GetDevicePtr()), m_Settings, a_CurrentPixelData, seed);
+	PickPrimarySamples(static_cast<LightBagEntry*>(m_LightBags.GetDevicePtr()), static_cast<Reservoir*>(m_Reservoirs[currentIndex].GetDevicePtr()), m_Settings, a_CurrentPixelData, seed, a_OutputChannels);
 	if (a_DebugPrint) printf("Picking primary samples time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
 
 	/*

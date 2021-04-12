@@ -39,7 +39,7 @@ CPU_ON_GPU void FindEmissives(
     //find texture coordinates on this triangle (rather than just vertices
     //sample texture at area of triangle through UVs
 
-    for (unsigned int baseIndex = 0; baseIndex +3 < a_IndexBufferSize; baseIndex+=3)
+    for (unsigned int baseIndex = 0; baseIndex < a_IndexBufferSize; baseIndex+=3)
     {
 
         //looped over 3 vertices, construct triangle
@@ -88,16 +88,22 @@ CPU_ON_GPU void FindEmissives(
         if(emissiveTexture)
         {
             //sample emission at UVCentroid
-            emissiveColor *= tex2D<float4>(emissiveTexture, UVCentroid.x, UVCentroid.y);
+            const float4 emissiveTextureColor = tex2D<float4>(emissiveTexture, UVCentroid.x, UVCentroid.y);
+            emissiveColor *= emissiveTextureColor;
         }
 
         const float4 finalEmission = diffuseColor * emissiveColor;
 
+        assert(!isnan(finalEmission.x));
+        assert(!isnan(finalEmission.y));
+        assert(!isnan(finalEmission.z));
+        assert(!isnan(finalEmission.w));
 
         const unsigned triangleIndex = baseIndex / 3; //Base index goes up by three each loop, divide by three to get the num of triangles before current value.
         //if emission not equal to 0
-        if ((finalEmission.x != 0.0f || finalEmission.y != 0.0f || finalEmission.z != 0.0f) && finalEmission.w != 0.f)
+        if ((finalEmission.x > 0.0f || finalEmission.y > 0.0f || finalEmission.z > 0.0f) && finalEmission.w > 0.f)
         {
+            printf("CREATED LIGHT: %i\n", triangleIndex);
             a_Emissives[triangleIndex] = true;
             (*a_NumLights)++;
             continue;
@@ -149,12 +155,12 @@ CPU_ON_GPU void AddToLightBuffer(
 
     for(unsigned int triangleIndex = index; triangleIndex < numTriangles; triangleIndex += stride)
     {
-
         const unsigned baseIndex = triangleIndex * 3; //We run this function for each triangle, triangle has 3 vertices.
 
         //check first vertex of triangle to see if its in emissive buffer
-        if (a_Emissives[baseIndex / 3] == true)
+        if (a_Emissives[triangleIndex] == true)
         {
+            printf("Emissive triangle is enabled. %i\n", triangleIndex);
             const unsigned index0 = a_Indices[baseIndex + 0];
             const unsigned index1 = a_Indices[baseIndex + 1];
             const unsigned index2 = a_Indices[baseIndex + 2];

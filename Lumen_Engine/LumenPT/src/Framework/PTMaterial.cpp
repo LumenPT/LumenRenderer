@@ -100,6 +100,8 @@ DeviceMaterial PTMaterial::CreateDeviceMaterial() const
     //Should always be default loaded
     m.m_NormalTexture = **m_NormalTexture;
 
+    m.m_EmissiveTexture = **m_EmissiveTexture;
+
 
     if (m_DiffuseTexture)
     {

@@ -99,7 +99,7 @@ __global__ void FillLightBagsInternal(unsigned a_NumLightBags, unsigned a_NumLig
     }
 }
 
-__host__ void PickPrimarySamples(const LightBagEntry* const a_LightBags, Reservoir* a_Reservoirs, const ReSTIRSettings& a_Settings, const WaveFront::SurfaceData * const a_PixelData, const std::uint32_t a_Seed)
+__host__ void PickPrimarySamples(const LightBagEntry* const a_LightBags, Reservoir* a_Reservoirs, const ReSTIRSettings& a_Settings, const WaveFront::SurfaceData * const a_PixelData, const std::uint32_t a_Seed, float3* a_OutputChannels)
 {
     /*
      * This functions uses a single light bag per block.
@@ -117,12 +117,14 @@ __host__ void PickPrimarySamples(const LightBagEntry* const a_LightBags, Reservo
         a_Settings.numLightBags,
         a_Settings.numLightsPerBag,
         a_PixelData,
-        a_Seed);
+        a_Seed,
+        a_OutputChannels
+    );
     cudaDeviceSynchronize();
     CHECKLASTCUDAERROR;
 }
 
-__global__ void PickPrimarySamplesInternal(const LightBagEntry* const a_LightBags, Reservoir* a_Reservoirs, unsigned a_NumPrimarySamples, unsigned a_NumReservoirs, unsigned a_NumLightBags, unsigned a_NumLightsPerBag, const WaveFront::SurfaceData * const a_PixelData, const std::uint32_t a_Seed)
+__global__ void PickPrimarySamplesInternal(const LightBagEntry* const a_LightBags, Reservoir* a_Reservoirs, unsigned a_NumPrimarySamples, unsigned a_NumReservoirs, unsigned a_NumLightBags, unsigned a_NumLightsPerBag, const WaveFront::SurfaceData * const a_PixelData, const std::uint32_t a_Seed, float3* a_OutputChannels)
 {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     if (index >= a_NumReservoirs)
@@ -153,8 +155,15 @@ __global__ void PickPrimarySamplesInternal(const LightBagEntry* const a_LightBag
     //The current pixel index.
     const WaveFront::SurfaceData pixel = a_PixelData[pixelIndex];
 
-    //If no intersection exists at this pixel, do nothing. Emissive surfaces are also excluded.
-    if(pixel.m_IntersectionT <= 0.f || pixel.m_Emissive)
+    //If the surface is emissive, store its light directly in the output buffer.
+    if(pixel.m_Emissive)
+    {
+        a_OutputChannels[static_cast<int>(WaveFront::LightChannel::NUM_CHANNELS) * index + static_cast<int>(WaveFront::LightChannel::DIRECT)] = pixel.m_Color;
+        return;
+    }
+
+    //If no intersection exists at this pixel, do nothing.
+    if(pixel.m_IntersectionT <= 0.f)
     {
         return;
     }

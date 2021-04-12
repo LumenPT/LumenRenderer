@@ -30,6 +30,7 @@ public:
 	 * Run ReSTIR.
 	 */
 	CPU_ONLY void Run(
+		float3* a_OutputChannels,
 		const WaveFront::SurfaceData * const a_CurrentPixelData,
 		const WaveFront::SurfaceData * const a_PreviousPixelData,
 		const MemoryBuffer const* a_Lights,

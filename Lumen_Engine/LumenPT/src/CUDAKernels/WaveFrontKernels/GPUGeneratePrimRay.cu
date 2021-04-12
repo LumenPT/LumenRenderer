@@ -113,6 +113,7 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
             const float4 textureColor = tex2D<float4>(material->m_DiffuseTexture, texCoords.x, texCoords.y);
             const float3 finalColor = make_float3(textureColor * material->m_DiffuseColor);
             const float4 metalRoughness = tex2D<float4>(material->m_MetalRoughnessTexture, texCoords.x, texCoords.y);
+            const float4 emissive = tex2D<float4>(material->m_EmissiveTexture, texCoords.x, texCoords.y);
             const float metal = metalRoughness.z;
             const float roughness = metalRoughness.y;
 
@@ -162,7 +163,6 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
             //The surface data to write to. Local copy for fast access.
             SurfaceData output;
             output.m_Index = currIntersection.m_PixelIndex;
-            output.m_Emissive = false; //TODO set based on whether or not a light was hit.
             output.m_IntersectionT = currIntersection.m_IntersectionT;
             output.m_Normal = vertexNormal; //TODO: use normal mapping.
             output.m_Color = finalColor;
@@ -171,6 +171,11 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
             output.m_Metallic = metal;
             output.m_Roughness = roughness;
             output.m_TransportFactor = currRay.m_Contribution;
+
+            if((output.m_Emissive = (emissive.x > 0 || emissive.y > 0 || emissive.z > 0)))
+            {
+                output.m_Color = make_float3(emissive);
+            }
 
             a_OutPut[surfaceDataIndex] = output;
         }

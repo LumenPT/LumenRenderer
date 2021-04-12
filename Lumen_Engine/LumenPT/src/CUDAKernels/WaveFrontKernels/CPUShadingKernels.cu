@@ -101,6 +101,7 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
     if(a_ShadingParams.m_CurrentDepth == 0 && useRestir)
     {
         a_ShadingParams.m_ReSTIR->Run(
+            a_ShadingParams.m_Output,
             a_ShadingParams.m_CurrentSurfaceData,
             a_ShadingParams.m_TemporalSurfaceData,
             a_ShadingParams.m_TriangleLights,
