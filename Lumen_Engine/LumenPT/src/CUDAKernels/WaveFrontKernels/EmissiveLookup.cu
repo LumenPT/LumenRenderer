@@ -8,7 +8,29 @@
 #include <cassert>
 
 
-CPU_ON_GPU void FindEmissives(const Vertex* a_Vertices, bool* a_EmissiveBools, const uint32_t* a_Indices, const DeviceMaterial* a_Mat, const uint8_t a_VertexBufferSize, unsigned int& a_NumLights)
+CPU_ONLY void FindEmissivesWrap(
+    const Vertex* a_Vertices,
+    bool* a_EmissiveBools,
+    const uint32_t* a_Indices,
+    const DeviceMaterial* a_Mat,
+    const uint8_t a_VertexBufferSize,
+    unsigned int& a_NumLights)
+{
+    unsigned int* numLightsPtr;
+    cudaMalloc(&numLightsPtr, sizeof(unsigned int));
+
+    FindEmissives <<<1, 1>>> (a_Vertices, a_EmissiveBools, a_Indices, a_Mat, a_VertexBufferSize, numLightsPtr);
+    cudaDeviceSynchronize();
+    cudaMemcpy(&a_NumLights, numLightsPtr, sizeof(unsigned int), cudaMemcpyDeviceToHost);
+}
+
+CPU_ON_GPU void FindEmissives(
+    const Vertex* a_Vertices, 
+    bool* a_EmissiveBools, 
+    const uint32_t* a_Indices, 
+    const DeviceMaterial* a_Mat, 
+    const uint8_t a_VertexBufferSize, 
+    unsigned int* a_NumLights)
 {
     //const auto devMat = a_Mat->GetDeviceMaterial();
 
@@ -78,6 +100,17 @@ CPU_ON_GPU void FindEmissives(const Vertex* a_Vertices, bool* a_EmissiveBools, c
     }
 }
 
+CPU_ONLY void AddToLightBufferWrap(
+    const Vertex* a_Vertices,
+    const uint32_t* a_Indices,
+    const bool* a_Emissives,
+    const uint8_t a_VertexBufferSize,
+    WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights,
+    sutil::Matrix4x4 a_TransformMat)
+{
+    AddToLightBuffer <<<1, 1>>> (a_Vertices, a_Indices, a_Emissives, a_VertexBufferSize, a_Lights, a_TransformMat);
+}
+
 CPU_ON_GPU void AddToLightBuffer(
     const Vertex* a_Vertices,
     const uint32_t* a_Indices,
@@ -86,11 +119,10 @@ CPU_ON_GPU void AddToLightBuffer(
     WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights,
     sutil::Matrix4x4 a_TransformMat)
 {
-    assert(sizeof(a_Vertices) <= 0);
+    //assert(sizeof(a_Vertices) <= 0);
 
-    printf("Constructing lights buffer");
+    printf("Constructing lights buffer\n");
 
-    cudaDeviceSynchronize();
 
     //Loop over triangles in primitive
     for (unsigned int i = 0; i < a_VertexBufferSize; i+=3)

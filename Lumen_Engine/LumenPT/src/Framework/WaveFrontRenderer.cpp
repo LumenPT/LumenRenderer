@@ -300,7 +300,7 @@ namespace WaveFront
 
         unsigned int numLights = 0; //number of emissive triangles in this primitive
         
-        FindEmissives(vertexBuffer->GetDevicePtr<Vertex>(), 
+        FindEmissivesWrap(vertexBuffer->GetDevicePtr<Vertex>(), 
             emissiveBuffer->GetDevicePtr<bool>(), 
             indexBuffer->GetDevicePtr<uint32_t>(), 
             static_cast<PTMaterial*>(a_PrimitiveData.m_Material.get())->GetDeviceMaterial(),
@@ -459,20 +459,25 @@ namespace WaveFront
                     //ptPrim->m_IndexBuffer->GetDevicePtr<uint32_t>();
                     //ptPrim->m_BoolBuffer->GetDevicePtr<bool>();
 
-                    printf("%f\n", ptPrim->m_VertBuffer->GetSize());
-                    printf("%f\n", ptPrim->m_IndexBuffer->GetSize());
-                    printf("%f\n", ptPrim->m_BoolBuffer->GetSize());
+                    printf("Vertex buffer size %d\n", ptPrim->m_VertBuffer->GetSize());
+                    printf("Index buffer size %d\n", ptPrim->m_IndexBuffer->GetSize());
+                    printf("Emissive vertices size %d\n", ptPrim->m_BoolBuffer->GetSize());
 
                     //AddToLightBuffer2();
+                    cudaDeviceSynchronize();
+
 
                     //call cuda kernel with data from ptPrim. Unpack emissive triangles, store in lightsbuffer
-                    AddToLightBuffer(
+                    AddToLightBufferWrap(
                         ptPrim->m_VertBuffer->GetDevicePtr<Vertex>(),
                         ptPrim->m_IndexBuffer->GetDevicePtr<uint32_t>(),
                         ptPrim->m_BoolBuffer->GetDevicePtr<bool>(),
                         ptPrim->m_VertBuffer->GetSize(),
                         trianglePtr,
                         instanceTransform);
+
+                    cudaDeviceSynchronize();
+
                 }
             }
             else

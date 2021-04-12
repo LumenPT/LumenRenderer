@@ -6,13 +6,31 @@
 
 class PTMaterial;
 
+CPU_ONLY void FindEmissivesWrap(
+	const Vertex* a_Vertices,
+	bool* a_EmissiveBools,
+	const uint32_t* a_Indices,
+	const DeviceMaterial* a_Mat,
+	const uint8_t a_VertexBufferSize,
+	unsigned int& a_NumLights
+);
+
 CPU_ON_GPU void FindEmissives(
 	const Vertex* a_Vertices, 
 	bool* a_EmissiveBools, 
 	const uint32_t* a_Indices, 
 	const DeviceMaterial* a_Mat,
 	const uint8_t a_VertexBufferSize, 
-	unsigned int& a_NumLights
+	unsigned int* a_NumLights
+);
+
+CPU_ONLY void AddToLightBufferWrap(
+	const Vertex* a_Vertices,
+	const uint32_t* a_Indices,
+	const bool* a_Emissives,
+	const uint8_t a_VertexBufferSize,
+	WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights,
+	sutil::Matrix4x4 a_TransformMat
 );
 
 CPU_ON_GPU void AddToLightBuffer(
