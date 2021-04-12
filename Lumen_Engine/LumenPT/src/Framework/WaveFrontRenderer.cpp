@@ -269,7 +269,7 @@ namespace WaveFront
     {
         auto vertexBuffer = InterleaveVertexData(a_PrimitiveData);
         cudaDeviceSynchronize();
-        auto err = cudaGetLastError();
+        CHECKLASTCUDAERROR;
         
         std::vector<uint32_t> correctedIndices;
 
