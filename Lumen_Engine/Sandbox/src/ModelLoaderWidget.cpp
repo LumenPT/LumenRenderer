@@ -2,6 +2,10 @@
 
 #include "ImGui/imgui.h"
 
+#include "Lumen/../AssetLoading/AssetLoading.h"
+
+#include "Tools/ImGuiUtil.h"
+
 #include <map>
 
 namespace fs = std::filesystem;
@@ -12,6 +16,7 @@ ModelLoaderWidget::ModelLoaderWidget(Lumen::SceneManager& a_SceneManager, std::s
     , m_State(State::Directory)
     , m_LoadingFinished(true)
 {
+	LoadIcons();
 	// Initialze the selected path to the working directory for the application
 	m_SelectedPath = fs::current_path();
 }
@@ -43,6 +48,47 @@ void ModelLoaderWidget::Display()
 		ImGui::Text(m_AdditionalMessage.c_str());
 
 	ImGui::End();
+}
+
+void ModelLoaderWidget::LoadIcons()
+{
+	auto p = fs::current_path();
+
+    while (p.filename() != "Lumen_Engine")
+    {
+		p = p.parent_path();
+    }
+
+	fs::current_path(p);
+
+	m_Icons[FileType::Directory] = MakeGLTexture("Sandbox/assets/toolAssets/folder.png");
+	m_Icons[FileType::GLTF] = MakeGLTexture("Sandbox/assets/toolAssets/file.png");
+	m_Icons[FileType::VDB] = MakeGLTexture("Sandbox/assets/toolAssets/file.png");
+}
+
+GLuint ModelLoaderWidget::MakeGLTexture(std::string a_FilePath)
+{
+
+	int w, h, c;
+	auto imgData = stbi_load(a_FilePath.c_str(), &w, &h, &c, 4);
+
+	GLuint tex;
+	glGenTextures(1, &tex);
+
+	glBindTexture(GL_TEXTURE_2D, tex);
+
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, imgData);
+
+	// Set the sampler settings, standard procedure
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+	// Unbind the pixel buffer and texture to avoid mistakes with future OpenGL calls
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	stbi_image_free(imgData);
+
+	return tex;
 }
 
 void ModelLoaderWidget::DirectoryNavigatorHeader()
@@ -247,27 +293,70 @@ void ModelLoaderWidget::DirectoryNagivation()
 	// The directory navigation
 	if (ImGui::ListBoxHeader("", ImVec2(500.0f, 350.0f)))
 	{
+		struct Dir
+		{
+			std::string m_Name;
+			fs::directory_entry m_DirEntry;
+			FileType m_Type;
+		};
+
+
 		fs::directory_entry selectedDir;
-		std::map<std::string, fs::directory_entry> entries;
+		std::vector<Dir> entries;
 		// Go through all directories and files in order to mark them accordingly
 		// Might replace with Icons later for +fancy points
 		for (auto dir : fs::directory_iterator(m_SelectedPath))
 		{
+			Dir d;
+			d.m_Name = dir.path().filename().string();
+			
 			if (dir.is_directory())
-				entries.emplace("[D]" + dir.path().filename().string(), dir); // Mark as directory
+				//entries.emplace("[D]" + dir.path().filename().string(), { dir, FileType::Directory }); // Mark as directory
+				d.m_Type = FileType::Directory;
 			else
-				entries.emplace("[F]" + dir.path().filename().string(), dir); // Mark as file
+				d.m_Type = FileType::GLTF;
+
+			d.m_DirEntry = dir;
+
+			entries.push_back(d);
+				//entries.emplace("[F]" + dir.path().filename().string(), {dir, FileType::GLTF}); // Mark as file
 		}
+
+		entries.push_back({ std::string(".."), fs::directory_entry(m_SelectedPath.parent_path()), FileType::Directory });
+		std::sort(entries.begin(), entries.end(), [](const Dir& a_Left, const Dir& a_Right)
+			{
+				if (a_Left.m_Type == FileType::Directory && a_Left.m_Type != a_Right.m_Type)
+				{
+					return true;
+				}
+
+				auto length = std::max(a_Left.m_Name.size(), a_Right.m_Name.size());
+
+				for (size_t i = 0; i < length; i++)
+				{
+					auto l = std::tolower(a_Left.m_Name[i]);
+					auto r = std::tolower(a_Right.m_Name[i]);
+					if (l != r)
+					{
+						return l < r;
+					}
+				}
+
+				return a_Left.m_Name.size() < a_Right.m_Name.size();
+			});
+
 		// Add an old-school "go back" option to the list of directories
-		entries.emplace("..", m_SelectedPath.parent_path());
 
 		// Make a menu item for each directory
 		for (auto entry : entries)
 		{
-			if (ImGui::MenuItem(entry.first.c_str()))
+			ImGuiUtil::DisplayImage(m_Icons[entry.m_Type], glm::ivec2(8));
+			ImGui::SameLine();
+
+			if (ImGui::MenuItem(entry.m_Name.c_str()))
 			{
 				// set the selected dir to the current item's directory if it was clicked
-				selectedDir = entry.second;
+				selectedDir = entry.m_DirEntry;
 			}
 		}
 

@@ -17,6 +17,9 @@ public:
 
 private:
 
+    void LoadIcons();
+    GLuint MakeGLTexture(std::string a_FilePath);
+
     // Enum describing the different states the widget can be in
     enum class State
     {
@@ -28,9 +31,11 @@ private:
     // Enum describing the file that is being/has been loaded
     enum class FileType
     {
+        Directory,
         GLTF,
         VDB
     };
+
 
     // Navigates the directory, mimicking windows explorer
     void DirectoryNagivation();
@@ -77,7 +82,10 @@ private:
     // Handle to the thread that is used when loading a file. Used to avoid freezing the application while loading big files.
     std::thread m_LoadingThread;
     bool m_LoadingFinished;
-    
+
+    std::map<FileType, GLuint> m_Icons;
+
+
 
 };
 
