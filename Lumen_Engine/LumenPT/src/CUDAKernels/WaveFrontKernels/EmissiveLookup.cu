@@ -73,15 +73,15 @@ CPU_ON_GPU void FindEmissives(
 
         const float2 UVCentroid = (vert0.m_UVCoord + vert1.m_UVCoord + vert2.m_UVCoord) * oneThird;
 
-        auto diffuseTexture = a_Mat->m_DiffuseTexture;
+        //auto diffuseTexture = a_Mat->m_DiffuseTexture;
         auto emissiveTexture = a_Mat->m_EmissiveTexture;
 
-        float4 diffuseColor = a_Mat->m_DiffuseColor;
+        //float4 diffuseColor = a_Mat->m_DiffuseColor;
 
-        if(diffuseTexture)
-        {
-            diffuseColor *= tex2D<float4>(diffuseTexture, UVCentroid.x, UVCentroid.y);
-        }
+        //if(diffuseTexture)
+        //{
+        //    diffuseColor *= tex2D<float4>(diffuseTexture, UVCentroid.x, UVCentroid.y);
+        //}
 
         float4 emissiveColor = a_Mat->m_EmissionColor;
 
@@ -92,7 +92,7 @@ CPU_ON_GPU void FindEmissives(
             emissiveColor *= emissiveTextureColor;
         }
 
-        const float4 finalEmission = diffuseColor * emissiveColor;
+        const float4 finalEmission = emissiveColor;
 
         assert(!isnan(finalEmission.x));
         assert(!isnan(finalEmission.y));
@@ -190,12 +190,12 @@ CPU_ON_GPU void AddToLightBuffer(
             auto diffuseTexture = a_Mat->m_DiffuseTexture;
             auto emissiveTexture = a_Mat->m_EmissiveTexture;
 
-            float4 diffuseColor = a_Mat->m_DiffuseColor;
+            //float4 diffuseColor = a_Mat->m_DiffuseColor;
 
-            if (diffuseTexture)
-            {
-                diffuseColor *= tex2D<float4>(diffuseTexture, UVCentroid.x, UVCentroid.y);
-            }
+            //if (diffuseTexture)
+            //{
+            //    diffuseColor *= tex2D<float4>(diffuseTexture, UVCentroid.x, UVCentroid.y);
+            //}
 
             float4 emissiveColor = a_Mat->m_EmissionColor;
 
@@ -205,7 +205,7 @@ CPU_ON_GPU void AddToLightBuffer(
                 emissiveColor *= tex2D<float4>(emissiveTexture, UVCentroid.x, UVCentroid.y);
             }
 
-            const float4 finalEmission = diffuseColor * emissiveColor;
+            const float4 finalEmission = emissiveColor;
 
             light.radiance = make_float3(finalEmission);
             light.normal = (vert0.m_Normal + vert1.m_Normal + vert2.m_Normal) * oneThird;

@@ -87,12 +87,12 @@ public:
 		std::replace(p_string2.begin(), p_string2.end(), '\\', '/');
 
 		const std::string meshPath = p_string.append("/Sandbox/assets/models/Sponza/");
-		const std::string meshPath2 = p_string2.append("/Sandbox/assets/models/BoomBox/glTF/");
+		const std::string meshPath2 = p_string2.append("/Sandbox/assets/models/EmissiveSphere/");
 		//Base path for meshes.
 
 		//Mesh name
 		const std::string meshName = "Sponza.gltf";
-		const std::string meshName2 = "BoomBox.gltf";
+		const std::string meshName2 = "EmissiveSphere.gltf";
 
 		//p_string.append("/Sandbox/assets/models/Sponza/Sponza.gltf");
 		LMN_TRACE(p_string);
@@ -143,7 +143,7 @@ public:
 				mesh->SetMesh(res2->m_MeshPool[meshId]);
 				//mesh->m_Transform.CopyTransform(*node->m_LocalTransform);
 				mesh->m_Transform.SetPosition(glm::vec3(0.f, 100.f, 80.0f));
-				mesh->m_Transform.SetScale(glm::vec3(3000.0f));
+				mesh->m_Transform.SetScale(glm::vec3(10.0f));
 			}
 		}
 
