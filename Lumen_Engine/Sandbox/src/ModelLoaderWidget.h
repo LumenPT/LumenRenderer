@@ -12,6 +12,8 @@ public:
 
     ModelLoaderWidget(Lumen::SceneManager& a_SceneManager, std::shared_ptr<Lumen::ILumenScene>& a_SceneRef);
 
+    ~ModelLoaderWidget();
+
     // Display the tool in a separate window
     void Display();
 

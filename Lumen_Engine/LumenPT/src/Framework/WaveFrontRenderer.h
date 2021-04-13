@@ -59,6 +59,8 @@ namespace WaveFront
     public:
         WaveFrontRenderer();
 
+        ~WaveFrontRenderer();
+
         /*
          * Render.
          */

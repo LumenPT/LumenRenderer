@@ -21,6 +21,14 @@ ModelLoaderWidget::ModelLoaderWidget(Lumen::SceneManager& a_SceneManager, std::s
 	m_SelectedPath = fs::current_path();
 }
 
+ModelLoaderWidget::~ModelLoaderWidget()
+{
+	// Thread needs to be joined if it was used before, otherwise it will throw an error
+	if (m_LoadingThread.joinable())
+		m_LoadingThread.join();
+
+}
+
 void ModelLoaderWidget::Display()
 {
 	// TODO: Probably better to not hardcode the window's size, but then we need better other stuff
