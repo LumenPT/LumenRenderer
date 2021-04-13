@@ -103,7 +103,6 @@ CPU_ON_GPU void FindEmissives(
         //if emission not equal to 0
         if ((finalEmission.x > 0.0f || finalEmission.y > 0.0f || finalEmission.z > 0.0f) && finalEmission.w > 0.f)
         {
-            printf("CREATED LIGHT: %i\n", triangleIndex);
             a_Emissives[triangleIndex] = true;
             (*a_NumLights)++;
             continue;
@@ -160,7 +159,6 @@ CPU_ON_GPU void AddToLightBuffer(
         //check first vertex of triangle to see if its in emissive buffer
         if (a_Emissives[triangleIndex] == true)
         {
-            printf("Emissive triangle is enabled. %i\n", triangleIndex);
             const unsigned index0 = a_Indices[baseIndex + 0];
             const unsigned index1 = a_Indices[baseIndex + 1];
             const unsigned index2 = a_Indices[baseIndex + 2];
@@ -209,7 +207,7 @@ CPU_ON_GPU void AddToLightBuffer(
 
             const float4 finalEmission = diffuseColor * emissiveColor;
 
-            light.radiance = { 200.f, 200.f, 200.f };//make_float3(finalEmission);
+            light.radiance = make_float3(finalEmission);
             light.normal = (vert0.m_Normal + vert1.m_Normal + vert2.m_Normal) * oneThird;
 
             const float3 vec1 = light.p0 - light.p1;

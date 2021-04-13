@@ -125,9 +125,9 @@
         "index": 1
       },
       "emissiveFactor": [
-        1.0,
-        1.0,
-        1.0
+        2000.0,
+        2000.0,
+        2000.0
       ],
       "emissiveTexture": {
         "index": 3

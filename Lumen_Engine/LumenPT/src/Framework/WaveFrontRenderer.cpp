@@ -295,7 +295,11 @@ namespace WaveFront
         std::unique_ptr<MemoryBuffer> indexBuffer = std::make_unique<MemoryBuffer>(correctedIndices);
 
         uint32_t numIndices = correctedIndices.size();
-        std::unique_ptr<MemoryBuffer> emissiveBuffer = std::make_unique<MemoryBuffer>((numIndices / 3) * sizeof(bool)); //might be wrong
+        const size_t memSize = (numIndices / 3) * sizeof(bool);
+        std::unique_ptr<MemoryBuffer> emissiveBuffer = std::make_unique<MemoryBuffer>(memSize); //might be wrong
+
+        //Initialize with false so that nothing is emissive by default.
+        cudaMemset(emissiveBuffer->GetDevicePtr(), 0, memSize);
 
         unsigned int numLights = 0; //number of emissive triangles in this primitive
 
@@ -315,9 +319,10 @@ namespace WaveFront
                 numLights
             );
 
+            
+
             cudaDeviceSynchronize();
             CHECKLASTCUDAERROR;
-
         }
 
         

@@ -99,7 +99,7 @@ public:
 
 	    m_SceneManager->SetPipeline(*m_ContextLayer->GetPipeline());
 		auto res = m_SceneManager->LoadGLTF(meshName, meshPath);
-		//auto res2 = m_SceneManager->LoadGLTF(meshName2, meshPath2);
+		auto res2 = m_SceneManager->LoadGLTF(meshName2, meshPath2);
 
 		auto lumenPT = m_ContextLayer->GetPipeline();
 
@@ -129,10 +129,23 @@ public:
 		//		auto mesh = lumenPT->m_Scene->AddMesh();
 		//		mesh->SetMesh(res2->m_MeshPool[meshId]);
 		//		//mesh->m_Transform.CopyTransform(*node->m_LocalTransform);
-		//		mesh->m_Transform.SetPosition(glm::vec3(0.f, 0.f, 0.0f));
-  //              mesh->m_Transform.SetScale(glm::vec3(350.0f));
+		//		mesh->m_Transform.SetPosition(glm::vec3(100.f, 500.f, 0.0f));
+        //		mesh->m_Transform.SetScale(glm::vec3(3000.0f));
 		//	}
 		//}
+
+		for (auto& node : res2->m_NodePool)
+		{
+			auto meshId = node->m_MeshID;
+			//if (meshId >= 0)
+			{
+				auto mesh = lumenPT->m_Scene->AddMesh();
+				mesh->SetMesh(res2->m_MeshPool[meshId]);
+				//mesh->m_Transform.CopyTransform(*node->m_LocalTransform);
+				mesh->m_Transform.SetPosition(glm::vec3(0.f, 100.f, 80.0f));
+				mesh->m_Transform.SetScale(glm::vec3(3000.0f));
+			}
+		}
 
 		//lumenPT->m_Scene = lumenPT->CreateScene(scData);
 		//auto mesh = lumenPT->m_Scene->AddMesh();
