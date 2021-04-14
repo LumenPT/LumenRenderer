@@ -98,13 +98,13 @@ public:
 		std::filesystem::current_path(p);
 		std::string p_string{ p.string() };
 		std::replace(p_string.begin(), p_string.end(), '\\', '/');
-		//p_string.append("/Sandbox/assets/models/Lantern.gltf");
+		const std::string meshPath = p_string.append("/Sandbox/assets/models/");
 
-		const std::string meshPath = p_string.append("/Sandbox/assets/models/Sponza/");
+		//const std::string meshPath = p_string.append("/Sandbox/assets/models/Sponza/");
 		//Base path for meshes.
 
 		//Mesh name
-		const std::string meshName = "Sponza.gltf";
+		const std::string meshName = "Lantern.gltf";
 
 		//p_string.append("/Sandbox/assets/models/Sponza/Sponza.gltf");
 		LMN_TRACE(p_string);

@@ -19,6 +19,7 @@
 
 #include "Tools/ImGuiUtil.h"
 
+#include "ModelLoaderWidget.h"
 
 #include "Glad/glad.h"
 
@@ -26,7 +27,6 @@
 
 #include "GLFW/glfw3.h"
 
-#include "filesystem"
 #include <iostream>
 
 #include "../../LumenPT/src/Framework/CudaUtilities.h"
@@ -130,6 +130,12 @@ OutputLayer::OutputLayer()
 OutputLayer::~OutputLayer()
 {										    
 	glDeleteProgram(m_Program);
+}
+
+void OutputLayer::OnAttach()
+{
+	InitializeScenePresets();
+	m_ModelLoaderWidget = std::make_unique<ModelLoaderWidget>(*m_LayerServices->m_SceneManager, m_Renderer->m_Scene);
 }
 
 void OutputLayer::OnUpdate()
@@ -405,18 +411,11 @@ void OutputLayer::OnImGuiRender()
 
 	ImGui::End();
 
-	ImGui::Begin("Testing");
+	/////////////////////////////////////////////////
+	// Model loading shenanigans
+	/////////////////////////////////////////////////
 
-	if (ImGui::BeginMenu("My Menu"))
-	{	    
-		ImGui::MenuItem("Item 1");
-		ImGui::MenuItem("Item 2");
-		ImGui::MenuItem("Item 3");
-		ImGui::EndMenu();
-	}
-
-	ImGui::End();
-
+	m_ModelLoaderWidget->Display();
 }
 
 void OutputLayer::OnEvent(Lumen::Event& a_Event)

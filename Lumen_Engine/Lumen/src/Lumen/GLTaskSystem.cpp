@@ -37,7 +37,12 @@ GLTaskSystem::~GLTaskSystem()
 {
     // Tell the processing thread to exit when it finishes its current operations
     m_ProcessingThreadExit = true;
+    while (m_Tasks.size())
+    {
+        m_Tasks.pop();
+    }
 
+    m_ProcessingThreadCondition.notify_all();
     // Wait for the processing thread to finish up
     m_ProcessingThread.join();
 }
@@ -55,13 +60,18 @@ void GLTaskSystem::StartProcessingThread(GLFWwindow* a_Window)
             // Have the thread run as long as it's not told to exit
             while (!m_ProcessingThreadExit)
             {
-                if (m_Tasks.empty())
+                if (m_Tasks.empty() && !m_ProcessingThreadExit)
                 {
                     // Put the thread to sleep via the condition variable if there are no tasks for it
                     std::unique_lock lock(m_ProcessingThreadMutex);
-                    m_ProcessingThreadCondition.wait(lock, [&]() { return !m_Tasks.empty(); });
+                    m_ProcessingThreadCondition.wait(lock, [&]() 
+                        {
+                            return !m_Tasks.empty() || m_ProcessingThreadExit;
+                        });
                 }
 
+                if (m_ProcessingThreadExit)
+                    break;
                 // Perform the task
                 m_Tasks.front().m_Function();
                 auto err = glGetError();

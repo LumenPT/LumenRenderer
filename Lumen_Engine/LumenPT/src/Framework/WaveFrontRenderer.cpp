@@ -398,10 +398,15 @@ namespace WaveFront
         const unsigned counterDefault = 0;
         SetAtomicCounter<ShadowRayData>(&m_ShadowRays, counterDefault);
         SetAtomicCounter<IntersectionData>(&m_IntersectionData, counterDefault);
+        CHECKLASTCUDAERROR;
 
         //Retrieve the acceleration structure and scene data table once.
         m_OptixSystem->UpdateSBT();
+        CHECKLASTCUDAERROR;
+
         auto* sceneDataTableAccessor = m_Table->GetDevicePointer();
+        CHECKLASTCUDAERROR;
+
         auto accelerationStructure = std::static_pointer_cast<PTScene>(m_Scene)->GetSceneAccelerationStructure();
         cudaDeviceSynchronize();
         CHECKLASTCUDAERROR;
@@ -615,19 +620,11 @@ namespace WaveFront
 
     void WaveFrontRenderer::StartRendering()
     {
-        auto baseContext = Lumen::LumenApp::Get().GetWindow().GetNativeWindow();
-
-        glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
-        m_GLContext = glfwCreateWindow(1, 1, "Path tracing context", NULL, reinterpret_cast<GLFWwindow*>(baseContext));
-
-        auto err = glGetError();
         m_PathTracingThread = std::thread([&]()
             {
-                //glfwMakeContextCurrent(m_GLContext);
                 while (!m_StopRendering)
                     TraceFrame();
 
-                glfwDestroyWindow(m_GLContext);
             });       
     }
 
@@ -818,6 +815,20 @@ namespace WaveFront
         , m_SnapshotReady(false)
     {
 
+    }
+
+    WaveFrontRenderer::~WaveFrontRenderer()
+    {
+
+        // Stop the path tracing thread and join it into the main thread
+        m_StopRendering = true;
+        assert(m_PathTracingThread.joinable() && "The wavefront renderer was never used for rendering, and its being destroyed.");
+        m_PathTracingThread.join();
+
+        // Explicitly destroy the scene before the scene data table to avoid
+        // Dereferencing invalid memory addresses
+        m_Scene.reset();
+        m_Table.reset();
     }
 
     unsigned WaveFrontRenderer::GetOutputTexture()

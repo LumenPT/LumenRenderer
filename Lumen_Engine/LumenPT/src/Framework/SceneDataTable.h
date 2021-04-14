@@ -21,7 +21,9 @@ public:
     SceneDataTable()
         : m_NextEntryKey(0)
         , m_EntryStride(0)
-    { }
+    {
+        m_GpuBuffer.Resize(2 * 1024 * 1024);
+    }
 
     // Add an entry to the table containing the specified data struct.
     // The returned struct manages the lifetime of the entry within the table, so it should be kept alive

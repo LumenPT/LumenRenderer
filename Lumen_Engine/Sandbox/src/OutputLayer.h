@@ -26,7 +26,7 @@ public:
     OutputLayer();
     ~OutputLayer();
 
-    void OnAttach() override { InitializeScenePresets(); };
+    void OnAttach() override;
 
     void OnUpdate() override;
 
@@ -56,6 +56,8 @@ private:
 
     float m_CameraMouseSensitivity;
     float m_CameraMovementSpeed;
+
+    std::unique_ptr<class ModelLoaderWidget> m_ModelLoaderWidget;
 
     enum ContentViewMode
     {
