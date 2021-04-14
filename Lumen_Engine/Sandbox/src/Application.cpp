@@ -108,6 +108,28 @@ public:
 		lumenPT->m_Scene = lumenPT->CreateScene(scData);
 		
 		//Loop over the nodes in the scene, and add their meshes if they have one.
+
+		float xOffset = -900.f;
+
+		for(int i = 0; i < 30; ++i)
+		{
+			for (auto& node : res2->m_NodePool)
+			{
+				auto meshId = node->m_MeshID;
+				//if (meshId >= 0)
+				{
+					auto mesh = lumenPT->m_Scene->AddMesh();
+					mesh->SetMesh(res2->m_MeshPool[meshId]);
+					//mesh->m_Transform.CopyTransform(*node->m_LocalTransform);
+					float p = i;
+					mesh->m_Transform.SetPosition(glm::vec3(xOffset, 100.f + (p*p), 0.f));
+					mesh->m_Transform.SetScale(glm::vec3(2.0f * (static_cast<float>(i * 2) / 4.f)));
+				}
+			}
+
+			xOffset += 50;
+		}
+
 		for(auto& node: res->m_NodePool)
 		{
 			auto meshId = node->m_MeshID;
@@ -133,19 +155,6 @@ public:
         //		mesh->m_Transform.SetScale(glm::vec3(3000.0f));
 		//	}
 		//}
-
-		for (auto& node : res2->m_NodePool)
-		{
-			auto meshId = node->m_MeshID;
-			//if (meshId >= 0)
-			{
-				auto mesh = lumenPT->m_Scene->AddMesh();
-				mesh->SetMesh(res2->m_MeshPool[meshId]);
-				//mesh->m_Transform.CopyTransform(*node->m_LocalTransform);
-				mesh->m_Transform.SetPosition(glm::vec3(0.f, 100.f, 80.0f));
-				mesh->m_Transform.SetScale(glm::vec3(10.0f));
-			}
-		}
 
 		//lumenPT->m_Scene = lumenPT->CreateScene(scData);
 		//auto mesh = lumenPT->m_Scene->AddMesh();
