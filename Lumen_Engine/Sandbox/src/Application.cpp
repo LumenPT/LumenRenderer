@@ -78,15 +78,33 @@ public:
 
 		//temporary stuff to avoid absolute paths to gltf cube
 		std::filesystem::path p = std::filesystem::current_path();
+
+		while (p.has_parent_path())
+		{
+			bool found = false;
+			for (auto child : std::filesystem::directory_iterator(p))
+			{
+				if (child.is_directory() && child.path().filename() == "Sandbox")
+				{
+					found = true;
+					p = child.path().parent_path();
+				}
+			}
+
+			if (found) break;
+
+			p = p.parent_path();
+		}
+		std::filesystem::current_path(p);
 		std::string p_string{ p.string() };
 		std::replace(p_string.begin(), p_string.end(), '\\', '/');
-		//p_string.append("/Sandbox/assets/models/Lantern.gltf");
+		const std::string meshPath = p_string.append("/Sandbox/assets/models/");
 
-		const std::string meshPath = p_string.append("/Sandbox/assets/models/Sponza/");
+		//const std::string meshPath = p_string.append("/Sandbox/assets/models/Sponza/");
 		//Base path for meshes.
 
 		//Mesh name
-		const std::string meshName = "Sponza.gltf";
+		const std::string meshName = "Lantern.gltf";
 
 		//p_string.append("/Sandbox/assets/models/Sponza/Sponza.gltf");
 		LMN_TRACE(p_string);
@@ -134,6 +152,10 @@ public:
 
 		auto volume = lumenPT->m_Scene->AddVolume();
 		volume->SetVolume(volumeRes->m_Volume);
+
+
+		m_ContextLayer->GetPipeline()->StartRendering();
+
 	}
 
 	~Sandbox()

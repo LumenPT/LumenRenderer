@@ -5,8 +5,8 @@
 #include "PTMesh.h"
 #include "PTScene.h"
 #include "AccelerationStructure.h"
-#include "Material.h"
-#include "Texture.h"
+#include "PTMaterial.h"
+#include "PTTexture.h"
 #include "MemoryBuffer.h"
 #include "CudaGLTexture.h"
 #include "ShaderBindingTableGen.h"
@@ -58,7 +58,7 @@ OptiXRenderer::OptiXRenderer(const InitializationData& a_InitializationData)
     m_ShaderBindingTableGenerator = std::make_unique<ShaderBindingTableGenerator>();
 
     m_ServiceLocator.m_Renderer = this;
-    m_Texture = std::make_unique<Texture>(LumenPTConsts::gs_AssetDirectory + "debugTex.jpg");
+    m_Texture = std::make_unique<PTTexture>(LumenPTConsts::gs_AssetDirectory + "debugTex.jpg");
 
     CreateShaderBindingTable();
 
@@ -501,7 +501,7 @@ std::shared_ptr<Lumen::ILumenTexture> OptiXRenderer::CreateTexture(void* a_Pixel
 {
 
     static cudaChannelFormatDesc formatDesc = cudaCreateChannelDesc<uchar4>();
-    return std::make_shared<Texture>(a_PixelData, formatDesc, a_Width, a_Height);
+    return std::make_shared<PTTexture>(a_PixelData, formatDesc, a_Width, a_Height);
 
 }
 
@@ -553,7 +553,7 @@ std::unique_ptr<Lumen::ILumenPrimitive> OptiXRenderer::CreatePrimitive(Primitive
     auto& entry = prim->m_SceneDataTableEntry.GetData();
     entry.m_VertexBuffer = prim->m_VertBuffer->GetDevicePtr<Vertex>();
     entry.m_IndexBuffer = prim->m_IndexBuffer->GetDevicePtr<unsigned int>();
-    entry.m_Material = static_cast<Material*>(prim->m_Material.get())->GetDeviceMaterial();
+    entry.m_Material = static_cast<PTMaterial*>(prim->m_Material.get())->GetDeviceMaterial();
 
     return prim;
 }
@@ -568,7 +568,7 @@ std::shared_ptr<Lumen::ILumenMesh> OptiXRenderer::CreateMesh(
 std::shared_ptr<Lumen::ILumenMaterial> OptiXRenderer::CreateMaterial(const MaterialData& a_MaterialData)
 {
 
-    auto mat = std::make_shared<Material>();
+    auto mat = std::make_shared<PTMaterial>();
     mat->SetDiffuseColor(a_MaterialData.m_DiffuseColor);
     mat->SetDiffuseTexture(a_MaterialData.m_DiffuseTexture);
 

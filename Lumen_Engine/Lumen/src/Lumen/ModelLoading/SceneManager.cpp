@@ -13,25 +13,25 @@
 
 Lumen::SceneManager::~SceneManager()
 {
-    for (auto loadedScene : m_LoadedScenes)
-    {
+	for (auto loadedScene : m_LoadedScenes)
+	{
 		// Release the meshes and materials from each GLTFResource manually
 		auto& res = loadedScene.second;
 
-        for (auto& mesh : res.m_MeshPool)
+		for (auto& mesh : res.m_MeshPool)
 			mesh.reset();
 
-        for (auto& material : res.m_MaterialPool)
+		for (auto& material : res.m_MaterialPool)
 			material.reset();
-    }
+	}
 
 	// Release the meshes and materials which are no longer parts of GLTFResources
 	// due to being in use by the renderer
 
-    for (auto& inUseMesh : m_InUseMeshes)
+	for (auto& inUseMesh : m_InUseMeshes)
 		inUseMesh.reset();
 
-    for (auto& inUseMaterial : m_InUseMaterials)
+	for (auto& inUseMaterial : m_InUseMaterials)
 		inUseMaterial.reset();
 }
 
@@ -53,7 +53,7 @@ Lumen::SceneManager::GLTFResource* Lumen::SceneManager::LoadGLTF(std::string a_F
 
 	//NOTE: No quotas specified and no check for .gltf suffix. Might fail to load with large files and wrongly specified suffix.
 	fx::gltf::Document doc;
-	if(!isBinary)
+	if (!isBinary)
 	{
 		doc = fx::gltf::LoadFromText(fullPath);
 	}
@@ -68,6 +68,8 @@ Lumen::SceneManager::GLTFResource* Lumen::SceneManager::LoadGLTF(std::string a_F
 	LoadMaterials(doc, res, a_Path);
 
 	LoadMeshes(doc, res);
+
+	LoadScenes(doc, res);
 
 	//Loop over the root nodes in every scene in this GLTF file, and then add them as instances.
 	for (int sceneId = 0; sceneId < doc.scenes.size(); ++sceneId)
@@ -86,30 +88,32 @@ void Lumen::SceneManager::SetPipeline(LumenRenderer& a_Renderer)
 {
 	m_RenderPipeline = &a_Renderer;
 	m_VolumeManager.SetPipeline(a_Renderer);
+
+	InitializeDefaultResources();
 }
 
 void Lumen::SceneManager::ClearUnusedAssets()
 {
-    for (auto loadedScene : m_LoadedScenes)
-    {
+	for (auto loadedScene : m_LoadedScenes)
+	{
 		auto& res = loadedScene.second;
 
-        for (auto& mesh : res.m_MeshPool)
-        {
-            if (mesh.use_count() > 1) // Are there other shared pointer instances to this mesh?
-            {
-                // If yes, store the mesh separately from the GLTF resource
+		for (auto& mesh : res.m_MeshPool)
+		{
+			if (mesh.use_count() > 1) // Are there other shared pointer instances to this mesh?
+			{
+				// If yes, store the mesh separately from the GLTF resource
 				m_InUseMeshes.push_back(mesh);
-            }
+			}
 			else
 			{
-			    // Otherwise, reset the pointer, thus destroying the mesh
+				// Otherwise, reset the pointer, thus destroying the mesh
 				mesh.reset();
 			}
-        }
+		}
 
-        for (auto& material : res.m_MaterialPool)
-        {
+		for (auto& material : res.m_MaterialPool)
+		{
 			if (material.use_count() > 1) // Are there other shared pointer instances to this material?
 			{
 				// If yes, store the material separately from the GLTF resource
@@ -120,11 +124,11 @@ void Lumen::SceneManager::ClearUnusedAssets()
 				// Otherwise, reset the pointer, thus destroying the material
 				material.reset();
 			}
-        }
-    }
+		}
+	}
 
 	// Verify that none of the meshes and materials that are stored separately
-    // have been left unused since the last call to this function
+	// have been left unused since the last call to this function
 
 	for (auto& mesh : m_InUseMeshes)
 	{
@@ -145,6 +149,16 @@ void Lumen::SceneManager::ClearUnusedAssets()
 	}
 }
 
+void Lumen::SceneManager::InitializeDefaultResources()
+{
+	uchar4 whitePixel = { 255,255,255,255 };
+	uchar4 diffusePixel{ 0, 255, 255, 0};
+	uchar4 normal = { 128, 128, 255, 0 };
+	m_DefaultDiffuseTexture = m_RenderPipeline->CreateTexture(&whitePixel, 1, 1);
+	m_DefaultMetalRoughnessTexture = m_RenderPipeline->CreateTexture(&diffusePixel, 1, 1);
+	m_DefaultNormalTexture = m_RenderPipeline->CreateTexture(&normal, 1, 1);
+}
+
 void Lumen::SceneManager::LoadNodes(fx::gltf::Document& a_Doc, GLTFResource& a_Res, int a_NodeId, bool a_Root, const glm::mat4& a_TransformMat)
 {
 	const static glm::mat4 IDENTITY = glm::identity<glm::mat4>();
@@ -153,7 +167,7 @@ void Lumen::SceneManager::LoadNodes(fx::gltf::Document& a_Doc, GLTFResource& a_R
 	glm::mat4 transform = glm::make_mat4(&node.matrix[0]);
 
 	//If the matrix is not defined, load from the other settings.
-	if(IDENTITY == transform)
+	if (IDENTITY == transform)
 	{
 		auto translation = glm::vec3(
 			node.translation[0],
@@ -184,9 +198,9 @@ void Lumen::SceneManager::LoadNodes(fx::gltf::Document& a_Doc, GLTFResource& a_R
 
 	const glm::mat4 chainedTransform = a_TransformMat * transform;
 
-	if(a_Root)
+	if (a_Root)
 	{
-        a_Res.m_RootNodeIndices.push_back(a_NodeId);
+		a_Res.m_RootNodeIndices.push_back(a_NodeId);
 	}
 
 	std::shared_ptr<Node> newNode = std::make_shared<Node>();
@@ -277,12 +291,17 @@ void Lumen::SceneManager::LoadMeshes(fx::gltf::Document& a_Doc, GLTFResource& a_
 	std::vector<std::shared_ptr<ILumenMesh>> meshes;
 	// pass binary data into mesh
 
+	// For each mesh in file
 	for (auto& fxMesh : a_Doc.meshes)
 	{
+		// List of primitives in the mesh to fill out
 		std::vector<std::unique_ptr<Lumen::ILumenPrimitive>> primitives;
+		// For each primitive in mesh
 		for (auto& fxPrim : fxMesh.primitives)
 		{
-			std::vector<uint8_t> posBinary, texBinary, norBinary;
+			// Extract the binary data of the primitive
+			std::vector<uint8_t> posBinary, texBinary, norBinary, tanBinary;
+			// For each attribute in the primitive
 			for (auto& fxAttribute : fxPrim.attributes)
 			{
 				if (fxAttribute.first == "POSITION")
@@ -306,25 +325,120 @@ void Lumen::SceneManager::LoadMeshes(fx::gltf::Document& a_Doc, GLTFResource& a_
 				{
 					norBinary = LoadBinary(a_Doc, fxAttribute.second);
 				}
+				else if (fxAttribute.first == "TANGENT")
+				{
+					tanBinary = LoadBinary(a_Doc, fxAttribute.second);
+				}
+
 			}
-			auto& acc = fxPrim.attributes["POSITION"];
-			auto& accessprYe = a_Doc.accessors[acc];
-			auto& bufferView = a_Doc.bufferViews[accessprYe.bufferView];
 
-			auto binary = a_Doc.buffers[bufferView.buffer];
-
-			//index to accessor
-
-
+			// Get binary data for the primitive's indices if those are included
 			auto indexBufferAcc = a_Doc.accessors[fxPrim.indices];
-			auto indexBin = LoadBinary(a_Doc, fxPrim.indices);
+			std::vector<unsigned char> indexBin = LoadBinary(a_Doc, fxPrim.indices);
 			auto indexSize = GetComponentSize(indexBufferAcc); // indices are are always a single component
 			assert(indexSize <= 4);
 
+			assert(fxPrim.mode == fx::gltf::Primitive::Mode::Triangles);
+
+			VectorView<glm::vec3, uint8_t> vertexView(posBinary);
+			VectorView<glm::vec2, uint8_t> texView(texBinary);
+			VectorView<uint32_t, uint8_t> indexView32(indexBin);
+			VectorView<uint16_t, uint8_t> indexView16(indexBin);
+			VectorView<glm::vec3, uint8_t> normalView(norBinary);
+
+			//If no tangents were loaded, generate them.
+			if (tanBinary.empty())
+			{
+				const auto numIndices = indexBin.size() / indexSize;
+				tanBinary.resize(numIndices * sizeof(glm::vec4));
+
+				VectorView<glm::vec4, uint8_t> tangentView(tanBinary);
+
+				////Invert the V coordinates
+				for(auto i = 0; i < texView.Size(); ++i)
+				{
+					texView[i].y = 1.f - texView[i].y;
+				}
+
+				//Loop over every triangle in the index buffer.
+				for (auto index = 0u; index < numIndices; index += 3)
+				{
+					//Retrieve the indices from the index buffer.
+					unsigned int index1;
+					unsigned int index2;
+					unsigned int index3;
+
+					if (indexSize == 2)
+					{
+						index1 = indexView16[index + 0];
+						index2 = indexView16[index + 1];
+						index3 = indexView16[index + 2];
+					}
+					else
+					{
+						index1 = indexView32[index + 0];
+						index2 = indexView32[index + 1];
+						index3 = indexView32[index + 2];
+					}
+
+					//Can't have a triangle that has two points the same. That's called a line.
+					if(index1 == index2 || index2 == index3 || index3 == index1)
+					{
+						printf("Warning: Invalid vertex indices found.\n");
+					}
+
+					//Thanks to opengl-tutorial.com
+					const glm::vec3* v0 = &vertexView[index1];
+					const glm::vec3* v1 = &vertexView[index2];
+					const glm::vec3* v2 = &vertexView[index3];
+					glm::vec2* uv0 = &texView[index1];
+					glm::vec2* uv1 = &texView[index2];
+					glm::vec2* uv2 = &texView[index3];
+
+					glm::vec3 deltaPos1 = *v1 - *v0;
+					glm::vec3 deltaPos2 = *v2 - *v0;
+
+					glm::vec2 deltaUV1 = *uv1 - *uv0;
+					glm::vec2 deltaUV2 = *uv2 - *uv0;
+
+					float cross = deltaUV1.x * deltaUV2.y - deltaUV1.y * deltaUV2.x;
+
+					//If cross is 0, it means the texture coordinates are a single point for two corners.
+				    assert(cross != 0);
+
+					float r = 1.0f / cross;
+
+					glm::vec3 tangent = glm::vec3((deltaPos1 * deltaUV2.y - deltaPos2 * deltaUV1.y) * r);
+
+					assert(!isnan(tangent.x));
+					assert(!isnan(tangent.y));
+					assert(!isnan(tangent.z));
+					assert(glm::length(glm::vec3(tangent.x, tangent.y, tangent.z)) > 0.f);
+					//
+					if(isnan(tangent.x) || isnan(tangent.y) || isnan(tangent.z) || isinf(tangent.x) || isinf(tangent.y) || isinf(tangent.z))
+					{
+						tangent = glm::vec3(1.f, 0.f, 0.f);
+					}
+
+					//Normalize the tangent.
+					tangent = glm::normalize(tangent);
+
+					auto tanVec4 = glm::vec4(tangent, 1.f);
+
+					//Put in the output buffer. Same tangent for every vertex that was processed.
+					tangentView[index1] = tanVec4;
+					tangentView[index2] = tanVec4;
+					tangentView[index3] = tanVec4;
+				}
+			}
+
+
+			// Fill out the primitive data struct and make a primitive through the renderer
 			LumenRenderer::PrimitiveData primitiveData;
 			primitiveData.m_Positions = posBinary;
 			primitiveData.m_TexCoords = texBinary;
 			primitiveData.m_Normals = norBinary;
+			primitiveData.m_Tangents = tanBinary;
 
 			primitiveData.m_IndexBinary = indexBin;
 			primitiveData.m_IndexSize = indexSize;
@@ -333,18 +447,94 @@ void Lumen::SceneManager::LoadMeshes(fx::gltf::Document& a_Doc, GLTFResource& a_
 
 			auto newPrim = m_RenderPipeline->CreatePrimitive(primitiveData);
 
-			//newPrim->m_Material = a_Res.m_MaterialPool[fxPrim.material];
+			// Add the primitive to the primitive list
 			primitives.push_back(std::move(newPrim));
 		}
+		// Create a mesh from the primitives
 		meshes.push_back(m_RenderPipeline->CreateMesh(primitives));
 	}
 
+	// Save all the meshes into the GLTFResource
 	a_Res.m_MeshPool = meshes;
 
 }
 
+void Lumen::SceneManager::LoadScenes(fx::gltf::Document& a_Doc, GLTFResource& a_Res)
+{
+	int32_t counter = 0;
+	// For each scene in the document
+	for (auto& scene : a_Doc.scenes)
+	{
+		// Create a renderer-specific scene
+		auto lumenScene = m_RenderPipeline->CreateScene();
+        if (scene.name.empty())
+        {
+			lumenScene->m_Name = "Unnamed scene " + std::to_string(counter++);
+        }
+		else
+		    lumenScene->m_Name = scene.name;            
+
+		// And load all of the scene's root nodes
+		for (auto& rootNode : scene.nodes)
+		{
+			LoadNodeAndChildren(a_Doc, a_Res, *lumenScene, rootNode);
+		}
+
+		// Save the scene into the resource
+		a_Res.m_Scenes.push_back(lumenScene);
+	}
+}
+
+void Lumen::SceneManager::LoadNodeAndChildren(fx::gltf::Document a_Doc, Lumen::SceneManager::GLTFResource a_Res, ILumenScene& a_Scene, uint32_t a_NodeID, Lumen::Transform a_ParentTransform)
+{
+	auto node = a_Doc.nodes[a_NodeID];
+	auto nodeTransform = LoadNodeTransform(node);
+
+	// Calculate the world space transform of this node taking into account the parent's world space transform
+	nodeTransform = a_ParentTransform * nodeTransform;
+
+	// If the node has a mesh, we add the mesh to the scene and give it the node's transform
+	if (node.mesh != -1)
+	{
+		auto newMesh = a_Scene.AddMesh();
+		newMesh->SetMesh(a_Res.m_MeshPool[node.mesh]);
+		newMesh->m_Transform = nodeTransform;
+	}
+
+	// Recursively load all of the node's children
+	for (auto& child : node.children)
+	{
+		LoadNodeAndChildren(a_Doc, a_Res, a_Scene, child, nodeTransform);
+	}
+}
+
+Lumen::Transform Lumen::SceneManager::LoadNodeTransform(fx::gltf::Node a_Node)
+{
+	const static glm::mat4 identity = glm::identity<glm::mat4>();
+	auto nodeMat = glm::make_mat4(a_Node.matrix.data());
+
+	Transform transform;
+
+	// The GLTF spec is quite ambiguous about the transform, but this appears to work
+	// If the matrix representation is an identity matrix, it seems safe to assume that the transform is represented by the TRS
+	if (nodeMat == identity)
+	{
+		auto t = a_Node.translation;
+		auto r = a_Node.rotation;
+		auto s = a_Node.scale;
+		transform.SetPosition(glm::vec3(t[0], t[1], t[2]));
+		transform.SetRotation(glm::quat(r[3], r[0], r[1], r[2]));
+		transform.SetScale(glm::vec3(s[0], s[1], s[2]));
+	}
+	else
+	{
+		transform = nodeMat;
+	}
+	return transform;
+}
+
 Lumen::LoadedImageInformation Lumen::SceneManager::LoadTexture(fx::gltf::Document& a_File, int a_TextureId,
-    const std::string& a_Path, int a_NumChannels)
+	const std::string& a_Path, int a_NumChannels)
 {
 	assert(a_TextureId >= 0);
 
@@ -390,13 +580,19 @@ std::vector<uint8_t> Lumen::SceneManager::LoadBinary(fx::gltf::Document& a_Doc, 
 	uint32_t compSize = GetComponentSize(bufferAccessor);
 	uint32_t attSize = compCount * compSize;
 
-	auto stride = std::max(attSize, bufferView.byteStride);
+	// Sometimes bufferView.byteStride is 0, so we pick the biggest of the two
+	// That way this works for interleaved buffers as well
+	uint32_t stride = std::max(attSize, bufferView.byteStride);
 
-	data.resize(bufferView.byteLength / stride * attSize);
+	// Resize the output buffer to fit all the data that will be extracted
+	data.resize(bufferView.byteLength / stride * static_cast<uint64_t>(attSize));
 
+	// Offset from which to read in the buffer
 	auto bufferOffset = 0;
+	// Buffer offset specified in the file
 	auto gltfBufferOffset = bufferView.byteOffset + bufferAccessor.byteOffset;
 
+	// Copy over the binary data via a loop
 	for (uint32_t i = 0; i < bufferAccessor.count; i++)
 	{
 		memcpy(data.data() + bufferOffset, buffer.data.data() + gltfBufferOffset + bufferOffset, attSize);
@@ -428,6 +624,7 @@ void Lumen::SceneManager::LoadMaterials(fx::gltf::Document& a_Doc, GLTFResource&
 			));
 		}
 
+		// Check if the diffuse texture is specified
 		if (fxMat.pbrMetallicRoughness.baseColorTexture.index != -1)
 		{
 			//auto& fxTex = a_Doc.images.at(fxMat.pbrMetallicRoughness.baseColorTexture.index);
@@ -435,7 +632,7 @@ void Lumen::SceneManager::LoadMaterials(fx::gltf::Document& a_Doc, GLTFResource&
 			//const auto file = (a_Res.m_Path + "/../" + fxTex.uri);
 			//const auto stbTex = stbi_load(file.c_str(), &x, &y, &c, 4);
 			//const auto tex = m_RenderPipeline->CreateTexture(stbTex, x, y);
-			
+
 
 			//Load the texture either from file or binary. Then create the engine texture object.
 			auto info = LoadTexture(a_Doc, fxMat.pbrMetallicRoughness.baseColorTexture.index, a_Path, 4);
@@ -445,6 +642,51 @@ void Lumen::SceneManager::LoadMaterials(fx::gltf::Document& a_Doc, GLTFResource&
 
 			//Free the memory after it's uploaded.
 			stbi_image_free(info.data);
+		}
+		else
+		{
+			// If it isn't, set the diffuse texture to a default white one
+			mat->SetDiffuseTexture(m_DefaultDiffuseTexture);
+		}
+
+		//Metallic/roughness value
+		if (fxMat.pbrMetallicRoughness.metallicRoughnessTexture.index != -1)
+		{
+			//Load the texture either from file or binary. Then create the engine texture object.
+			auto info = LoadTexture(a_Doc, fxMat.pbrMetallicRoughness.metallicRoughnessTexture.index, a_Path, 4);
+
+			//Clamp perfect mirrors to be within bounds.
+			for(int index = 0; index < info.w * info.h; ++index)
+			{
+				uchar4* data = reinterpret_cast<uchar4*>(&info.data[index * 4]);
+				data->y = std::max(data->y, static_cast<unsigned char>(1));
+			}
+
+			const auto tex = m_RenderPipeline->CreateTexture(info.data, info.w, info.h);
+			mat->SetMetalRoughnessTexture(tex);
+
+			//Free the memory after it's uploaded.
+			stbi_image_free(info.data);
+		}
+		else
+		{
+			mat->SetMetalRoughnessTexture(m_DefaultMetalRoughnessTexture);
+		}
+
+		//Normal map
+		if (fxMat.normalTexture.index != -1)
+		{
+			//Load the texture either from file or binary. Then create the engine texture object.
+			auto info = LoadTexture(a_Doc, fxMat.normalTexture.index, a_Path, 4);
+			const auto tex = m_RenderPipeline->CreateTexture(info.data, info.w, info.h);
+			mat->SetNormalTexture(tex);
+
+			//Free the memory after it's uploaded.
+			stbi_image_free(info.data);
+		}
+		else
+		{
+			mat->SetNormalTexture(m_DefaultNormalTexture);
 		}
 
 		if (fxMat.emissiveFactor != std::array<float, 3>{0.0f, 0.0f, 0.0f})
@@ -460,11 +702,11 @@ void Lumen::SceneManager::LoadMaterials(fx::gltf::Document& a_Doc, GLTFResource&
 		{
 			auto info = LoadTexture(a_Doc, fxMat.emissiveTexture.index, a_Path, 4);
 			const auto tex = m_RenderPipeline->CreateTexture(info.data, info.w, info.h);
-			
+
 			mat->SetEmissiveTexture(tex);
 
 			//LMN_INFO("Emissive texture present");
-			
+
 			stbi_image_free(info.data);
 		}
 
@@ -512,6 +754,9 @@ uint32_t Lumen::SceneManager::GetComponentCount(fx::gltf::Accessor& a_Accessor)
 	case fx::gltf::Accessor::Type::Vec3:
 		return 3;
 		break;
+	case fx::gltf::Accessor::Type::Vec4:
+		return 4;
+		break;
 	case fx::gltf::Accessor::Type::Mat2:
 		return 4;
 		break;
@@ -523,8 +768,7 @@ uint32_t Lumen::SceneManager::GetComponentCount(fx::gltf::Accessor& a_Accessor)
 		break;
 	default:
 		LMN_ASSERT(0 && "Failed to load GLTF file");
+		assert(0);
 		return 0;
 	}
 }
-
-

@@ -4,7 +4,7 @@
 
 
 RecordHandleBase::RecordHandleBase()
-    : m_Dirty(true)
+    : m_Dirty(true) // The record handles are initialized as dirty so that they are added to the shader binding table on its next update
     , m_TableIndex(0)
     , m_Size(0)
     , m_RawData(nullptr)
@@ -18,19 +18,10 @@ RecordHandleBase::~RecordHandleBase()
    
 }
 
-//RecordHandleBase::RecordHandleBase(RecordHandleBase&& a_Other)
-//{
-//    // Big brain play here. m_Size is the size of the child instantiated class. Copies the exact data contained by the child class.
-//    memcpy(this, &a_Other, sizeof(RecordHandleBase) + a_Other.m_Size);
-//
-//    UpdateGeneratorReference();
-//
-//    a_Other.m_RecordListRef = nullptr;
-//    a_Other.m_RecordHandleRef = nullptr;
-//}
-
 void RecordHandleBase::UpdateGeneratorReference()
 {
+    // If both m_RecordHandleRef and m_RecordListRef are nullptrs, then this handle is invalid,
+    // so it should not have any reflection on the generator
     if (m_RecordHandleRef)
     {
         *m_RecordHandleRef = this;

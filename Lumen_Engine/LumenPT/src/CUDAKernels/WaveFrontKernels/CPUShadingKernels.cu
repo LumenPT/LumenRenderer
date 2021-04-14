@@ -32,7 +32,7 @@ CPU_ONLY void GeneratePrimaryRays(const PrimRayGenLaunchParameters& a_PrimaryRay
     const float3 v = a_PrimaryRayGenParams.m_Camera.m_Right;
     const float3 w = a_PrimaryRayGenParams.m_Camera.m_Forward;
     const float3 eye = a_PrimaryRayGenParams.m_Camera.m_Position;
-    const int2 dimensions = make_int2(a_PrimaryRayGenParams.m_Resolution.x, a_PrimaryRayGenParams.m_Resolution.y);
+    const uint2 dimensions = uint2{ a_PrimaryRayGenParams.m_Resolution.x, a_PrimaryRayGenParams.m_Resolution.y };
     const int numRays = dimensions.x * dimensions.y;
     const unsigned int frameCount = a_PrimaryRayGenParams.m_FrameCount;
 
@@ -48,10 +48,10 @@ CPU_ONLY void GenerateMotionVectors(MotionVectorsGenerationData& a_MotionVectors
     const int blockSize = 256;
     const int numBlocks = (numPixels + blockSize - 1) / blockSize;
 
-    GenerateMotionVector<<<numBlocks, blockSize>>>(
-    a_MotionVectorsData.m_MotionVectorBuffer, 
-    a_MotionVectorsData.a_CurrentSurfaceData, 
-    a_MotionVectorsData.m_ScreenResolution,
+    GenerateMotionVector << <numBlocks, blockSize >> > (
+        a_MotionVectorsData.m_MotionVectorBuffer,
+        a_MotionVectorsData.a_CurrentSurfaceData,
+        a_MotionVectorsData.m_ScreenResolution,
         a_MotionVectorsData.m_ProjectionMatrix * a_MotionVectorsData.m_PrevViewMatrix);
 
     cudaDeviceSynchronize();
@@ -110,7 +110,8 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
             a_ShadingParams.m_OptixSceneHandle,
             a_ShadingParams.m_ShadowRays,
             a_ShadingParams.m_OptixSystem,
-            a_ShadingParams.m_MotionVectorBuffer
+            a_ShadingParams.m_MotionVectorBuffer,
+            false
         );
     }
     else
@@ -122,7 +123,7 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
         }
 
         const int numPixels = a_ShadingParams.m_ResolutionAndDepth.x * a_ShadingParams.m_ResolutionAndDepth.y;
-        const int blockSize = 256;
+        const int blockSize = 512;
         const int numBlocks = (numPixels + blockSize - 1) / blockSize;
         CDF* cdfPtr = a_ShadingParams.m_ReSTIR->GetCdfGpuPointer();
 
@@ -145,7 +146,7 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
     //Generate secondary rays only when there's a wave after this.
     if(a_ShadingParams.m_CurrentDepth < a_ShadingParams.m_ResolutionAndDepth.z - 1)
     {
-        const int blockSize = 256;
+        const int blockSize = 512;
         const int numBlocks = (a_ShadingParams.m_NumIntersections + blockSize - 1) / blockSize;
 
         ShadeIndirect << <numBlocks, blockSize >> > (
@@ -161,10 +162,12 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
         cudaDeviceSynchronize();
     }
 
-    /*DEBUGShadePrimIntersections<<<numBlocks, blockSize>>>(
-        a_ShadingParams.m_ResolutionAndDepth,
-        a_ShadingParams.m_CurrentSurfaceData,
-        a_ShadingParams.m_Output);*/
+    //const int blockSize = 512;
+    //const int numBlocks = (a_ShadingParams.m_NumIntersections + blockSize - 1) / blockSize;
+    //DEBUGShadePrimIntersections<<<numBlocks, blockSize>>>(
+    //    a_ShadingParams.m_ResolutionAndDepth,
+    //    a_ShadingParams.m_CurrentSurfaceData,
+    //    a_ShadingParams.m_Output);
 }
 
 CPU_ONLY void PostProcess(const PostProcessLaunchParameters& a_PostProcessParams)
@@ -189,7 +192,10 @@ CPU_ONLY void PostProcess(const PostProcessLaunchParameters& a_PostProcessParams
     MergeOutputChannels << <numBlocks, blockSize >> > (
         a_PostProcessParams.m_RenderResolution,
         a_PostProcessParams.m_WavefrontOutput,
-        a_PostProcessParams.m_ProcessedOutput);
+        a_PostProcessParams.m_ProcessedOutput,
+        a_PostProcessParams.m_BlendOutput,
+        a_PostProcessParams.m_BlendCount
+        );
 
     /*cudaDeviceSynchronize();
     CHECKLASTCUDAERROR;*/
@@ -215,5 +221,6 @@ CPU_ONLY void PostProcess(const PostProcessLaunchParameters& a_PostProcessParams
     WriteToOutput << <numBlocksUpscaled, blockSizeUpscaled >> > (
         a_PostProcessParams.m_OutputResolution,
         a_PostProcessParams.m_ProcessedOutput,
-        a_PostProcessParams.m_FinalOutput);
+        a_PostProcessParams.m_FinalOutput
+        );
 }

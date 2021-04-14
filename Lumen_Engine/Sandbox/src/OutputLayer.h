@@ -26,11 +26,13 @@ public:
     OutputLayer();
     ~OutputLayer();
 
-    void OnAttach() override { InitializeScenePresets(); };
+    void OnAttach() override;
 
     void OnUpdate() override;
 
     void OnImGuiRender() override;
+
+    void OnEvent(Lumen::Event& a_Event) override;
 
     //LumenPT* GetPipeline() { return m_LumenPT.get(); };
     LumenRenderer* GetPipeline() { return m_Renderer.get(); };
@@ -54,6 +56,8 @@ private:
 
     float m_CameraMouseSensitivity;
     float m_CameraMovementSpeed;
+
+    std::unique_ptr<class ModelLoaderWidget> m_ModelLoaderWidget;
 
     enum ContentViewMode
     {

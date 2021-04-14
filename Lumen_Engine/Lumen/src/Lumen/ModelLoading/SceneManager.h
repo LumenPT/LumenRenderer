@@ -94,7 +94,9 @@ namespace Lumen
 
 		std::vector<uint8_t> m_embeddedData{};
 	};
+	 
 
+    // Essentially model loader and manager
 	class SceneManager
 	{
 	public:
@@ -107,6 +109,7 @@ namespace Lumen
 			std::vector<std::shared_ptr<Node>>					m_NodePool;
 			std::vector<std::shared_ptr<Lumen::ILumenMesh>>		m_MeshPool;
 			std::vector<std::shared_ptr<ILumenMaterial>>		m_MaterialPool;
+			std::vector<std::shared_ptr<ILumenScene>>			m_Scenes;
 			// Also contain materials
 				//binary material data is kinda unsigned long long
 			// Also contain textures
@@ -144,7 +147,7 @@ namespace Lumen
 
 		//Temporary for debugging
 		//std::map<std::string, GLTFResource>* GetResourceMap() { &m_LoadedScenes; };
-		
+
 	private:
 		std::map<std::string, GLTFResource> m_LoadedScenes;
 
@@ -154,21 +157,40 @@ namespace Lumen
 
 		//std::vector<std::shared_ptr<GLTFResource>> LoadScenes(fx::gltf::Document& a_Doc, std::string a_Filepath);
 
-		void LoadNodes(fx::gltf::Document& a_Doc, GLTFResource& a_Res, int a_NodeId, bool a_Root, const glm::mat4& a_TransformMat = glm::mat4(1));
-		void LoadMeshes(fx::gltf::Document& a_Doc, GLTFResource& a_Res);
+		// Initializes all default resources which are used as a fall back when properties are not found in the file.
+		void InitializeDefaultResources();
 
-		//Load a texture from the given file.
+		void LoadNodes(fx::gltf::Document& a_Doc, GLTFResource& a_Res, int a_NodeId, bool a_Root, const glm::mat4& a_TransformMat = glm::mat4(1));
+		void LoadMeshes(fx::gltf::Document& a_Doc, GLTFResource& a_Res); // Load all meshes in the file
+		void LoadScenes(fx::gltf::Document& a_Doc, GLTFResource& a_Res); // Load all scenes in the file
+		// Load the node with the specified node ID together with all of its children
+		void LoadNodeAndChildren(fx::gltf::Document a_Doc, GLTFResource a_Res, ILumenScene& a_Scene, uint32_t a_NodeID, Transform a_ParentTransform = Transform());
+		Transform LoadNodeTransform(fx::gltf::Node a_Node); // Load the transform of a node
+
+		//Load a texture from the texture ID.
 		LoadedImageInformation LoadTexture(fx::gltf::Document& a_File, int a_TextureId, const std::string& a_Path, int a_NumChannels);
 
+		// Load all materials in the file
 		void LoadMaterials(fx::gltf::Document& a_Doc, GLTFResource& a_Res, const std::string& a_Path);
+		// Output a vector of binary data from the given accessor index
 		std::vector<uint8_t> LoadBinary(fx::gltf::Document& a_Doc, uint32_t a_AccessorIndx);
-		uint32_t GetComponentCount(fx::gltf::Accessor& a_Accessor);
-		uint32_t GetComponentSize(fx::gltf::Accessor& a_Accessor);
+		uint32_t GetComponentCount(fx::gltf::Accessor& a_Accessor); // Return how many components the accessor uses
+		uint32_t GetComponentSize(fx::gltf::Accessor& a_Accessor); // Return the size of the components used by the accessor
 
 		LumenRenderer* m_RenderPipeline;
 
+		// List of all meshes and materials that are currently in use by the renderer
 		std::vector<std::shared_ptr<Lumen::ILumenMesh>>		m_InUseMeshes;
 		std::vector<std::shared_ptr<ILumenMaterial>>		m_InUseMaterials;
+
+		// Default white texture to use in scenarios when the material's diffuse texture is not specified
+		std::shared_ptr<ILumenTexture> m_DefaultDiffuseTexture;
+
+		//Default metallic roughness texture in case the metallic roughness is not specified.
+		std::shared_ptr<ILumenTexture> m_DefaultMetalRoughnessTexture;
+
+		//The default normal texture in case none is specified.
+		std::shared_ptr<ILumenTexture> m_DefaultNormalTexture;
 	};
 
 

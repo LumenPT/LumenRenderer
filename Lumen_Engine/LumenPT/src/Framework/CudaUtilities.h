@@ -73,7 +73,7 @@ inline void CheckCudaLastErr()
 #endif
 
 #if defined(CUDA_NOCHECK) || ! defined(_DEBUG)
-#define CHECKLASTCUDAERROR
+#define CHECKLASTCUDAERROR CheckCudaLastErr();
 #elif defined(CUDA_CHECK) || defined(_DEBUG)
 #define CHECKLASTCUDAERROR\
     CheckCudaLastErr();

@@ -4,6 +4,7 @@
 
 namespace Lumen
 {
+    // Base class for volume instances
     class VolumeInstance
     {
     public:

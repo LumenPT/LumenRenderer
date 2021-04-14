@@ -9,7 +9,6 @@
 #include "../Shaders/CppCommon/WaveFrontDataStructs/AtomicBuffer.h"
 #include "OptixWrapper.h"
 
-
 CPU_ONLY void ReSTIR::Initialize(const ReSTIRSettings& a_Settings)
 {
 	m_Settings = a_Settings;
@@ -62,8 +61,8 @@ CPU_ONLY void ReSTIR::Initialize(const ReSTIRSettings& a_Settings)
 }
 
 CPU_ONLY void ReSTIR::Run(
-	const WaveFront::SurfaceData * const a_CurrentPixelData,
-	const WaveFront::SurfaceData * const a_PreviousPixelData,
+	const WaveFront::SurfaceData* const a_CurrentPixelData,
+	const WaveFront::SurfaceData* const a_PreviousPixelData,
 	const WaveFront::TriangleLight* a_Lights,
 	const unsigned a_NumLights,
 	const float3& a_CameraPosition,
@@ -71,7 +70,8 @@ CPU_ONLY void ReSTIR::Run(
 	const OptixTraversableHandle a_OptixSceneHandle,
 	WaveFront::AtomicBuffer<WaveFront::ShadowRayData>* a_WaveFrontShadowRayBuffer,
 	const WaveFront::OptixWrapper* a_OptixSystem,
-	WaveFront::MotionVectorBuffer* a_MotionVectorBuffer
+	WaveFront::MotionVectorBuffer* a_MotionVectorBuffer,
+	bool a_DebugPrint
 )
 {
 	assert(m_SwapDirtyFlag && "SwapBuffers has to be called once per frame for ReSTIR to properly work.");
@@ -79,7 +79,7 @@ CPU_ONLY void ReSTIR::Run(
 
 	//Index of the reservoir buffers (current and temporal).
 	const auto currentIndex = m_SwapChainIndex;
-	const auto temporalIndex = currentIndex == 1 ? 0 : 1;
+	const auto temporalIndex = (currentIndex == 1 ? 0 : 1);
 
 	//The seed will be modified over time.
 	auto seed = WangHash(a_Seed);
@@ -92,6 +92,7 @@ CPU_ONLY void ReSTIR::Run(
 
 	//Timer for measuring performance.
 	Timer timer;
+	Timer totalTimer;
 
 	/*
      * Resize buffers based on the amount of lights and update data.
@@ -101,13 +102,13 @@ CPU_ONLY void ReSTIR::Run(
 	//Update the CDF for the provided light sources.
 	timer.reset();
 	BuildCDF(a_Lights, a_NumLights);
-	printf("Building CDF time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
+	if(a_DebugPrint) printf("Building CDF time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
 
 	//Fill light bags with values from the CDF.
 	{
 		timer.reset();
 		FillLightBags(m_Settings.numLightBags, m_Settings.numLightsPerBag, static_cast<CDF*>(m_Cdf.GetDevicePtr()), static_cast<LightBagEntry*>(m_LightBags.GetDevicePtr()), a_Lights, a_Seed);
-		printf("Filling light bags time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
+		if (a_DebugPrint) printf("Filling light bags time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
 	}
 
 	/*
@@ -116,13 +117,16 @@ CPU_ONLY void ReSTIR::Run(
 	seed = WangHash(seed);
 	timer.reset();
 	PickPrimarySamples(static_cast<LightBagEntry*>(m_LightBags.GetDevicePtr()), static_cast<Reservoir*>(m_Reservoirs[currentIndex].GetDevicePtr()), m_Settings, a_CurrentPixelData, seed);
-	printf("Picking primary samples time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
+	if (a_DebugPrint) printf("Picking primary samples time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
 
 	/*
 	 * Generate shadow rays for each reservoir and resolve them.
 	 * If a shadow ray is occluded, the reservoirs weight is set to 0.
 	 */
-	const unsigned int numRaysGenerated = GenerateReSTIRShadowRays(&m_ShadowRays, static_cast<Reservoir*>(m_Reservoirs[currentIndex].GetDevicePtr()), a_CurrentPixelData, numPixels);
+	const auto numReservoirs = numPixels * m_Settings.numReservoirsPerPixel;
+	timer.reset();
+	const unsigned int numRaysGenerated = GenerateReSTIRShadowRays(&m_ShadowRays, static_cast<Reservoir*>(m_Reservoirs[currentIndex].GetDevicePtr()), a_CurrentPixelData, numReservoirs);
+	if (a_DebugPrint) printf("ReSTIR Shadow Ray Generation time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
 
 	//Parameters for optix launch.
 	WaveFront::OptixLaunchParameters params;
@@ -138,7 +142,7 @@ CPU_ONLY void ReSTIR::Run(
 	{
 		timer.reset();
 		a_OptixSystem->TraceRays(numRaysGenerated, params);
-		printf("Tracing ReSTIR shadow rays time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
+		if (a_DebugPrint) printf("Tracing ReSTIR shadow rays time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
 	}
 
 	/*
@@ -154,11 +158,10 @@ CPU_ONLY void ReSTIR::Run(
 			a_CurrentPixelData,
 			a_PreviousPixelData,
 			seed,
-			numPixels,
 			dimensions,
 			a_MotionVectorBuffer
 		);
-		printf("Temporal sampling time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
+		if (a_DebugPrint) printf("Temporal sampling time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
 	}
 
 	/*
@@ -175,7 +178,7 @@ CPU_ONLY void ReSTIR::Run(
 			seed,
 			dimensions
 		);
-		printf("Spatial sampling time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
+		if (a_DebugPrint) printf("Spatial sampling time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
 	}
 
 	timer.reset();
@@ -185,10 +188,13 @@ CPU_ONLY void ReSTIR::Run(
 		a_WaveFrontShadowRayBuffer,
 		numPixels
 	);
-	printf("Generating wavefront shadow rays time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
+	if (a_DebugPrint) printf("Generating wavefront shadow rays time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
 
 	//Ensure CUDA is done executing now.
 	cudaDeviceSynchronize();
+
+	printf("Total ReSTIR runtime: %f millis.\n", totalTimer.measure(TimeUnit::MILLIS));
+
 
 	//Ensure that swap buffers is called.
 	m_SwapDirtyFlag = false;
