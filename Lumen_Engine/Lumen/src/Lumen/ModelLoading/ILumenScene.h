@@ -23,6 +23,7 @@ namespace Lumen
         virtual void Clear();
 
         std::vector<std::unique_ptr<Lumen::MeshInstance>> m_MeshInstances;
+        std::vector<unsigned int> m_MeshLightIndices;
         std::vector<std::unique_ptr<Lumen::VolumeInstance>> m_VolumeInstances;
         const std::unique_ptr<Camera> m_Camera;
     	//accelleration structure
