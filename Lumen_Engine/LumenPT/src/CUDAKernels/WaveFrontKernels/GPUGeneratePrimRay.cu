@@ -113,7 +113,8 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
             const float4 textureColor = tex2D<float4>(material->m_DiffuseTexture, texCoords.x, texCoords.y);
             const float3 finalColor = make_float3(textureColor * material->m_DiffuseColor);
             const float4 metalRoughness = tex2D<float4>(material->m_MetalRoughnessTexture, texCoords.x, texCoords.y);
-            const float4 emissive = tex2D<float4>(material->m_EmissiveTexture, texCoords.x, texCoords.y);
+            float4 emissive = tex2D<float4>(material->m_EmissiveTexture, texCoords.x, texCoords.y);
+            emissive *= material->m_EmissionColor;
             const float metal = metalRoughness.z;
             const float roughness = metalRoughness.y;
 

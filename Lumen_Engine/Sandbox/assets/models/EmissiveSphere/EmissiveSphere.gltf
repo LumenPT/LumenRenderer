@@ -22,9 +22,9 @@
         {
             "doubleSided" : true,
             "emissiveFactor" : [
-                1,
-                0.9656218886375427,
-                0.7230551242828369
+                500,
+                500,
+                500
             ],
             "name" : "Emissive",
             "pbrMetallicRoughness" : {}
