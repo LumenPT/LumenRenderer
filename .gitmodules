@@ -1,0 +1,3 @@
+[submodule "Lumen_Engine/Sandbox/assets/gltfExternalAssets"]
+	path = Lumen_Engine/Sandbox/assets/gltfExternalAssets
+	url = https://github.com/LumenPT/gltfExternalAssets.git
