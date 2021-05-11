@@ -4,8 +4,8 @@ class DX12Wrapper
 {
 public:
 
-	DX12Wrapper();
-	virtual ~DX12Wrapper();
+	DX12Wrapper() = default;
+	virtual ~DX12Wrapper() = default;
 
 	virtual void Initialize() = 0;
 
