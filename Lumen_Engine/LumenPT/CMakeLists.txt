@@ -93,6 +93,14 @@ file(GLOB_RECURSE CPP_HEADER_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/Tools/*.cuh
 )
 
+if(${USE_NVIDIA_DENOISER})
+	list(APPEND CPP_HEADER_FILES 
+	"vendor/RayTracingDenoiser/LumenPT/Framework/DX12Wrapper/NRIDX12Wrapper.h"
+	"vendor/RayTracingDenoiser/LumenPT/Framework/DX12Wrapper/NRIHelper.h"
+	"vendor/RayTracingDenoiser/LumenPT/Framework/DX12Wrapper/NRIUtils.h"
+	)
+endif()
+
 #Add source files
 file(GLOB_RECURSE CPP_SOURCE_FILES 
 
@@ -101,6 +109,13 @@ file(GLOB_RECURSE CPP_SOURCE_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/CUDAKernels/*.cu
 	${CMAKE_CURRENT_SOURCE_DIR}/src/Tools/*.cu
 )
+
+if(${USE_NVIDIA_DENOISER})
+	list(APPEND CPP_HEADER_FILES 
+	"vendor/RayTracingDenoiser/LumenPT/Framework/DX12Wrapper/NRIDX12Wrapper.cpp"
+	"vendor/RayTracingDenoiser/LumenPT/Framework/DX12Wrapper/NRIUtils.cpp"
+	)
+endif()
 
 # Add header and source files to library
 add_library (LumenPT STATIC ${CPP_HEADER_FILES} ${CPP_SOURCE_FILES})
@@ -159,6 +174,15 @@ set(INCLUDES
 	${NANOVDB_HEADERS}
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/openvdb/openvdb"
 )
+
+if(${USE_NVIDIA_DENOISER})
+	list(APPEND LIBS NRD NRI NRI_D3D12)
+	list(APPEND INCLUDES 
+	
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/LumenPT/Framework/DX12Wrapper" 
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/NRI/Include" 
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Include/Detex")
+endif()
 
 # Define the include DIRs
 target_include_directories(LumenPT PUBLIC

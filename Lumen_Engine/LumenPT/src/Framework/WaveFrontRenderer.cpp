@@ -21,6 +21,7 @@
 #include "../Tools/FrameSnapshot.h"
 #include "../Tools/SnapShotProcessing.cuh"
 #include "MotionVectors.h"
+#include "NRIDX12Wrapper.h"
 
 #include <Optix/optix_function_table_definition.h>
 #include <filesystem>
@@ -72,6 +73,9 @@ namespace WaveFront
         //Set the service locator's pointer to the OptixWrapper.
         m_ServiceLocator.m_OptixWrapper = m_OptixSystem.get();
 
+        //TODO: set to null object if no DX12 support
+        m_DX12System = std::make_unique<NRIDX12Wrapper>();
+        m_DX12System->Initialize();
 
         //Set up the OpenGL output buffer.
         m_OutputBuffer = std::make_unique<CudaGLTexture>(GL_RGBA8, m_Settings.outputResolution.x, m_Settings.outputResolution.y, 4);
