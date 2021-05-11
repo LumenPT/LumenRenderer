@@ -191,6 +191,9 @@ namespace Lumen
 
 		//The default normal texture in case none is specified.
 		std::shared_ptr<ILumenTexture> m_DefaultNormalTexture;
+
+		//Emission is 0 by default.
+		std::shared_ptr<ILumenTexture> m_DefaultEmissiveTexture;
 	};
 
 

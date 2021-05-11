@@ -159,6 +159,52 @@ __device__ __forceinline__ void ReSTIRRayGen()
     }
 }
 
+extern "C"
+__device__ __forceinline__ void ReSTIRRayGenShading()
+{
+    //Launch as a 1D Array so that idx.x corresponds to the literal ray index.
+    unsigned int idx = optixGetLaunchIndex().x;
+
+    //Retrieve the data.
+    const RestirShadowRayShading& rayData = *launchParams.m_ReSTIRShadowRayShadingBatch->GetData(idx);
+    const OptixTraversableHandle scene = launchParams.m_TraversableHandle;
+    auto reservoirIndex = rayData.index;
+
+    unsigned int intersected = 0;
+
+    optixTrace(
+        scene,
+        rayData.origin,
+        rayData.direction,
+        launchParams.m_MinMaxDistance.x, //Prevent self shadowing so offset a little bit.
+        rayData.distance,   //Max distance already has a small offset to prevent self-shadowing.
+        0.f,
+        OptixVisibilityMask(255),
+        OPTIX_RAY_FLAG_NONE,
+        0,
+        0,
+        0,
+        intersected  //Pass the reservoir index so that it can be set to 0 when a hit is found.
+    );
+
+    //If occluded, set reservoir weight to 0 so it won't be reused next frame.
+    if (intersected != 0)
+    {
+        launchParams.m_Reservoirs[reservoirIndex].weight = 0.f;
+    }
+    //Not occluded, so add the contribution to the output buffer right away.
+    else
+    {
+        using namespace WaveFront;
+
+        const auto pixelIndex = reservoirIndex / ReSTIRSettings::numReservoirsPerPixel;
+        unsigned int resultIndex =
+            static_cast<unsigned int>(LightChannel::NUM_CHANNELS) * pixelIndex +
+            static_cast<unsigned int>(LightChannel::DIRECT);
+
+        launchParams.m_ResultBuffer[resultIndex] += rayData.contribution;
+    }
+}
 
 
 extern "C"
@@ -180,7 +226,12 @@ __global__ void __raygen__WaveFrontRG()
             //ReSTIR Rays.
             ReSTIRRayGen();
         }
-
+        break;
+    case WaveFront::RayType::RESTIR_SHADING_RAY:
+    {
+        //ReSTIR Rays.
+        ReSTIRRayGenShading();
+    }
         break;
 	}
 
@@ -225,6 +276,7 @@ __global__ void __anyhit__WaveFrontAH()
             optixTerminateRay();
         }
         break;
+    case WaveFront::RayType::RESTIR_SHADING_RAY:
     case WaveFront::RayType::RESTIR_RAY:
         {
             //Any hit is enough.
@@ -263,6 +315,7 @@ __global__ void __closesthit__WaveFrontCH()
     case WaveFront::RayType::SHADOW_RAY:
         break;
     case WaveFront::RayType::RESTIR_RAY:
+    case WaveFront::RayType::RESTIR_SHADING_RAY:
         //Get the reservoir and set its weight to 0 so that it is no longer considered a valid candidate.
         //reSTIRParams.reservoirs[optixGetAttribute_0()].weight = 0.f;
         //optixTerminateRay();

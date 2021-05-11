@@ -157,6 +157,7 @@ void Lumen::SceneManager::InitializeDefaultResources()
 	m_DefaultDiffuseTexture = m_RenderPipeline->CreateTexture(&whitePixel, 1, 1);
 	m_DefaultMetalRoughnessTexture = m_RenderPipeline->CreateTexture(&diffusePixel, 1, 1);
 	m_DefaultNormalTexture = m_RenderPipeline->CreateTexture(&normal, 1, 1);
+	m_DefaultEmissiveTexture = m_RenderPipeline->CreateTexture(&whitePixel, 1, 1);
 }
 
 void Lumen::SceneManager::LoadNodes(fx::gltf::Document& a_Doc, GLTFResource& a_Res, int a_NodeId, bool a_Root, const glm::mat4& a_TransformMat)
@@ -295,7 +296,7 @@ void Lumen::SceneManager::LoadMeshes(fx::gltf::Document& a_Doc, GLTFResource& a_
 	for (auto& fxMesh : a_Doc.meshes)
 	{
 		// List of primitives in the mesh to fill out
-		std::vector<std::unique_ptr<Lumen::ILumenPrimitive>> primitives;
+		std::vector<std::shared_ptr<Lumen::ILumenPrimitive>> primitives;
 		// For each primitive in mesh
 		for (auto& fxPrim : fxMesh.primitives)
 		{
@@ -689,14 +690,18 @@ void Lumen::SceneManager::LoadMaterials(fx::gltf::Document& a_Doc, GLTFResource&
 			mat->SetNormalTexture(m_DefaultNormalTexture);
 		}
 
+		glm::vec3 emission = { 0.f, 0.f, 0.f };
+
 		if (fxMat.emissiveFactor != std::array<float, 3>{0.0f, 0.0f, 0.0f})
 		{
-			mat->SetEmission(glm::vec3(
+			emission = glm::vec3(
 				fxMat.emissiveFactor.at(0),
 				fxMat.emissiveFactor.at(1),
 				fxMat.emissiveFactor.at(2)
-			));
+			);
 		}
+
+		mat->SetEmission(emission);
 
 		if (fxMat.emissiveTexture.index != -1)
 		{
@@ -708,6 +713,10 @@ void Lumen::SceneManager::LoadMaterials(fx::gltf::Document& a_Doc, GLTFResource&
 			//LMN_INFO("Emissive texture present");
 
 			stbi_image_free(info.data);
+		}
+		else
+		{
+			mat->SetEmissiveTexture(m_DefaultEmissiveTexture);
 		}
 
 

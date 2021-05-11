@@ -16,7 +16,7 @@ class PTMesh : public Lumen::ILumenMesh
 public:
     // Construction requires all the primitives in the mesh, as well as a reference to the services.
     // This is necessary for the construction of the acceleration structures
-    PTMesh(std::vector<std::unique_ptr<Lumen::ILumenPrimitive>>& a_Primitives, PTServiceLocator& a_ServiceLocator);
+    PTMesh(std::vector<std::shared_ptr<Lumen::ILumenPrimitive>>& a_Primitives, PTServiceLocator& a_ServiceLocator);
 
     // Rebuilds the acceleration structure for the mesh from the primitives' acceleration structures
     void UpdateAccelerationStructure();
