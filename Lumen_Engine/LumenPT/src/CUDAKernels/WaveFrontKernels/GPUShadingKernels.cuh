@@ -49,6 +49,16 @@ CPU_ON_GPU void ShadeDirect(
     );
 
 /*
+ * When a light is hit at depth 0, it needs to be visualized on the screen.
+ * This kernel does that.
+ */
+CPU_ON_GPU void ResolveDirectLightHits(
+    const SurfaceData* a_SurfaceDataBuffer,
+    const unsigned a_NumPixels,
+    float3* a_OutputChannels
+);
+
+/*
  *
  */
 CPU_ON_GPU void ShadeSpecular();

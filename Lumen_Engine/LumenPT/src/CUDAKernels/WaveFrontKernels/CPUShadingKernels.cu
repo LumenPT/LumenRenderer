@@ -72,6 +72,10 @@ CPU_ONLY void ExtractSurfaceData(
 
 CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
 {
+    //Calculate how many blocks and threads should be used based on the amount of pixels.
+    const int numPixels = a_ShadingParams.m_ResolutionAndDepth.x * a_ShadingParams.m_ResolutionAndDepth.y;
+    const int blockSize = 512;
+    const int numBlocks = (numPixels + blockSize - 1) / blockSize;
 
     auto seed = WangHash(a_ShadingParams.m_Seed);
     //TODO
@@ -92,16 +96,24 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
     //Ensure that ReSTIR is loaded so that the CDF can be extracted.
     assert(a_ShadingParams.m_ReSTIR != nullptr);
 
-    //TODO remove
-    static bool useRestir = true;
-
     /*
-     * Run ReSTIR at the first depth.
+     * First depth is somewhat of a special case.
      */
-    if(a_ShadingParams.m_CurrentDepth == 0 && useRestir)
+    if(a_ShadingParams.m_CurrentDepth == 0)
     {
+        /*
+         * First visualize all lights directly hit by the camera rays.
+         */
+        ResolveDirectLightHits<<<numBlocks, blockSize>>>(
+            a_ShadingParams.m_CurrentSurfaceData,
+            numPixels,
+            a_ShadingParams.m_Output
+        );
+
+        /*
+         * Run ReSTIR to find the best direct light candidates.
+         */
         a_ShadingParams.m_ReSTIR->Run(
-            a_ShadingParams.m_Output,
             a_ShadingParams.m_CurrentSurfaceData,
             a_ShadingParams.m_TemporalSurfaceData,
             a_ShadingParams.m_TriangleLights,
@@ -116,15 +128,13 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
     }
     else
     {
-        //Generate the CDF if ReSTIR is disabled.
-        if(a_ShadingParams.m_CurrentDepth == 0 && !useRestir)
-        {
-            a_ShadingParams.m_ReSTIR->BuildCDF(a_ShadingParams.m_TriangleLights);
-        }
+        //This was from when ReSTIR was optional. Now it always runs so honestly no need to check.
+        ////Generate the CDF if ReSTIR is disabled.
+        //if(a_ShadingParams.m_CurrentDepth == 0 && !useRestir)
+        //{
+        //    a_ShadingParams.m_ReSTIR->BuildCDF(a_ShadingParams.m_TriangleLights);
+        //}
 
-        const int numPixels = a_ShadingParams.m_ResolutionAndDepth.x * a_ShadingParams.m_ResolutionAndDepth.y;
-        const int blockSize = 512;
-        const int numBlocks = (numPixels + blockSize - 1) / blockSize;
         CDF* cdfPtr = a_ShadingParams.m_ReSTIR->GetCdfGpuPointer();
 
         //Generate shadow rays for direct lights.
