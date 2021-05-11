@@ -16,17 +16,11 @@ GPU_ONLY void VolumetricShadeDirect(
 {
 	const auto& intersection = a_VolumetricDataBuffer[a_PixelIndex];
 
-	//if (intersection.m_EntryIntersectionT > 0.1f)
-	//{
-	//	printf("Entry: %u Exit: %u", intersection.m_EntryIntersectionT, in)
-	//}
-
 	if (intersection.m_ExitIntersectionT > intersection.m_EntryIntersectionT)
 	{
-		//printf("HA");
 		const int MAX_STEPS = 1000;
 		const float STEP_SIZE = 1.0f;
-		const float HARDCODED_DENSITY_PER_STEP = 0.005f;
+		const float HARDCODED_DENSITY_PER_STEP = 0.001f;
 		const float VOLUME_COLOR_R = 1.0f;
 		const float VOLUME_COLOR_G = 1.0f;
 		const float VOLUME_COLOR_B = 1.0f;
