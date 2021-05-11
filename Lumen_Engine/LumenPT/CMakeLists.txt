@@ -179,7 +179,7 @@ if(${USE_NVIDIA_DENOISER})
 	list(APPEND LIBS NRD NRI NRI_D3D12)
 	list(APPEND INCLUDES 
 	
-	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/LumenPT/Framework/DX12Wrapper" 
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/LumenPT/Framework" 
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/NRI/Include" 
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Include/Detex")
 endif()

@@ -21,7 +21,7 @@
 #include "../Tools/FrameSnapshot.h"
 #include "../Tools/SnapShotProcessing.cuh"
 #include "MotionVectors.h"
-#include "NRIDX12Wrapper.h"
+#include "DX12Wrapper/NRIDX12Wrapper.h"
 
 #include <Optix/optix_function_table_definition.h>
 #include <filesystem>
