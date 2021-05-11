@@ -123,7 +123,7 @@ public:
 					//mesh->m_Transform.CopyTransform(*node->m_LocalTransform);
 					float p = i;
 					mesh->m_Transform.SetPosition(glm::vec3(xOffset, 100.f + (p*p), 0.f));
-					mesh->m_Transform.SetScale(glm::vec3(2.0f * (static_cast<float>(i * 2) / 4.f)));
+					mesh->m_Transform.SetScale(glm::vec3(2.0f * (static_cast<float>((i + 1) * 2) / 4.f)));
 				}
 			}
 

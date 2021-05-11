@@ -53,8 +53,15 @@ __global__ void PickPrimarySamplesInternal(const LightBagEntry* const a_LightBag
  */
 __host__ unsigned int GenerateReSTIRShadowRays(MemoryBuffer* a_AtomicBuffer, Reservoir* a_Reservoirs, const WaveFront::SurfaceData* a_PixelData, unsigned a_NumReservoirs);
 
+/*
+ * Generate the shadow rays used for shading.
+ */
+__host__ unsigned int GenerateReSTIRShadowRaysShading(MemoryBuffer* a_AtomicBuffer, Reservoir* a_Reservoirs, const WaveFront::SurfaceData* a_PixelData, unsigned a_NumPixels);
+
 //Generate a shadow ray based on the thread ID.
 __global__ void GenerateShadowRay(WaveFront::AtomicBuffer<RestirShadowRay>* a_AtomicBuffer, Reservoir* a_Reservoirs, const  WaveFront::SurfaceData* a_PixelData, unsigned a_NumReservoirs);
+
+__global__ void GenerateShadowRayShading(WaveFront::AtomicBuffer<RestirShadowRayShading>* a_AtomicBuffer, Reservoir* a_Reservoirs, const  WaveFront::SurfaceData* a_PixelData, unsigned a_NumPixels, unsigned a_Depth);
 
 /*
  * Resample spatial neighbours with an intermediate output buffer.

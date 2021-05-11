@@ -33,10 +33,10 @@ struct ReSTIRSettings
     static constexpr std::uint32_t numReservoirsPerPixel = 5; //Default 5
 
     //The amount of lights per light bag.
-    static constexpr std::uint32_t numLightsPerBag = 10;  //Default 1000
+    static constexpr std::uint32_t numLightsPerBag = 1000;  //Default 1000
 
     //The total amount of light bags to generate.
-    static constexpr std::uint32_t numLightBags = 10;   //Default 50
+    static constexpr std::uint32_t numLightBags = 50;   //Default 50
 
     //The amount of initial samples to take each frame.
     static constexpr std::uint32_t numPrimarySamples = 32;  //Default 32
@@ -62,11 +62,6 @@ struct ReSTIRSettings
 
     //Enable temporal sampling.
     static constexpr bool enableTemporal = true;    //Default true
-
-    //Enable or disable certain parts of ReSTIR TODO
-#define RESTIR_BIASED 1
-#define RESTIR_SPATIAL 1
-#define RESTIR_TEMPORAL 1
 };
 
 /*
@@ -78,6 +73,18 @@ struct RestirShadowRay
     float3 direction;   //Ray direction, normalized.
     float distance;     //The distance of the light source from the origin along the ray direction.
     unsigned index;     //The index into the reservoir buffer at which to set weight to 0 when occluded.
+};
+
+/*
+ * Visibility ray with potential payload used in the final stage of ReSTIR where the final chosen samples are resolved.
+ */
+struct RestirShadowRayShading
+{
+    float3 origin;      //Ray origin.
+    float3 direction;   //Ray direction, normalized.
+    float distance;     //The distance of the light source from the origin along the ray direction.
+    unsigned index;     //The index into the reservoir buffer at which to set weight to 0 when occluded.
+    float3 contribution;    //The potential contribution if un-occluded.
 };
 
  /*

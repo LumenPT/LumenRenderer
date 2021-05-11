@@ -39,6 +39,7 @@ public:
 		WaveFront::AtomicBuffer<WaveFront::ShadowRayData>* a_WaveFrontShadowRayBuffer,
         const WaveFront::OptixWrapper* a_OptixSystem,
 		WaveFront::MotionVectorBuffer* a_MotionVectorBuffer,
+		float3* a_OutputBuffer,
 		bool a_DebugPrint = false
 	);
 
@@ -80,7 +81,8 @@ private:
 	//Memory buffers only used in the current frame.
 	MemoryBuffer m_Cdf;			//The CDF which is the size of a CDF entry times the amount of lights.
 	MemoryBuffer m_LightBags;	//All light bags as a single array. Size of num light bags * size of light bag * light index or something.
-	MemoryBuffer m_ShadowRays;	//Buffer for each shadow ray in a frame. Size of screen dimensions * ray size.
+	MemoryBuffer m_ShadowRays;	//Buffer for each shadow ray in a frame. Size of screen dimensions * ray size * reservoirsPerPixel.
+	MemoryBuffer m_ShadowRaysShading;	//Buffer for each shadow ray in a frame. Size of screen dimensions * ray size * reservoirsPerPixel.
 
 	//Memory buffers that need to be temporally available.
 	MemoryBuffer m_Reservoirs[3];	//Reservoir buffers per frame. 0, 1 = swap chain of reservoir buffers. 2 = spatial swap buffer.

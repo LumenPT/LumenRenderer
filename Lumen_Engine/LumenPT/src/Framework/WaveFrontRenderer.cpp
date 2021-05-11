@@ -171,7 +171,7 @@ namespace WaveFront
 
         //Initialize the ray buffers. Note: These are not initialized but Reset() is called when the waves start.
         const auto numPrimaryRays = numPixels;
-        const auto numShadowRays = numPixels * m_Settings.depth + (numPixels * ReSTIRSettings::numReservoirsPerPixel); //TODO: change to 2x num pixels and add safety check to resolve when full.
+        const auto numShadowRays = numPixels * m_Settings.depth;
 
         //Create atomic buffers. This automatically sets the counter to 0 and size to max.
         CreateAtomicBuffer<IntersectionRayData>(&m_Rays, numPrimaryRays);
