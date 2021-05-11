@@ -12,6 +12,7 @@
 
 __host__ void ResetReservoirs(int a_NumReservoirs, Reservoir* a_ReservoirPointer)
 {
+    CHECKLASTCUDAERROR;
     //Call in parallel.
     const int blockSize = CUDA_BLOCK_SIZE;
     const int numBlocks = (a_NumReservoirs + blockSize - 1) / blockSize;

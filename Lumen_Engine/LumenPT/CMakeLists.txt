@@ -105,6 +105,7 @@ file(GLOB_RECURSE CPP_SOURCE_FILES
 # Add header and source files to library
 add_library (LumenPT STATIC ${CPP_HEADER_FILES} ${CPP_SOURCE_FILES})
 add_dependencies(LumenPT CudaPTX)
+add_dependencies(LumenPT copyCUDAOutput)
 set_property(TARGET LumenPT APPEND_STRING PROPERTY COMPILE_DEFINITIONS CONFIG_NAME=\"${CONFIG_NAME}\")
 set_property(TARGET LumenPT APPEND PROPERTY COMPILE_DEFINITIONS LUMEN_PT)
 set_property(TARGET LumenPT APPEND PROPERTY COMPILE_DEFINITIONS $<$<CONFIG:Debug>:CUDA_CHECK OPTIX_CHECK>)
@@ -155,6 +156,7 @@ set(INCLUDES
 	"../Lumen/src/AssetLoading"
 	"../Lumen/src/Lumen"
 	"../Lumen/src"
+	"../Lumen/vendor/spdlog/include/"
 	"${CMAKE_CURRENT_SOURCE_DIR}/../Lumen/vendor/glm"
 	"${CMAKE_CURRENT_BINARY_DIR}/config"
 	${NANOVDB_HEADERS}

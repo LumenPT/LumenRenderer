@@ -3,6 +3,8 @@
 #include "VolumeInstance.h"
 #include "Lumen/Renderer/Camera.h"
 
+#include <string>
+
 namespace Lumen
 {
     // Interface class for scenes
@@ -28,6 +30,7 @@ namespace Lumen
         // Removes all instances from the scene
         virtual void Clear();
 
+        std::string m_Name;
         std::vector<std::unique_ptr<Lumen::MeshInstance>> m_MeshInstances;
         std::vector<unsigned int> m_MeshLightIndices;
         std::vector<std::unique_ptr<Lumen::VolumeInstance>> m_VolumeInstances;

@@ -462,11 +462,18 @@ void Lumen::SceneManager::LoadMeshes(fx::gltf::Document& a_Doc, GLTFResource& a_
 
 void Lumen::SceneManager::LoadScenes(fx::gltf::Document& a_Doc, GLTFResource& a_Res)
 {
+	int32_t counter = 0;
 	// For each scene in the document
 	for (auto& scene : a_Doc.scenes)
 	{
 		// Create a renderer-specific scene
 		auto lumenScene = m_RenderPipeline->CreateScene();
+        if (scene.name.empty())
+        {
+			lumenScene->m_Name = "Unnamed scene " + std::to_string(counter++);
+        }
+		else
+		    lumenScene->m_Name = scene.name;            
 
 		// And load all of the scene's root nodes
 		for (auto& rootNode : scene.nodes)

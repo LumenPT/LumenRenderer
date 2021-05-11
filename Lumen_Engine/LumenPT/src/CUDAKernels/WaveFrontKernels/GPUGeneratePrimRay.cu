@@ -134,7 +134,7 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
             const float3 tangent = normalize(make_float3(A->m_Tangent.x, A->m_Tangent.y, A->m_Tangent.z) * -A->m_Tangent.w);
 
             //Tangent nan? How?
-            assert(!isnan(length(tangent)));
+            //assert(!isnan(length(tangent)));
 
             //tangent = normalize(tangent - dot(tangent, vertexNormal) * vertexNormal);
 
