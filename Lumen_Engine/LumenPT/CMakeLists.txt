@@ -110,6 +110,7 @@ set(CUDAKernels_INCLUDES
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Include"
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Include/Cuda"
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Include/sutil"
+	"${CMAKE_CURRENT_SOURCE_DIR}/../Lumen/vendor/glm"
 	${NANOVDB_HEADERS}
 )
 
@@ -151,6 +152,7 @@ set(LUMENPT_INCLUDES
 	"../Lumen/src/AssetLoading"
 	"../Lumen/src/Lumen"
 	"../Lumen/src"
+	"../Lumen/vendor/spdlog/include/"
 	"${CMAKE_CURRENT_SOURCE_DIR}/../Lumen/vendor/glm"
 	"${CMAKE_CURRENT_BINARY_DIR}/config"
 	${NANOVDB_HEADERS}

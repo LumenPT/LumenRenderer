@@ -16,7 +16,6 @@ GPU_ONLY void VolumetricShadeDirect(
     const uint3 a_ResolutionAndDepth,
     const WaveFront::VolumetricData* a_VolumetricDataBuffer,
     WaveFront::AtomicBuffer<WaveFront::ShadowRayData>* const a_ShadowRays,
-    const WaveFront::TriangleLight* const a_Lights,
-    const unsigned int a_NumLights,
+    const WaveFront::AtomicBuffer<WaveFront::TriangleLight>* const a_Lights,
     const CDF* const a_CDF = nullptr,
 	float3* a_Output = nullptr);

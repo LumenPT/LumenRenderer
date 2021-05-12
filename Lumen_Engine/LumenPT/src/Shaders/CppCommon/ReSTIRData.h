@@ -15,7 +15,7 @@
 
 #include "../../CUDAKernels/RandomUtilities.cuh"
 
-constexpr float MINFLOAT = std::numeric_limits<float>::min();
+constexpr float MINFLOAT = std::numeric_limits<float>::epsilon();
 
 /*
  * All configurable settings for ReSTIR.
@@ -24,44 +24,44 @@ constexpr float MINFLOAT = std::numeric_limits<float>::min();
 struct ReSTIRSettings
 {
     //Screen width in pixels.
-    static constexpr std::uint32_t width = 0;
+    std::uint32_t width = 0;
 
     //Screen height in pixels.
-    static constexpr std::uint32_t height = 0;
+    std::uint32_t height = 0;
 
     //The amount of reservoirs used per pixel.
-    static constexpr std::uint32_t numReservoirsPerPixel = 5;
+    static constexpr std::uint32_t numReservoirsPerPixel = 5; //Default 5
 
     //The amount of lights per light bag.
-    static constexpr std::uint32_t numLightsPerBag = 1000;
+    static constexpr std::uint32_t numLightsPerBag = 1000;  //Default 1000
 
     //The total amount of light bags to generate.
-    static constexpr std::uint32_t numLightBags = 50;
+    static constexpr std::uint32_t numLightBags = 50;   //Default 50
 
     //The amount of initial samples to take each frame.
-    static constexpr std::uint32_t numPrimarySamples = 32;
+    static constexpr std::uint32_t numPrimarySamples = 32;  //Default 32
 
     //The amount of spatial neighbours to consider.
-    static constexpr std::uint32_t numSpatialSamples = 5;
+    static constexpr std::uint32_t numSpatialSamples = 5;   //Default 5    
 
     //The maximum distance for spatial samples.
-    static constexpr std::uint32_t spatialSampleRadius = 30;
+    static constexpr std::uint32_t spatialSampleRadius = 30;    //Default 30
 
-    //The x and y size of the pixel grid per light bag. This indirectly determines the amount of light bags.
-    static constexpr std::uint32_t pixelGridSize = 16;
+    //The x and y size of the pixel grid per light bag.
+    static constexpr std::uint32_t pixelGridSize = 16;      //Default 16
 
     //The amount of spatial iterations to perform. Previous output becomes current input.
     //This has to be an even number so that the final results end up in the right buffer.
-    static constexpr std::uint32_t numSpatialIterations = 2;
+    static constexpr std::uint32_t numSpatialIterations = 2;    //Default 2
 
     //Use the biased algorithm or not. When false, the unbiased algorithm is used instead.
-    static constexpr bool enableBiased = true;
+    static constexpr bool enableBiased = true;  //Default true
 
     //Enable spatial sampling.
-    static constexpr bool enableSpatial = true;
+    static constexpr bool enableSpatial = true; //Default true
 
     //Enable temporal sampling.
-    static constexpr bool enableTemporal = true;
+    static constexpr bool enableTemporal = true;    //Default true
 };
 
 /*
@@ -73,6 +73,18 @@ struct RestirShadowRay
     float3 direction;   //Ray direction, normalized.
     float distance;     //The distance of the light source from the origin along the ray direction.
     unsigned index;     //The index into the reservoir buffer at which to set weight to 0 when occluded.
+};
+
+/*
+ * Visibility ray with potential payload used in the final stage of ReSTIR where the final chosen samples are resolved.
+ */
+struct RestirShadowRayShading
+{
+    float3 origin;      //Ray origin.
+    float3 direction;   //Ray direction, normalized.
+    float distance;     //The distance of the light source from the origin along the ray direction.
+    unsigned index;     //The index into the reservoir buffer at which to set weight to 0 when occluded.
+    float3 contribution;    //The potential contribution if un-occluded.
 };
 
  /*
@@ -117,7 +129,7 @@ struct Reservoir
 
         //In this case R is inclusive with 0.0 and 1.0. This means that the first sample is always chosen.
         //If weight is 0, then a division by 0 would happen. Also it'd be impossible to pick this sample.
-        if (a_Weight != 0.f && r <= (a_Weight / weightSum))
+        if (r <= (a_Weight / weightSum))
         {
             sample = a_Sample;
             return true;
@@ -190,12 +202,14 @@ struct CDF
     GPU_ONLY void Get(float a_Value, unsigned& a_LightIndex, float& a_LightPdf) const
     {
         //Index is not normalized in the actual set.
-        int index = static_cast<int>(sum * a_Value);
+        const float requiredValue = sum * a_Value;
 
         //Binary search
-        int entry = BinarySearch(0, size - 1, index);
+        const int entry = BinarySearch(0, size - 1, requiredValue);
 
-        float higher = data[entry];
+        const float higher = data[entry];
+
+        //TODO this if statement can be avoided by always making index  0 equal to 0. Then offset array indices by 1 and add 1 to the size req of the class.
         float lower = 0.f;
         if (entry != 0)
         {

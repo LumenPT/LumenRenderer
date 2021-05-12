@@ -1,8 +1,9 @@
 #pragma once
 #if defined(WAVEFRONT)
 #include "OptixWrapper.h"
-#include "OutputBuffer.h"
+#include "CudaGLTexture.h"
 #include "MemoryBuffer.h"
+#include "MotionVectors.h"
 #include "../Shaders/CppCommon/WaveFrontDataStructs.h"
 #include "PTServiceLocator.h"
 
@@ -12,9 +13,12 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <mutex>
+#include <queue>
 
 class SceneDataTable;
 
+class FrameSnapshot;
 namespace WaveFront
 {
     struct WaveFrontSettings
@@ -33,14 +37,19 @@ namespace WaveFront
 
         //The maximum distance a ray can travel before terminating.
         float maxIntersectionT;
+
+        bool blendOutput;
     };
 
     class WaveFrontRenderer : public LumenRenderer
     {
         //Overridden functionality.
     public:
+        void StartRendering() override;
+        void PerformDeferredOperations() override;
+
         std::unique_ptr<Lumen::ILumenPrimitive> CreatePrimitive(PrimitiveData& a_PrimitiveData) override;
-        std::shared_ptr<Lumen::ILumenMesh> CreateMesh(std::vector<std::unique_ptr<Lumen::ILumenPrimitive>>& a_Primitives) override;
+        std::shared_ptr<Lumen::ILumenMesh> CreateMesh(std::vector<std::shared_ptr<Lumen::ILumenPrimitive>>& a_Primitives) override;
         std::shared_ptr<Lumen::ILumenTexture> CreateTexture(void* a_PixelData, uint32_t a_Width, uint32_t a_Height) override;
         std::shared_ptr<Lumen::ILumenMaterial> CreateMaterial(const MaterialData& a_MaterialData) override;
         std::shared_ptr<Lumen::ILumenVolume> CreateVolume(const std::string& a_FilePath) override;
@@ -50,10 +59,12 @@ namespace WaveFront
     public:
         WaveFrontRenderer();
 
+        ~WaveFrontRenderer();
+
         /*
          * Render.
          */
-        unsigned TraceFrame(std::shared_ptr<Lumen::ILumenScene>& a_Scene) override;
+        unsigned GetOutputTexture() override;
 
         /*
          * Initialize the wavefront pipeline.
@@ -61,13 +72,44 @@ namespace WaveFront
          */
         void Init(const WaveFrontSettings& a_Settings);
 
-        //Buffers
+        void BeginSnapshot() override;
+
+        std::unique_ptr<FrameSnapshot> EndSnapshot() override;
+
+        void SetRenderResolution(glm::uvec2 a_NewResolution) override;
+        void SetOutputResolution(glm::uvec2 a_NewResolution) override;
+        glm::uvec2 GetRenderResolution() override;
+        glm::uvec2 GetOutputResolution() override;
+
+        /*
+         * Set the append mode.
+         * When true, final output is blended and not overwritten to build a higher res image over time.
+         * When false, output is overwritten every frame.
+         */
+        void SetBlendMode(bool a_Blend) override;
+
+        /*
+         * Get the append mode.
+         * When true, output is blended and not overwritten.
+         */
+        bool GetBlendMode() const override;
+    	
     private:
+
+        void TraceFrame();
 
         std::unique_ptr<MemoryBuffer> InterleaveVertexData(const PrimitiveData& a_MeshData) const;
 
+        void ResizeBuffers();
+
+        void SetOutputResolutionInternal(glm::uvec2 a_NewResolution);
+        void WaitForDeferredCalls(); // Stalls the thread until all calls that are deferred to other treads are performed
+
         //OpenGL buffer to write output to.
-        OutputBuffer m_OutputBuffer;
+        std::unique_ptr<CudaGLTexture> m_OutputBuffer;
+
+        // Intermediate buffer to store path tracing results without interfering with OpenGL rendering thread
+        MemoryBuffer m_IntermediateOutputBuffer;
 
         //The surface data per pixel. 0 and 1 are used for the current and previous frame. 2 is used for any other depth.
         MemoryBuffer m_SurfaceData[3];
@@ -99,12 +141,26 @@ namespace WaveFront
         //Triangle lights.
         MemoryBuffer m_TriangleLights;
 
+    	//Buffer containing motion vectors
+        MotionVectors m_MotionVectors;
+
         //Optix system
         std::unique_ptr<OptixWrapper> m_OptixSystem;
 
+        //ReSTIR
+        std::unique_ptr<ReSTIR> m_ReSTIR;
+
         //Variables and settings.
     private:
-        WaveFrontSettings m_Settings;
+        WaveFrontSettings m_Settings; // Settings to use while rendering
+        WaveFrontSettings m_IntermediateSettings; // Settings used to make changes from other threads without affecting the rendering process
+        std::mutex m_SettingsUpdateMutex;
+
+        std::queue<std::function<void()>> m_DeferredOpenGLCalls;
+        std::condition_variable m_OGLCallCondition;
+
+        //Blend counter when blending is enabled.
+        unsigned m_BlendCounter;
 
         //Index of the frame, used to swap buffers.
         std::uint32_t m_FrameIndex;
@@ -115,8 +171,23 @@ namespace WaveFront
         //The server locator instance.
         PTServiceLocator m_ServiceLocator;
 
+        std::mutex m_OutputBufferMutex;
+        std::thread m_PathTracingThread;
+        std::condition_variable m_OutputCondition;
+        class GLFWwindow* m_GLContext;
+        bool m_StopRendering;
+
+        GLuint m_OutputTexture;
+
         //Kamen's lookup table
         std::unique_ptr<SceneDataTable> m_Table;
+
+        // The Frame Snapshot is used to define what to record when the output layer requests that
+        // See TraceFrame() ##ToolsBookmark for example
+        std::unique_ptr<FrameSnapshot> m_FrameSnapshot;
+        bool m_SnapshotReady;
+        bool m_StartSnapshot;
+
     };
 }
 #endif

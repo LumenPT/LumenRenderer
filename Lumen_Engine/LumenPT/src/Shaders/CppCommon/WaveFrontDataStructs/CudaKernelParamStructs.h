@@ -3,9 +3,14 @@
 #include "../CudaDefines.h"
 #include "SurfaceData.h"
 #include "VolumetricData.h"
+#include "MotionVectorsGenerationData.h"
+
+class ReSTIR;
 
 namespace WaveFront
 {
+    class OptixWrapper;
+
     //Kernel Launch parameters
     struct PrimRayGenLaunchParameters
     {
@@ -63,23 +68,42 @@ namespace WaveFront
             const SurfaceData* a_CurrentSurfaceData,
             const SurfaceData* a_TemporalSurfaceData,
             const VolumetricData* a_VolumetricData,
+            const AtomicBuffer<IntersectionData>* a_Intersections,
+            AtomicBuffer<IntersectionRayData>* a_RayBuffer,
             AtomicBuffer<ShadowRayData>* a_ShadowRays,
             AtomicBuffer<ShadowRayData>* a_VolumetricShadowRays,
-            TriangleLight* a_TriangleLights,
-            std::uint32_t a_NumLights,
-            const CDF* const a_CDF = nullptr,
+			MemoryBuffer* a_TriangleLights,
+            const float3& a_CameraPosition,
+            const float3& a_CameraDirection,
+            const OptixTraversableHandle a_OptixSceneHandle,
+            const WaveFront::OptixWrapper* a_OptixSystem,
+            const unsigned a_Seed,
+            ReSTIR* a_ReSTIR,
+            unsigned a_Currentdepth,
+            WaveFront::MotionVectorBuffer* a_MotionVectorBuffer,
+            const unsigned a_NumIntersections,
             float3* a_Output = nullptr
-        ) :
+        )
+        :
         m_ResolutionAndDepth(a_ResolutionAndDepth),
         m_CurrentSurfaceData(a_CurrentSurfaceData),
         m_TemporalSurfaceData(a_TemporalSurfaceData),
+        m_IntersectionData(a_Intersections),
         m_VolumetricData(a_VolumetricData),
         m_ShadowRays(a_ShadowRays),
         m_VolumetricShadowRays(a_VolumetricShadowRays),
         m_TriangleLights(a_TriangleLights),
-        m_NumLights(a_NumLights),
-        m_CDF(a_CDF),
-        m_Output(a_Output)
+        m_CurrentDepth(a_Currentdepth),
+        m_CameraPosition(a_CameraPosition),
+        m_CameraDirection(a_CameraDirection),
+        m_OptixSceneHandle(a_OptixSceneHandle),
+        m_OptixSystem(a_OptixSystem),
+        m_Seed(a_Seed),
+        m_NumIntersections(a_NumIntersections),
+        m_RayBuffer(a_RayBuffer),
+        m_ReSTIR(a_ReSTIR),
+        m_Output(a_Output),
+        m_MotionVectorBuffer(a_MotionVectorBuffer)
         {}
 
 
@@ -89,14 +113,22 @@ namespace WaveFront
         const uint3 m_ResolutionAndDepth;
         const SurfaceData* const m_CurrentSurfaceData;
         const SurfaceData* const m_TemporalSurfaceData;
+        const AtomicBuffer<IntersectionData>* const m_IntersectionData;
+        const MemoryBuffer* const m_TriangleLights;
         const VolumetricData* const m_VolumetricData;
-        const TriangleLight* const m_TriangleLights;
-        const std::uint32_t m_NumLights;
-        const CDF* const m_CDF;
-
+        const unsigned m_CurrentDepth;
+        const float3 m_CameraPosition;
+        const float3 m_CameraDirection;
+        const OptixTraversableHandle m_OptixSceneHandle;
+        const WaveFront::OptixWrapper* m_OptixSystem;
+        const unsigned m_Seed;
+        const unsigned m_NumIntersections;
+        AtomicBuffer<IntersectionRayData>* m_RayBuffer;
+        ReSTIR* m_ReSTIR;
         float3* m_Output;
         AtomicBuffer<ShadowRayData>* m_ShadowRays;
         AtomicBuffer<ShadowRayData>* m_VolumetricShadowRays;
+        WaveFront::MotionVectorBuffer* m_MotionVectorBuffer;
     };
 
     struct PostProcessLaunchParameters
@@ -107,13 +139,18 @@ namespace WaveFront
             const uint2& a_OutputResolution,
             const float3* const a_WavefrontOutput,
             float3* const a_ProcessedOutput,
-            uchar4* const a_FinalOutput)
+            uchar4* const a_FinalOutput,
+            const bool a_BlendOutput,
+            const unsigned a_BlendCount
+        )
             :
             m_RenderResolution(a_RenderResolution),
             m_OutputResolution(a_OutputResolution),
             m_WavefrontOutput(a_WavefrontOutput),
             m_ProcessedOutput(a_ProcessedOutput),
-            m_FinalOutput(a_FinalOutput)
+            m_FinalOutput(a_FinalOutput),
+            m_BlendOutput(a_BlendOutput),
+            m_BlendCount(a_BlendCount)
         {}
 
         CPU_ONLY ~PostProcessLaunchParameters() = default;
@@ -123,6 +160,8 @@ namespace WaveFront
         const float3* const m_WavefrontOutput;
         float3* const m_ProcessedOutput;
         uchar4* const m_FinalOutput;
+        const bool m_BlendOutput;
+        const unsigned m_BlendCount;
     };
 
 }

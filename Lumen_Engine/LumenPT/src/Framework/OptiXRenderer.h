@@ -16,7 +16,7 @@
 
 using GLuint = unsigned;
 
-class OutputBuffer;
+class CudaGLTexture;
 class ShaderBindingTableGenerator;
 
 class AccelerationStructure;
@@ -72,7 +72,7 @@ public:
     std::unique_ptr<Lumen::ILumenPrimitive> CreatePrimitive(PrimitiveData& a_PrimitiveData) override;
     std::unique_ptr<MemoryBuffer> InterleaveVertexData(const PrimitiveData& a_MeshData);
 
-    std::shared_ptr<Lumen::ILumenMesh> CreateMesh(std::vector<std::unique_ptr<Lumen::ILumenPrimitive>>& a_Primitives) override;
+    std::shared_ptr<Lumen::ILumenMesh> CreateMesh(std::vector<std::shared_ptr<Lumen::ILumenPrimitive>>& a_Primitives) override;
 
     std::shared_ptr<Lumen::ILumenMaterial> CreateMaterial(const MaterialData& a_MaterialData) override;
 
@@ -87,6 +87,7 @@ public:
     //Camera m_Camera;
 
     Lumen::Transform m_TestTransform;
+
 	
 private:
     static void DebugCallback(unsigned int a_Level, const char* a_Tag, const char* a_Message, void* /*extra data provided during context initialization*/);
@@ -117,11 +118,11 @@ private:
     RecordHandle<MissData>      m_MissRecord;
     RecordHandle<void>       m_HitRecord;
 
-    std::unique_ptr<class Texture> m_Texture;
+    std::unique_ptr<class PTTexture> m_Texture;
 
     std::map<std::string, OptixProgramGroup> m_ProgramGroups;
 
-    std::unique_ptr<OutputBuffer> m_OutputBuffer;
+    std::unique_ptr<CudaGLTexture> m_OutputBuffer;
 
     std::unique_ptr<MemoryBuffer> m_SBTBuffer;
 
@@ -164,7 +165,7 @@ std::unique_ptr<AccelerationStructure> OptiXRenderer::BuildGeometryAccelerationS
 
     // Extras which are not necessary, but are here for documentation purposes
     buildInput.triangleArray.primitiveIndexOffset = 0; // Defines an offset when accessing the primitive index offset in the hit shaders
-    // If the input contains multiple primitives, each with a different Material, we can specify offsets for their SBT records here
+    // If the input contains multiple primitives, each with a different PTMaterial, we can specify offsets for their SBT records here
     // This could be used as a replacement for the 3-layer acceleration structure we considered earlier
     buildInput.triangleArray.sbtIndexOffsetBuffer = 0;
     buildInput.triangleArray.sbtIndexOffsetSizeInBytes = 0;

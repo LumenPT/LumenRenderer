@@ -12,6 +12,7 @@ set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 
 option(USE_WAVEFRONT "Use the Wavefront rendering pipeline?" ON)
+option(USE_NVIDIA_DENOISER "Use Nvidia denoiser?" OFF)
 
 add_subdirectory("Lumen/vendor/GLFW")
 	#Glad
@@ -42,6 +43,10 @@ set(BOOST_LIBRARYDIR "${CMAKE_CURRENT_SOURCE_DIR}/LumenPT/vendor/Libs/boost")
 add_subdirectory ("LumenPT/vendor/openvdb")
 	#NanoVDB
 add_subdirectory ("LumenPT/vendor/openvdb/nanovdb")
+	#NRD
+if(${USE_NVIDIA_DENOISER})
+	add_subdirectory ("LumenPT/vendor/RayTracingDenoiser")
+endif()
 	#Lumen
 add_subdirectory ("Lumen")
 	#LumenPT

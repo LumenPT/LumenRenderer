@@ -2,6 +2,7 @@
 #include "LumenApp.h"
 #include "Layer.h"
 #include "ImGui/ImGuiLayer.h"
+#include "GLTaskSystem.h"
 
 #include "ModelLoading/SceneManager.h"
 
@@ -35,10 +36,14 @@ namespace Lumen
 
 		// Fill out the service locator for the layers
 		m_LayerServices.m_SceneManager = m_SceneManager.get();
+
+		Input::SetCallbacks();
+		GLTaskSystem::Initialize(reinterpret_cast<GLFWwindow*>(m_Window->GetNativeWindow()));
 	}
 
 	LumenApp::~LumenApp()
 	{
+		GLTaskSystem::Destroy();
 		m_SceneManager.reset();
 	}
 
@@ -50,7 +55,6 @@ namespace Lumen
 			glClearColor(1, 1, 0.5f, 1);
 			glClear(GL_COLOR_BUFFER_BIT);
 
-			Input::Update();
 
 			//Update loop
 			for (Layer* layer: m_LayerStack)
@@ -67,7 +71,8 @@ namespace Lumen
 				layer->OnImGuiRender();
 			}
 			m_ImGuiLayer->End();
-			
+			Input::Update();
+
 			m_Window->OnUpdate();
 		}
 	}

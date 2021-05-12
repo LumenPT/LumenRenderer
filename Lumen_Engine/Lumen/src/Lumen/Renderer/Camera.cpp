@@ -9,6 +9,8 @@ Camera::Camera() :
 {
 	UpdateCameraVectors();
 	UpdateImagePlane();
+
+	m_PreviousFrameMatrix = m_CurrentFrameMatrix;
 }
 
 Camera::Camera(glm::vec3 a_Position, glm::vec3 a_Up) :
@@ -18,11 +20,19 @@ Camera::Camera(glm::vec3 a_Position, glm::vec3 a_Up) :
 {
 	UpdateCameraVectors();
 	UpdateImagePlane();
+
+	m_PreviousFrameMatrix = m_CurrentFrameMatrix;
 }
 
 Camera::~Camera()
 {
 
+}
+
+void Camera::SetPosition(glm::vec3 a_Position)
+{
+	m_Position = a_Position;
+	m_DirtyFlag = true;
 }
 
 void Camera::SetRotation(glm::quat a_Rotation)
@@ -46,7 +56,10 @@ void Camera::SetLookAt(glm::vec3 a_Position, glm::vec3 a_LookAtPos, glm::vec3 a_
 
 void Camera::IncrementYaw(const float& a_AngleInRadians)
 {
-	UpdateCameraVectors();
+	if (m_DirtyFlag)
+	{
+		UpdateValues();
+	}
 	
 	m_Rotation = glm::angleAxis(a_AngleInRadians, glm::vec3(m_WorldUp)) * m_Rotation;
 	m_DirtyFlag = true;
@@ -54,7 +67,10 @@ void Camera::IncrementYaw(const float& a_AngleInRadians)
 
 void Camera::IncrementPitch(const float& a_AngleInRadians)
 {
-	UpdateCameraVectors();
+	if (m_DirtyFlag)
+	{
+		UpdateValues();
+	}
 	
 	m_Rotation = glm::angleAxis(a_AngleInRadians, glm::vec3(m_Right)) * m_Rotation;
 	m_DirtyFlag = true;
@@ -76,6 +92,27 @@ void Camera::GetVectorData(glm::vec3& a_Eye, glm::vec3& a_U, glm::vec3& a_V, glm
 	a_W = m_Forward * m_FocalLength;
 }
 
+void Camera::GetMatrixData(glm::mat4& a_PreviousFrameMatrix, glm::mat4& a_CurrentFrameMatrix)
+{
+	if (m_DirtyFlag)
+	{
+		UpdateValues();
+	}
+	
+	a_PreviousFrameMatrix = m_PreviousFrameMatrix;
+	a_CurrentFrameMatrix = m_CurrentFrameMatrix;
+}
+
+glm::mat4 Camera::GetProjectionMatrix() const
+{
+	return glm::perspective(glm::radians(m_FovY), m_AspectRatio, 0.5f, 10000.f);
+}
+
+void Camera::UpdatePreviousFrameMatrix()
+{
+	m_PreviousFrameMatrix = m_CurrentFrameMatrix;
+}
+
 void Camera::UpdateValues()
 {
 	UpdateImagePlane();
@@ -89,12 +126,15 @@ void Camera::UpdateImagePlane()
 }
 
 void Camera::UpdateCameraVectors()
-{	
-	glm::mat4 rotationMatrix = glm::toMat4(m_Rotation);
+{
+	
+	
+	m_CurrentFrameMatrix = glm::toMat4(m_Rotation);
+	m_CurrentFrameMatrix[3] = glm::vec4(m_Position, 1.0f);
 
-	m_Right = rotationMatrix[0];
-	m_Up = rotationMatrix[1];
-	m_Forward = rotationMatrix[2];
+	m_Right = m_CurrentFrameMatrix[0];
+	m_Up = m_CurrentFrameMatrix[1];
+	m_Forward = m_CurrentFrameMatrix[2];
 	
 	m_DirtyFlag = false;
 }

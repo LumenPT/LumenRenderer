@@ -13,7 +13,8 @@ namespace WaveFront
     {
         INTERSECTION_RAY = 0,
         SHADOW_RAY = 1,
-        RESTIR_RAY = 2
+        RESTIR_RAY = 2,
+        RESTIR_SHADING_RAY = 3
     };
     
     struct OptixLaunchParameters
@@ -26,7 +27,8 @@ namespace WaveFront
 		AtomicBuffer<VolumetricIntersectionData>* m_VolumetricIntersectionBuffer;
         AtomicBuffer<ShadowRayData>* m_ShadowRayBatch;
         AtomicBuffer<RestirShadowRay>* m_ReSTIRShadowRayBatch;
-        SceneDataTableAccessor* m_SceneData;
+        AtomicBuffer<RestirShadowRayShading>* m_ReSTIRShadowRayShadingBatch;
+		SceneDataTableAccessor* m_SceneData;
         Reservoir* m_Reservoirs;
         float3* m_ResultBuffer;
         float2 m_MinMaxDistance;
