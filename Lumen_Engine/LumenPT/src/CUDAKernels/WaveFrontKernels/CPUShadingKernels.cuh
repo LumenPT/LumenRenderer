@@ -19,7 +19,7 @@ CPU_ONLY void GeneratePrimaryRays(const WaveFront::PrimRayGenLaunchParameters& a
 /*
  *
  */
-CPU_ONLY void GenerateMotionVectors(MotionVectorsGenerationData& a_MotionVectorsData);
+CPU_ONLY void GenerateMotionVectors(WaveFront::MotionVectorsGenerationData& a_MotionVectorsData);
 
 /*
  * Extract the surface data for the current depth.
