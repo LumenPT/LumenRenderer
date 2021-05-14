@@ -133,8 +133,8 @@ namespace WaveFront
         //m_TriangleLights.Write(&lights[0], sizeof(TriangleLight) * numLights, 0);
 
         //Set the service locator pointer to point to the m'table.
-        m_Table = std::make_unique<SceneDataTable>();
-        m_ServiceLocator.m_SceneDataTable = m_Table.get();
+        /*m_Table = std::make_unique<SceneDataTable>();
+        m_ServiceLocator.m_SceneDataTable = m_Table.get();*/
         CHECKLASTCUDAERROR;
 
         m_ServiceLocator.m_Renderer = this;
@@ -439,7 +439,7 @@ namespace WaveFront
         m_OptixSystem->UpdateSBT();
         CHECKLASTCUDAERROR;
 
-        auto* sceneDataTableAccessor = m_Table->GetDevicePointer();
+        auto* sceneDataTableAccessor = static_cast<PTScene*>(m_Scene.get())->m_SceneDataTable->GetDevicePointer();
         CHECKLASTCUDAERROR;
 
         auto accelerationStructure = std::static_pointer_cast<PTScene>(m_Scene)->GetSceneAccelerationStructure();
@@ -768,15 +768,13 @@ namespace WaveFront
 
         std::unique_ptr<PTPrimitive> prim = std::make_unique<PTPrimitive>(std::move(vertexBuffer), std::move(indexBuffer), std::move(emissiveBuffer), std::move(gAccel));
         prim->m_Material = a_PrimitiveData.m_Material;
-        prim->m_SceneDataTableEntry = m_Table->AddEntry<DevicePrimitive>();
         prim->m_ContainEmissive = numLights > 0 ? true : false;
         prim->m_NumLights = numLights;
 
-        auto& entry = prim->m_SceneDataTableEntry.GetData();
-        entry.m_VertexBuffer = prim->m_VertBuffer->GetDevicePtr<Vertex>();
-        entry.m_IndexBuffer = prim->m_IndexBuffer->GetDevicePtr<unsigned int>();
-        entry.m_Material = std::static_pointer_cast<PTMaterial>(prim->m_Material)->GetDeviceMaterial();
-        entry.m_IsEmissive = prim->m_BoolBuffer->GetDevicePtr<bool>();
+        prim->m_DevicePrimitive.m_VertexBuffer = prim->m_VertBuffer->GetDevicePtr<Vertex>();
+        prim->m_DevicePrimitive.m_IndexBuffer = prim->m_IndexBuffer->GetDevicePtr<unsigned int>();
+        prim->m_DevicePrimitive.m_Material = std::static_pointer_cast<PTMaterial>(prim->m_Material)->GetDeviceMaterial();
+        prim->m_DevicePrimitive.m_IsEmissive = prim->m_BoolBuffer->GetDevicePtr<bool>();
         CHECKLASTCUDAERROR;
 
         return prim;
@@ -887,7 +885,6 @@ namespace WaveFront
         // Explicitly destroy the scene before the scene data table to avoid
         // Dereferencing invalid memory addresses
         m_Scene.reset();
-        m_Table.reset();
     }
 
     unsigned WaveFrontRenderer::GetOutputTexture()

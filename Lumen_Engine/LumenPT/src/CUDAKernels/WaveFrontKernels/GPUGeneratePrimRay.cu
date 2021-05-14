@@ -86,7 +86,8 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
             const unsigned int vertexIndex = 3 * currIntersection.m_PrimitiveIndex;
 
             assert(a_SceneDataTable->GetTableEntry<DevicePrimitive>(instanceId) != nullptr);
-            const auto devicePrimitive = *a_SceneDataTable->GetTableEntry<DevicePrimitive>(instanceId);
+            const auto devicePrimitiveInstance = *a_SceneDataTable->GetTableEntry<DevicePrimitiveInstance>(instanceId);
+            const auto devicePrimitive = devicePrimitiveInstance.m_Primitive;
 
             assert(devicePrimitive.m_Material != nullptr);
             assert(devicePrimitive.m_IndexBuffer != nullptr);
@@ -111,7 +112,7 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
             //TODO extract different textures (emissive, diffuse, metallic, roughness).
             const float4 normalMap = tex2D<float4>(material->m_NormalTexture, texCoords.x, texCoords.y);
             const float4 textureColor = tex2D<float4>(material->m_DiffuseTexture, texCoords.x, texCoords.y);
-            const float3 finalColor = make_float3(textureColor * material->m_DiffuseColor);
+            const float3 finalColor = make_float3(textureColor * material->m_DiffuseColor * devicePrimitiveInstance.m_AdditionColorIDK);
             const float4 metalRoughness = tex2D<float4>(material->m_MetalRoughnessTexture, texCoords.x, texCoords.y);
             float4 emissive = tex2D<float4>(material->m_EmissiveTexture, texCoords.x, texCoords.y);
             emissive *= material->m_EmissionColor;

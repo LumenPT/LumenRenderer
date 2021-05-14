@@ -6,6 +6,7 @@
 #include "PTVolume.h"
 #include "PTVolumeInstance.h"
 #include "RendererDefinition.h"
+#include "SceneDataTable.h"
 
 PTScene::PTScene(LumenRenderer::SceneData& a_SceneData, PTServiceLocator& a_ServiceLocator)
     : m_Services(a_ServiceLocator)
@@ -18,6 +19,13 @@ PTScene::PTScene(LumenRenderer::SceneData& a_SceneData, PTServiceLocator& a_Serv
         ptMesh->SetSceneRef(this);
         m_MeshInstances.push_back(std::move(ptMesh));
     }
+
+    m_SceneDataTable = std::make_unique<SceneDataTable>();
+}
+
+PTScene::~PTScene()
+{
+    m_SceneDataTable.reset();
 }
 
 Lumen::MeshInstance* PTScene::AddMesh()
@@ -68,14 +76,11 @@ void PTScene::UpdateSceneAccelerationStructure()
     // Go through all mesh instances, and verify that the meshes used by them are still correct
     for (auto& meshInstance : m_MeshInstances)
     {
-        if (meshInstance->GetMesh())
-        {
-            // VerifyStructCorrectness returns false if the acceleration structure was rebuilt.            
-            sbtMatchStructs &= static_cast<PTMesh*>(meshInstance->GetMesh().get())->VerifyStructCorrectness();
-        }
+        // VerifyAccelerationStructure returns false if the acceleration structure was rebuilt.            
+        sbtMatchStructs &= static_cast<PTMeshInstance*>(meshInstance.get())->VerifyAccelerationStructure();        
     }
 
-    // If there has been a mismatch between the SBT and the acceleration structs, some of the structs have been rebuilt and thus have new handles
+    // If there has been a mismatch between the SDT and the acceleration structs, some of the structs have been rebuilt and thus have new handles
     // which invalidates them in the scene struct
     // This is most likely to happen if resources were freed from the GPU, which would trigger a scene data table rebuild.
     // This rebuild is unlikely to mark the scene acceleration struct as dirty, but verifying that the mesh acceleration structures are still correct
@@ -91,11 +96,10 @@ void PTScene::UpdateSceneAccelerationStructure()
             if (!meshInstance->GetMesh())
                 continue;
             auto& ptmi = static_cast<PTMeshInstance&>(*meshInstance);
-            auto ptMesh = static_cast<PTMesh*>(meshInstance->GetMesh().get());
 
             auto& inst = instances.emplace_back();
             // Record the acceleration structure of the mesh into the OptixInstance
-            inst.traversableHandle = ptMesh->m_AccelerationStructure->m_TraversableHandle;
+            inst.traversableHandle = ptmi.GetAccelerationStructureHandle();
             inst.sbtOffset = 0; // Optix states that if the AS instance is an IAS, the sbt offset must be 0
             inst.visibilityMask = 0x80; // 128
             // The instance ID of this struct is irrelevant, as the intersections will see the ID of the lowest level AS

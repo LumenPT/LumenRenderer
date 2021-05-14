@@ -4,6 +4,8 @@
 #include "PTScene.h"
 #include "PTPrimitive.h"
 #include "PTServiceLocator.h"
+#include "WaveFrontRenderer.h"
+#include "SceneDataTable.h"
 
 PTMeshInstance::PTMeshInstance(PTServiceLocator& a_ServiceLocator)
     : m_Services(a_ServiceLocator)
@@ -20,6 +22,8 @@ PTMeshInstance::PTMeshInstance(const Lumen::MeshInstance& a_Instance, PTServiceL
     m_Transform = a_Instance.m_Transform;
     m_Transform.AddDependent(*this);
     m_MeshRef = a_Instance.GetMesh();
+
+
 }
 
 void PTMeshInstance::SetSceneRef(PTScene* a_SceneRef)
@@ -32,6 +36,7 @@ void PTMeshInstance::SetSceneRef(PTScene* a_SceneRef)
 void PTMeshInstance::DependencyCallback()
 {
     m_SceneRef->MarkSceneForUpdate();
+    UpdateRaytracingData();
 }
 
 
@@ -40,4 +45,101 @@ void PTMeshInstance::SetMesh(std::shared_ptr<Lumen::ILumenMesh> a_Mesh)
     MeshInstance::SetMesh(a_Mesh);
     // Because the mesh used by the instance was changed, the scene's structure needs to be rebuild to reflect the change.
     m_SceneRef->MarkSceneForUpdate();    
+}
+
+bool PTMeshInstance::VerifyAccelerationStructure()
+{
+    // Iterate through all the SDT entries and ensure that the instance IDs used by the acceleration structure are still correct
+    bool structCorrect = true;
+    for (auto& entry : m_EntryMap)
+    {
+        auto ptPrimitive = entry.first;
+        if (entry.second.m_TableIndex != m_LastUsedPrimitiveIDs[ptPrimitive])
+        {
+            structCorrect = false;
+        }
+    }
+
+    // If the struct was found to be incorrect, update it automatically
+    if (!structCorrect)
+    {
+        UpdateAccelerationStructure();
+    }
+
+    // Return true if the struct was correct to begin with, return false if it had to be updated
+    return structCorrect;
+}
+
+void PTMeshInstance::UpdateAccelerationStructure()
+{
+    std::vector<OptixInstance> instances;
+
+    for (auto& entry : m_EntryMap)
+    {
+        auto ptPrim = static_cast<const PTPrimitive*>(entry.first);
+        // Create the instance data used for the acceleration structure creation
+        auto& inst = instances.emplace_back();
+        // The instance ID is what is actually used to determine the material and buffer data for the geometry when an intersection occurs
+        inst.instanceId = entry.second.m_TableIndex;
+        // As convention shaders for non-volumetric geometry are kept in the first slot of the shader binding table
+        inst.sbtOffset = 0;
+        inst.visibilityMask = 255; // Can be intersected by anything
+        // Handle to the acceleration structure instance
+        inst.traversableHandle = ptPrim->m_GeometryAccelerationStructure->m_TraversableHandle;
+        inst.flags = OPTIX_INSTANCE_FLAG_NONE;
+
+        // Initialize the transform of the instance to an identity matrix because primitives are always untransformed in the meshes
+        // memcpy is easiest way to achieve this because OptixInstance::transform is a 3x4 matrix, and not a 4x4 matrix
+        auto transform = glm::mat4(1.0f);
+        memcpy(&inst.transform[0], &transform, sizeof(inst.transform));
+        
+        // Record the instance id used for this primitive in the acceleration structure
+        m_LastUsedPrimitiveIDs[entry.first] = entry.second.m_TableIndex;
+    }
+
+    // Finally, create the instance acceleration structure out of the instances
+    m_AccelerationStructure = m_Services.m_OptixWrapper->BuildInstanceAccelerationStructure(instances);
+}
+
+OptixTraversableHandle PTMeshInstance::GetAccelerationStructureHandle() const
+{
+    return m_AccelerationStructure->m_TraversableHandle;
+}
+
+void PTMeshInstance::SetAdditionalColor(glm::vec4 a_AdditionalColor)
+{
+    m_AdditionalColor = a_AdditionalColor;
+    UpdateRaytracingData(); // I hate this so much but IDK how to do it better
+}
+
+void PTMeshInstance::UpdateRaytracingData()
+{
+    if (!m_MeshRef || !m_SceneRef)
+        return;
+
+    std::vector<OptixInstance> instances;
+
+    for (auto& prim : m_MeshRef->m_Primitives)
+    {
+        auto ptPrim = static_cast<PTPrimitive*>(prim.get());
+
+        SceneDataTableEntry<DevicePrimitiveInstance>* entry;
+        if (m_EntryMap.find(prim.get()) == m_EntryMap.end())
+            m_EntryMap[prim.get()] = m_SceneRef->m_SceneDataTable->AddEntry<DevicePrimitiveInstance>();
+
+        entry = &m_EntryMap.at(prim.get());
+
+        // Fill out the data of the entry here
+        // Any instance specific data would go here
+        auto& entryData = entry->GetData();
+
+        entryData.m_Primitive = ptPrim->m_DevicePrimitive;
+        entryData.m_AdditionColorIDK = make_float4(m_AdditionalColor.x, m_AdditionalColor.y, m_AdditionalColor.z, m_AdditionalColor.w);
+        // The acceleration structure of the mesh instance does not need to be rebuild after this.
+        // This is because the scene data table and the acceleration structure are only connected by the entry Ids,
+        // which have not changed here
+
+        // It is however necessary to initialize the last used id for this primitive to a value which is almost certain to be invalid 
+        m_LastUsedPrimitiveIDs[prim.get()] = -1;
+    }    
 }
