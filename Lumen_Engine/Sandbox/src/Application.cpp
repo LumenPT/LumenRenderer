@@ -126,14 +126,17 @@ public:
 		
 		//Loop over the nodes in the scene, and add their meshes if they have one.
 
-		float xOffset = -900.f;
+		float xOffset = -1200.f;
+
+		uint32_t seed = 38947987;
+		seed = RandomInt(seed);
 
 		for(int i = 0; i < 30; ++i)
 		{
 			for (auto& node : res2->m_NodePool)
 			{
 				auto meshId = node->m_MeshID;
-				//if (meshId >= 0)
+				if (meshId >= 0)
 				{
 					auto mesh = lumenPT->m_Scene->AddMesh();
 					mesh->SetMesh(res2->m_MeshPool[meshId]);
@@ -141,6 +144,9 @@ public:
 					float p = i;
 					mesh->m_Transform.SetPosition(glm::vec3(xOffset, 100.f + (p*p), 0.f));
 					mesh->m_Transform.SetScale(glm::vec3(2.0f * (static_cast<float>((i + 1) * 2) / 4.f)));
+					glm::vec3 rgb = glm::vec3(RandomFloat(seed), RandomFloat(seed), RandomFloat(seed));
+					mesh->SetEmissiveness(Lumen::EmissionMode::OVERRIDE, rgb, 50.f);
+					mesh->UpdateAccelRemoveThis();
 				}
 			}
 
@@ -155,7 +161,9 @@ public:
 				auto mesh = lumenPT->m_Scene->AddMesh();
 				mesh->SetMesh(res->m_MeshPool[meshId]);
 				mesh->m_Transform.CopyTransform(*node->m_LocalTransform);
-				//mesh->m_Transform.SetPosition(glm::vec3(0.f, 0.f, 15.0f));
+				mesh->SetEmissiveness(Lumen::EmissionMode::ENABLED, glm::vec3(1.f, 1.f, 1.f), 3000.f);	//Make more bright
+				mesh->UpdateAccelRemoveThis();
+			    //mesh->m_Transform.SetPosition(glm::vec3(0.f, 0.f, 15.0f));
 				//mesh->m_Transform.SetScale(glm::vec3(1.0f));
 			}
 		}

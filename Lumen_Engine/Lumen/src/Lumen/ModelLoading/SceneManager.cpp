@@ -447,12 +447,37 @@ void Lumen::SceneManager::LoadMeshes(fx::gltf::Document& a_Doc, GLTFResource& a_
 					//Normalize the tangent.
 					tangent = glm::normalize(tangent);
 
+					//Ensure the tangent is valid.
+					assert(glm::length(tangent) > 0.f);
+
 					auto tanVec4 = glm::vec4(tangent, 1.f);
 
 					//Put in the output buffer. Same tangent for every vertex that was processed.
 					tangentView[index1] = tanVec4;
 					tangentView[index2] = tanVec4;
 					tangentView[index3] = tanVec4;
+				}
+			}
+
+			//Tangents provided by mesh. Assert that they are correct.
+			else
+			{
+			    VectorView<glm::vec4, uint8_t> tangentView(tanBinary);
+
+				assert(tangentView.Size() == normalView.Size());
+
+				for(int index = 0; index < tangentView.Size(); ++index)
+				{
+					//At least X, Y or Z must be non-zero. W can never be 0.
+					assert((tangentView[index].x != 0 || tangentView[index].y != 0 || tangentView[index].z != 0) && tangentView[index].w != 0);
+					assert(!isnan(tangentView[index].x));
+					assert(!isnan(tangentView[index].y));
+					assert(!isnan(tangentView[index].z));
+					assert(!isnan(tangentView[index].w));
+					assert(!isinf(tangentView[index].x));
+					assert(!isinf(tangentView[index].y));
+					assert(!isinf(tangentView[index].z));
+					assert(!isinf(tangentView[index].w));
 				}
 			}
 
