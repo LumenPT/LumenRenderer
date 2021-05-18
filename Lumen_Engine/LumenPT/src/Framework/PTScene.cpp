@@ -6,6 +6,7 @@
 #include "PTVolume.h"
 #include "PTVolumeInstance.h"
 #include "RendererDefinition.h"
+#include "../Shaders/CppCommon/WaveFrontDataStructs/WavefrontTraceMasks.h"
 
 PTScene::PTScene(LumenRenderer::SceneData& a_SceneData, PTServiceLocator& a_ServiceLocator)
     : m_Services(a_ServiceLocator)
@@ -98,7 +99,7 @@ void PTScene::UpdateSceneAccelerationStructure()
             // Record the acceleration structure of the mesh into the OptixInstance
             inst.traversableHandle = ptMesh->m_AccelerationStructure->m_TraversableHandle;
             inst.sbtOffset = 0;	// Optix states that if the AS instance is an IAS, the sbt offset must be 0
-            inst.visibilityMask = OptixVisibilityMask(0b00000001);	// 1
+            inst.visibilityMask = WaveFront::TraceMaskType::SOLIDS;	// 1
 			// The instance ID of this struct is irrelevant, as the intersections will see the ID of the lowest level AS
             inst.instanceId = instanceID++;
             inst.flags = OPTIX_INSTANCE_FLAG_NONE;
@@ -124,7 +125,7 @@ void PTScene::UpdateSceneAccelerationStructure()
             inst.traversableHandle = ptVolume->m_AccelerationStructure->m_TraversableHandle;
 			// TODO: This needs to be changed to represent the index of the volumetrics shaders in the shader binding table
 			inst.sbtOffset = 1;
-            inst.visibilityMask = OptixVisibilityMask(0b00000010);
+            inst.visibilityMask = WaveFront::TraceMaskType::VOLUMES;
             inst.instanceId = ptVolume->m_SceneDataTableEntry.m_TableIndex;
             inst.flags = OPTIX_INSTANCE_FLAG_NONE;
 

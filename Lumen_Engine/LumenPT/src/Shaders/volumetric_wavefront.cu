@@ -29,7 +29,8 @@ __device__ __forceinline__ static T* UnpackPointer(unsigned int a_Upper, unsigne
 
 extern "C"
 __global__ void __closesthit__Volumetric()
-{	
+{
+
 	WaveFront::VolumetricIntersectionData* intersection = UnpackPointer<WaveFront::VolumetricIntersectionData>(optixGetPayload_0(), optixGetPayload_1());
 
 	if (optixGetPayload_0() > 0)
