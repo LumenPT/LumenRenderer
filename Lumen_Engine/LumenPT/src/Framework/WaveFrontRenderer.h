@@ -23,6 +23,11 @@ namespace WaveFront
 {
     struct WaveFrontSettings
     {
+
+        std::filesystem::path m_ShadersFilePathSolids;
+
+        std::filesystem::path m_ShadersFilePathVolumetrics;
+
         //The maximum path length in the scene.
         std::uint32_t depth;
 

@@ -15,7 +15,6 @@
 #include "SceneDataTable.h"
 #include "../CUDAKernels/WaveFrontKernels.cuh"
 #include "../CUDAKernels/WaveFrontKernels/EmissiveLookup.cuh"
-#include "../Shaders/CppCommon/LumenPTConsts.h"
 #include "../Shaders/CppCommon/WaveFrontDataStructs.h"
 #include "CudaUtilities.h"
 #include "ReSTIR.h"
@@ -61,12 +60,11 @@ namespace WaveFront
         //Init CUDA
         cudaFree(0);
         m_CUDAContext = 0;
-        
 
         //TODO: Ensure shader names match what we put down here.
         OptixWrapper::InitializationData optixInitData;
         optixInitData.m_CUDAContext = m_CUDAContext;
-        optixInitData.m_ProgramData.m_ProgramPath = LumenPTConsts::gs_ShaderPathBase + "WaveFrontShaders.ptx";;
+        optixInitData.m_ProgramData.m_ProgramPath = a_Settings.m_ShadersFilePathSolids;
         optixInitData.m_ProgramData.m_ProgramLaunchParamName = "launchParams";
         optixInitData.m_ProgramData.m_ProgramRayGenFuncName = "__raygen__WaveFrontRG";
         optixInitData.m_ProgramData.m_ProgramMissFuncName = "__miss__WaveFrontMS";
