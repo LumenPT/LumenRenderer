@@ -22,8 +22,6 @@ file(GLOB_RECURSE CUDA_SOURCE_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/Shaders/*.cu
 )
 
-
-
 #generate .ptx files from .cu files
 add_library(CUDAShaders OBJECT ${CUDA_HEADER_FILES} ${CUDA_SOURCE_FILES})
 set_property(TARGET CUDAShaders PROPERTY CUDA_PTX_COMPILATION ON)
