@@ -130,48 +130,14 @@ namespace WaveFront
 			lights[i].area = sqrt(pow((vec1.y * vec2.z - vec2.y * vec1.z), 2) + pow((vec1.x * vec2.z - vec2.x * vec1.z), 2) + pow((vec1.x * vec2.y - vec2.x * vec1.y), 2)) / 2.f;
 		}
 
-		//Initialize the ray buffers. Note: These are not initialized but Reset() is called when the waves start.
-		const auto numPrimaryRays = numPixels;
-		const auto numShadowRays = numPixels * m_Settings.depth; //TODO: change to 2x num pixels and add safety check to resolve when full.
-		m_Rays.Resize(sizeof(AtomicBuffer<IntersectionRayData>) + sizeof(IntersectionRayData) * numPrimaryRays);
-		m_ShadowRays.Resize(sizeof(AtomicBuffer<ShadowRayData>) + sizeof(ShadowRayData) * numShadowRays);
-		m_VolumetricShadowRays.Resize(sizeof(AtomicBuffer<ShadowRayData>) + sizeof(ShadowRayData) * m_Settings.depth);
-
-		//Reset Atomic Counters for Intersection and Shadow Rays
-		m_Rays.Write(0);
-		m_ShadowRays.Write(0);
-		m_VolumetricShadowRays.Write(0);
-
-		//Initialize the intersection data. This one is the size of numPixels maximum.
-		//TODO: increase size of volume intersection buffer to allow multiple consecutive volumes
-		m_IntersectionData.Resize(sizeof(AtomicBuffer<IntersectionData>) + sizeof(IntersectionData) * numPixels);
-		m_VolumetricIntersectionData.Resize(sizeof(AtomicBuffer <IntersectionData>) + sizeof(VolumetricIntersectionData) * numPixels);
-
-		//Reset Atomic Counter for Intersection Buffers.
-		m_IntersectionData.Write(0);
-		m_VolumetricIntersectionData.Write(0);
-
-		//Initialize each surface data buffer.
-		for (auto& surfaceDataBuffer : m_SurfaceData)
+		//Calculate the normal for each light.
+		for (int i = 0; i < 3; ++i)
 		{
-			//Note; Only allocates memory and stores the size on the GPU. It does not actually fill any data in yet.
-			surfaceDataBuffer.Resize(numPixels * sizeof(SurfaceData));
+			glm::vec3 arm1 = normalize(glm::vec3(lights[i].p0.x - lights[i].p2.x, lights[i].p0.y - lights[i].p2.y, lights[i].p0.z - lights[i].p2.z));
+			glm::vec3 arm2 = normalize(glm::vec3(lights[i].p0.x - lights[i].p1.x, lights[i].p0.y - lights[i].p1.y, lights[i].p0.z - lights[i].p1.z));
+			glm::vec3 normal = normalize(glm::cross(arm2, arm1));
+			lights[i].normal = { normal.x, normal.y, normal.z };
 		}
-
-		for (auto& volumetricDataBuffer : m_VolumetricData)
-		{
-			volumetricDataBuffer.Resize(numPixels * sizeof(VolumetricData));
-		}
-
-        //Calculate the normal for each light.
-        for(int i = 0; i < 3; ++i)
-        {
-            glm::vec3 arm1 = normalize(glm::vec3(lights[i].p0.x - lights[i].p2.x, lights[i].p0.y - lights[i].p2.y, lights[i].p0.z - lights[i].p2.z));
-            glm::vec3 arm2 = normalize(glm::vec3(lights[i].p0.x - lights[i].p1.x, lights[i].p0.y - lights[i].p1.y, lights[i].p0.z - lights[i].p1.z));
-            glm::vec3 normal = normalize(glm::cross(arm2, arm1));
-            lights[i].normal = { normal.x, normal.y, normal.z };
-        }
-
 
         //m_TriangleLights.Write(&lights[0], sizeof(TriangleLight) * numLights, 0);
 
@@ -978,14 +944,22 @@ namespace WaveFront
         //Create atomic buffers. This automatically sets the counter to 0 and size to max.
         CreateAtomicBuffer<IntersectionRayData>(&m_Rays, numPrimaryRays);
         CreateAtomicBuffer<ShadowRayData>(&m_ShadowRays, numShadowRays);
-        CreateAtomicBuffer<IntersectionData>(&m_IntersectionData, numPixels);
+		CreateAtomicBuffer<ShadowRayData>(&m_VolumetricShadowRays, numShadowRays);
+		CreateAtomicBuffer<IntersectionData>(&m_IntersectionData, numPixels);
+		CreateAtomicBuffer<VolumetricIntersectionData>(&m_VolumetricIntersectionData, numPixels);
 
-        //Initialize each surface data buffer.
-        for (int i = 0; i < 3; ++i)
-        {
-            //Note; Only allocates memory and stores the size on the GPU. It does not actually fill any data in yet.
-            m_SurfaceData[i].Resize(numPixels * sizeof(SurfaceData));
-        }
+
+		//Initialize each surface data buffer.
+		for (auto& surfaceDataBuffer : m_SurfaceData)
+		{
+			//Note; Only allocates memory and stores the size on the GPU. It does not actually fill any data in yet.
+			surfaceDataBuffer.Resize(numPixels * sizeof(SurfaceData));
+		}
+
+		for (auto& volumetricDataBuffer : m_VolumetricData)
+		{
+			volumetricDataBuffer.Resize(numPixels * sizeof(VolumetricData));
+		}
 
         m_MotionVectors.Init(make_uint2(m_Settings.renderResolution.x, m_Settings.renderResolution.y));
 

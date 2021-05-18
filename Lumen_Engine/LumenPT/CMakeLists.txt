@@ -111,6 +111,7 @@ set(CUDAKernels_INCLUDES
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Include/Cuda"
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Include/sutil"
 	"${CMAKE_CURRENT_SOURCE_DIR}/../Lumen/vendor/glm"
+	"${CMAKE_CURRENT_SOURCE_DIR}/../Lumen/src/Lumen"
 	${NANOVDB_HEADERS}
 )
 
