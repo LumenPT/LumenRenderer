@@ -34,7 +34,7 @@ __global__ void ResetReservoirInternal(int a_NumReservoirs, Reservoir* a_Reservo
     }
 }
 
-__host__ void FillCDF(CDF* a_Cdf, const WaveFront::TriangleLight* a_Lights, unsigned a_LightCount)
+__host__ void FillCDF(CDF* a_Cdf, const WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights, unsigned a_LightCount)
 {
     //TODO: This is not efficient single threaded.
     //TODO: Use this: https://developer.nvidia.com/gpugems/gpugems3/part-vi-gpu-computing/chapter-39-parallel-prefix-sum-scan-cuda
@@ -55,17 +55,22 @@ __global__ void ResetCDF(CDF* a_Cdf)
     a_Cdf->Reset();
 }
 
-__global__ void FillCDFInternal(CDF* a_Cdf, const WaveFront::TriangleLight* a_Lights, unsigned a_LightCount)
+__global__ void FillCDFInternal(CDF* a_Cdf, const WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights, unsigned a_LightCount)
 {
     for (int i = 0; i < a_LightCount; ++i)
     {
         //Weight is the average illumination for now. Could take camera into account.
-        const float3 radiance = a_Lights[i].radiance;
+        const float3 radiance = a_Lights->GetData(i)->radiance;
+
+        //printf("Radiance: %f, %f, %f LightCount: %i \n", radiance.x, radiance.y, radiance.z, a_LightCount);
+
+        assert(radiance.x >= 0.f && radiance.y >= 0.f && radiance.z >= 0.f && "Radiance needs to be positive, no taking away the light in the soul");
+
         a_Cdf->Insert((radiance.x + radiance.y + radiance.z) / 3.f);
     }
 }
 
-__host__ void FillLightBags(unsigned a_NumLightBags, unsigned a_NumLightsPerBag, CDF* a_Cdf, LightBagEntry* a_LightBagPtr, const WaveFront::TriangleLight* a_Lights, const std::uint32_t a_Seed)
+__host__ void FillLightBags(unsigned a_NumLightBags, unsigned a_NumLightsPerBag, CDF* a_Cdf, LightBagEntry* a_LightBagPtr, const WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights, const std::uint32_t a_Seed)
 {
     const unsigned numLightsTotal = a_NumLightBags * a_NumLightsPerBag;
     const int blockSize = CUDA_BLOCK_SIZE;
@@ -75,7 +80,7 @@ __host__ void FillLightBags(unsigned a_NumLightBags, unsigned a_NumLightsPerBag,
     CHECKLASTCUDAERROR;
 }
 
-__global__ void FillLightBagsInternal(unsigned a_NumLightBags, unsigned a_NumLightsPerBag, CDF* a_Cdf, LightBagEntry* a_LightBagPtr, const WaveFront::TriangleLight* a_Lights, const std::uint32_t a_Seed)
+__global__ void FillLightBagsInternal(unsigned a_NumLightBags, unsigned a_NumLightsPerBag, CDF* a_Cdf, LightBagEntry* a_LightBagPtr, const WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights, const std::uint32_t a_Seed)
 {
     const unsigned numLightsTotal = a_NumLightBags * a_NumLightsPerBag;
     int index = blockIdx.x * blockDim.x + threadIdx.x;
@@ -91,7 +96,7 @@ __global__ void FillLightBagsInternal(unsigned a_NumLightBags, unsigned a_NumLig
         unsigned lIndex;
         float pdf;
         a_Cdf->Get(random, lIndex, pdf);
-        a_LightBagPtr[i] = LightBagEntry{a_Lights[lIndex], pdf};
+        a_LightBagPtr[i] = LightBagEntry{*a_Lights->GetData(lIndex), pdf};
     }
 }
 
@@ -113,7 +118,8 @@ __host__ void PickPrimarySamples(const LightBagEntry* const a_LightBags, Reservo
         a_Settings.numLightBags,
         a_Settings.numLightsPerBag,
         a_PixelData,
-        a_Seed);
+        a_Seed
+    );
     cudaDeviceSynchronize();
     CHECKLASTCUDAERROR;
 }
@@ -136,6 +142,10 @@ __global__ void PickPrimarySamplesInternal(const LightBagEntry* const a_LightBag
     //This line thus causes the L1 cache to only access a single light bag, which stops a lot of cache misses.
     //TODO: This means that depending on the blocks per SM, a single light bag may be used for multiple rows of pixels. Ensure no artifacts occur (difference in light in interleaved rows).
     //TODO: If this occurs, consider either changing back (performance loss) or interleaving the pixels in a way where a row of 256 pixels is actually a 16x16 area in the screen.
+    //TODO: Note: These artifacts seem to appear but only on the first few frames. With multiple reservoirs per pixel it resolves itself.
+    //TODO: It's only really noticeable when there is many lights of similar size to choose from, and light bags can be full of bad samples. Or small light bags.
+    //TODO: Conclusion: it's fine unless light bag to light ratio is too big. In those cases interleaved or per block doesn't really matter.
+    //TODO: So in those cases instead try to have a separate light bag per reservoir: seed + smid + depth. But then you lose the cache coherency somewhat.
     auto lBagSeed = WangHash(a_Seed + __mysmid());
 
     const float random = RandomFloat(lBagSeed);
@@ -149,8 +159,14 @@ __global__ void PickPrimarySamplesInternal(const LightBagEntry* const a_LightBag
     //The current pixel index.
     const WaveFront::SurfaceData pixel = a_PixelData[pixelIndex];
 
-    //If no intersection exists at this pixel, do nothing. Emissive surfaces are also excluded.
-    if(pixel.m_IntersectionT <= 0.f || pixel.m_Emissive)
+    //If the surface is emissive, don't apply ReSTIR.
+    if(pixel.m_Emissive)
+    {
+        return;
+    }
+
+    //If no intersection exists at this pixel, do nothing.
+    if(pixel.m_IntersectionT <= 0.f)
     {
         return;
     }
@@ -263,6 +279,70 @@ __global__ void GenerateShadowRay(WaveFront::AtomicBuffer<RestirShadowRay>* a_At
         }         
     }
 }
+
+/*
+ * Generate the shadow rays used for final shading.
+ */
+__host__ unsigned int GenerateReSTIRShadowRaysShading(MemoryBuffer* a_AtomicBuffer, Reservoir* a_Reservoirs, const WaveFront::SurfaceData* a_PixelData, unsigned a_NumPixels)
+{
+    //Counter that is atomically incremented. Copy it to the GPU.
+    WaveFront::ResetAtomicBuffer<RestirShadowRayShading>(a_AtomicBuffer);
+
+    const auto devicePtr = a_AtomicBuffer->GetDevicePtr<WaveFront::AtomicBuffer<RestirShadowRayShading>>();
+
+    //Call in parallel.
+    const int blockSize = CUDA_BLOCK_SIZE;
+    const int numBlocks = (a_NumPixels + blockSize - 1) / blockSize;
+
+    for (int depth = 0; depth < ReSTIRSettings::numReservoirsPerPixel; ++depth)
+    {
+        GenerateShadowRayShading <<<numBlocks, blockSize >>> (devicePtr, a_Reservoirs, a_PixelData, a_NumPixels, depth);
+    }
+    cudaDeviceSynchronize();
+
+    CHECKLASTCUDAERROR;
+
+    //Copy value back to the CPU.
+    return WaveFront::GetAtomicCounter<RestirShadowRayShading>(a_AtomicBuffer);
+}
+
+__global__ void GenerateShadowRayShading(WaveFront::AtomicBuffer<RestirShadowRayShading>* a_AtomicBuffer, Reservoir* a_Reservoirs, const WaveFront::SurfaceData* a_PixelData, unsigned a_NumPixels, unsigned a_Depth)
+{
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    if (index >= a_NumPixels) return;
+
+    const WaveFront::SurfaceData pixelData = a_PixelData[index];
+
+    //Only run for valid intersections.
+    if (pixelData.m_IntersectionT > 0.f && !pixelData.m_Emissive)
+    {
+        //If the reservoir has a weight, add a shadow ray.
+        const auto reservoirIndex = RESERVOIR_INDEX(index, a_Depth, ReSTIRSettings::numReservoirsPerPixel);
+        const Reservoir reservoir = a_Reservoirs[reservoirIndex];
+
+        if (reservoir.weight > 0.f)
+        {
+            float3 pixelToLight = (reservoir.sample.position - pixelData.m_Position);
+            const float l = length(pixelToLight);
+            pixelToLight /= l;
+
+            assert(fabsf(length(pixelToLight) - 1.f) <= FLT_EPSILON * 5.f);
+
+            RestirShadowRayShading ray;
+            ray.index = reservoirIndex;
+            ray.direction = pixelToLight;
+            ray.origin = pixelData.m_Position;
+            ray.distance = l - 0.05f; //Make length a little bit shorter to prevent self-shadowing.
+
+            //Take the average contribution scaled after all reservoirs.
+            ray.contribution = (reservoir.sample.unshadowedPathContribution * (reservoir.weight / static_cast<float>(ReSTIRSettings::numReservoirsPerPixel)));;
+
+            //TODO: this is a slow operation. Perhaps it's better to create multiple shadow rays per thread, store them locally, then add them at once?
+            a_AtomicBuffer->Add(&ray);
+        } 
+    }
+}
+
 
 __host__ void SpatialNeighbourSampling(Reservoir* a_Reservoirs, Reservoir* a_SwapBuffer, const WaveFront::SurfaceData* a_PixelData, const std::uint32_t a_Seed, uint2 a_Dimensions)
 {
@@ -813,6 +893,8 @@ __global__ void GenerateWaveFrontShadowRaysInternal(Reservoir* a_Reservoirs, con
     }
 }
 
+//This gets the SM ID on the GPU. So Streaming Multiprocessor.
+//Allows us to reason about the L1 cache used by a block.
 uint32_t __mysmid()
 {
     uint32_t smid;

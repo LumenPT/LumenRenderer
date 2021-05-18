@@ -13,6 +13,7 @@ set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 
 #Add option to use wavefront
 option(USE_WAVEFRONT "Use the Wavefront rendering pipeline?" ON)
+option(USE_NVIDIA_DENOISER "Use Nvidia denoiser?" OFF)
 
 #If wavefront is used, add compile definition.
 if(${USE_WAVEFRONT})
@@ -77,6 +78,10 @@ add_compile_definitions(CONFIG_NAME=\"${CONFIG_NAME}\")
 add_subdirectory ("LumenPT/vendor/openvdb")
 	#NanoVDB
 add_subdirectory ("LumenPT/vendor/openvdb/nanovdb")
+	#NRD
+if(${USE_NVIDIA_DENOISER})
+	add_subdirectory ("LumenPT/vendor/RayTracingDenoiser")
+endif()
 	#Lumen
 add_subdirectory ("Lumen")
 	#LumenPT

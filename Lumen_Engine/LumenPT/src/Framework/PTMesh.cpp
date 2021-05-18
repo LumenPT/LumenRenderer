@@ -7,7 +7,7 @@
 
 #include "glm/mat4x4.hpp"
 
-PTMesh::PTMesh(std::vector<std::unique_ptr<Lumen::ILumenPrimitive>>& a_Primitives, PTServiceLocator& a_ServiceLocator)
+PTMesh::PTMesh(std::vector<std::shared_ptr<Lumen::ILumenPrimitive>>& a_Primitives, PTServiceLocator& a_ServiceLocator)
     : ILumenMesh(a_Primitives)
     , m_Services(a_ServiceLocator)
 {

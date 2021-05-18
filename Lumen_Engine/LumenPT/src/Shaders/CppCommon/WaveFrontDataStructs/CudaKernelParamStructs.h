@@ -69,7 +69,7 @@ namespace WaveFront
             const AtomicBuffer<IntersectionData>* a_Intersections,
             AtomicBuffer<IntersectionRayData>* a_RayBuffer,
             AtomicBuffer<ShadowRayData>* a_ShadowRays,
-            TriangleLight* a_TriangleLights,
+            MemoryBuffer* a_TriangleLights,
             std::uint32_t a_NumLights,
             const float3& a_CameraPosition,
             const float3& a_CameraDirection,
@@ -111,7 +111,7 @@ namespace WaveFront
         const SurfaceData* const m_CurrentSurfaceData;
         const SurfaceData* const m_TemporalSurfaceData;
         const AtomicBuffer<IntersectionData>* const m_IntersectionData;
-        const TriangleLight* const m_TriangleLights;
+        const MemoryBuffer* const m_TriangleLights;
         const std::uint32_t m_NumLights;
         const unsigned m_CurrentDepth;
         const float3 m_CameraPosition;

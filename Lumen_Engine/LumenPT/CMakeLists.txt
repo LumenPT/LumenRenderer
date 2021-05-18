@@ -91,6 +91,8 @@ set_property(TARGET LumenPT PROPERTY CUDA_ARCHITECTURES 52-real)
 
 add_dependencies(LumenPT CudaPTX)
 add_dependencies(LumenPT copyCUDAOutput)
+set_property(TARGET LumenPT APPEND PROPERTY COMPILE_DEFINITIONS LUMEN_PT)
+set_property(TARGET LumenPT APPEND PROPERTY COMPILE_DEFINITIONS $<$<CONFIG:Debug>:CUDA_CHECK OPTIX_CHECK>)
 
 assign_source_group(${CPP_HEADER_FILES})
 assign_source_group(${CPP_SOURCE_FILES})

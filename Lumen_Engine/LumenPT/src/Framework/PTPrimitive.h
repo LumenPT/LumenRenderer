@@ -25,7 +25,7 @@ public:
 
 	std::unique_ptr<MemoryBuffer> m_VertBuffer; // Memory buffer containing the vertex data of the primitive
 	std::unique_ptr<MemoryBuffer> m_IndexBuffer; // Memory buffer containing the index data if such exists
-	std::unique_ptr<MemoryBuffer> m_BoolBuffer; // ???????
+	std::unique_ptr<MemoryBuffer> m_BoolBuffer; // Indicating which triangles are emissive
 	// The geometry acceleration structure of the primitive. This is used when creating the instance acceleration structure of the owner mesh
 	std::unique_ptr<AccelerationStructure> m_GeometryAccelerationStructure; 
 

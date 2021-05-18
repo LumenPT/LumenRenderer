@@ -559,7 +559,7 @@ std::unique_ptr<Lumen::ILumenPrimitive> OptiXRenderer::CreatePrimitive(Primitive
 }
 
 std::shared_ptr<Lumen::ILumenMesh> OptiXRenderer::CreateMesh(
-    std::vector<std::unique_ptr<Lumen::ILumenPrimitive>>& a_Primitives)
+    std::vector<std::shared_ptr<Lumen::ILumenPrimitive>>& a_Primitives)
 {
     auto mesh = std::make_shared<PTMesh>(a_Primitives, m_ServiceLocator);
     return mesh;
