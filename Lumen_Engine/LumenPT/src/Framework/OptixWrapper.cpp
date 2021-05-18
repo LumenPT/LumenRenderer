@@ -173,6 +173,12 @@ bool OptixWrapper::CreatePipeline(const InitializationData::ProgramData& a_Progr
 
     m_Module = CreateModule(a_ProgramData.m_ProgramPath, compileOptions);
 
+    if(!m_Module)
+    {
+        printf("Error: could not create shader module with the path: %s !", a_ProgramData.m_ProgramPath.string().c_str());
+        return false;
+    }
+
     return CreatePipeline(
         m_Module,
         compileOptions,

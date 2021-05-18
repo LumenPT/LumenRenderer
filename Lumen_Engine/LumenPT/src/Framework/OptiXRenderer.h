@@ -82,7 +82,7 @@ public:
 	
     void CreateOutputBuffer();
 
-    unsigned int TraceFrame(std::shared_ptr<Lumen::ILumenScene>& a_Scene) override;
+    TraceFrame() override;
 
     //Camera m_Camera;
 
@@ -130,6 +130,9 @@ private:
 
 	//volumetric_bookmark
     AccelerationStructure* m_testVolumeGAS = nullptr;
+
+    InitializationData m_InitData;
+
 };
 
 template <typename VertexType, typename IndexType>

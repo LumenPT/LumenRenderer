@@ -1,0 +1,11 @@
+{
+    "Directories": {
+        "AssetDirectory": "./Sandbox/assets/",
+        "ModelDirectory": "./Sandbox/assets/models/",
+        "ShaderDirectory": "./Sandbox/assets/Shaders/"
+    },
+    "FilePaths": {
+        "ShaderSolids": "./Sandbox/assets/Shaders/Debug/WaveFrontShaders.ptx",
+        "ShaderVolumetrics": "./Sandbox/assets/Shaders/Debug/volumetric.ptx"
+    }
+}

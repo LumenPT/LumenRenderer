@@ -35,7 +35,8 @@ public:
     void OnEvent(Lumen::Event& a_Event) override;
 
     //LumenPT* GetPipeline() { return m_LumenPT.get(); };
-    LumenRenderer* GetPipeline() { return m_Renderer.get(); };
+    void SetPipeline(const std::shared_ptr<LumenRenderer>& a_Renderer);
+    const std::shared_ptr<LumenRenderer>& GetPipeline() const;
 
 private:
 
@@ -47,7 +48,7 @@ private:
     void InitContentViewNameTable();
     void ContentViewDropDown();
 
-    std::unique_ptr<LumenRenderer> m_Renderer;
+    std::shared_ptr<LumenRenderer> m_Renderer;
     //std::unique_ptr<LumenPT> m_LumenPT;
 
     uint32_t m_Program;

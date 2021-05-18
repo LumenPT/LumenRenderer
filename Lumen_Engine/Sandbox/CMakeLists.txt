@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 3.16)
+cmake_minimum_required (VERSION 3.20)
 enable_language(CUDA)
 
 # specify the C++ standard
@@ -28,10 +28,6 @@ assign_source_group(${SOURCE_FILES})
 
 set_property(TARGET Sandbox PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 set_property(TARGET Sandbox APPEND PROPERTY COMPILE_DEFINITIONS GLFW_INCLUDE_NONE)
-
-if(${USE_WAVEFRONT})
-	set_property(TARGET Sandbox APPEND PROPERTY COMPILE_DEFINITIONS WAVEFRONT)
-endif()
 
 #Add header directory includes
 target_include_directories(Sandbox PUBLIC
