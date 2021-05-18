@@ -52,10 +52,10 @@ add_library(CUDAShaders OBJECT ${CUDA_HEADER_FILES} ${CUDA_SOURCE_FILES})
 set_property(TARGET CUDAShaders PROPERTY CUDA_PTX_COMPILATION ON)
 
 target_include_directories(CUDAShaders PUBLIC
-	"vendor/Include"
-	"vendor/Include/Cuda"
-	"src/Shaders"
-	"src/Shaders/CppCommon"
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Include"
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Include/Cuda"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/Shaders"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/Shaders/CppCommon"
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/openvdb/nanovdb"
 	${NANOVDB_HEADERS}
 )
@@ -106,12 +106,12 @@ file(GLOB_RECURSE CUDA_SOURCE_FILES
 )
 
 set(CUDAKernels_INCLUDES
-	"${CMAKE_CURRENT_BINARY_DIR}/config"	
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Include"
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Include/Cuda"
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Include/sutil"
 	"${CMAKE_CURRENT_SOURCE_DIR}/../Lumen/vendor/glm"
 	"${CMAKE_CURRENT_SOURCE_DIR}/../Lumen/src/Lumen"
+	"${CMAKE_CURRENT_BINARY_DIR}/config"
 	${NANOVDB_HEADERS}
 )
 
@@ -148,33 +148,29 @@ file(GLOB_RECURSE CPP_SOURCE_FILES
 )
 
 set(LUMENPT_INCLUDES
-	"vendor/Include"
-	"vendor/Include/Cuda"
-	"../Lumen/src/AssetLoading"
-	"../Lumen/src/Lumen"
-	"../Lumen/src"
-	"../Lumen/vendor/spdlog/include/"
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Include"
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Include/Cuda"
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/openvdb/openvdb"
+	"${CMAKE_CURRENT_SOURCE_DIR}/../Lumen/src"
+	"${CMAKE_CURRENT_SOURCE_DIR}/../Lumen/src/Lumen"
+	"${CMAKE_CURRENT_SOURCE_DIR}/../Lumen/src/AssetLoading"
+	"${CMAKE_CURRENT_SOURCE_DIR}/../Lumen/vendor/spdlog/include/"
 	"${CMAKE_CURRENT_SOURCE_DIR}/../Lumen/vendor/glm"
 	"${CMAKE_CURRENT_BINARY_DIR}/config"
 	${NANOVDB_HEADERS}
-	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/openvdb/openvdb"
 )
 
 # Put all libraries into a variable
 set(LUMENPT_LIBS
-	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Libs/glad.lib"
 
 	libnanovdb
 	openvdb_static
-
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Libs/glad.lib"
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Libs/tbb/tbb.lib"
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Libs/tbb/tbbmalloc.lib"
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Libs/tbb/tbbmalloc_proxy.lib"
-
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Libs/blosc.lib"
-
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Libs/zlib.lib"
-
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Libs/OpenEXR/Half-2_5.lib"
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Libs/OpenEXR/Iex-2_5.lib"
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Libs/OpenEXR/IexMath-2_5.lib"
