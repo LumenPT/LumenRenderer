@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 3.16)
+cmake_minimum_required (VERSION 3.20)
 enable_language(CUDA)
 
 set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} -G")
@@ -8,31 +8,6 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_CUDA_STANDARD 14)
 set(CMAKE_CUDA_STANDARD_REQUIRED True)
-
-set(CONFIG_NAME "")
-
-if(	${CMAKE_GENERATOR} STREQUAL "Visual Studio 8 2005" OR
-	${CMAKE_GENERATOR} STREQUAL "Visual Studio 9 2008")
-
-	set(CONFIG_NAME $(ConfigurationName))
-
-elseif(
-	${CMAKE_GENERATOR} STREQUAL "Visual Studio 10 2010" OR
-	${CMAKE_GENERATOR} STREQUAL "Visual Studio 11 2012" OR
-	${CMAKE_GENERATOR} STREQUAL "Visual Studio 12 2013" OR
-	${CMAKE_GENERATOR} STREQUAL "Visual Studio 14 2015" OR
-	${CMAKE_GENERATOR} STREQUAL "Visual Studio 15 2017" OR
-	${CMAKE_GENERATOR} STREQUAL "Visual Studio 16 2019")
-
-	set(CONFIG_NAME $(Configuration))
-
-elseif(
-	${CMAKE_GENERATOR} STREQUAL "Xcode" OR
-	${CMAKE_GENERATOR} STREQUAL "Ninja Multi-Config")
-
-	set(CONFIG_NAME $(CONFIGURATION))
-	
-endif()
 
 
 
@@ -47,9 +22,12 @@ file(GLOB_RECURSE CUDA_SOURCE_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/Shaders/*.cu
 )
 
+
+
 #generate .ptx files from .cu files
 add_library(CUDAShaders OBJECT ${CUDA_HEADER_FILES} ${CUDA_SOURCE_FILES})
 set_property(TARGET CUDAShaders PROPERTY CUDA_PTX_COMPILATION ON)
+set_property(TARGET CUDAShaders PROPERTY CUDA_ARCHITECTURES 52-real)
 
 target_include_directories(CUDAShaders PUBLIC
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Include"
@@ -61,12 +39,11 @@ target_include_directories(CUDAShaders PUBLIC
 )
 
 set(CUDA_FILES_OUTPUT "")
-set(CUDA_FILES_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/Assets/PrecompiledShaders)
+cmake_path(SET CUDA_FILES_OUTPUT_DIR NORMALIZE ${CMAKE_CURRENT_SOURCE_DIR}/../Sandbox/Assets/Shaders)
 #if(${CONFIG_NAME})
 	message("ConfigName: ${CONFIG_NAME}")
 	set(CUDA_FILES_OUTPUT_DIR ${CUDA_FILES_OUTPUT_DIR}/${CONFIG_NAME})
 #endif()
-
 
 #set(CUDA_FILES_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/Assets/PrecompiledShaders/${CMAKE_CFG_INTDIR})
 #https://cmake.org/cmake/help/v3.19/variable/CMAKE_CFG_INTDIR.html#variable:CMAKE_CFG_INTDIR
@@ -118,6 +95,7 @@ set(CUDAKernels_INCLUDES
 set(CUDAKernels_LIBS libnanovdb)
 
 add_library(CUDAKernels STATIC ${CUDA_HEADER_FILES} ${CUDA_SOURCE_FILES})
+set_property(TARGET CUDAKernels PROPERTY CUDA_ARCHITECTURES 52-real)
 set_property(TARGET CUDAKernels PROPERTY CUDA_SEPARABLE_COMPILATION ON)
 set_property(TARGET CUDAKernels PROPERTY CUDA_RESOLVE_DEVICE_SYMBOLS ON)
 
@@ -185,8 +163,9 @@ set(LUMENPT_LIBS
 add_library (LumenPT STATIC ${CPP_HEADER_FILES} ${CPP_SOURCE_FILES})
 add_dependencies(LumenPT CUDAKernels)
 add_dependencies(LumenPT CopyCUDAShaders)
-set_property(TARGET LumenPT APPEND_STRING PROPERTY COMPILE_DEFINITIONS CONFIG_NAME=\"${CONFIG_NAME}\")
+set_property(TARGET LumenPT PROPERTY CUDA_ARCHITECTURES 52-real)
 set_property(TARGET LumenPT APPEND PROPERTY COMPILE_DEFINITIONS LUMEN_PT)
+set_property(TARGET LumenPT APPEND PROPERTY COMPILE_DEFINITIONS $<$<CONFIG:Debug>:CUDA_CHECK OPTIX_CHECK>)
 
 if(${USE_WAVEFRONT})
 	set_property(TARGET LumenPT APPEND PROPERTY COMPILE_DEFINITIONS WAVEFRONT)
@@ -202,7 +181,7 @@ target_include_directories(LumenPT PUBLIC ${LUMENPT_INCLUDES})
 target_link_libraries(LumenPT ${LUMENPT_LIBS} CUDAKernels)
 
 # Config file where CMake will specify the location of the project directory
-configure_file(
-	${CMAKE_CURRENT_SOURCE_DIR}/cmake/LumenPTConfig.h.in 
-	${CMAKE_CURRENT_BINARY_DIR}/config/LumenPTConfig.h
-)
+# configure_file(
+# 	${CMAKE_CURRENT_SOURCE_DIR}/cmake/LumenPTConfig.h.in 
+# 	${CMAKE_CURRENT_BINARY_DIR}/config/LumenPTConfig.h
+# )

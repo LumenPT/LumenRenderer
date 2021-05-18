@@ -531,6 +531,8 @@ void OptixWrapper::TraceRays(
     const OptixLaunchParameters& a_LaunchParams,  
     CUstream a_CUDAStream) const
 {
+	cudaDeviceSynchronize();
+	CHECKLASTCUDAERROR;
 
     m_OptixLaunchParamBuffer->Write(a_LaunchParams);
 
