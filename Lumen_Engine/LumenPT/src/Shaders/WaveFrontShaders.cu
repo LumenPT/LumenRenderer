@@ -177,7 +177,7 @@ __device__ __forceinline__ void ReSTIRRayGen()
         launchParams.m_MinMaxDistance.x, //Prevent self shadowing so offset a little bit.
         rayData.distance,   //Max distance already has a small offset to prevent self-shadowing.
         0.f,
-        OptixVisibilityMask(255),
+        OptixVisibilityMask(0b00000001),
         OPTIX_RAY_FLAG_NONE,
         0,
         0,
@@ -211,7 +211,7 @@ __device__ __forceinline__ void ReSTIRRayGenShading()
         launchParams.m_MinMaxDistance.x, //Prevent self shadowing so offset a little bit.
         rayData.distance,   //Max distance already has a small offset to prevent self-shadowing.
         0.f,
-        OptixVisibilityMask(255),
+        OptixVisibilityMask(0b00000001),
         OPTIX_RAY_FLAG_NONE,
         0,
         0,
