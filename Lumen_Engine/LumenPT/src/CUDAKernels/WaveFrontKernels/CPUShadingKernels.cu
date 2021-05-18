@@ -2,7 +2,7 @@
 #include "GPUShadingKernels.cuh"
 #include "../../Framework/CudaUtilities.h"
 #include "../../Shaders/CppCommon/ReSTIRData.h"
-#include "../../LumenPT/src/Framework/ReSTIR.h"
+#include "../../Framework/ReSTIR.h"
 
 using namespace WaveFront;
 
@@ -144,11 +144,14 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
             a_ShadingParams.m_ResolutionAndDepth,
             a_ShadingParams.m_TemporalSurfaceData,
             a_ShadingParams.m_CurrentSurfaceData,
+			a_ShadingParams.m_VolumetricData,
             a_ShadingParams.m_ShadowRays,
+			a_ShadingParams.m_VolumetricShadowRays,
             a_ShadingParams.m_TriangleLights->GetDevicePtr<AtomicBuffer<TriangleLight>>(),
             seed,
             a_ShadingParams.m_CurrentDepth,
-            cdfPtr);
+            cdfPtr,
+			a_ShadingParams.m_Output);
     }
 
     //Update the seed.

@@ -6,6 +6,7 @@
 #include "PTVolume.h"
 #include "PTVolumeInstance.h"
 #include "RendererDefinition.h"
+#include "../Shaders/CppCommon/WaveFrontDataStructs/WavefrontTraceMasks.h"
 
 PTScene::PTScene(LumenRenderer::SceneData& a_SceneData, PTServiceLocator& a_ServiceLocator)
     : m_Services(a_ServiceLocator)
@@ -82,8 +83,9 @@ void PTScene::UpdateSceneAccelerationStructure()
     // will pick up on that
     if (m_AccelerationStructureDirty || !sbtMatchStructs)
     {
+		uint32_t instanceID = 0;
         // Create a list of all acceleration structure instances that need to be in the scene acceleration structure
-        std::vector<OptixInstance> instances;
+		std::vector<OptixInstance> instances;
 
         // First go through the static geometry structures
         for (auto& meshInstance : m_MeshInstances)
@@ -96,10 +98,10 @@ void PTScene::UpdateSceneAccelerationStructure()
             auto& inst = instances.emplace_back();
             // Record the acceleration structure of the mesh into the OptixInstance
             inst.traversableHandle = ptMesh->m_AccelerationStructure->m_TraversableHandle;
-            inst.sbtOffset = 0; // Optix states that if the AS instance is an IAS, the sbt offset must be 0
-            inst.visibilityMask = 0x80; // 128
-            // The instance ID of this struct is irrelevant, as the intersections will see the ID of the lowest level AS
-            inst.instanceId = 0; 
+            inst.sbtOffset = 0;	// Optix states that if the AS instance is an IAS, the sbt offset must be 0
+            inst.visibilityMask = WaveFront::TraceMaskType::SOLIDS;	// 1
+			// The instance ID of this struct is irrelevant, as the intersections will see the ID of the lowest level AS
+            inst.instanceId = instanceID++;
             inst.flags = OPTIX_INSTANCE_FLAG_NONE;
 
             // Get the transformation matrix from the transform of the instance
@@ -121,11 +123,10 @@ void PTScene::UpdateSceneAccelerationStructure()
             auto& inst = instances.emplace_back();
             // Record the acceleration structure of the volume into the OptixInstance
             inst.traversableHandle = ptVolume->m_AccelerationStructure->m_TraversableHandle;
-            // TODO: This needs to be changed to represent the index of the volumetrics shaders in the shader binding table
-            inst.sbtOffset = ptVolume->m_RecordHandle.m_TableIndex; 
-            inst.visibilityMask = 0x40; // 64
-            // For volumetrics, the instance ID is important because it determine which volumetric data will be displayed
-            inst.instanceId = ptVolume->m_SceneEntry.m_TableIndex;
+			// TODO: This needs to be changed to represent the index of the volumetrics shaders in the shader binding table
+			inst.sbtOffset = 1;
+            inst.visibilityMask = WaveFront::TraceMaskType::VOLUMES;
+            inst.instanceId = ptVolume->m_SceneDataTableEntry.m_TableIndex;
             inst.flags = OPTIX_INSTANCE_FLAG_NONE;
 
             // Get the transformation matrix from the transform of the instance

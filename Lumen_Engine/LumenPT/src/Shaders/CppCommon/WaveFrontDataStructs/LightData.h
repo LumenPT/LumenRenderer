@@ -13,6 +13,7 @@ namespace WaveFront
         DIRECT,
         INDIRECT,
         SPECULAR,
+        VOLUMETRIC,
         NUM_CHANNELS
     };
 
@@ -23,29 +24,6 @@ namespace WaveFront
         float3 normal;
         float3 radiance;    //Radiance has the texture color baked into it. Probably average texture color.
         float area;         //The area of the triangle. This is required to project the light onto a hemisphere.
-    };
-
-    struct LightDataBuffer
-    {
-
-        CPU_GPU LightDataBuffer()
-            :
-        m_Size(0u),
-        m_Lights()
-        {}
-
-        CPU_GPU LightDataBuffer(unsigned int a_Size)
-            :
-        m_Size(a_Size),
-        m_Lights()
-        {}
-
-
-
-        unsigned int m_Size;
-
-        TriangleLight m_Lights[];
-
     };
 
 }

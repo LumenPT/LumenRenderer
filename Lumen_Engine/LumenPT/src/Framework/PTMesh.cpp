@@ -28,8 +28,7 @@ void PTMesh::UpdateAccelerationStructure()
         inst.instanceId = ptPrim->m_SceneDataTableEntry.m_TableIndex;
         // As convention shaders for non-volumetric geometry are kept in the first slot of the shader binding table
         inst.sbtOffset = 0;
-        inst.visibilityMask = 255; // Can be intersected by anything
-        // Handle to the acceleration structure instance
+        inst.visibilityMask = OptixVisibilityMask(0b00000001);
         inst.traversableHandle = ptPrim->m_GeometryAccelerationStructure->m_TraversableHandle;
         inst.flags = OPTIX_INSTANCE_FLAG_NONE;
 

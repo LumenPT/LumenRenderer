@@ -119,14 +119,23 @@ namespace WaveFront
         //The surface data per pixel. 0 and 1 are used for the current and previous frame. 2 is used for any other depth.
         MemoryBuffer m_SurfaceData[3];
 
+        //The volumetric data per pixel.
+        MemoryBuffer m_VolumetricData[1];
+
         //Intersection points passed to Optix.
         MemoryBuffer m_IntersectionData;
+
+		//Volumetric intersection data passed to Optix
+		MemoryBuffer m_VolumetricIntersectionData;
 
         //Buffer containing intersection rays.
         MemoryBuffer m_Rays;
 
         //Buffer containing shadow rays.
         MemoryBuffer m_ShadowRays;
+
+        //Buffer containing volumetric shadow rays.
+        MemoryBuffer m_VolumetricShadowRays;
 
         //Buffer used for output of separate channels of light.
         MemoryBuffer m_PixelBufferSeparate;

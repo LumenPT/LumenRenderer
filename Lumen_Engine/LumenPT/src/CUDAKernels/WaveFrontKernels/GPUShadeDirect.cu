@@ -1,8 +1,8 @@
 #include "GPUShadingKernels.cuh"
+#include "../VolumetricKernels/GPUVolumetricShadingKernels.cuh"
+#include "../../Shaders/CppCommon/RenderingUtility.h"
 #include <device_launch_parameters.h>
 #include <sutil/vec_math.h>
-
-#include "../../Shaders/CppCommon/RenderingUtility.h"
 
 CPU_ON_GPU void ResolveDirectLightHits(
     const SurfaceData* a_SurfaceDataBuffer,
@@ -31,11 +31,14 @@ CPU_ON_GPU void ShadeDirect(
     const uint3 a_ResolutionAndDepth,
     const SurfaceData* a_TemporalSurfaceDatBuffer,
     const SurfaceData* a_SurfaceDataBuffer,
+    const VolumetricData* a_VolumetricDataBuffer,
     AtomicBuffer<ShadowRayData>* const a_ShadowRays,
+	AtomicBuffer<ShadowRayData>* const a_VolumetricShadowRays,
     const AtomicBuffer<TriangleLight>* const a_Lights,
     const unsigned a_Seed,
     const unsigned a_CurrentDepth,
-    const CDF* const a_CDF
+    const CDF* const a_CDF,
+	float3* a_Output
 )
 {
     const unsigned int numPixels = a_ResolutionAndDepth.x * a_ResolutionAndDepth.y;
@@ -49,6 +52,10 @@ CPU_ON_GPU void ShadeDirect(
     //i will update to a new pixel index if there is less threads than there are pixels.
     for (unsigned int i = index; i < numPixels; i += stride)
     {
+
+        //TODO: return some form of light transform factor after resolving the distances in the volume.
+        VolumetricShadeDirect(i, a_ResolutionAndDepth, a_VolumetricDataBuffer, a_VolumetricShadowRays, a_Lights, a_CDF, a_Output);
+
         // Get intersection.
         const SurfaceData& surfaceData = a_SurfaceDataBuffer[i];
 

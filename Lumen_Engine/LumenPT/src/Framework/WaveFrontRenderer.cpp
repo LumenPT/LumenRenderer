@@ -64,14 +64,18 @@ namespace WaveFront
         //TODO: Ensure shader names match what we put down here.
         OptixWrapper::InitializationData optixInitData;
         optixInitData.m_CUDAContext = m_CUDAContext;
-        optixInitData.m_ProgramData.m_ProgramPath = a_Settings.m_ShadersFilePathSolids;
-        optixInitData.m_ProgramData.m_ProgramLaunchParamName = "launchParams";
-        optixInitData.m_ProgramData.m_ProgramRayGenFuncName = "__raygen__WaveFrontRG";
-        optixInitData.m_ProgramData.m_ProgramMissFuncName = "__miss__WaveFrontMS";
-        optixInitData.m_ProgramData.m_ProgramAnyHitFuncName = "__anyhit__WaveFrontAH";
-        optixInitData.m_ProgramData.m_ProgramClosestHitFuncName = "__closesthit__WaveFrontCH";
-        optixInitData.m_ProgramData.m_MaxNumHitResultAttributes = 2;
-        optixInitData.m_ProgramData.m_MaxNumPayloads = 2;
+		optixInitData.m_SolidProgramData.m_ProgramPath = a_Settings.m_ShadersFilePathSolids;
+        optixInitData.m_SolidProgramData.m_ProgramLaunchParamName = "launchParams";
+        optixInitData.m_SolidProgramData.m_ProgramRayGenFuncName = "__raygen__WaveFrontRG";
+        optixInitData.m_SolidProgramData.m_ProgramMissFuncName = "__miss__WaveFrontMS";
+        optixInitData.m_SolidProgramData.m_ProgramAnyHitFuncName = "__anyhit__WaveFrontAH";
+        optixInitData.m_SolidProgramData.m_ProgramClosestHitFuncName = "__closesthit__WaveFrontCH";
+        optixInitData.m_VolumetricProgramData.m_ProgramPath = a_Settings.m_ShadersFilePathVolumetrics;
+        optixInitData.m_VolumetricProgramData.m_ProgramIntersectionFuncName = "__intersection__Volumetric";
+        optixInitData.m_VolumetricProgramData.m_ProgramAnyHitFuncName = "__anyhit__Volumetric";
+        optixInitData.m_VolumetricProgramData.m_ProgramClosestHitFuncName = "__closesthit__Volumetric";
+        optixInitData.m_PipelineMaxNumHitResultAttributes = 2;
+        optixInitData.m_PipelineMaxNumPayloads = 5;
 
         m_OptixSystem = std::make_unique<OptixWrapper>(optixInitData);
 
@@ -83,7 +87,11 @@ namespace WaveFront
         m_OutputBuffer = std::make_unique<CudaGLTexture>(GL_RGBA8, m_Settings.outputResolution.x, m_Settings.outputResolution.y, 4);
         //SetRenderResolution(glm::uvec2(m_Settings.outputResolution.x, m_Settings.outputResolution.y));
         ResizeBuffers();
-        //TODO: number of lights will be dynamic per frame but this is temporary.
+        
+		//Set up buffers.
+		const unsigned numPixels = m_Settings.renderResolution.x * m_Settings.renderResolution.y;
+		
+		//TODO: number of lights will be dynamic per frame but this is temporary.
         constexpr auto numLights = 3;
 
         CreateAtomicBuffer<WaveFront::TriangleLight>(&m_TriangleLights, 1000000);
@@ -96,6 +104,7 @@ namespace WaveFront
         lights[1].radiance = { 150000, 150000, 150000 };
         lights[2].radiance = { 150000, 150000, 105000 };
 
+        
 
         //Actually set the triangle lights to have an area.
         lights[0].p0 = {605.f, 700.f, -5.f};
@@ -105,28 +114,28 @@ namespace WaveFront
         lights[1].p0 = { 5.f, 700.f, -5.f };
         lights[1].p1 = { 0.f, 700.f, 5.f };
         lights[1].p2 = { -5.f, 700.f, -5.f };
+        
 
         lights[2].p0 = { -595.f, 700.f, -5.f };
         lights[2].p1 = { -600.f, 700.f, 5.f };
         lights[2].p2 = { -605.f, 700.f, -5.f };
 
-        //Calculate the area per light.
-        for(int i = 0; i < 3; ++i)
-        {
-            float3 vec1 = (lights[i].p0 - lights[i].p1);
-            float3 vec2 = (lights[i].p0 - lights[i].p2);
-            lights[i].area = sqrt(pow((vec1.y * vec2.z - vec2.y * vec1.z), 2) + pow((vec1.x * vec2.z - vec2.x * vec1.z), 2) + pow((vec1.x * vec2.y - vec2.x * vec1.y), 2)) / 2.f;
-        }
+		//Calculate the area per light.
+		for (int i = 0; i < 3; ++i)
+		{
+			float3 vec1 = (lights[i].p0 - lights[i].p1);
+			float3 vec2 = (lights[i].p0 - lights[i].p2);
+			lights[i].area = sqrt(pow((vec1.y * vec2.z - vec2.y * vec1.z), 2) + pow((vec1.x * vec2.z - vec2.x * vec1.z), 2) + pow((vec1.x * vec2.y - vec2.x * vec1.y), 2)) / 2.f;
+		}
 
-        //Calculate the normal for each light.
-        for(int i = 0; i < 3; ++i)
-        {
-            glm::vec3 arm1 = normalize(glm::vec3(lights[i].p0.x - lights[i].p2.x, lights[i].p0.y - lights[i].p2.y, lights[i].p0.z - lights[i].p2.z));
-            glm::vec3 arm2 = normalize(glm::vec3(lights[i].p0.x - lights[i].p1.x, lights[i].p0.y - lights[i].p1.y, lights[i].p0.z - lights[i].p1.z));
-            glm::vec3 normal = normalize(glm::cross(arm2, arm1));
-            lights[i].normal = { normal.x, normal.y, normal.z };
-        }
-
+		//Calculate the normal for each light.
+		for (int i = 0; i < 3; ++i)
+		{
+			glm::vec3 arm1 = normalize(glm::vec3(lights[i].p0.x - lights[i].p2.x, lights[i].p0.y - lights[i].p2.y, lights[i].p0.z - lights[i].p2.z));
+			glm::vec3 arm2 = normalize(glm::vec3(lights[i].p0.x - lights[i].p1.x, lights[i].p0.y - lights[i].p1.y, lights[i].p0.z - lights[i].p1.z));
+			glm::vec3 normal = normalize(glm::cross(arm2, arm1));
+			lights[i].normal = { normal.x, normal.y, normal.z };
+		}
 
         //m_TriangleLights.Write(&lights[0], sizeof(TriangleLight) * numLights, 0);
 
@@ -204,6 +213,52 @@ namespace WaveFront
     {
         return m_IntermediateSettings.blendOutput;
     }
+
+	std::shared_ptr<Lumen::ILumenVolume> WaveFrontRenderer::CreateVolume(const std::string& a_FilePath)
+	{
+		//TODO tell optix to create a volume acceleration structure.
+		auto volume = std::make_shared<PTVolume>(a_FilePath, m_ServiceLocator);
+
+		uint32_t geomFlags[1] = { OPTIX_GEOMETRY_FLAG_NONE };
+
+		OptixAccelBuildOptions buildOptions = {};
+		buildOptions.buildFlags = OPTIX_BUILD_FLAG_PREFER_FAST_TRACE;
+		buildOptions.operation = OPTIX_BUILD_OPERATION_BUILD;
+		buildOptions.motionOptions = {};
+
+		OptixAabb aabb = { -1.5f, -1.5f, -1.5f, 1.5f, 1.5f, 1.5f };
+
+		auto grid = volume->GetHandle()->grid<float>();
+		auto bbox = grid->worldBBox();
+
+		nanovdb::Vec3<double> temp = bbox.min();
+		float bboxMinX = bbox.min()[0];
+		float bboxMinY = bbox.min()[1];
+		float bboxMinZ = bbox.min()[2];
+		float bboxMaxX = bbox.max()[0];
+		float bboxMaxY = bbox.max()[1];
+		float bboxMaxZ = bbox.max()[2];
+
+		aabb = { bboxMinX, bboxMinY, bboxMinZ, bboxMaxX, bboxMaxY, bboxMaxZ };
+
+		MemoryBuffer aabb_buffer(sizeof(OptixAabb));
+		aabb_buffer.Write(aabb);
+
+		OptixBuildInput buildInput = {};
+		buildInput.type = OPTIX_BUILD_INPUT_TYPE_CUSTOM_PRIMITIVES;
+		buildInput.customPrimitiveArray.aabbBuffers = &*aabb_buffer;
+		buildInput.customPrimitiveArray.numPrimitives = 1;
+		buildInput.customPrimitiveArray.flags = geomFlags;
+		buildInput.customPrimitiveArray.numSbtRecords = 1;
+
+		volume->m_AccelerationStructure = m_OptixSystem->BuildGeometryAccelerationStructure(buildOptions, buildInput);
+
+		volume->m_SceneDataTableEntry = m_Table->AddEntry<DeviceVolume>();
+		auto& entry = volume->m_SceneDataTableEntry.GetData();
+		entry.m_Grid = grid;
+
+		return volume;
+	}
 
     void WaveFrontRenderer::TraceFrame()
     {
@@ -431,6 +486,7 @@ namespace WaveFront
         const unsigned counterDefault = 0;
         SetAtomicCounter<ShadowRayData>(&m_ShadowRays, counterDefault);
         SetAtomicCounter<IntersectionData>(&m_IntersectionData, counterDefault);
+		SetAtomicCounter<VolumetricIntersectionData>(&m_VolumetricIntersectionData, counterDefault);
         CHECKLASTCUDAERROR;
 
         //Retrieve the acceleration structure and scene data table once.
@@ -449,7 +505,9 @@ namespace WaveFront
         rayLaunchParameters.m_TraceType = RayType::INTERSECTION_RAY;
         rayLaunchParameters.m_MinMaxDistance = { 0.01f, 5000.f };
         rayLaunchParameters.m_IntersectionBuffer = m_IntersectionData.GetDevicePtr<AtomicBuffer<IntersectionData>>();
+		rayLaunchParameters.m_VolumetricIntersectionBuffer = m_VolumetricIntersectionData.GetDevicePtr<AtomicBuffer<VolumetricIntersectionData>>();
         rayLaunchParameters.m_IntersectionRayBatch = m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>();
+        rayLaunchParameters.m_SceneData = sceneDataTableAccessor;
         rayLaunchParameters.m_TraversableHandle = accelerationStructure;
         rayLaunchParameters.m_ResolutionAndDepth = uint3{ m_Settings.renderResolution.x, m_Settings.renderResolution.y, m_Settings.depth };
 
@@ -489,6 +547,17 @@ namespace WaveFront
                 m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>(),
                 m_SurfaceData[surfaceDataBufferIndex].GetDevicePtr<SurfaceData>(),
                 sceneDataTableAccessor);
+
+            unsigned numVolumeIntersections = 0;
+            m_VolumetricIntersectionData.Read(&numVolumeIntersections, sizeof(numVolumeIntersections), 0);
+            const auto volumetricDataBufferIndex = 0;
+            ExtractVolumetricData(
+                numVolumeIntersections,
+                m_VolumetricIntersectionData.GetDevicePtr<AtomicBuffer<VolumetricIntersectionData>>(),
+                m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>(),
+                m_VolumetricData[volumetricDataBufferIndex].GetDevicePtr<VolumetricData>(),
+                sceneDataTableAccessor);
+
             cudaDeviceSynchronize();
             CHECKLASTCUDAERROR;
 
@@ -518,11 +587,12 @@ namespace WaveFront
                 uint3{ m_Settings.renderResolution.x, m_Settings.renderResolution.y, m_Settings.depth },
                 m_SurfaceData[surfaceDataBufferIndex].GetDevicePtr<SurfaceData>(),
                 m_SurfaceData[temporalIndex].GetDevicePtr<SurfaceData>(),
+				m_VolumetricData[volumetricDataBufferIndex].GetDevicePtr<VolumetricData>(),
                 m_IntersectionData.GetDevicePtr<AtomicBuffer<IntersectionData>>(),
                 m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>(),
                 m_ShadowRays.GetDevicePtr<AtomicBuffer<ShadowRayData>>(),
+				m_VolumetricShadowRays.GetDevicePtr<AtomicBuffer<ShadowRayData>>(),
                 &m_TriangleLights,
-                3,
                 camPosition,
                 camForward,
                 accelerationStructure,  //ReSTIR needs to check visibility early on so it does an optix launch for this scene.
@@ -553,6 +623,7 @@ namespace WaveFront
 
             //Reset the intersection data so that the next frame can re-fill it.
             ResetAtomicBuffer<IntersectionData>(&m_IntersectionData);
+			ResetAtomicBuffer<VolumetricIntersectionData>(&m_VolumetricIntersectionData);
 
             //Swap the ReSTIR buffers around.
             m_ReSTIR->SwapBuffers();
@@ -809,56 +880,6 @@ namespace WaveFront
         return mat;
     }
 
-    std::shared_ptr<Lumen::ILumenVolume> WaveFrontRenderer::CreateVolume(const std::string& a_FilePath)
-    {
-        //TODO tell optix to create a volume acceleration structure.
-        std::shared_ptr<Lumen::ILumenVolume> volume = std::make_shared<PTVolume>(a_FilePath, m_ServiceLocator);
-
-        //volumetric_bookmark
-    //TODO: add volume records to sbt
-    /*volume->m_RecordHandle = m_ShaderBindingTableGenerator->AddHitGroup<DeviceVolume>();
-    auto& rec = volume->m_RecordHandle.GetRecord();
-    rec.m_Header = GetProgramGroupHeader("VolumetricHit");
-    rec.m_Data.m_Grid = volume->m_Handle.grid<float>();*/
-
-        uint32_t geomFlags[1] = { OPTIX_GEOMETRY_FLAG_NONE };
-
-        OptixAccelBuildOptions buildOptions = {};
-        buildOptions.buildFlags = OPTIX_BUILD_FLAG_PREFER_FAST_TRACE;
-        buildOptions.operation = OPTIX_BUILD_OPERATION_BUILD;
-        buildOptions.motionOptions = {};
-
-        OptixAabb aabb = { -1.5f, -1.5f, -1.5f, 1.5f, 1.5f, 1.5f };
-
-        auto grid = std::static_pointer_cast<PTVolume>(volume)->GetHandle()->grid<float>();
-        auto bbox = grid->worldBBox();
-
-        nanovdb::Vec3<double> temp = bbox.min();
-        float bboxMinX = bbox.min()[0];
-        float bboxMinY = bbox.min()[1];
-        float bboxMinZ = bbox.min()[2];
-        float bboxMaxX = bbox.max()[0];
-        float bboxMaxY = bbox.max()[1];
-        float bboxMaxZ = bbox.max()[2];
-
-        aabb = { bboxMinX, bboxMinY, bboxMinZ, bboxMaxX, bboxMaxY, bboxMaxZ };
-
-        MemoryBuffer aabb_buffer(sizeof(OptixAabb));
-        aabb_buffer.Write(aabb);
-
-        OptixBuildInput buildInput = {};
-        buildInput.type = OPTIX_BUILD_INPUT_TYPE_CUSTOM_PRIMITIVES;
-        buildInput.customPrimitiveArray.aabbBuffers = &*aabb_buffer;
-        buildInput.customPrimitiveArray.numPrimitives = 1;
-        buildInput.customPrimitiveArray.flags = geomFlags;
-        buildInput.customPrimitiveArray.numSbtRecords = 1;
-
-        std::static_pointer_cast<PTVolume>(volume)->m_AccelerationStructure = m_OptixSystem->BuildGeometryAccelerationStructure(buildOptions, buildInput);
-        CHECKLASTCUDAERROR;
-
-        return volume;
-    }
-
     std::shared_ptr<Lumen::ILumenScene> WaveFrontRenderer::CreateScene(SceneData a_SceneData)
     {
         return std::make_shared<PTScene>(a_SceneData, m_ServiceLocator);
@@ -921,14 +942,22 @@ namespace WaveFront
         //Create atomic buffers. This automatically sets the counter to 0 and size to max.
         CreateAtomicBuffer<IntersectionRayData>(&m_Rays, numPrimaryRays);
         CreateAtomicBuffer<ShadowRayData>(&m_ShadowRays, numShadowRays);
-        CreateAtomicBuffer<IntersectionData>(&m_IntersectionData, numPixels);
+		CreateAtomicBuffer<ShadowRayData>(&m_VolumetricShadowRays, numShadowRays);
+		CreateAtomicBuffer<IntersectionData>(&m_IntersectionData, numPixels);
+		CreateAtomicBuffer<VolumetricIntersectionData>(&m_VolumetricIntersectionData, numPixels);
 
-        //Initialize each surface data buffer.
-        for (int i = 0; i < 3; ++i)
-        {
-            //Note; Only allocates memory and stores the size on the GPU. It does not actually fill any data in yet.
-            m_SurfaceData[i].Resize(numPixels * sizeof(SurfaceData));
-        }
+
+		//Initialize each surface data buffer.
+		for (auto& surfaceDataBuffer : m_SurfaceData)
+		{
+			//Note; Only allocates memory and stores the size on the GPU. It does not actually fill any data in yet.
+			surfaceDataBuffer.Resize(numPixels * sizeof(SurfaceData));
+		}
+
+		for (auto& volumetricDataBuffer : m_VolumetricData)
+		{
+			volumetricDataBuffer.Resize(numPixels * sizeof(VolumetricData));
+		}
 
         m_MotionVectors.Init(make_uint2(m_Settings.renderResolution.x, m_Settings.renderResolution.y));
 

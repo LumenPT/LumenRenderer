@@ -6,6 +6,6 @@
     },
     "FilePaths": {
         "ShaderSolids": "./Sandbox/assets/Shaders/Debug/WaveFrontShaders.ptx",
-        "ShaderVolumetrics": "./Sandbox/assets/Shaders/Debug/volumetric.ptx"
+        "ShaderVolumetrics": "./Sandbox/assets/Shaders/Debug/volumetric_wavefront.ptx"
     }
 }
