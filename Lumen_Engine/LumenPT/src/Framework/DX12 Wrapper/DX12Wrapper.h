@@ -7,7 +7,7 @@ public:
 	DX12Wrapper() = default;
 	virtual ~DX12Wrapper() = default;
 
-	virtual void Initialize() = 0;
+	virtual void Initialize(int a_screenWidth, int a_screenHeight) = 0;
 
 
 protected:

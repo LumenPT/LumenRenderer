@@ -9,7 +9,7 @@ public:
 	NullDX12Wrapper() {}
 	~NullDX12Wrapper() {}
 
-	void Initialize() override {}
+	void Initialize(int a_screenWidth, int a_screenHeight) override {}
 
 
 protected:

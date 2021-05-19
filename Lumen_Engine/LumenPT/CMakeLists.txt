@@ -98,6 +98,8 @@ if(${USE_NVIDIA_DENOISER})
 	"vendor/RayTracingDenoiser/LumenPT/Framework/DX12Wrapper/NRIDX12Wrapper.h"
 	"vendor/RayTracingDenoiser/LumenPT/Framework/DX12Wrapper/NRIHelper.h"
 	"vendor/RayTracingDenoiser/LumenPT/Framework/DX12Wrapper/NRIUtils.h"
+	"vendor/RayTracingDenoiser/NRD/Integration/NRDIntegration.h"
+	"vendor/RayTracingDenoiser/NRD/Integration/NRDIntegration.hpp"
 	)
 endif()
 
@@ -114,6 +116,7 @@ if(${USE_NVIDIA_DENOISER})
 	list(APPEND CPP_HEADER_FILES 
 	"vendor/RayTracingDenoiser/LumenPT/Framework/DX12Wrapper/NRIDX12Wrapper.cpp"
 	"vendor/RayTracingDenoiser/LumenPT/Framework/DX12Wrapper/NRIUtils.cpp"
+	#"vendor/RayTracingDenoiser/NRD/Integration/NRDIntegration.cpp"
 	)
 endif()
 
@@ -176,11 +179,13 @@ set(INCLUDES
 )
 
 if(${USE_NVIDIA_DENOISER})
-	list(APPEND LIBS NRD NRI NRI_D3D12)
+	list(APPEND LIBS NRD NRI NRI_D3D12 NRI_Validation)
+
 	list(APPEND INCLUDES 
 	
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/LumenPT/Framework" 
-	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/NRI/Include" 
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/NRI/Include"
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/NRD/Integration" 
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Include/Detex")
 endif()
 

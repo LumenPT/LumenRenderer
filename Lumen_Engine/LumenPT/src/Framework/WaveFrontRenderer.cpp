@@ -75,7 +75,7 @@ namespace WaveFront
 
         //TODO: set to null object if no DX12 support
         m_DX12System = std::make_unique<NRIDX12Wrapper>();
-        m_DX12System->Initialize();
+        m_DX12System->Initialize(a_Settings.renderResolution.x, a_Settings.renderResolution.y);
 
         //Set up the OpenGL output buffer.
         m_OutputBuffer = std::make_unique<CudaGLTexture>(GL_RGBA8, m_Settings.outputResolution.x, m_Settings.outputResolution.y, 4);
