@@ -13,7 +13,12 @@ set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 
 #Add option to use wavefront
 option(USE_WAVEFRONT "Use the Wavefront rendering pipeline?" ON)
-option(USE_NVIDIA_DENOISER "Use Nvidia denoiser?" OFF)
+#option(USE_NVIDIA_DENOISER "Use Nvidia denoiser?" OFF)
+
+SET(USE_NVIDIA_DENOISER FALSE)
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/LumenPT/vendor/RayTracingDenoiser")
+SET(USE_NVIDIA_DENOISER TRUE)
+endif()
 
 #If wavefront is used, add compile definition.
 if(${USE_WAVEFRONT})
