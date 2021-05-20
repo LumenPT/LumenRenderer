@@ -1,7 +1,7 @@
 #pragma once
 #include "../../Shaders/CppCommon/CudaDefines.h"
 #include "../../Shaders/CppCommon/WaveFrontDataStructs.h"
-#include "../../Shaders/CppCommon/WaveFrontDataStructs/LightDataBuffer.h"
+#include "../../Shaders/CppCommon/WaveFrontDataStructs/LightData.h"
 #include "../../Shaders/CppCommon/WaveFrontDataStructs/AtomicBuffer.h"
 #include <sutil/Matrix.h>
 

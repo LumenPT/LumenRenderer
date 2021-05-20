@@ -158,7 +158,7 @@ CPU_ON_GPU void AddToLightBuffer(
     {
         const unsigned baseIndex = triangleIndex * 3; //We run this function for each triangle, triangle has 3 vertices.
 
-        assert(a_SceneDataTable->GetTableEntry<DevicePrimitive>(instanceId) != nullptr);
+        assert(a_SceneDataTable->GetTableEntry<DevicePrimitive>(a_InstanceId) != nullptr);
         const auto devicePrimitiveInstance = a_SceneDataTable->GetTableEntry<DevicePrimitiveInstance>(a_InstanceId);
         const auto devicePrimitive = devicePrimitiveInstance->m_Primitive;
 

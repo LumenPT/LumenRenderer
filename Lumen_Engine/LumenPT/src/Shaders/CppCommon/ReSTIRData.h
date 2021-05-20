@@ -5,7 +5,7 @@
  */
 
 #include "CudaDefines.h"
-#include "WaveFrontDataStructs/LightDataBuffer.h"
+#include "WaveFrontDataStructs/LightData.h"
 
 #include <Optix/optix.h>
 #include <Cuda/cuda/helpers.h>

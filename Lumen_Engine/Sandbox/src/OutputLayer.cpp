@@ -90,41 +90,6 @@ OutputLayer::OutputLayer()
 
 	//GLTaskSystem::WaitOnTask(task);
 	
-
-	LumenRenderer::InitializationData init{};
-	init.m_RenderResolution = { 800, 600 };
-	init.m_OutputResolution = { 800, 600 };
-	init.m_MaxDepth = 1;
-	init.m_RaysPerPixel = 1;
-	init.m_ShadowRaysPerPixel = 1;
-//#ifdef WAVEFRONT
-//	init.m_RenderResolution = { 800, 600 };
-//	init.m_OutputResolution = { 800, 600 };
-//	init.m_MaxDepth = 1;
-//	init.m_RaysPerPixel = 1;
-//	init.m_ShadowRaysPerPixel = 1;
-//#else
-//#endif
-
-#ifdef WAVEFRONT
-
-	m_Renderer = std::make_unique<WaveFront::WaveFrontRenderer>();
-
-	WaveFront::WaveFrontSettings settings{};
-	settings.depth = 5;
-	settings.minIntersectionT = 0.1f;
-	settings.maxIntersectionT = 5000.f;
-	settings.renderResolution = { 800, 600 };
-	settings.outputResolution = { 800, 600 };
-	settings.blendOutput = false;	//When true will blend output instead of overwriting it (high res image over time if static scene).
-
-	static_cast<WaveFront::WaveFrontRenderer*>(m_Renderer.get())->Init(settings);
-
-	CHECKLASTCUDAERROR;
-
-#else
-	m_Renderer = std::make_unique<OptiXRenderer>(init);
-#endif
 }
 
 OutputLayer::~OutputLayer()
@@ -135,11 +100,25 @@ OutputLayer::~OutputLayer()
 void OutputLayer::OnAttach()
 {
 	InitializeScenePresets();
+
+	if(!m_Renderer)
+	{
+		printf("Error: No rendering pipeline present in output layer!");
+		return;
+	}
+
 	m_ModelLoaderWidget = std::make_unique<ModelLoaderWidget>(*m_LayerServices->m_SceneManager, m_Renderer->m_Scene);
 }
 
 void OutputLayer::OnUpdate()
 {
+
+	if(!m_Renderer)
+	{
+		printf("Error: No rendering pipeline present in the output layer!");
+		return;
+	}
+
 	m_Renderer->PerformDeferredOperations();
 	HandleCameraInput(*m_Renderer->m_Scene->m_Camera);
 
@@ -178,6 +157,13 @@ void OutputLayer::OnUpdate()
 
 void OutputLayer::OnImGuiRender()
 {
+
+	if(!m_Renderer)
+	{
+		printf("Error: No rendering pipeline present in the output layer!");
+		return;
+	}
+
 	ImGuiCameraSettings();
 	if (!m_Renderer->m_Scene->m_MeshInstances.empty())
 	{
@@ -427,8 +413,31 @@ void OutputLayer::OnEvent(Lumen::Event& a_Event)
 	}
 }
 
+void OutputLayer::SetPipeline(const std::shared_ptr<LumenRenderer>& a_Renderer)
+{
+
+	m_Renderer = a_Renderer;
+
+}
+
+const std::shared_ptr<LumenRenderer>& OutputLayer::GetPipeline() const
+{
+
+	return m_Renderer;
+
+}
+
+
+
 void OutputLayer::InitializeScenePresets()
 {
+
+	if (!m_Renderer)
+	{
+		printf("Error: No rendering pipeline present in the output layer!");
+		return;
+	}
+
 	ScenePreset pres = {};
 
 
@@ -480,7 +489,14 @@ void OutputLayer::InitializeScenePresets()
 
 void OutputLayer::HandleCameraInput(Camera& a_Camera)
 {
-	if (!ImGui::IsAnyItemActive() && Lumen::Input::IsMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT))
+
+	if (!m_Renderer)
+	{
+		printf("Error: No rendering pipeline present in the output layer!");
+		return;
+	}
+
+    if (!ImGui::IsAnyItemActive() && Lumen::Input::IsMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT))
 	{
 		auto delta = Lumen::Input::GetMouseDelta();
 
@@ -567,7 +583,14 @@ void OutputLayer::HandleCameraInput(Camera& a_Camera)
 
 void OutputLayer::HandleSceneInput()
 {
-	static uint16_t keyDown = 0;
+
+	if (!m_Renderer)
+	{
+		printf("Error: No rendering pipeline present in the output layer!");
+		return;
+	}
+
+    static uint16_t keyDown = 0;
 
 	if (!ImGui::IsAnyItemActive())
 	{
@@ -594,7 +617,8 @@ void OutputLayer::HandleSceneInput()
 
 void OutputLayer::ImGuiCameraSettings()
 {
-	ImGui::Begin("Camera settings");
+
+    ImGui::Begin("Camera settings");
 
 	auto del = Lumen::Input::GetMouseDelta();
 
