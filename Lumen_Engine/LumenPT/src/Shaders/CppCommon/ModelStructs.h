@@ -10,6 +10,10 @@ typedef unsigned long long cudaTextureObject_t;
 #endif
 #include <sutil/Matrix.h>
 
+namespace Lumen {
+    enum class EmissionMode;
+}
+
 // Common struct for a vertex meant to be used both on the CPU when loading models,
 // and on the GPU when reading their data
 struct Vertex
@@ -57,29 +61,31 @@ struct DevicePrimitiveInstance
 {
     DevicePrimitive m_Primitive;
     // Other instance-specific data
-    float4 m_Position;
-    float4 m_AdditionColorIDK;
+    sutil::Matrix4x4 m_Transform;       //The transform for this primitive.
+    Lumen::EmissionMode m_EmissionMode; //The emission mode for this primitive.
+    float4 m_EmissiveColorAndScale;     //RGB color override and W = scaling factor.
 };
 
-/*
- * A struct on the GPU containing pointers to the data buffers for a specific mesh.
- */
-struct DeviceMesh
-{
-    Vertex*         m_VertexBuffer;	//The vertex buffer.
-    unsigned int*   m_IndexBuffer;	//The index buffer.
-};
-
-/*
- * Instance data on the GPU about a particular scene object.
- */
-struct DeviceInstanceData
-{
-    DeviceMesh*         m_Mesh;			//Pointer to the mesh data for this instance.
-    DeviceMaterial*     m_Material;		//The material for this instance.
-    sutil::Matrix4x4	m_Transform;	//The transform for this instance.
-    float3				m_Radiance;		//The emissive radiance for this instance.
-    bool				m_IsEmissive;	//True when emissive, false when not.
-};
+//TODO remove old
+///*
+// * A struct on the GPU containing pointers to the data buffers for a specific mesh.
+// */
+//struct DeviceMesh
+//{
+//    Vertex*         m_VertexBuffer;	//The vertex buffer.
+//    unsigned int*   m_IndexBuffer;	//The index buffer.
+//};
+//
+///*
+// * Instance data on the GPU about a particular scene object.
+// */
+//struct DeviceInstanceData
+//{
+//    DeviceMesh*         m_Mesh;			//Pointer to the mesh data for this instance.
+//    DeviceMaterial*     m_Material;		//The material for this instance.
+//    sutil::Matrix4x4	m_Transform;	//The transform for this instance.
+//    float3				m_Radiance;		//The emissive radiance for this instance.
+//    bool				m_IsEmissive;	//True when emissive, false when not.
+//};
 
 #undef NONAMESPACE

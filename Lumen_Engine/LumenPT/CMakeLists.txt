@@ -85,7 +85,10 @@ set(CUDAKernels_INCLUDES
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Include/Cuda"
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Include/sutil"
 	"${CMAKE_CURRENT_SOURCE_DIR}/../Lumen/vendor/glm"
+	"${CMAKE_CURRENT_SOURCE_DIR}/../Lumen/src"
 	"${CMAKE_CURRENT_SOURCE_DIR}/../Lumen/src/Lumen"
+	"${CMAKE_CURRENT_SOURCE_DIR}/../Lumen/src/Lumen/AssetLoading"
+	"${CMAKE_CURRENT_SOURCE_DIR}/../Lumen/src/Lumen/ModelLoading"
 	"${CMAKE_CURRENT_BINARY_DIR}/config"
 	${NANOVDB_HEADERS}
 )
