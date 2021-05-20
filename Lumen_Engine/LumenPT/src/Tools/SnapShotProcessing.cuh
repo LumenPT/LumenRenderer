@@ -1,4 +1,4 @@
-#include "../Shaders/CppCommon/WaveFrontDataStructs/IntersectionRayBatch.h"
+#include "../Shaders/CppCommon/WaveFrontDataStructs/IntersectionRayData.h"
 
 
 #include <cstdint>

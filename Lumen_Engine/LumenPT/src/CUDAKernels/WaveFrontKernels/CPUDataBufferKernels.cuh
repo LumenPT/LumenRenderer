@@ -4,17 +4,6 @@
 
 using namespace WaveFront;
 
-CPU_ONLY void ResetIntersectionRayBatch(
-    IntersectionRayBatch* const a_RayBatchDevPtr,
-    unsigned int a_NumPixels,
-    unsigned int a_RaysPerPixel);
-
-CPU_ONLY void ResetShadowRayBatch(
-    ShadowRayBatch* a_ShadowRayBatchDevPtr,
-    unsigned int a_MaxDepth,
-    unsigned int a_NumPixels,
-    unsigned int a_RaysPerPixel);
-
 CPU_ONLY void ResetPixelBuffer(
     PixelBuffer* a_PixelBufferDevPtr,
     unsigned int a_NumPixels,

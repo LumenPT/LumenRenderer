@@ -10,6 +10,7 @@
 
 #include <memory>
 #include <string>
+#include <filesystem>
 #include "Glad/glad.h"
 
 class FrameSnapshot;
@@ -65,6 +66,9 @@ public:
 	// Struct used to initialize the renderer
 	struct InitializationData
 	{
+
+		std::filesystem::path m_AssetDirectory;
+		std::filesystem::path m_ShaderDirectory;
 
 		uint8_t m_MaxDepth;
 		uint8_t m_RaysPerPixel;
