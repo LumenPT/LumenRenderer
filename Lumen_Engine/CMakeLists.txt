@@ -45,7 +45,7 @@ add_subdirectory ("LumenPT/vendor/openvdb")
 add_subdirectory ("LumenPT/vendor/openvdb/nanovdb")
 	#NRD
 if(${USE_NVIDIA_DENOISER})
-	add_subdirectory ("LumenPT/vendor/RayTracingDenoiser")
+	#add_subdirectory ("LumenPT/vendor/RayTracingDenoiser")
 endif()
 	#Lumen
 add_subdirectory ("Lumen")
