@@ -67,13 +67,15 @@ __device__ __forceinline__ float geometrySmith(const float3 N, const float3 V, c
 __device__ __forceinline__ float distributionGGX(const float3 N, const float3 H, float roughness)
 {
     float a = roughness * roughness;
-    float a2 = roughness * roughness;
+    float a2 = a*a;
     float NdotH = fmax(dot(N, H), 0.0f);
     float NdotH2 = NdotH * NdotH;
 
     float nom = a2;
     float denom = (NdotH2 * (a2 - 1.0f) + 1.0f);
-    denom = M_PIf * denom * denom;
+    denom = fmaxf(0.00001f, M_PIf * denom * denom);
+
+    assert(denom != 0);
 
     return nom / denom;
 }
@@ -102,7 +104,18 @@ __device__ __forceinline__ float3 MicrofacetBRDF(const float3 WIN, const float3 
 
     const float3 kd = (1.0f - F) * (1.0f - metallic);
     const float3 diffuse = albedo / M_PIf;
-    return kd * diffuse + specular;
+
+    const auto brdf = kd * diffuse + specular;
+
+    assert(brdf.x >= 0.f && brdf.y >= 0.f && brdf.z >= 0.f);
+    assert(!isnan(brdf.x));
+    assert(!isnan(brdf.y));
+    assert(!isnan(brdf.z));
+    assert(!isinf(brdf.x));
+    assert(!isinf(brdf.y));
+    assert(!isinf(brdf.z));
+
+    return brdf;
 }
 
 /*
@@ -325,8 +338,8 @@ __device__ __forceinline__ void SampleGGXVNDF(const float3& a_ViewDir, float a_R
 __device__ __forceinline__ void SampleHemisphere(const float3& a_ViewDirection, const float3& a_SurfaceNormal, const float a_Roughness, unsigned int a_Seed, float3& a_OutputDirection, float& a_OutputPdf)
 {
     //Make sure the view direction and normal are normalized.
-    assert(fabsf(length(a_ViewDirection) - 1.f) < 0.001);
-    assert(fabsf(length(a_SurfaceNormal) - 1.f) < 0.001);
+    assert(fabsf(length(a_ViewDirection) - 1.f) < 0.001f);
+    assert(fabsf(length(a_SurfaceNormal) - 1.f) < 0.001f);
 
     //make sure that the view direction is going towards the normal.
     assert(dot(a_ViewDirection, a_SurfaceNormal) < 0.f);

@@ -9,6 +9,7 @@
 
 struct PTServiceLocator;
 class PTMeshInstance;
+class SceneDataTable;
 
 class PTScene : public Lumen::ILumenScene
 {
@@ -16,7 +17,7 @@ public:
 
     // Constructs the scene out of the provided scene data. This invalidates a_SceneData for future use.
     PTScene(LumenRenderer::SceneData& a_SceneData, PTServiceLocator& a_ServiceLocator);
-    ~PTScene(){};
+    ~PTScene();
 
     // Adds a new static geometry mesh to the scene
     Lumen::MeshInstance* AddMesh() override;
@@ -35,7 +36,7 @@ public:
     // Updates the instance acceleration structure of the scene
     void UpdateSceneAccelerationStructure();
 
-
+    std::unique_ptr<SceneDataTable> m_SceneDataTable;
 private:
     // Reference to the path tracer service locator. Necessary when updating the scene acceleration structure
     PTServiceLocator& m_Services;

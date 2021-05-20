@@ -12,12 +12,14 @@
 #include "Lumen/Input.h"
 #include "Lumen/ModelLoading/SceneManager.h"
 #include "Lumen/KeyCodes.h"
-#include "Lumen/Events/ApplicationEvent.h" 
+#include "Lumen/Events/ApplicationEvent.h"
+#include "Lumen/GLTaskSystem.h"
 
 #include "Tools/FrameSnapshot.h"
 
 #include "Tools/ImGuiUtil.h"
 
+#include "ModelLoaderWidget.h"
 
 #include "Glad/glad.h"
 
@@ -25,8 +27,9 @@
 
 #include "GLFW/glfw3.h"
 
-#include "filesystem"
 #include <iostream>
+
+#include "../../LumenPT/src/Framework/CudaUtilities.h"
 
 OutputLayer::OutputLayer()
 	: m_CameraMovementSpeed(300.0f)
@@ -39,82 +42,54 @@ OutputLayer::OutputLayer()
     , m_ContentViewFunc([](glm::vec2){})
 {
 	InitContentViewNameTable();
+	//auto task = GLTaskSystem::AddTask([this]()
+		{
+			auto vs = glCreateShader(GL_VERTEX_SHADER);
+			auto fs = glCreateShader(GL_FRAGMENT_SHADER);
 
-	auto vs = glCreateShader(GL_VERTEX_SHADER);
-	auto fs = glCreateShader(GL_FRAGMENT_SHADER);
+			glShaderSource(vs, 1, &m_VSSource, nullptr);
+			glCompileShader(vs);
 
-	glShaderSource(vs, 1, &m_VSSource, nullptr);
-	glCompileShader(vs);
+			int success;
+			char infoLog[512];
+			glGetShaderiv(vs, GL_COMPILE_STATUS, &success);
+			if (!success)
+			{
+				glGetShaderInfoLog(vs, 512, NULL, infoLog);
+				std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n" << infoLog << std::endl;
+			};
 
-	int success;
-	char infoLog[512];
-	glGetShaderiv(vs, GL_COMPILE_STATUS, &success);
-	if (!success)
-	{
-		glGetShaderInfoLog(vs, 512, NULL, infoLog);
-		std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n" << infoLog << std::endl;
-	};
+			glShaderSource(fs, 1, &m_FSSource, nullptr);
+			glCompileShader(fs);
+			glGetShaderiv(fs, GL_COMPILE_STATUS, &success);
+			if (!success)
+			{
+				glGetShaderInfoLog(fs, 512, NULL, infoLog);
+				std::cout << "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n" << infoLog << std::endl;
+			};
 
-	glShaderSource(fs, 1, &m_FSSource, nullptr);
-	glCompileShader(fs);
-	glGetShaderiv(fs, GL_COMPILE_STATUS, &success);
-	if (!success)
-	{
-		glGetShaderInfoLog(fs, 512, NULL, infoLog);
-		std::cout << "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n" << infoLog << std::endl;
-	};
+			auto program = glCreateProgram();
 
-	auto program = glCreateProgram();
+			glAttachShader(program, vs);
+			glAttachShader(program, fs);
 
-	glAttachShader(program, vs);
-	glAttachShader(program, fs);
+			glLinkProgram(program);
 
-	glLinkProgram(program);
+			glGetProgramiv(program, GL_LINK_STATUS, &success);
+			if (!success)
+			{
+				glGetProgramInfoLog(program, 512, nullptr, infoLog);
+				std::cout << "ERROR::PROGRAM::LINKING_FAILED\n" << infoLog << std::endl;
+			}
 
-	glGetProgramiv(program, GL_LINK_STATUS, &success);
-    if (!success)
-    {
-		glGetProgramInfoLog(program, 512, nullptr, infoLog);
-		std::cout << "ERROR::PROGRAM::LINKING_FAILED\n" << infoLog << std::endl;
-    }
+			glDeleteShader(vs);
+			glDeleteShader(fs);
 
-	glDeleteShader(vs);
-	glDeleteShader(fs);
+			m_Program = program;
+		};
 
-	m_Program = program;
-
-	LumenRenderer::InitializationData init{};
-	init.m_RenderResolution = { 800, 600 };
-	init.m_OutputResolution = { 800, 600 };
-	init.m_MaxDepth = 1;
-	init.m_RaysPerPixel = 1;
-	init.m_ShadowRaysPerPixel = 1;
-//#ifdef WAVEFRONT
-//	init.m_RenderResolution = { 800, 600 };
-//	init.m_OutputResolution = { 800, 600 };
-//	init.m_MaxDepth = 1;
-//	init.m_RaysPerPixel = 1;
-//	init.m_ShadowRaysPerPixel = 1;
-//#else
-//#endif
-
-#ifdef WAVEFRONT
-
-	m_Renderer = std::make_unique<WaveFront::WaveFrontRenderer>();
-
-	WaveFront::WaveFrontSettings settings{};
-	settings.depth = 5;
-	settings.minIntersectionT = 0.1f;
-	settings.maxIntersectionT = 5000.f;
-	settings.renderResolution = { 800, 600 };
-	settings.outputResolution = { 800, 600 };
-	settings.blendOutput = false;	//When true will blend output instead of overwriting it (high res image over time if static scene).
-
-	static_cast<WaveFront::WaveFrontRenderer*>(m_Renderer.get())->Init(settings);
-
-#else
-	m_Renderer = std::make_unique<OptiXRenderer>(init);
-#endif
+	//GLTaskSystem::WaitOnTask(task);
+	
 }
 
 OutputLayer::~OutputLayer()
@@ -122,8 +97,29 @@ OutputLayer::~OutputLayer()
 	glDeleteProgram(m_Program);
 }
 
-void OutputLayer::OnUpdate(){
+void OutputLayer::OnAttach()
+{
+	InitializeScenePresets();
 
+	if(!m_Renderer)
+	{
+		printf("Error: No rendering pipeline present in output layer!");
+		return;
+	}
+
+	m_ModelLoaderWidget = std::make_unique<ModelLoaderWidget>(*m_LayerServices->m_SceneManager, m_Renderer->m_Scene);
+}
+
+void OutputLayer::OnUpdate()
+{
+
+	if(!m_Renderer)
+	{
+		printf("Error: No rendering pipeline present in the output layer!");
+		return;
+	}
+
+	m_Renderer->PerformDeferredOperations();
 	HandleCameraInput(*m_Renderer->m_Scene->m_Camera);
 
 	bool recordingSnapshot = false;
@@ -131,26 +127,43 @@ void OutputLayer::OnUpdate(){
 	if (Lumen::Input::IsKeyPressed(LMN_KEY_K))
 	{
 		recordingSnapshot = true;
-		m_Renderer->BeginSnapshot();	    
+		m_Renderer->BeginSnapshot();
 	}
 
-	auto texture = m_Renderer->TraceFrame(m_Renderer->m_Scene); // TRACE SUM
+	auto texture = m_Renderer->GetOutputTexture(); // TRACE SUM
 	HandleSceneInput();
 	m_LastFrameTex = texture;
 	m_SmallViewportFrameTex = texture;
-	
-	if (recordingSnapshot)
-	{
-		m_FrameSnapshots.push_back(m_Renderer->EndSnapshot());			
-	}
 
-	glBindTexture(GL_TEXTURE_2D, texture);
-	glUseProgram(m_Program);
-	glDrawArrays(GL_TRIANGLES, 0, 3);
+	auto snap = std::move(m_Renderer->EndSnapshot());
+	if (snap)
+	{
+	    m_FrameSnapshots.push_back(std::move(snap));
+	}
+	if (texture)
+	{
+		//GLTaskSystem::AddTask([&]()
+		{
+			auto err1 = glGetError();
+
+			glBindTexture(GL_TEXTURE_2D, texture);
+			glUseProgram(m_Program);
+			glDrawArrays(GL_TRIANGLES, 0, 3);
+
+			glBindTexture(GL_TEXTURE_2D, 0);
+		};
+	}
 }
 
 void OutputLayer::OnImGuiRender()
 {
+
+	if(!m_Renderer)
+	{
+		printf("Error: No rendering pipeline present in the output layer!");
+		return;
+	}
+
 	ImGuiCameraSettings();
 	if (!m_Renderer->m_Scene->m_MeshInstances.empty())
 	{
@@ -384,18 +397,11 @@ void OutputLayer::OnImGuiRender()
 
 	ImGui::End();
 
-	ImGui::Begin("Testing");
+	/////////////////////////////////////////////////
+	// Model loading shenanigans
+	/////////////////////////////////////////////////
 
-	if (ImGui::BeginMenu("My Menu"))
-	{	    
-		ImGui::MenuItem("Item 1");
-		ImGui::MenuItem("Item 2");
-		ImGui::MenuItem("Item 3");
-		ImGui::EndMenu();
-	}
-
-	ImGui::End();
-
+	m_ModelLoaderWidget->Display();
 }
 
 void OutputLayer::OnEvent(Lumen::Event& a_Event)
@@ -407,8 +413,31 @@ void OutputLayer::OnEvent(Lumen::Event& a_Event)
 	}
 }
 
+void OutputLayer::SetPipeline(const std::shared_ptr<LumenRenderer>& a_Renderer)
+{
+
+	m_Renderer = a_Renderer;
+
+}
+
+const std::shared_ptr<LumenRenderer>& OutputLayer::GetPipeline() const
+{
+
+	return m_Renderer;
+
+}
+
+
+
 void OutputLayer::InitializeScenePresets()
 {
+
+	if (!m_Renderer)
+	{
+		printf("Error: No rendering pipeline present in the output layer!");
+		return;
+	}
+
 	ScenePreset pres = {};
 
 
@@ -460,7 +489,14 @@ void OutputLayer::InitializeScenePresets()
 
 void OutputLayer::HandleCameraInput(Camera& a_Camera)
 {
-	if (!ImGui::IsAnyItemActive() && Lumen::Input::IsMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT))
+
+	if (!m_Renderer)
+	{
+		printf("Error: No rendering pipeline present in the output layer!");
+		return;
+	}
+
+    if (!ImGui::IsAnyItemActive() && Lumen::Input::IsMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT))
 	{
 		auto delta = Lumen::Input::GetMouseDelta();
 
@@ -547,7 +583,14 @@ void OutputLayer::HandleCameraInput(Camera& a_Camera)
 
 void OutputLayer::HandleSceneInput()
 {
-	static uint16_t keyDown = 0;
+
+	if (!m_Renderer)
+	{
+		printf("Error: No rendering pipeline present in the output layer!");
+		return;
+	}
+
+    static uint16_t keyDown = 0;
 
 	if (!ImGui::IsAnyItemActive())
 	{
@@ -574,7 +617,8 @@ void OutputLayer::HandleSceneInput()
 
 void OutputLayer::ImGuiCameraSettings()
 {
-	ImGui::Begin("Camera settings");
+
+    ImGui::Begin("Camera settings");
 
 	auto del = Lumen::Input::GetMouseDelta();
 

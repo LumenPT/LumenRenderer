@@ -10,7 +10,6 @@
 #include "MemoryBuffer.h"
 #include "CudaGLTexture.h"
 #include "ShaderBindingTableGen.h"
-#include "../Shaders/CppCommon/LumenPTConsts.h"
 #include "../Shaders/CppCommon/SceneDataTableAccessor.h"
 #include "CudaUtilities.h"
 #include "SceneDataTable.h"
@@ -46,7 +45,8 @@ OptiXRenderer::OptiXRenderer(const InitializationData& a_InitializationData)
     m_Texture(nullptr),
     m_ProgramGroups({}),
     m_OutputBuffer(nullptr),
-    m_SBTBuffer(nullptr)
+    m_SBTBuffer(nullptr),
+    m_InitData(a_InitializationData)
 {
     bool success = true;
 
@@ -58,7 +58,7 @@ OptiXRenderer::OptiXRenderer(const InitializationData& a_InitializationData)
     m_ShaderBindingTableGenerator = std::make_unique<ShaderBindingTableGenerator>();
 
     m_ServiceLocator.m_Renderer = this;
-    m_Texture = std::make_unique<PTTexture>(LumenPTConsts::gs_AssetDirectory + "debugTex.jpg");
+    m_Texture = std::make_unique<PTTexture>(m_InitData.m_AssetDirectory.string() + "debugTex.jpg");
 
     CreateShaderBindingTable();
 
@@ -112,7 +112,7 @@ void OptiXRenderer::CreatePipeline()
 {
 
     //OptixModule shaderModule = CreateModule(LumenPTConsts::gs_ShaderPathBase + "WaveFrontShaders.ptx");
-    OptixModule shaderModule = CreateModule(LumenPTConsts::gs_ShaderPathBase + "draw_solid_color.ptx");
+    OptixModule shaderModule = CreateModule( + "draw_solid_color.ptx");
 
     OptixProgramGroupDesc rgGroupDesc = {};
     rgGroupDesc.kind = OPTIX_PROGRAM_GROUP_KIND_RAYGEN;
@@ -145,7 +145,7 @@ void OptiXRenderer::CreatePipeline()
     pipelineLinkOptions.maxTraceDepth = 3; //TODO: potentially add this as a init param.
 
     //volumetric_bookmark
-    OptixModule volumetricShaderModule = CreateModule(LumenPTConsts::gs_ShaderPathBase + "volumetric.ptx");
+    OptixModule volumetricShaderModule = CreateModule(m_InitData.m_ShaderDirectory.string() + "volumetric.ptx");
 
     assert(volumetricShaderModule);
 
@@ -425,7 +425,7 @@ unsigned int OptiXRenderer::TraceFrame(std::shared_ptr<Lumen::ILumenScene>& a_Sc
     params.m_SceneData = m_SceneDataTable->GetDevicePointer();
     auto str = static_cast<PTScene*>(a_Scene.get())->GetSceneAccelerationStructure();
 
-    params.m_Image = m_OutputBuffer->GetDevicePointer();
+    params.m_Image = m_OutputBuffer->GetDevicePtr();
     params.m_Handle = str;
 
     params.m_ImageWidth = gs_ImageWidth;
@@ -559,7 +559,7 @@ std::unique_ptr<Lumen::ILumenPrimitive> OptiXRenderer::CreatePrimitive(Primitive
 }
 
 std::shared_ptr<Lumen::ILumenMesh> OptiXRenderer::CreateMesh(
-    std::vector<std::unique_ptr<Lumen::ILumenPrimitive>>& a_Primitives)
+    std::vector<std::shared_ptr<Lumen::ILumenPrimitive>>& a_Primitives)
 {
     auto mesh = std::make_shared<PTMesh>(a_Primitives, m_ServiceLocator);
     return mesh;

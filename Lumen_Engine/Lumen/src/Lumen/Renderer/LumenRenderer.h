@@ -10,6 +10,7 @@
 
 #include <memory>
 #include <string>
+#include <filesystem>
 #include "Glad/glad.h"
 
 class FrameSnapshot;
@@ -33,6 +34,7 @@ public:
 		VectorView<glm::vec3, uint8_t> m_Positions;
 		VectorView<glm::vec2, uint8_t> m_TexCoords;
 		VectorView<glm::vec3, uint8_t> m_Normals;
+		VectorView<glm::vec4, uint8_t> m_Tangents;
 
 		// Perhaps temporary solution till we decide how we'll handle the indices
 		std::vector<uint8_t> m_IndexBinary;
@@ -53,17 +55,20 @@ public:
 	// Struct used to initialize a scene
 	struct SceneData
 	{
-		glm::vec3 m_CameraPosition = glm::vec3(0,0,0);
-		glm::vec3 m_CameraUp = glm::vec3(0,1,0);
+		glm::vec3 m_CameraPosition = glm::vec3(0, 0, 0);
+		glm::vec3 m_CameraUp = glm::vec3(0, 1, 0);
 		glm::mat4 m_CameraTrans = glm::mat4(1);
 		//Camera m_Camera;
-		
+
 		std::vector<Lumen::MeshInstance> m_InstancedMeshes;
 	};
 
 	// Struct used to initialize the renderer
 	struct InitializationData
 	{
+
+		std::filesystem::path m_AssetDirectory;
+		std::filesystem::path m_ShaderDirectory;
 
 		uint8_t m_MaxDepth;
 		uint8_t m_RaysPerPixel;
@@ -76,17 +81,20 @@ public:
 
 	};
 
-	LumenRenderer(){};
-	LumenRenderer(const InitializationData& a_InitializationData){};
+	LumenRenderer() {};
+	LumenRenderer(const InitializationData& a_InitializationData) {};
 	virtual ~LumenRenderer() = default;
 
 	// The following functions are abstract because they are used to hide away implementation details connected to the rendering APIs.
 	// Essentially all of them need to be implemented by the child classes to match the API requirements.
 
 	// Create a primitive from the provided primitive data
+	virtual void StartRendering() = 0;
+	virtual void PerformDeferredOperations() {};
+
 	virtual std::unique_ptr<Lumen::ILumenPrimitive> CreatePrimitive(PrimitiveData& a_MeshData) = 0;
 	// Create a mesh from the provided primitives
-	virtual std::shared_ptr<Lumen::ILumenMesh> CreateMesh(std::vector<std::unique_ptr<Lumen::ILumenPrimitive>>& a_Primitives) = 0;
+	virtual std::shared_ptr<Lumen::ILumenMesh> CreateMesh(std::vector<std::shared_ptr<Lumen::ILumenPrimitive>>& a_Primitives) = 0;
 	// Create a texture from the provided texture data
 	virtual std::shared_ptr<Lumen::ILumenTexture> CreateTexture(void* a_PixelData, uint32_t a_Width, uint32_t a_Height) = 0;
 	// Create a material from the provided material data
@@ -96,27 +104,27 @@ public:
 	// Create a volume from the provided file path
 	virtual std::shared_ptr<Lumen::ILumenVolume> CreateVolume(const std::string& a_FilePath) = 0;
 
-	virtual unsigned int TraceFrame(std::shared_ptr<Lumen::ILumenScene>& a_Scene) = 0;	//scene argument may be redundant... or not 
+	virtual unsigned int GetOutputTexture() = 0;	//scene argument may be redundant... or not
 
+	virtual void SetRenderResolution(glm::uvec2 a_NewResolution) = 0;
+	virtual void SetOutputResolution(glm::uvec2 a_NewResolution) = 0;
 	/*
 	 * Set the blend mode.
 	 * When set to true, output is blended instead of overwritten.
 	 */
 	virtual void SetBlendMode(bool a_Blend) = 0;
-	virtual void SetRenderResolution(glm::uvec2 a_NewResolution) = 0;
-	virtual void SetOutputResolution(glm::uvec2 a_NewResolution) = 0;
-
-	/*
-	 * Get the blend mode.
-	 * When true, output is blended and not overwritten.
-	 */
-	virtual bool GetBlendMode() const = 0;
 
 	void SetRenderResolution(uint32_t a_NewWidth, uint32_t a_NewHeight) { SetRenderResolution(glm::uvec2(a_NewWidth, a_NewHeight)); }
 	void SetOutputResolution(uint32_t a_NewWidth, uint32_t a_NewHeight) { SetOutputResolution(glm::uvec2(a_NewWidth, a_NewHeight)); }
 
 	virtual glm::uvec2 GetRenderResolution() = 0;
 	virtual glm::uvec2 GetOutputResolution() = 0;
+
+	/*
+	 * Get the blend mode.
+	 * When true, output is blended and not overwritten.
+	 */
+	virtual bool GetBlendMode() const = 0;
 
 	virtual void BeginSnapshot() = 0;
 

@@ -52,7 +52,7 @@ CPU_ON_GPU void ShadeIndirect(
          * If the angle is too perpendicular to the normal, discard. It's too prone to floating point error which means it can't generate a reflection
          * some of the time.
          */
-        if(dot(surfaceData.m_Normal, surfaceData.m_IncomingRayDirection) >= -3.f*EPSILON)
+        if(dot(surfaceData.m_Normal, surfaceData.m_IncomingRayDirection) >= -10.f * EPSILON)
         {
             continue;
         }

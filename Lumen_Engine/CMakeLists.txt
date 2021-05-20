@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 3.16)
+cmake_minimum_required (VERSION 3.20)
 
 #project name (i.e. VS solution)
 project ("Lumen_Engine" LANGUAGES C CXX)
@@ -11,8 +11,14 @@ set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 
+#Add option to use wavefront
 option(USE_WAVEFRONT "Use the Wavefront rendering pipeline?" ON)
 option(USE_NVIDIA_DENOISER "Use Nvidia denoiser?" OFF)
+
+#If wavefront is used, add compile definition.
+if(${USE_WAVEFRONT})
+	add_compile_definitions(WAVEFRONT)
+endif()
 
 add_subdirectory("Lumen/vendor/GLFW")
 	#Glad
@@ -39,6 +45,35 @@ set(ZLIB_ROOT
 set(BOOST_INCLUDEDIR "${CMAKE_CURRENT_SOURCE_DIR}/LumenPT/vendor/Include")
 set(BOOST_LIBRARYDIR "${CMAKE_CURRENT_SOURCE_DIR}/LumenPT/vendor/Libs/boost")
 
+#Set config name variable to use for different IDEs
+set(CONFIG_NAME "")
+
+if(	${CMAKE_GENERATOR} STREQUAL "Visual Studio 8 2005" OR
+	${CMAKE_GENERATOR} STREQUAL "Visual Studio 9 2008")
+
+	set(CONFIG_NAME $(ConfigurationName))
+
+elseif(
+	${CMAKE_GENERATOR} STREQUAL "Visual Studio 10 2010" OR
+	${CMAKE_GENERATOR} STREQUAL "Visual Studio 11 2012" OR
+	${CMAKE_GENERATOR} STREQUAL "Visual Studio 12 2013" OR
+	${CMAKE_GENERATOR} STREQUAL "Visual Studio 14 2015" OR
+	${CMAKE_GENERATOR} STREQUAL "Visual Studio 15 2017" OR
+	${CMAKE_GENERATOR} STREQUAL "Visual Studio 16 2019")
+
+	set(CONFIG_NAME $(Configuration))
+
+elseif(
+	${CMAKE_GENERATOR} STREQUAL "Xcode" OR
+	${CMAKE_GENERATOR} STREQUAL "Ninja Multi-Config")
+
+	set(CONFIG_NAME $(CONFIGURATION))
+	
+endif()
+
+#Add config name variable as compile definition.
+add_compile_definitions(CONFIG_NAME=\"${CONFIG_NAME}\")
+
 	#OpenVDB
 add_subdirectory ("LumenPT/vendor/openvdb")
 	#NanoVDB
@@ -54,4 +89,4 @@ add_subdirectory ("LumenPT")
 	#Sandbox
 add_subdirectory ("Sandbox")
 
-set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT "Sandbox")	
+set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT "Sandbox")

@@ -109,7 +109,7 @@ namespace WaveFront
     }
 
     template<typename T>
-    unsigned GetAtomicCounter(MemoryBuffer* a_Buffer)
+    unsigned GetAtomicCounter(const MemoryBuffer const* a_Buffer)
     {
         unsigned returned = 0;
         a_Buffer->Read(&returned, sizeof(unsigned), 0);

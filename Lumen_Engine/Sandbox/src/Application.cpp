@@ -11,6 +11,9 @@
 #include "GLFW/include/GLFW/glfw3.h"
 #include "Lumen/ModelLoading/SceneManager.h"
 
+#include "AppConfiguration.h"
+#include "Framework/CudaUtilities.h"
+
 #ifdef WAVEFRONT
 #include "../../LumenPT/src/Framework/WaveFrontRenderer.h"
 #else
@@ -70,37 +73,131 @@ public:
 	{
 		glfwMakeContextCurrent(reinterpret_cast<GLFWwindow*>(GetWindow().GetNativeWindow()));
 		//PushOverlay(new Lumen::ImGuiLayer());
-		
 
-		OutputLayer* m_ContextLayer = new OutputLayer;
-		PushLayer(m_ContextLayer);
+		const std::filesystem::path configFilePath = std::filesystem::current_path() += "/Config.json";
 
+		AppConfiguration& config = AppConfiguration::GetInstance();
+		config.Load(configFilePath, true, true);
+
+		std::shared_ptr<LumenRenderer> renderer = nullptr;
+
+#ifdef WAVEFRONT
+
+		renderer = std::make_shared<WaveFront::WaveFrontRenderer>();
+
+		WaveFront::WaveFrontSettings settings{};
+
+		settings.m_ShadersFilePathSolids = config.GetFileShaderSolids();
+		settings.m_ShadersFilePathVolumetrics = config.GetFileShaderVolumetrics();
+
+		settings.depth = 5;
+		settings.minIntersectionT = 0.1f;
+		settings.maxIntersectionT = 5000.f;
+		settings.renderResolution = { 800, 600 };
+		settings.outputResolution = { 800, 600 };
+		settings.blendOutput = false;	//When true will blend output instead of overwriting it (high res image over time if static scene).
+
+		std::static_pointer_cast<WaveFront::WaveFrontRenderer>(renderer)->Init(settings);
+
+		CHECKLASTCUDAERROR;
+
+#else
+
+		OptiXRenderer::InitializationData initData;
+		initData.m_AssetDirectory = config.GetDirectoryAssets();
+		initData.m_ShaderDirectory = config.GetDirectoryShaders();
+
+		initData.m_MaxDepth = 5;
+		initData.m_RaysPerPixel = 1;
+		initData.m_ShadowRaysPerPixel = 1;
+
+		initData.m_RenderResolution = { 800, 600 };
+		initData.m_OutputResolution = { 800, 600 };
+
+		renderer = std::make_unique<OptiXRenderer>(initData);
+#endif
+
+		OutputLayer* contextLayer = new OutputLayer;
+		contextLayer->SetPipeline(renderer);
+		PushLayer(contextLayer);
 
 		//temporary stuff to avoid absolute paths to gltf cube
 		std::filesystem::path p = std::filesystem::current_path();
+
+		while (p.has_parent_path())
+		{
+			bool found = false;
+			for (auto child : std::filesystem::directory_iterator(p))
+			{
+				if (child.is_directory() && child.path().filename() == "Sandbox")
+				{
+					found = true;
+					p = child.path().parent_path();
+				}
+			}
+
+			if (found) break;
+
+			p = p.parent_path();
+		}
+		std::filesystem::current_path(p);
 		std::string p_string{ p.string() };
 		std::replace(p_string.begin(), p_string.end(), '\\', '/');
-		//p_string.append("/Sandbox/assets/models/Lantern.gltf");
 
-		const std::string meshPath = p_string.append("/Sandbox/assets/models/Sponza/");
+		std::filesystem::path p2 = std::filesystem::current_path();
+		std::string p_string2{ p2.string() };
+		std::replace(p_string2.begin(), p_string2.end(), '\\', '/');
+
+		const std::string meshPath = p_string.append("/Sandbox/assets/models/tavern/");
+		const std::string meshPath2 = p_string2.append("/Sandbox/assets/models/EmissiveSphere/");
 		//Base path for meshes.
 
 		//Mesh name
-		const std::string meshName = "Sponza.gltf";
+		const std::string meshName = "scene.gltf";
+		const std::string meshName2 = "EmissiveSphere.gltf";
 
 		//p_string.append("/Sandbox/assets/models/Sponza/Sponza.gltf");
 		LMN_TRACE(p_string);
 
-	    m_SceneManager->SetPipeline(*m_ContextLayer->GetPipeline());
+	    m_SceneManager->SetPipeline(*contextLayer->GetPipeline());
 		auto res = m_SceneManager->LoadGLTF(meshName, meshPath);
+		auto res2 = m_SceneManager->LoadGLTF(meshName2, meshPath2);
 
-		auto lumenPT = m_ContextLayer->GetPipeline();
+		auto lumenPT = contextLayer->GetPipeline();
 
 		LumenRenderer::SceneData scData = {};
 		
 		lumenPT->m_Scene = lumenPT->CreateScene(scData);
 		
 		//Loop over the nodes in the scene, and add their meshes if they have one.
+
+		float xOffset = -1200.f;
+
+		uint32_t seed = 38947987;
+		seed = RandomInt(seed);
+
+		for(int i = 0; i < 30; ++i)
+		{
+			for (auto& node : res2->m_NodePool)
+			{
+				auto meshId = node->m_MeshID;
+				if (meshId >= 0)
+				{
+					auto mesh = lumenPT->m_Scene->AddMesh();
+					mesh->SetMesh(res2->m_MeshPool[meshId]);
+					//mesh->m_Transform.CopyTransform(*node->m_LocalTransform);
+					float p = i;
+					mesh->m_Transform.SetPosition(glm::vec3(xOffset, 100.f + (p*p), 0.f));
+					mesh->m_Transform.SetScale(glm::vec3(2.0f * (static_cast<float>((i + 1) * 2) / 4.f)));
+					glm::vec3 rgb = glm::vec3(RandomFloat(seed), RandomFloat(seed), RandomFloat(seed));
+					mesh->SetEmissiveness(Lumen::EmissionMode::OVERRIDE, rgb, 50.f);
+					mesh->UpdateAccelRemoveThis();
+				}
+			}
+
+			xOffset += 50;
+		}
+
 		for(auto& node: res->m_NodePool)
 		{
 			auto meshId = node->m_MeshID;
@@ -109,20 +206,38 @@ public:
 				auto mesh = lumenPT->m_Scene->AddMesh();
 				mesh->SetMesh(res->m_MeshPool[meshId]);
 				mesh->m_Transform.CopyTransform(*node->m_LocalTransform);
+				mesh->SetEmissiveness(Lumen::EmissionMode::ENABLED, glm::vec3(1.f, 1.f, 1.f), 3000.f);	//Make more bright
+				mesh->UpdateAccelRemoveThis();
+			    //mesh->m_Transform.SetPosition(glm::vec3(0.f, 0.f, 15.0f));
+				//mesh->m_Transform.SetScale(glm::vec3(1.0f));
 			}
 		}
 
-		lumenPT->m_Scene = lumenPT->CreateScene(scData);
-		auto mesh = lumenPT->m_Scene->AddMesh();
-		mesh->SetMesh(res->m_MeshPool[0]);
-
-		mesh->m_Transform.SetPosition(glm::vec3(0.f, 0.f, 15.0f));
-		mesh->m_Transform.SetScale(glm::vec3(1.0f));
-
-		//for (size_t i = 0; i < 10; i++)
+		//for (auto& node : res2->m_NodePool)
 		//{
-		//	//load lantern yay
+		//	auto meshId = node->m_MeshID;
+		//	//if (meshId >= 0)
+		//	{
+		//		auto mesh = lumenPT->m_Scene->AddMesh();
+		//		mesh->SetMesh(res2->m_MeshPool[meshId]);
+		//		//mesh->m_Transform.CopyTransform(*node->m_LocalTransform);
+		//		mesh->m_Transform.SetPosition(glm::vec3(100.f, 500.f, 0.0f));
+        //		mesh->m_Transform.SetScale(glm::vec3(3000.0f));
+		//	}
 		//}
+
+		//lumenPT->m_Scene = lumenPT->CreateScene(scData);
+		//auto mesh = lumenPT->m_Scene->AddMesh();
+		//mesh->SetMesh(res->m_MeshPool[0]);
+
+		//mesh->m_Transform.SetPosition(glm::vec3(0.f, 0.f, 15.0f));
+		//mesh->m_Transform.SetScale(glm::vec3(1.0f));
+
+		//auto mesh2 = lumenPT->m_Scene->AddMesh();
+		//mesh2->SetMesh(res2->m_MeshPool[0]);
+		//mesh2->m_Transform.SetPosition(glm::vec3(0.f, 30.f, 15.0f));
+		//mesh2->m_Transform.SetScale(glm::vec3(1.0f));
+		//
 		
 		//meshLight->m_Transform.SetPosition(glm::vec3(0.f, 0.f, 15.0f));
 		//meshLight->m_Transform.SetScale(glm::vec3(1.0f));
@@ -134,6 +249,10 @@ public:
 
 		auto volume = lumenPT->m_Scene->AddVolume();
 		volume->SetVolume(volumeRes->m_Volume);
+
+
+		contextLayer->GetPipeline()->StartRendering();
+
 	}
 
 	~Sandbox()

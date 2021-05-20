@@ -5,7 +5,7 @@
  */
 
 #include "CudaDefines.h"
-#include "WaveFrontDataStructs/LightDataBuffer.h"
+#include "WaveFrontDataStructs/LightData.h"
 
 #include <Optix/optix.h>
 #include <Cuda/cuda/helpers.h>
@@ -62,11 +62,6 @@ struct ReSTIRSettings
 
     //Enable temporal sampling.
     static constexpr bool enableTemporal = true;    //Default true
-
-    //Enable or disable certain parts of ReSTIR TODO
-#define RESTIR_BIASED 1
-#define RESTIR_SPATIAL 1
-#define RESTIR_TEMPORAL 1
 };
 
 /*
@@ -78,6 +73,18 @@ struct RestirShadowRay
     float3 direction;   //Ray direction, normalized.
     float distance;     //The distance of the light source from the origin along the ray direction.
     unsigned index;     //The index into the reservoir buffer at which to set weight to 0 when occluded.
+};
+
+/*
+ * Visibility ray with potential payload used in the final stage of ReSTIR where the final chosen samples are resolved.
+ */
+struct RestirShadowRayShading
+{
+    float3 origin;      //Ray origin.
+    float3 direction;   //Ray direction, normalized.
+    float distance;     //The distance of the light source from the origin along the ray direction.
+    unsigned index;     //The index into the reservoir buffer at which to set weight to 0 when occluded.
+    float3 contribution;    //The potential contribution if un-occluded.
 };
 
  /*
