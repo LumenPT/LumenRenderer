@@ -480,6 +480,7 @@ void OutputLayer::InitializeScenePresets()
 
 void OutputLayer::HandleCameraInput(Camera& a_Camera)
 {
+
 	if (!ImGui::IsAnyItemActive() && Lumen::Input::IsMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT))
 	{
 		auto delta = Lumen::Input::GetMouseDelta();
@@ -487,15 +488,38 @@ void OutputLayer::HandleCameraInput(Camera& a_Camera)
 		a_Camera.IncrementYaw(-glm::radians(delta.first * m_CameraMouseSensitivity));
 		a_Camera.IncrementPitch(glm::radians(delta.second * m_CameraMouseSensitivity));
 
+		//to be moved to a place where i is appropriate to put conversion code
+		const glm::quat camRot = a_Camera.GetRotation();
+
+		float t0 = 2.0f * (camRot.w * camRot.x + camRot.y + camRot.z);
+		float t1 = 1.0f - 2.0f * (camRot.x * camRot.x + camRot.y * camRot.y);
+		m_CameraRotation.x = atan2(t0, t1); //in radians
+
+		m_CameraRotation.x = m_CameraRotation.x * 180.f / 3.14159f; //convert to euler
+
+
+		float t2 = 2.0f * (camRot.w * camRot.y - camRot.z * camRot.x);
+		t2 = t2 > 1.0f ? 1.0f : t2;
+		t2 = t2 < -1.0f ? -1.0f : t2;
+		m_CameraRotation.y = asin(t2);
+
+		m_CameraRotation.y = m_CameraRotation.y * 180.f / 3.14159f; //convert to euler
+
+		float t3 = 2.0f * (camRot.w * camRot.z + camRot.x * camRot.y);
+		float t4 = 1.0f - 2.0f * (camRot.y * camRot.y + camRot.z * camRot.z);
+		m_CameraRotation.z = atan2(t3, t4);
+
+		m_CameraRotation.z = m_CameraRotation.z * 180.f / 3.14159f; //convert to euler
+
 	}
 
 
 	float movementSpeed = m_CameraMovementSpeed / 60.f;
-	
+
 	glm::vec3 movementDirection = glm::vec3(0.f, 0.f, 0.f);
 	glm::vec3 eye, U, V, W;
 	a_Camera.GetVectorData(eye, U, V, W);
-	
+
 	if (Lumen::Input::IsKeyPressed(LMN_KEY_W))
 	{
 		movementDirection += glm::normalize(W) * movementSpeed;
@@ -529,15 +553,26 @@ void OutputLayer::HandleCameraInput(Camera& a_Camera)
 		auto now = std::chrono::high_resolution_clock::now();
 		if (std::chrono::duration_cast<std::chrono::milliseconds>(now - lastToggle).count() > 500)
 		{
-		    lastToggle = now;
-		    m_Renderer->SetBlendMode(!m_Renderer->GetBlendMode());
+			lastToggle = now;
+			m_Renderer->SetBlendMode(!m_Renderer->GetBlendMode());
 			printf("Output append mode is now %s.\n", (m_Renderer->GetBlendMode() ? "on" : "off"));
 		}
 	}
 
-	if(glm::length(movementDirection))
+	if (a_Camera.GetPosition() != m_CameraPosition)
+	{
+		a_Camera.SetPosition(m_CameraPosition);
+	}
+
+	/*if (a_Camera.GetRotation() != m_CameraRotation)
+	{
+		a_Camera.SetRotation();
+	}*/
+
+	if (glm::length(movementDirection))
 	{
 		a_Camera.SetPosition(eye + glm::normalize(movementDirection) * movementSpeed);
+		m_CameraPosition = a_Camera.GetPosition();
 	}
 
 	constexpr float rotationSpeed = 100.f * (1.0f / 60.f);
@@ -547,7 +582,7 @@ void OutputLayer::HandleCameraInput(Camera& a_Camera)
 	{
 		yawRotation += rotationSpeed;
 	}
-	if(Lumen::Input::IsKeyPressed(LMN_KEY_RIGHT))
+	if (Lumen::Input::IsKeyPressed(LMN_KEY_RIGHT))
 	{
 		yawRotation -= rotationSpeed;
 	}
@@ -602,6 +637,9 @@ void OutputLayer::ImGuiCameraSettings()
 	ImGui::DragFloat("Camera Sensitivity", &m_CameraMouseSensitivity, 0.01f, 0.0f, 1.0f, "%.2f");
 
 	ImGui::DragFloat("Camera Movement Speed", &m_CameraMovementSpeed, 0.1f, 0.0f);
+
+	ImGui::DragFloat3("Position", &m_CameraPosition[0]);
+	ImGui::DragFloat3("Rotation (WIP)", &m_CameraRotation[0]);	//euler angles
 
 	ImGui::End();
 }

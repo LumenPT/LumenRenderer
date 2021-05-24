@@ -18,6 +18,7 @@ public:
 	glm::vec3 GetPosition() const { return m_Position; }
 
 	void SetRotation(glm::quat a_Rotation);
+	glm::quat GetRotation() const { return m_Rotation; }
 	
 	void SetLookAt(glm::vec3 a_Position, glm::vec3 a_LookAt, glm::vec3 a_WorldUp);
 

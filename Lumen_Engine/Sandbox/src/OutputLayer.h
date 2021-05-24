@@ -56,6 +56,9 @@ private:
 
     float m_CameraMouseSensitivity;
     float m_CameraMovementSpeed;
+    glm::vec3 m_CameraPosition;
+    //glm::quat m_CameraRotation;
+    glm::vec3 m_CameraRotation;
 
     std::unique_ptr<class ModelLoaderWidget> m_ModelLoaderWidget;
 
