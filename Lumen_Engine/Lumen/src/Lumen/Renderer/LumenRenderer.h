@@ -4,6 +4,8 @@
 
 #include "Lumen/ModelLoading/ILumenScene.h"
 
+#include "Lumen/ModelLoading/SceneManager.h"
+
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
@@ -91,6 +93,9 @@ public:
 	// Create a primitive from the provided primitive data
 	virtual void StartRendering() = 0;
 	virtual void PerformDeferredOperations() {};
+
+	virtual Lumen::SceneManager::GLTFResource OpenCustomFileFormat(const std::string& a_OriginalFilePath);
+	virtual Lumen::SceneManager::GLTFResource CreateCustomFileFormat(const std::string& a_OriginalFilePath);
 
 	virtual std::unique_ptr<Lumen::ILumenPrimitive> CreatePrimitive(PrimitiveData& a_MeshData) = 0;
 	// Create a mesh from the provided primitives

@@ -6,8 +6,10 @@
 #include "MotionVectors.h"
 #include "../Shaders/CppCommon/WaveFrontDataStructs.h"
 #include "PTServiceLocator.h"
+#include "../Tools/LumenPTModelConverter.h"
 
 #include "Renderer/LumenRenderer.h"
+
 
 #include <map>
 #include <string>
@@ -52,6 +54,9 @@ namespace WaveFront
     public:
         void StartRendering() override;
         void PerformDeferredOperations() override;
+
+        Lumen::SceneManager::GLTFResource OpenCustomFileFormat(const std::string& a_OriginalFilePath) override;
+        Lumen::SceneManager::GLTFResource CreateCustomFileFormat(const std::string& a_OriginalFilePath) override;
 
         std::unique_ptr<Lumen::ILumenPrimitive> CreatePrimitive(PrimitiveData& a_PrimitiveData) override;
         std::shared_ptr<Lumen::ILumenMesh> CreateMesh(std::vector<std::shared_ptr<Lumen::ILumenPrimitive>>& a_Primitives) override;
@@ -193,6 +198,7 @@ namespace WaveFront
         bool m_SnapshotReady;
         bool m_StartSnapshot;
 
+        LumenPTModelConverter m_ModelConverter;
     };
 }
 #endif

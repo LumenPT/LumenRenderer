@@ -747,6 +747,19 @@ namespace WaveFront
         m_OGLCallCondition.notify_all();
     }
 
+    Lumen::SceneManager::GLTFResource WaveFrontRenderer::OpenCustomFileFormat(const std::string& a_OriginalFilePath)
+    {
+        std::filesystem::path p(a_OriginalFilePath);
+        p.replace_extension(LumenPTModelConverter::ms_ExtensionName);
+
+        return m_ModelConverter.LoadFile(a_OriginalFilePath);
+    }
+
+    Lumen::SceneManager::GLTFResource WaveFrontRenderer::CreateCustomFileFormat(const std::string& a_OriginalFilePath)
+    {
+        return m_ModelConverter.ConvertGLTF(a_OriginalFilePath);
+    }
+
     std::unique_ptr<Lumen::ILumenPrimitive> WaveFrontRenderer::CreatePrimitive(PrimitiveData& a_PrimitiveData)
     {
         //TODO let optix build the acceleration structure and return the handle.

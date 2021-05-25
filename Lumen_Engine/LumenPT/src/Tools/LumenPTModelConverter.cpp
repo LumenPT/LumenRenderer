@@ -1,9 +1,10 @@
-#include "ModelConverter.h"
+#include "LumenPTModelConverter.h"
 
 #include "Utils/VectorView.h"
 //#include "../../../../LumenPT/src/Shaders/CppCommon/ModelStructs.h" // I hate this as much as whoever is reading this
 #include "Lumen/Core.h"
 #include "AssetLoading/AssetLoading.h"
+#include "../Shaders/CppCommon/ModelStructs.h"
 
 #include <glm/geometric.hpp>
 #include <glm/vec2.hpp>
@@ -13,122 +14,122 @@
 #include <fstream>
 #include <filesystem>
 
-
-// TODO: This is blatant copy-pasta from ModelStruct.h until we decide on how this will fit into the solution
-struct Vertex
-{
-	glm::vec3 m_Position;
-	glm::vec2 m_UVCoord;
-	glm::vec3 m_Normal;
-	glm::vec4 m_Tangent;
-	// Can be expanded with additional per-vertex attributes that we need
-};
-
-
-
 namespace fs = std::filesystem;
 using namespace fx::gltf;
 
-ModelConverter::Header* dbgH;
-ModelConverter::FileContent* dbgFc;
-
-void ModelConverter::ConvertGLTF(std::string a_SourcePath, std::string a_DestPath)
+Lumen::SceneManager::GLTFResource LumenPTModelConverter::ConvertGLTF(std::string a_SourcePath)
 {
 	auto workDir = fs::current_path();
 	auto p = workDir.string().append(a_SourcePath);
 
-	auto fxDoc = LoadFromText(p);
+	fs::path sp(p);
+
+	fx::gltf::Document fxDoc;
+
+	if (sp.extension() == ".gltf")
+		fxDoc = LoadFromText(p);
+	else if (sp.extension() == ".glb")
+		fxDoc = LoadFromBinary(p);
+	
+
 
 	auto content = GenerateContent(fxDoc, p);
 	auto header = GenerateHeader(content);
 
-	dbgFc = &content;
-	dbgH = &header;
-
 	p.erase(p.begin() + p.find('.'), p.end());
-	a_DestPath = p.append(".ollad");
+	std::string destPath = p.append(ms_ExtensionName);
 
-	OutputToFile(header, content.m_Blob, a_DestPath);
+	OutputToFile(header, content.m_Blob, destPath);
 
-	LoadOllad(a_DestPath);
+	return LoadFile(destPath);
 }
 
-void ModelConverter::LoadOllad(std::string a_SourcePath)
+Lumen::SceneManager::GLTFResource LumenPTModelConverter::LoadFile(std::string a_SourcePath)
 {
+	Lumen::SceneManager::GLTFResource res;
+
 	std::ifstream ifs(a_SourcePath, std::ios::in | std::ios::binary | std::ios::ate);
 
-	// Get the full size of the file
-	ifs.seekg(0, ifs.end);
-	uint64_t fileSize = ifs.tellg();
-	ifs.seekg(0, ifs.beg);
-
-	// Read the first bytes which point to the size of the header
-	decltype(Header::m_Size) headerSize;
-	ifs.read(reinterpret_cast<char*>(&headerSize), sizeof(headerSize));
-	/*std::vector<char> headerBin(headerSize);
-	ifs.read(headerBin.data(), headerSize);*/
-
-	// Set the cursor to the end of the header
-	ifs.seekg(headerSize, ifs.cur);
-
-	// Copy all of the binary payload used by the header into a buffer
-    auto dataSize = fileSize - sizeof(headerSize) - headerSize;
-	std::vector<char> dataBin(dataSize);
-	ifs.read(dataBin.data(), dataSize);
-
-	printf("shit's loaded like my nuts :)....... :(");
-
-	// Move the cursor back to the beginning of the header
-	ifs.seekg(sizeof(headerSize), ifs.beg);
-
-	uint64_t numTex;
-	ifs.read(reinterpret_cast<char*>(&numTex), sizeof(uint64_t));
-
-	for (size_t i = 0; i < numTex; i++)
+	if (ifs.is_open()) // Was the file opened successfully?
 	{
-		HeaderTexture ht;
-		ifs.read(reinterpret_cast<char*>(&ht), sizeof(ht));
+		// If yes, start decoding the data in it
 
-		int32_t x, y, c;
+	    // Get the full size of the file
+		ifs.seekg(0, ifs.end);
+		uint64_t fileSize = ifs.tellg();
+		ifs.seekg(0, ifs.beg);
 
-		auto texData = stbi_load_from_memory(reinterpret_cast<uint8_t*>(&dataBin[ht.m_Offset]), ht.m_Size, &x, &y, &c, 4);
+		// Read the first bytes which point to the size of the header
+		decltype(Header::m_Size) headerSize;
+		ifs.read(reinterpret_cast<char*>(&headerSize), sizeof(headerSize));
 
-		// TODO: Create a texture object from this data
-	}
+		// Set the cursor to the end of the header
+		ifs.seekg(headerSize, ifs.cur);
 
-	uint64_t numMat;
-	ifs.read(reinterpret_cast<char*>(&numMat), sizeof(uint64_t));
+		// Copy all of the binary payload used by the header into a buffer
+		auto dataSize = fileSize - sizeof(headerSize) - headerSize;
+		std::vector<char> dataBin(dataSize);
+		ifs.read(dataBin.data(), dataSize);
 
-	for (size_t i = 0; i < numMat; i++)
-	{
-		HeaderMaterial hm;
-		ifs.read(reinterpret_cast<char*>(&hm), sizeof(hm));
+		printf("shit's loaded like my nuts :)....... :(");
 
-		// TODO: Create a material object from this data	
-	}
+		// Move the cursor back to the beginning of the header, right after the number signifying the size of the header
+		ifs.seekg(sizeof(headerSize), ifs.beg);
 
-	uint64_t numMeshes;
-	ifs.read(reinterpret_cast<char*>(&numMeshes), sizeof(uint64_t));
+		uint64_t numTex;
+		ifs.read(reinterpret_cast<char*>(&numTex), sizeof(uint64_t));
 
-	for (size_t i = 0; i < numMeshes; i++)
-	{
-		decltype(HeaderMesh::m_Header) meshHeader;
-		ifs.read(reinterpret_cast<char*>(&meshHeader), sizeof(meshHeader));
-
-		for (size_t j = 0; j < meshHeader.m_NumPrimitives; j++)
+		for (size_t i = 0; i < numTex; i++)
 		{
-			HeaderPrimitive primitive;
+			HeaderTexture ht;
+			ifs.read(reinterpret_cast<char*>(&ht), sizeof(ht));
 
-			ifs.read(reinterpret_cast<char*>(&primitive), sizeof(primitive));
+			int32_t x, y, c;
 
-			printf("test");
-			// TODO: Create a primitive from this data
+			// TODO: This seems to be the actual bottleneck in the loading process.
+			// Could maybe move the image decompression to the conversion process.
+			auto texData = stbi_load_from_memory(reinterpret_cast<uint8_t*>(&dataBin[ht.m_Offset]), ht.m_Size, &x, &y, &c, 4);
+
+			// TODO: Create a texture object from this data
+		}
+
+		uint64_t numMat;
+		ifs.read(reinterpret_cast<char*>(&numMat), sizeof(uint64_t));
+
+		for (size_t i = 0; i < numMat; i++)
+		{
+			HeaderMaterial hm;
+			ifs.read(reinterpret_cast<char*>(&hm), sizeof(hm));
+
+			// TODO: Create a material object from this data	
+		}
+
+		uint64_t numMeshes;
+		ifs.read(reinterpret_cast<char*>(&numMeshes), sizeof(uint64_t));
+
+		for (size_t i = 0; i < numMeshes; i++)
+		{
+			decltype(HeaderMesh::m_Header) meshHeader;
+			ifs.read(reinterpret_cast<char*>(&meshHeader), sizeof(meshHeader));
+
+			for (size_t j = 0; j < meshHeader.m_NumPrimitives; j++)
+			{
+				HeaderPrimitive primitive;
+
+				ifs.read(reinterpret_cast<char*>(&primitive), sizeof(primitive));
+
+				printf("test");
+				// TODO: Create a primitive from this data
+			}
 		}
 	}
+	else
+		res.m_Path = ""; // Empty path means no file 
 
+	return res;
 }
 
-ModelConverter::FileContent ModelConverter::GenerateContent(const fx::gltf::Document& a_FxDoc, const std::string& a_SourcePath)
+LumenPTModelConverter::FileContent LumenPTModelConverter::GenerateContent(const fx::gltf::Document& a_FxDoc, const std::string& a_SourcePath)
 {
 	FileContent fc;
 
@@ -165,7 +166,7 @@ ModelConverter::FileContent ModelConverter::GenerateContent(const fx::gltf::Docu
 	return fc;
 }
 
-ModelConverter::Header ModelConverter::GenerateHeader(const FileContent& a_Content)
+LumenPTModelConverter::Header LumenPTModelConverter::GenerateHeader(const FileContent& a_Content)
 {
 	Header h;
 
@@ -190,7 +191,7 @@ ModelConverter::Header ModelConverter::GenerateHeader(const FileContent& a_Conte
 	return h;
 }
 
-void ModelConverter::OutputToFile(const Header& a_Header, const Blob& a_Binary, const std::string& a_DestPath)
+void LumenPTModelConverter::OutputToFile(const Header& a_Header, const Blob& a_Binary, const std::string& a_DestPath)
 {
 	std::ofstream ofs(a_DestPath, std::ios::out | std::ios::binary);
 
@@ -201,7 +202,7 @@ void ModelConverter::OutputToFile(const Header& a_Header, const Blob& a_Binary, 
 	ofs.close();
 }
 
-ModelConverter::HeaderTexture ModelConverter::TextureToBlob(const fx::gltf::Document& a_FxDoc, uint32_t a_ImageId, Blob& a_Blob, const std::string& a_SourcePath)
+LumenPTModelConverter::HeaderTexture LumenPTModelConverter::TextureToBlob(const fx::gltf::Document& a_FxDoc, uint32_t a_ImageId, Blob& a_Blob, const std::string& a_SourcePath)
 {
 	HeaderTexture ht;
     auto image = a_FxDoc.images[a_ImageId];
@@ -242,7 +243,7 @@ ModelConverter::HeaderTexture ModelConverter::TextureToBlob(const fx::gltf::Docu
 	return ht;
 }
 
-ModelConverter::HeaderPrimitive ModelConverter::PrimitiveToBlob(const fx::gltf::Document& a_FxDoc,
+LumenPTModelConverter::HeaderPrimitive LumenPTModelConverter::PrimitiveToBlob(const fx::gltf::Document& a_FxDoc,
     const fx::gltf::Primitive& a_FxPrimitive, Blob& a_Blob)
 {
 	// Extract the binary data of the primitive
@@ -313,7 +314,7 @@ ModelConverter::HeaderPrimitive ModelConverter::PrimitiveToBlob(const fx::gltf::
 	return hp;
 }
 
-std::vector<uint8_t> ModelConverter::GenerateTangentBinary(std::vector<uint8_t>& a_PosBinary,
+std::vector<uint8_t> LumenPTModelConverter::GenerateTangentBinary(std::vector<uint8_t>& a_PosBinary,
     std::vector<uint8_t>& a_TexBinary, std::vector<uint8_t>& a_IndexBinary, uint32_t a_IndexSize)
 {
 	VectorView<glm::vec3, uint8_t> vertexView(a_PosBinary);
@@ -407,12 +408,12 @@ std::vector<uint8_t> ModelConverter::GenerateTangentBinary(std::vector<uint8_t>&
 	return tanBinary;
 }
 
-std::vector<char> ModelConverter::InterleaveVertexBuffers(InterleaveInput& a_Input)
+std::vector<char> LumenPTModelConverter::InterleaveVertexBuffers(InterleaveInput& a_Input)
 {
-	VectorView<glm::vec3, uint8_t> posView(*a_Input.m_Pos);
-	VectorView<glm::vec2, uint8_t> texView(*a_Input.m_Tex);
-	VectorView<glm::vec3, uint8_t> normalView(*a_Input.m_Normal);
-	VectorView<glm::vec4, uint8_t> tangentView(*a_Input.m_Tangent);
+	VectorView<float3, uint8_t> posView(*a_Input.m_Pos);
+	VectorView<float2, uint8_t> texView(*a_Input.m_Tex);
+	VectorView<float3, uint8_t> normalView(*a_Input.m_Normal);
+	VectorView<float4, uint8_t> tangentView(*a_Input.m_Tangent);
 
 	std::vector<char> interleavedBinary(sizeof(Vertex) * posView.Size());
 	VectorView<Vertex, char> interleavedView(interleavedBinary);
@@ -429,7 +430,7 @@ std::vector<char> ModelConverter::InterleaveVertexBuffers(InterleaveInput& a_Inp
 }
 
 
-std::vector<uint8_t> ModelConverter::LoadBinary(const fx::gltf::Document& a_Doc, uint32_t a_AccessorIndx)
+std::vector<uint8_t> LumenPTModelConverter::LoadBinary(const fx::gltf::Document& a_Doc, uint32_t a_AccessorIndx)
 {
 	std::vector<unsigned char> data;
 	// Load raw data at accessor index
@@ -464,7 +465,7 @@ std::vector<uint8_t> ModelConverter::LoadBinary(const fx::gltf::Document& a_Doc,
 }
 
 
-uint32_t ModelConverter::GetComponentSize(fx::gltf::Accessor& a_Accessor)
+uint32_t LumenPTModelConverter::GetComponentSize(fx::gltf::Accessor& a_Accessor)
 {
 
 	switch (a_Accessor.componentType)
@@ -487,7 +488,7 @@ uint32_t ModelConverter::GetComponentSize(fx::gltf::Accessor& a_Accessor)
 
 }
 
-uint32_t ModelConverter::GetComponentCount(fx::gltf::Accessor& a_Accessor)
+uint32_t LumenPTModelConverter::GetComponentCount(fx::gltf::Accessor& a_Accessor)
 {
 	switch (a_Accessor.type)
 	{

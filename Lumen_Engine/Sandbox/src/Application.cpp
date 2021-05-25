@@ -140,6 +140,7 @@ public:
 
 			p = p.parent_path();
 		}
+
 		std::filesystem::current_path(p);
 		std::string p_string{ p.string() };
 		std::replace(p_string.begin(), p_string.end(), '\\', '/');
@@ -160,7 +161,8 @@ public:
 		LMN_TRACE(p_string);
 
 	    m_SceneManager->SetPipeline(*contextLayer->GetPipeline());
-		auto res = m_SceneManager->LoadGLTF(meshName, meshPath);
+		auto res = m_SceneManager->LoadGLTF("Lantern.gltf", "/Sandbox/assets/models/");
+		//auto res = m_SceneManager->LoadGLTF(meshName, meshPath);
 		auto res2 = m_SceneManager->LoadGLTF(meshName2, meshPath2);
 
 		auto lumenPT = contextLayer->GetPipeline();

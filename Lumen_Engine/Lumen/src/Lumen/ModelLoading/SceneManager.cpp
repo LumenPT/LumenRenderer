@@ -3,9 +3,10 @@
 #include "Node.h"
 #include "Transform.h"
 #include "../Renderer/ILumenResources.h"
-#include "stb_image.h"
-//#include "../../LumenPT/src/Framework/OptiXRenderer.h"
+#include "Lumen/Renderer/LumenRenderer.h"
 
+//#include "../../LumenPT/src/Framework/OptiXRenderer.h"
+#include "stb_image.h"
 #include <glm/gtc/type_ptr.hpp>
 
 //#include <string>
@@ -46,6 +47,19 @@ Lumen::SceneManager::GLTFResource* Lumen::SceneManager::LoadGLTF(std::string a_F
 	}
 
 	auto& res = m_LoadedScenes[fullPath];		// create new scene at path key
+
+	// First try to load an optimized version of the specified file, if such exists.
+	res = m_RenderPipeline->OpenCustomFileFormat(fullPath);
+
+    if (!res.m_Path.empty()) // If the path is not empty, then an optimized file was found for this model, and successfully loaded.
+		return &res;
+
+	// If no optimized version of the model was found, try to create one if the renderer specifies how.
+	res = m_RenderPipeline->CreateCustomFileFormat(fullPath);
+	if (!res.m_Path.empty()) 
+		return &res;
+
+	// If res.m_Path is still empty, the renderer does not use an optimized model file format, and the application is free to continue with default model loading.
 
 	//Check for glb or gltf
 	const std::string binarySuffix = ".glb";

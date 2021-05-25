@@ -4,16 +4,23 @@
 
 //#include "../vendor/fx/gltf.h"
 
+#include "Lumen/ModelLoading/SceneManager.h"
 
-
-class ModelConverter
+class LumenPTModelConverter
 {
 public:
 
-    static void ConvertGLTF(std::string a_SourcePath, std::string a_DestPath = "");
+    LumenPTModelConverter() {};
 
-    static void LoadOllad(std::string a_SourcePath);
+    ~LumenPTModelConverter() {};
 
+    Lumen::SceneManager::GLTFResource ConvertGLTF(std::string a_SourcePath);
+    
+    Lumen::SceneManager::GLTFResource LoadFile(std::string a_SourcePath);
+
+    const static inline std::string ms_ExtensionName = ".ollad";
+    
+private:
     struct Blob 
     {
         Blob()
