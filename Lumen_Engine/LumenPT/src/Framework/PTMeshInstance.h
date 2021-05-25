@@ -43,8 +43,22 @@ public:
 
     void SetAdditionalColor(glm::vec4 a_AdditionalColor) override;
 
+    std::unordered_map<Lumen::ILumenPrimitive*, SceneDataTableEntry<DevicePrimitiveInstance>>& GetInstanceEntryMap()
+    {
+        return m_EntryMap;
+    }
+
+    virtual void UpdateAccelRemoveThis() override
+    {
+        UpdateRaytracingData();
+    }
+
+    PTScene* GetSceneRef() { return m_SceneRef; }
+
+
 private:
     void UpdateRaytracingData();
+private:
 
     std::unique_ptr<AccelerationStructure> m_AccelerationStructure;
     std::unordered_map<Lumen::ILumenPrimitive*, SceneDataTableEntry<DevicePrimitiveInstance>> m_EntryMap;

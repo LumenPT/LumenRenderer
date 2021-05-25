@@ -6,6 +6,8 @@
 #include <cuda_runtime_api.h>
 #include <cassert>
 #include <device_launch_parameters.h>
+#include "../../Shaders/CppCommon/SceneDataTableAccessor.h"
+#include <Lumen/ModelLoading/MeshInstance.h>
 
 
 CPU_ONLY void FindEmissivesWrap(
@@ -125,26 +127,26 @@ CPU_ONLY void AddToLightBufferWrap(
     const Vertex* a_Vertices,
     const uint32_t* a_Indices,
     const bool* a_Emissives,
-    const DeviceMaterial* a_Mat,
     const uint32_t a_IndexBufferSize,
     WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights,
-    sutil::Matrix4x4 a_TransformMat)
+    SceneDataTableAccessor* a_SceneDataTable,
+    unsigned a_InstanceId)
 {
     const unsigned int numTriangles = a_IndexBufferSize / 3;
     const int blockSize = 256;
     const int numBlocks = (numTriangles + blockSize - 1) / blockSize;
 
-    AddToLightBuffer <<<numBlocks, blockSize>>> (a_Vertices, a_Indices, a_Emissives, a_Mat, a_IndexBufferSize, a_Lights, a_TransformMat);
+    AddToLightBuffer <<<numBlocks, blockSize>>> (a_Vertices, a_Indices, a_Emissives, a_IndexBufferSize, a_Lights, a_SceneDataTable, a_InstanceId);
 }
 
 CPU_ON_GPU void AddToLightBuffer(
     const Vertex* a_Vertices,
     const uint32_t* a_Indices,
     const bool* a_Emissives,
-    const DeviceMaterial* a_Mat,
     const uint32_t a_IndexBufferSize,
     WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights,
-    sutil::Matrix4x4 a_TransformMat)
+    SceneDataTableAccessor* a_SceneDataTable,
+    unsigned a_InstanceId)
 {
 
     const unsigned numTriangles = a_IndexBufferSize / 3; //Num of triangles we are processing (max bound).
@@ -156,8 +158,13 @@ CPU_ON_GPU void AddToLightBuffer(
     {
         const unsigned baseIndex = triangleIndex * 3; //We run this function for each triangle, triangle has 3 vertices.
 
+        assert(a_SceneDataTable->GetTableEntry<DevicePrimitive>(a_InstanceId) != nullptr);
+        const auto devicePrimitiveInstance = a_SceneDataTable->GetTableEntry<DevicePrimitiveInstance>(a_InstanceId);
+        const auto devicePrimitive = devicePrimitiveInstance->m_Primitive;
+
+        //TODO this can be optimized in case of override.
         //check first vertex of triangle to see if its in emissive buffer
-        if (a_Emissives[triangleIndex] == true)
+        if ((devicePrimitiveInstance->m_EmissionMode == Lumen::EmissionMode::ENABLED && a_Emissives[triangleIndex] == true) || devicePrimitiveInstance->m_EmissionMode == Lumen::EmissionMode::OVERRIDE)
         {
             const unsigned index0 = a_Indices[baseIndex + 0];
             const unsigned index1 = a_Indices[baseIndex + 1];
@@ -173,22 +180,21 @@ CPU_ON_GPU void AddToLightBuffer(
             //Need it this way because need float3 to float4 and back conversions
             //Light vertex 0
             tempWorldPos = make_float4(vert0.m_Position, 1.f);
-            tempWorldPos = a_TransformMat * tempWorldPos;
+            tempWorldPos = devicePrimitiveInstance->m_Transform * tempWorldPos;
             light.p0 = make_float3(tempWorldPos);
             //Light vertex 1
             tempWorldPos = { vert1.m_Position.x, vert1.m_Position.y, vert1.m_Position.z, 1.0f };
-            tempWorldPos = a_TransformMat * tempWorldPos;
+            tempWorldPos = devicePrimitiveInstance->m_Transform * tempWorldPos;
             light.p1 = make_float3(tempWorldPos);
             //Light vertex 2
             tempWorldPos = { vert2.m_Position.x, vert2.m_Position.y, vert2.m_Position.z, 1.0f };
-            tempWorldPos = a_TransformMat * tempWorldPos;
+            tempWorldPos = devicePrimitiveInstance->m_Transform * tempWorldPos;
             light.p2 = make_float3(tempWorldPos);
 
             constexpr float oneThird = 1.f / 3.f;
             const float2 UVCentroid = (vert0.m_UVCoord + vert1.m_UVCoord + vert2.m_UVCoord) * oneThird;
 
-            auto diffuseTexture = a_Mat->m_DiffuseTexture;
-            auto emissiveTexture = a_Mat->m_EmissiveTexture;
+            auto mat = devicePrimitiveInstance->m_Primitive.m_Material;
 
             //float4 diffuseColor = a_Mat->m_DiffuseColor;
 
@@ -197,17 +203,22 @@ CPU_ON_GPU void AddToLightBuffer(
             //    diffuseColor *= tex2D<float4>(diffuseTexture, UVCentroid.x, UVCentroid.y);
             //}
 
-            float4 emissiveColor = a_Mat->m_EmissionColor;
+            //Emissive mode
+            float4 emissive = make_float4(0.f);
 
-            if (emissiveTexture)
+            //When enabled, just read the GLTF data and scale it accordingly.
+            if (devicePrimitiveInstance->m_EmissionMode == Lumen::EmissionMode::ENABLED)
             {
-                //sample emission at UVCentroid
-                emissiveColor *= tex2D<float4>(emissiveTexture, UVCentroid.x, UVCentroid.y);
+                emissive = tex2D<float4>(mat->m_EmissiveTexture, UVCentroid.x, UVCentroid.y);
+                emissive *= mat->m_EmissionColor * devicePrimitiveInstance->m_EmissiveColorAndScale.w;
+            }
+            //When override, take the ovverride emissive color and scale it up.
+            else if (devicePrimitiveInstance->m_EmissionMode == Lumen::EmissionMode::OVERRIDE)
+            {
+                emissive = devicePrimitiveInstance->m_EmissiveColorAndScale * devicePrimitiveInstance->m_EmissiveColorAndScale.w;
             }
 
-            const float4 finalEmission = emissiveColor;
-
-            light.radiance = make_float3(finalEmission);
+            light.radiance = make_float3(emissive);
             light.normal = (vert0.m_Normal + vert1.m_Normal + vert2.m_Normal) * oneThird;
 
             const float3 vec1 = light.p0 - light.p1;

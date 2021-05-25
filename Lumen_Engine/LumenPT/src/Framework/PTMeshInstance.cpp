@@ -1,6 +1,7 @@
 #include "PTMeshInstance.h"
 #include "MemoryBuffer.h"
 #include "AccelerationStructure.h"
+#include "PTMaterial.h"
 #include "PTScene.h"
 #include "PTPrimitive.h"
 #include "PTServiceLocator.h"
@@ -13,6 +14,9 @@ PTMeshInstance::PTMeshInstance(PTServiceLocator& a_ServiceLocator)
     // Register the instance to the dependency callback of its transform.
     // This ensures that DependencyCallback() is called when the transform changes.
     m_Transform.AddDependent(*this);
+    m_EmissionMode = Lumen::EmissionMode::ENABLED;
+    m_EmissiveOverride = { 0.f, 0.f, 0.f };
+    m_EmissionScale = 1.f;
 }
 
 
@@ -22,6 +26,9 @@ PTMeshInstance::PTMeshInstance(const Lumen::MeshInstance& a_Instance, PTServiceL
     m_Transform = a_Instance.m_Transform;
     m_Transform.AddDependent(*this);
     m_MeshRef = a_Instance.GetMesh();
+    m_EmissionMode = Lumen::EmissionMode::ENABLED;
+    m_EmissiveOverride = { 0.f, 0.f, 0.f };
+    m_EmissionScale = 1.f;
 
 
 }
@@ -133,8 +140,20 @@ void PTMeshInstance::UpdateRaytracingData()
         // Any instance specific data would go here
         auto& entryData = entry->GetData();
 
+        auto glmTransform = m_Transform.GetTransformationMatrix();
+        glmTransform = glm::transpose((glmTransform));
+
         entryData.m_Primitive = ptPrim->m_DevicePrimitive;
-        entryData.m_AdditionColorIDK = make_float4(m_AdditionalColor.x, m_AdditionalColor.y, m_AdditionalColor.z, m_AdditionalColor.w);
+        entryData.m_Transform = sutil::Matrix4x4(reinterpret_cast<float*>(&glmTransform[0]));
+        entryData.m_EmissionMode = m_EmissionMode;
+        entryData.m_EmissiveColorAndScale = make_float4(m_EmissiveOverride.x, m_EmissiveOverride.y, m_EmissiveOverride.z, m_EmissionScale);
+
+        //Check for overridden materials. If defined, overwrite the material pointer.
+        if(m_OverrideMaterial != nullptr)
+        {
+            entryData.m_Primitive.m_Material = std::static_pointer_cast<PTMaterial>(m_OverrideMaterial)->GetDeviceMaterial();
+        }
+
         // The acceleration structure of the mesh instance does not need to be rebuild after this.
         // This is because the scene data table and the acceleration structure are only connected by the entry Ids,
         // which have not changed here
