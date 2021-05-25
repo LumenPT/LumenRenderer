@@ -132,6 +132,8 @@ set(LUMENPT_INCLUDES
 	"${CMAKE_CURRENT_SOURCE_DIR}/../Lumen/src/AssetLoading"
 	"${CMAKE_CURRENT_SOURCE_DIR}/../Lumen/vendor/spdlog/include/"
 	"${CMAKE_CURRENT_SOURCE_DIR}/../Lumen/vendor/glm"
+	"${CMAKE_CURRENT_SOURCE_DIR}/../Lumen/vendor/fx"
+	"${CMAKE_CURRENT_SOURCE_DIR}/../Lumen/vendor/nlohmann/include"
 	"${CMAKE_CURRENT_BINARY_DIR}/config"
 	${NANOVDB_HEADERS}
 )
