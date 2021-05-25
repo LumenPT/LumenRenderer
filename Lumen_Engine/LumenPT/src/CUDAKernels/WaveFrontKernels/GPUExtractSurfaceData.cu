@@ -3,6 +3,7 @@
 #include <Lumen/ModelLoading/MeshInstance.h>
 #include <device_launch_parameters.h>
 #include <sutil/vec_math.h>
+#include <sutil/Matrix.h>
 
 
 CPU_ON_GPU void ExtractSurfaceDataGpu(
@@ -53,9 +54,9 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
             const DeviceMaterial* material = devicePrimitive.m_Material;
 
             //TODO extract different textures (emissive, diffuse, metallic, roughness).
-            const float4 normalMap = tex2D<float4>(material->m_NormalTexture, texCoords.x, texCoords.y);
+            const float4 mappedNormal = tex2D<float4>(material->m_NormalTexture, texCoords.x, texCoords.y);
             const float4 textureColor = tex2D<float4>(material->m_DiffuseTexture, texCoords.x, texCoords.y);
-            const float3 finalColor = make_float3(textureColor * material->m_DiffuseColor);
+            const float3 surfaceColor = make_float3(textureColor * material->m_DiffuseColor);
             const float4 metalRoughness = tex2D<float4>(material->m_MetalRoughnessTexture, texCoords.x, texCoords.y);
 
             //Emissive mode
@@ -68,7 +69,7 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
                 emissive *= material->m_EmissionColor * devicePrimitiveInstance.m_EmissiveColorAndScale.w;
             }
 
-            //When override, take the ovverride emissive color and scale it up.
+                //When override, take the ovverride emissive color and scale it up.
             else if (devicePrimitiveInstance.m_EmissionMode == Lumen::EmissionMode::OVERRIDE)
             {
                 emissive = devicePrimitiveInstance.m_EmissiveColorAndScale * devicePrimitiveInstance.m_EmissiveColorAndScale.w;
@@ -88,40 +89,44 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
             const float roughness = metalRoughness.y;
             
             //Calculate the surface normal based on the texture and normal provided.
-
-            //TODO: weigh based on barycentrics instead.
-            float3 surfaceNormal = normalize(A->m_Normal * W + B->m_Normal * U + C->m_Normal * V);
-
-            //Transform the normal to world space
-            float4 surfaceNormalWorld = devicePrimitiveInstance.m_Transform * make_float4(surfaceNormal, 0.f);
+            const float3 surfaceNormal = 
+                A->m_Normal * W + 
+                B->m_Normal * U + 
+                C->m_Normal * V;
 
             //TODO normal mapping
-            //float3 tangent = 
-            //    normalize(
-            //        (make_float3(A->m_Tangent) * A->m_Tangent.w) * W + 
-            //        (make_float3(B->m_Tangent) * B->m_Tangent.w) * U + 
-            //        (make_float3(C->m_Tangent) * C->m_Tangent.w) * V
-            //    );
+            const float3 surfaceTangent = 
+                make_float3(A->m_Tangent) * W + 
+                make_float3(B->m_Tangent) * U + 
+                make_float3(C->m_Tangent) * V;
+
             //assert(!isnan(length(tangent)));
             //assert(length(tangent) > 0);
 
             ////tangent = normalize(tangent);
             ////assert(!isnan(length(tangent)));
+            
+            //According to the gltf2.0 spec, all the tangents' w components of each vertex in a triangle should be the same.
+            assert(A->m_Tangent.w == B->m_Tangent.w == C->m_Tangent.w);
+            const float tangentSpaceHandedness = A->m_Tangent.w;
 
-            //float3 biTangent = normalize(cross(vertexNormal, tangent));
+            const float3 surfaceBiTangent = cross(surfaceNormal, surfaceTangent) * tangentSpaceHandedness;
 
-            //sutil::Matrix3x3 tbn
-            //{
-            //    tangent.x, biTangent.x, vertexNormal.x,
-            //    tangent.y, biTangent.y, vertexNormal.y,
-            //    tangent.z, biTangent.z, vertexNormal.z
-            //};
+            //Transform the normal, tangent and bi-tangent to world space
+            const float3 surfaceNormalWorld = normalize(make_float3(devicePrimitiveInstance.m_Transform * make_float4(surfaceNormal, 0.f)));
+            const float3 surfaceTangentWorld = normalize(make_float3(devicePrimitiveInstance.m_Transform * make_float4(surfaceTangent, 0.f)));
+            const float3 surfaceBiTangentWorld = normalize(make_float3(devicePrimitiveInstance.m_Transform * make_float4(surfaceBiTangent, 0.f)));
+
+            sutil::Matrix3x3 tbn
+            {
+                surfaceTangentWorld.x, surfaceBiTangentWorld.x, surfaceNormalWorld.x,
+                surfaceTangentWorld.y, surfaceBiTangentWorld.y, surfaceNormalWorld.y,
+                surfaceTangentWorld.z, surfaceBiTangentWorld.z, surfaceNormalWorld.z
+            };
 
             //////Calculate the normal based on the vertex normal, tangent, bitangent and normal texture.
-            //float3 actualNormal = make_float3(normalMap.x, normalMap.y, normalMap.z);
-            //actualNormal = actualNormal * 2.f - 1.f;
-            //actualNormal = normalize(actualNormal);
-            //actualNormal = tbn * actualNormal;
+            float3 mappedNormalWorld = make_float3(mappedNormal) * 2.f - 1.f;
+            mappedNormalWorld = normalize(tbn * mappedNormalWorld);
             ////Transform the normal to world space (0 for no translation).
             //auto normalWorldSpace = devicePrimitiveInstance.m_Transform * make_float4(actualNormal, 0.f);
             //actualNormal = normalize(make_float3(normalWorldSpace));
@@ -134,12 +139,12 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
             SurfaceData output;
             output.m_Index = currIntersection.m_PixelIndex;
             output.m_IntersectionT = currIntersection.m_IntersectionT;
-            output.m_Normal = normalize(make_float3(surfaceNormalWorld));
-            output.m_Color = finalColor;
+            output.m_Normal = normalize(surfaceNormalWorld);
+            output.m_Color = surfaceColor;
             output.m_Position = currRay.m_Origin + currRay.m_Direction * currIntersection.m_IntersectionT;
             output.m_IncomingRayDirection = currRay.m_Direction;
             output.m_Metallic = metal;
-            output.m_Roughness = 0.0001f;
+            output.m_Roughness = roughness;
             output.m_TransportFactor = currRay.m_Contribution;
             output.m_Emissive = (emissive.x > 0 || emissive.y > 0 || emissive.z > 0);
             if (output.m_Emissive)
