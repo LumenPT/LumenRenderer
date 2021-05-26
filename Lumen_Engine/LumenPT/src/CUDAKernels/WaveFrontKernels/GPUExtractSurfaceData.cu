@@ -86,24 +86,29 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
 
             const float metal = metalRoughness.z;
             const float roughness = metalRoughness.y;
-
+            
             //Calculate the surface normal based on the texture and normal provided.
 
             //TODO: weigh based on barycentrics instead.
-            float3 vertexNormal = normalize(A->m_Normal + B->m_Normal + C->m_Normal);
+            float3 surfaceNormal = normalize(A->m_Normal * W + B->m_Normal * U + C->m_Normal * V);
 
             //Transform the normal to world space
-            float4 vertexNormalWorld = devicePrimitiveInstance.m_Transform * make_float4(vertexNormal, 0.f);
+            float4 surfaceNormalWorld = devicePrimitiveInstance.m_Transform * make_float4(surfaceNormal, 0.f);
 
             //TODO normal mapping
-            //float3 tangent = make_float3(A->m_Tangent.x, A->m_Tangent.y, A->m_Tangent.z);
+            //float3 tangent = 
+            //    normalize(
+            //        (make_float3(A->m_Tangent) * A->m_Tangent.w) * W + 
+            //        (make_float3(B->m_Tangent) * B->m_Tangent.w) * U + 
+            //        (make_float3(C->m_Tangent) * C->m_Tangent.w) * V
+            //    );
             //assert(!isnan(length(tangent)));
             //assert(length(tangent) > 0);
 
-            //tangent = normalize(tangent);
-            //assert(!isnan(length(tangent)));
+            ////tangent = normalize(tangent);
+            ////assert(!isnan(length(tangent)));
 
-            //float3 biTangent = normalize(cross(vertexNormal, tangent) * A->m_Tangent.w);
+            //float3 biTangent = normalize(cross(vertexNormal, tangent));
 
             //sutil::Matrix3x3 tbn
             //{
@@ -129,12 +134,12 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
             SurfaceData output;
             output.m_Index = currIntersection.m_PixelIndex;
             output.m_IntersectionT = currIntersection.m_IntersectionT;
-            output.m_Normal = normalize(make_float3(vertexNormalWorld));
+            output.m_Normal = normalize(make_float3(surfaceNormalWorld));
             output.m_Color = finalColor;
             output.m_Position = currRay.m_Origin + currRay.m_Direction * currIntersection.m_IntersectionT;
             output.m_IncomingRayDirection = currRay.m_Direction;
             output.m_Metallic = metal;
-            output.m_Roughness = roughness;
+            output.m_Roughness = 0.0001f;
             output.m_TransportFactor = currRay.m_Contribution;
             output.m_Emissive = (emissive.x > 0 || emissive.y > 0 || emissive.z > 0);
             if (output.m_Emissive)

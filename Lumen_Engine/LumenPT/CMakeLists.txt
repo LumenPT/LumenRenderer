@@ -9,7 +9,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_CUDA_STANDARD 14)
 set(CMAKE_CUDA_STANDARD_REQUIRED True)
 
-
+# Config file where CMake will specify the location of the project directory
+configure_file(
+	${CMAKE_CURRENT_SOURCE_DIR}/cmake/LumenPTConfig.h.in 
+	${CMAKE_CURRENT_BINARY_DIR}/config/LumenPTConfig.h
+)
 
 #CudaPTX project ---------------------------------------------------------------------------------------
 
@@ -89,7 +93,6 @@ set(CUDAKernels_INCLUDES
 	"${CMAKE_CURRENT_SOURCE_DIR}/../Lumen/src/Lumen"
 	"${CMAKE_CURRENT_SOURCE_DIR}/../Lumen/src/Lumen/AssetLoading"
 	"${CMAKE_CURRENT_SOURCE_DIR}/../Lumen/src/Lumen/ModelLoading"
-	"${CMAKE_CURRENT_BINARY_DIR}/config"
 	${NANOVDB_HEADERS}
 )
 
@@ -117,11 +120,14 @@ file(GLOB_RECURSE CPP_HEADER_FILES
 	${CMAKE_CURRENT_SOURCE_DIR}/src/*.h
 	${CMAKE_CURRENT_SOURCE_DIR}/src/*.hpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/*.inl
+
+	${CMAKE_CURRENT_BINARY_DIR}/Config.h	
+
 )
 
 if(${USE_NVIDIA_DENOISER})
 	list(APPEND CPP_HEADER_FILES 
-	"vendor/RayTracingDenoiser/LumenPT/DX12Wrapper/NRIDX12Wrapper.h"
+	"vendor/RayTracingDenoiser/LumenPT/DX12Wrapper/NRIWrapper.h"
 	"vendor/RayTracingDenoiser/LumenPT/DX12Wrapper/Helper.h"
 	"vendor/RayTracingDenoiser/LumenPT/DX12Wrapper/Utils.h"
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/_NRD_SDK/Integration/NRDIntegration.h"
@@ -140,7 +146,7 @@ file(GLOB_RECURSE CPP_SOURCE_FILES
 
 if(${USE_NVIDIA_DENOISER})
 	list(APPEND CPP_SOURCE_FILES
-	"vendor/RayTracingDenoiser/LumenPT/DX12Wrapper/NRIDX12Wrapper.cpp"
+	"vendor/RayTracingDenoiser/LumenPT/DX12Wrapper/NRIWrapper.cpp"
 	"vendor/RayTracingDenoiser/LumenPT/DX12Wrapper/Utils.cpp"
 	#"vendor/RayTracingDenoiser/NRD/Integration/NRDIntegration.cpp"
 	)
@@ -225,7 +231,7 @@ assign_source_group(${CPP_SOURCE_FILES})
 # Define the include DIRs
 target_include_directories(LumenPT PUBLIC ${LUMENPT_INCLUDES})
 
-# Define the link libraries
+# Define the link librarie
 target_link_libraries(LumenPT ${LUMENPT_LIBS} CUDAKernels)
 
 # Config file where CMake will specify the location of the project directory
