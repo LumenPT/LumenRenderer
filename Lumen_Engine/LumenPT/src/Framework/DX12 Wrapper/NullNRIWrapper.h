@@ -1,6 +1,6 @@
 #pragma once
 
-#include "DX12Wrapper.h"
+#include "INRIWrapper.h"
 
 class NullNRIWrapper : public INRIWrapper
 {

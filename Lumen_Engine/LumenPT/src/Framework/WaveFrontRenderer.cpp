@@ -24,7 +24,7 @@
 //#include "Lumen/Window.h"
 #include "Lumen/LumenApp.h"
 
-#include "LumenPTConfig.h"
+//#include "LumenPTConfig.h"
 
 #ifdef USE_NVIDIA_DENOISER
 #include "DX12Wrapper/NRIWrapper.h"
@@ -94,7 +94,7 @@ namespace WaveFront
 #ifdef USE_NVIDIA_DENOISER
         m_DX12System = std::make_unique<NRIWrapper>();
 #else
-        m_DX12System = std::make_unique<NullDX12Wrapper>();
+        m_DX12System = std::make_unique<NullNRIWrapper>();
 #endif
 
         m_DX12System->Initialize(a_Settings.renderResolution.x, a_Settings.renderResolution.y);

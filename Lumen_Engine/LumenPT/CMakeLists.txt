@@ -161,7 +161,7 @@ set(LUMENPT_INCLUDES
 	"${CMAKE_CURRENT_SOURCE_DIR}/../Lumen/src/AssetLoading"
 	"${CMAKE_CURRENT_SOURCE_DIR}/../Lumen/vendor/spdlog/include/"
 	"${CMAKE_CURRENT_SOURCE_DIR}/../Lumen/vendor/glm"
-	"${CMAKE_CURRENT_BINARY_DIR}/config"
+	#"${CMAKE_CURRENT_BINARY_DIR}/config"
 	${NANOVDB_HEADERS}
 )
 
@@ -221,9 +221,15 @@ set_property(TARGET LumenPT PROPERTY CUDA_ARCHITECTURES 52-real)
 set_property(TARGET LumenPT APPEND PROPERTY COMPILE_DEFINITIONS LUMEN_PT)
 set_property(TARGET LumenPT APPEND PROPERTY COMPILE_DEFINITIONS $<$<CONFIG:Debug>:CUDA_CHECK OPTIX_CHECK>)
 
+
 if(${USE_WAVEFRONT})
 	set_property(TARGET LumenPT APPEND PROPERTY COMPILE_DEFINITIONS WAVEFRONT)
 endif()
+
+if(${USE_NVIDIA_DENOISER})
+	set_property(TARGET LumenPT APPEND PROPERTY COMPILE_DEFINITIONS USE_NVIDIA_DENOISER)
+endif()
+
 
 assign_source_group(${CPP_HEADER_FILES})
 assign_source_group(${CPP_SOURCE_FILES})
@@ -235,7 +241,7 @@ target_include_directories(LumenPT PUBLIC ${LUMENPT_INCLUDES})
 target_link_libraries(LumenPT ${LUMENPT_LIBS} CUDAKernels)
 
 # Config file where CMake will specify the location of the project directory
-configure_file(
-	${CMAKE_CURRENT_SOURCE_DIR}/cmake/LumenPTConfig.h.in 
-	${CMAKE_CURRENT_BINARY_DIR}/config/LumenPTConfig.h
-)
+#configure_file(
+#	${CMAKE_CURRENT_SOURCE_DIR}/cmake/LumenPTConfig.h.in 
+#	${CMAKE_CURRENT_BINARY_DIR}/config/LumenPTConfig.h
+#)
