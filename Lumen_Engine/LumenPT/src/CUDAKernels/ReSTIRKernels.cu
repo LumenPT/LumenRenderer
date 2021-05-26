@@ -827,6 +827,12 @@ __device__ __inline__ void Resample(LightSample* a_Input, const WaveFront::Surfa
     a_Output->unshadowedPathContribution = unshadowedPathContribution;
 
     assert(unshadowedPathContribution.x >= 0 && unshadowedPathContribution.y >= 0 && unshadowedPathContribution.z >= 0);
+    assert(!isnan(unshadowedPathContribution.x));
+    assert(!isnan(unshadowedPathContribution.y));
+    assert(!isnan(unshadowedPathContribution.z));
+    assert(!isinf(unshadowedPathContribution.x));
+    assert(!isinf(unshadowedPathContribution.y));
+    assert(!isinf(unshadowedPathContribution.z));
 
     //For the PDF, I take the unshadowed path contribution as a single float value. Average for now.
     //TODO: Maybe use the human eye for scaling (green weighed more).
