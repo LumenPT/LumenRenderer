@@ -2,12 +2,12 @@
 
 #include "DX12Wrapper.h"
 
-class NullDX12Wrapper : public DX12Wrapper
+class NullNRIWrapper : public INRIWrapper
 {
 public:
 
-	NullDX12Wrapper() {}
-	~NullDX12Wrapper() {}
+	NullNRIWrapper() {}
+	~NullNRIWrapper() {}
 
 	void Initialize(int a_screenWidth, int a_screenHeight) override {}
 

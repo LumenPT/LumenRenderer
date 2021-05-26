@@ -6,7 +6,7 @@
 #include "MotionVectors.h"
 #include "../Shaders/CppCommon/WaveFrontDataStructs.h"
 #include "PTServiceLocator.h"
-#include "DX12 Wrapper/DX12Wrapper.h"
+#include "DX12 Wrapper/INRIWrapper.h"
 
 #include "Renderer/LumenRenderer.h"
 
@@ -154,7 +154,7 @@ namespace WaveFront
         std::unique_ptr<OptixWrapper> m_OptixSystem;
 
         //DX12 wrapper
-        std::unique_ptr<DX12Wrapper> m_DX12System;
+        std::unique_ptr<INRIWrapper> m_DX12System;
 
         //ReSTIR
         std::unique_ptr<ReSTIR> m_ReSTIR;

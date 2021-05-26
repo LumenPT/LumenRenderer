@@ -229,7 +229,7 @@ target_include_directories(LumenPT PUBLIC ${LUMENPT_INCLUDES})
 target_link_libraries(LumenPT ${LUMENPT_LIBS} CUDAKernels)
 
 # Config file where CMake will specify the location of the project directory
-# configure_file(
-# 	${CMAKE_CURRENT_SOURCE_DIR}/cmake/LumenPTConfig.h.in 
-# 	${CMAKE_CURRENT_BINARY_DIR}/config/LumenPTConfig.h
-# )
+configure_file(
+	${CMAKE_CURRENT_SOURCE_DIR}/cmake/LumenPTConfig.h.in 
+	${CMAKE_CURRENT_BINARY_DIR}/config/LumenPTConfig.h
+)

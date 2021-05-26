@@ -23,7 +23,14 @@
 #include "MotionVectors.h"
 //#include "Lumen/Window.h"
 #include "Lumen/LumenApp.h"
-#include "DX12Wrapper/NRIDX12Wrapper.h"
+
+#include "LumenPTConfig.h"
+
+#ifdef USE_NVIDIA_DENOISER
+#include "DX12Wrapper/NRIWrapper.h"
+#else
+#include "DX12 Wrapper/NullNRIWrapper.h"
+#endif
 
 #include "../../../Lumen/vendor/GLFW/include/GLFW/glfw3.h"
 #include <Optix/optix_function_table_definition.h>
@@ -84,8 +91,12 @@ namespace WaveFront
         //Set the service locator's pointer to the OptixWrapper.
         m_ServiceLocator.m_OptixWrapper = m_OptixSystem.get();
 
-        //TODO: set to null object if no DX12 support
-        m_DX12System = std::make_unique<NRIDX12Wrapper>();
+#ifdef USE_NVIDIA_DENOISER
+        m_DX12System = std::make_unique<NRIWrapper>();
+#else
+        m_DX12System = std::make_unique<NullDX12Wrapper>();
+#endif
+
         m_DX12System->Initialize(a_Settings.renderResolution.x, a_Settings.renderResolution.y);
 
         //Set up the OpenGL output buffer.
