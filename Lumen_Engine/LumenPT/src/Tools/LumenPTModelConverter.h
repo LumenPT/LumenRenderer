@@ -18,6 +18,8 @@ public:
     
     Lumen::SceneManager::GLTFResource LoadFile(std::string a_SourcePath);
 
+    void SetRendererRef(LumenRenderer& a_Renderer);
+
     const static inline std::string ms_ExtensionName = ".ollad";
     
 private:
@@ -68,9 +70,18 @@ private:
 
     struct HeaderMaterial
     {
+        HeaderMaterial()
+            : m_DiffuseTextureId(-1)
+            , m_NormalMapId(-1)
+            , m_EmissiveTextureId(-1)
+            , m_MetallicRoughnessTextureId(-1)
+        {}
         float m_Color[4];
-        uint32_t m_DiffuseTextureId;
-        uint32_t m_NormalMapId;
+        float m_Emission[3];
+        int32_t m_DiffuseTextureId;
+        int32_t m_NormalMapId;
+        int32_t m_MetallicRoughnessTextureId;
+        int32_t m_EmissiveTextureId;
     };
 
     struct HeaderPrimitive 
@@ -115,8 +126,6 @@ private:
 
     static HeaderPrimitive PrimitiveToBlob(const fx::gltf::Document& a_FxDoc, const fx::gltf::Primitive& a_FxPrimitive, Blob& a_Blob);
 
-
-
     static std::vector<uint8_t> GenerateTangentBinary(std::vector<uint8_t>& a_PosBinary, std::vector<uint8_t>& a_TexBinary, std::vector<uint8_t>& a_IndexBinary, uint32_t a_IndexSize);
 
     struct InterleaveInput
@@ -132,6 +141,13 @@ private:
     static std::vector<uint8_t> LoadBinary(const fx::gltf::Document& a_Doc, uint32_t a_AccessorIndx);
     static uint32_t GetComponentCount(fx::gltf::Accessor& a_Accessor); // Return how many components the accessor uses
     static uint32_t GetComponentSize(fx::gltf::Accessor& a_Accessor); // Return the size of the components used by the accessor
+
+    LumenRenderer* m_RendererRef;
+
+    std::shared_ptr<Lumen::ILumenTexture> m_DefaultDiffuseTexture;
+    std::shared_ptr<Lumen::ILumenTexture> m_DefaultMetalRoughnessTexture;
+    std::shared_ptr<Lumen::ILumenTexture> m_DefaultNormalTexture;
+    std::shared_ptr<Lumen::ILumenTexture> m_DefaultEmissiveTexture;
 
 };
 

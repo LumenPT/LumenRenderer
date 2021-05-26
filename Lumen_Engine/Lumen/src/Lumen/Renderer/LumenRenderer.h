@@ -33,10 +33,15 @@ public:
 	// Structu used to initialize a primitive
 	struct PrimitiveData
 	{
+		PrimitiveData() : m_Interleaved(false) {}
+		bool m_Interleaved;
+
 		VectorView<glm::vec3, uint8_t> m_Positions;
 		VectorView<glm::vec2, uint8_t> m_TexCoords;
 		VectorView<glm::vec3, uint8_t> m_Normals;
 		VectorView<glm::vec4, uint8_t> m_Tangents;
+
+		std::vector<uint8_t> m_VertexBinary;
 
 		// Perhaps temporary solution till we decide how we'll handle the indices
 		std::vector<uint8_t> m_IndexBinary;
@@ -49,9 +54,11 @@ public:
 	struct MaterialData
 	{
 		glm::vec4 m_DiffuseColor;
-		glm::vec4 m_EmssivionVal;
+		glm::vec3 m_EmissionVal;
 		std::shared_ptr<Lumen::ILumenTexture> m_DiffuseTexture;
 		std::shared_ptr<Lumen::ILumenTexture> m_NormalMap;
+		std::shared_ptr<Lumen::ILumenTexture> m_MetallicRoughnessTexture;
+		std::shared_ptr<Lumen::ILumenTexture> m_EmissiveTexture;
 	};
 
 	// Struct used to initialize a scene

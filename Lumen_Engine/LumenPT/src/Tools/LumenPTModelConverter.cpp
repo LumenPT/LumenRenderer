@@ -14,13 +14,16 @@
 #include <fstream>
 #include <filesystem>
 
+
+#include "Renderer/LumenRenderer.h"
+
 namespace fs = std::filesystem;
 using namespace fx::gltf;
 
 Lumen::SceneManager::GLTFResource LumenPTModelConverter::ConvertGLTF(std::string a_SourcePath)
 {
 	auto workDir = fs::current_path();
-	auto p = workDir.string().append(a_SourcePath);
+	auto p = (a_SourcePath);
 
 	fs::path sp(p);
 
@@ -47,6 +50,7 @@ Lumen::SceneManager::GLTFResource LumenPTModelConverter::ConvertGLTF(std::string
 Lumen::SceneManager::GLTFResource LumenPTModelConverter::LoadFile(std::string a_SourcePath)
 {
 	Lumen::SceneManager::GLTFResource res;
+	res.m_Path = a_SourcePath;
 
 	std::ifstream ifs(a_SourcePath, std::ios::in | std::ios::binary | std::ios::ate);
 
@@ -79,6 +83,8 @@ Lumen::SceneManager::GLTFResource LumenPTModelConverter::LoadFile(std::string a_
 		uint64_t numTex;
 		ifs.read(reinterpret_cast<char*>(&numTex), sizeof(uint64_t));
 
+		std::vector<std::shared_ptr<Lumen::ILumenTexture>> textures;
+
 		for (size_t i = 0; i < numTex; i++)
 		{
 			HeaderTexture ht;
@@ -90,7 +96,10 @@ Lumen::SceneManager::GLTFResource LumenPTModelConverter::LoadFile(std::string a_
 			// Could maybe move the image decompression to the conversion process.
 			auto texData = stbi_load_from_memory(reinterpret_cast<uint8_t*>(&dataBin[ht.m_Offset]), ht.m_Size, &x, &y, &c, 4);
 
-			// TODO: Create a texture object from this data
+			std::vector<uint8_t> arr(x * y);
+			memcpy(arr.data(), texData, x * y);
+
+			textures.push_back(m_RendererRef->CreateTexture(texData, x, y));
 		}
 
 		uint64_t numMat;
@@ -101,7 +110,39 @@ Lumen::SceneManager::GLTFResource LumenPTModelConverter::LoadFile(std::string a_
 			HeaderMaterial hm;
 			ifs.read(reinterpret_cast<char*>(&hm), sizeof(hm));
 
-			// TODO: Create a material object from this data	
+			
+
+			LumenRenderer::MaterialData matData;
+			matData.m_DiffuseColor.x = hm.m_Color[0];
+			matData.m_DiffuseColor.y = hm.m_Color[1];
+			matData.m_DiffuseColor.z = hm.m_Color[2];
+			matData.m_DiffuseColor.w = hm.m_Color[3];
+
+			matData.m_EmissionVal.x = hm.m_Emission[0];
+			matData.m_EmissionVal.y = hm.m_Emission[1];
+			matData.m_EmissionVal.z = hm.m_Emission[2];
+
+			if (hm.m_DiffuseTextureId != -1)
+				matData.m_DiffuseTexture = textures[hm.m_DiffuseTextureId];
+			else
+				matData.m_DiffuseTexture = m_DefaultDiffuseTexture;
+
+			if (hm.m_NormalMapId != -1)
+				matData.m_NormalMap = textures[hm.m_NormalMapId];
+			else
+				matData.m_NormalMap = m_DefaultNormalTexture;
+
+			if (hm.m_MetallicRoughnessTextureId != -1)
+				matData.m_MetallicRoughnessTexture = textures[hm.m_MetallicRoughnessTextureId];
+			else
+			    matData.m_MetallicRoughnessTexture = m_DefaultMetalRoughnessTexture;
+
+            if (hm.m_EmissiveTextureId != -1)
+			    matData.m_EmissiveTexture = textures[hm.m_EmissiveTextureId];
+			else
+				matData.m_EmissiveTexture = m_DefaultEmissiveTexture;
+
+			res.m_MaterialPool.push_back(m_RendererRef->CreateMaterial(matData));
 		}
 
 		uint64_t numMeshes;
@@ -112,21 +153,58 @@ Lumen::SceneManager::GLTFResource LumenPTModelConverter::LoadFile(std::string a_
 			decltype(HeaderMesh::m_Header) meshHeader;
 			ifs.read(reinterpret_cast<char*>(&meshHeader), sizeof(meshHeader));
 
+			std::vector<std::shared_ptr<Lumen::ILumenPrimitive>> primitives;
+
 			for (size_t j = 0; j < meshHeader.m_NumPrimitives; j++)
 			{
-				HeaderPrimitive primitive;
+				HeaderPrimitive hp;
 
-				ifs.read(reinterpret_cast<char*>(&primitive), sizeof(primitive));
+				ifs.read(reinterpret_cast<char*>(&hp), sizeof(hp));
 
-				printf("test");
-				// TODO: Create a primitive from this data
+
+                if (j == 53)
+                {
+					printf("hammertime");
+                }
+				LumenRenderer::PrimitiveData primData;
+				primData.m_IndexSize = hp.m_IndexSize;
+				primData.m_IndexBinary.resize(hp.m_IndexBufferSize);
+				memcpy(primData.m_IndexBinary.data(), &dataBin[hp.m_IndexBufferOffset], hp.m_IndexBufferSize);
+
+				primData.m_Interleaved = true;
+				primData.m_VertexBinary.resize(hp.m_VertexBufferSize);
+				memcpy(primData.m_VertexBinary.data(), &dataBin[hp.m_VertexBufferOffset], hp.m_VertexBufferSize);
+
+				primData.m_Material = res.m_MaterialPool[hp.m_MaterialId];
+
+				primitives.push_back(m_RendererRef->CreatePrimitive(primData));
+
 			}
+
+			res.m_MeshPool.push_back(m_RendererRef->CreateMesh(primitives));
 		}
 	}
 	else
 		res.m_Path = ""; // Empty path means no file 
 
 	return res;
+}
+
+void LumenPTModelConverter::SetRendererRef(LumenRenderer& a_Renderer)
+{
+	m_DefaultDiffuseTexture.reset();
+	m_DefaultMetalRoughnessTexture.reset();
+	m_DefaultNormalTexture.reset();
+	m_DefaultEmissiveTexture.reset();
+
+	m_RendererRef = &a_Renderer;
+	uchar4 whitePixel = { 255,255,255,255 };
+	uchar4 diffusePixel{ 0, 255, 255, 0 };
+	uchar4 normal = { 128, 128, 255, 0 };
+	m_DefaultDiffuseTexture = m_RendererRef->CreateTexture(&whitePixel, 1, 1);
+	m_DefaultMetalRoughnessTexture = m_RendererRef->CreateTexture(&diffusePixel, 1, 1);
+	m_DefaultNormalTexture = m_RendererRef->CreateTexture(&normal, 1, 1);
+	m_DefaultEmissiveTexture = m_RendererRef->CreateTexture(&whitePixel, 1, 1);
 }
 
 LumenPTModelConverter::FileContent LumenPTModelConverter::GenerateContent(const fx::gltf::Document& a_FxDoc, const std::string& a_SourcePath)
@@ -147,8 +225,14 @@ LumenPTModelConverter::FileContent LumenPTModelConverter::GenerateContent(const 
 		m.m_Color[2] = material.pbrMetallicRoughness.baseColorFactor[2];
 		m.m_Color[3] = material.pbrMetallicRoughness.baseColorFactor[3];
 
+		m.m_Emission[0] = material.emissiveFactor[0];
+		m.m_Emission[1] = material.emissiveFactor[1];
+		m.m_Emission[2] = material.emissiveFactor[2];
+
 		m.m_DiffuseTextureId = material.pbrMetallicRoughness.baseColorTexture.index;
 		m.m_NormalMapId = material.normalTexture.index;
+		m.m_MetallicRoughnessTextureId = material.pbrMetallicRoughness.metallicRoughnessTexture.index;
+		m.m_EmissiveTextureId = material.emissiveTexture.index;
     }
 
     for (auto& mesh : a_FxDoc.meshes)

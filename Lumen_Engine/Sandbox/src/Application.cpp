@@ -14,6 +14,8 @@
 #include "AppConfiguration.h"
 #include "Framework/CudaUtilities.h"
 
+#include <chrono>
+
 #ifdef WAVEFRONT
 #include "../../LumenPT/src/Framework/WaveFrontRenderer.h"
 #else
@@ -90,7 +92,7 @@ public:
 		settings.m_ShadersFilePathSolids = config.GetFileShaderSolids();
 		settings.m_ShadersFilePathVolumetrics = config.GetFileShaderVolumetrics();
 
-		settings.depth = 5;
+		settings.depth = 1;
 		settings.minIntersectionT = 0.1f;
 		settings.maxIntersectionT = 5000.f;
 		settings.renderResolution = { 800, 600 };
@@ -161,7 +163,17 @@ public:
 		LMN_TRACE(p_string);
 
 	    m_SceneManager->SetPipeline(*contextLayer->GetPipeline());
-		auto res = m_SceneManager->LoadGLTF("Lantern.gltf", "/Sandbox/assets/models/");
+
+		auto begin = std::chrono::high_resolution_clock::now();
+
+		auto res = m_SceneManager->LoadGLTF(meshName, meshPath);
+
+		auto end = std::chrono::high_resolution_clock::now();
+
+		auto milli = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
+
+		printf("\n\nTime elapsed to load model: %li milliseconds\n\n", milli);
+
 		//auto res = m_SceneManager->LoadGLTF(meshName, meshPath);
 		auto res2 = m_SceneManager->LoadGLTF(meshName2, meshPath2);
 
@@ -182,15 +194,15 @@ public:
 				auto meshId = node->m_MeshID;
 				//if (meshId >= 0)
 				{
-					auto mesh = lumenPT->m_Scene->AddMesh();
-					mesh->SetMesh(res2->m_MeshPool[meshId]);
-					//mesh->m_Transform.CopyTransform(*node->m_LocalTransform);
-					float p = i;
-					mesh->m_Transform.SetPosition(glm::vec3(xOffset, 100.f + (p*p), 0.f));
-					mesh->m_Transform.SetScale(glm::vec3(2.0f * (static_cast<float>((i + 1) * 2) / 4.f)));
+					
 				}
 			}
-
+			auto mesh = lumenPT->m_Scene->AddMesh();
+			mesh->SetMesh(res2->m_MeshPool[0]);
+			//mesh->m_Transform.CopyTransform(*node->m_LocalTransform);
+			float p = i;
+			mesh->m_Transform.SetPosition(glm::vec3(xOffset, 100.f + (p * p), 0.f));
+			mesh->m_Transform.SetScale(glm::vec3(2.0f * (static_cast<float>((i + 1) * 2) / 4.f)));
 			xOffset += 50;
 		}
 
@@ -199,14 +211,14 @@ public:
 			auto meshId = node->m_MeshID;
 			if(meshId >= 0)
 			{
-				auto mesh = lumenPT->m_Scene->AddMesh();
-				mesh->SetMesh(res->m_MeshPool[meshId]);
-				//mesh->m_Transform.CopyTransform(*node->m_LocalTransform);
-				mesh->m_Transform.SetPosition(glm::vec3(0.f, 0.f, 15.0f));
-				mesh->m_Transform.SetScale(glm::vec3(1.0f));
+				
 			}
 		}
-
+		auto mesh = lumenPT->m_Scene->AddMesh();
+		mesh->SetMesh(res->m_MeshPool[0]);
+		//mesh->m_Transform.CopyTransform(*node->m_LocalTransform);
+		mesh->m_Transform.SetPosition(glm::vec3(0.f, 0.f, 15.0f));
+		mesh->m_Transform.SetScale(glm::vec3(1.0f));
 		//for (auto& node : res2->m_NodePool)
 		//{
 		//	auto meshId = node->m_MeshID;
