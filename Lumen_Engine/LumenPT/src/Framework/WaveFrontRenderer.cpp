@@ -28,7 +28,7 @@
 
 #ifdef USE_NVIDIA_DENOISER
 #include "DX12Wrapper/NRIWrapper.h"
-using Nri = DX12Wrapper;
+using Nri = NRIWrapper;
 #else
 #include "DX12 Wrapper/NullNRIWrapper.h"
 using Nri = NullNRIWrapper;
@@ -102,10 +102,12 @@ namespace WaveFront
         m_ServiceLocator.m_OptixWrapper = m_OptixSystem.get();
 
         m_NRD = std::make_unique<Nri>();
-        m_NRD->Initialize(a_Settings.renderResolution.x, a_Settings.renderResolution.y);
+        NRDWrapperInitParams nrdInitParams;
+        m_NRD->Initialize(nrdInitParams);
 
         m_DLSS = std::make_unique<Dlss>();
-        m_DLSS->Initialize(a_Settings.renderResolution.x, a_Settings.renderResolution.y);
+        DLSSWrapperInitParams dlssInitParams;
+        m_DLSS->Initialize(dlssInitParams);
 
         //Set up the OpenGL output buffer.
         m_OutputBuffer = std::make_unique<CudaGLTexture>(GL_RGBA8, m_Settings.outputResolution.x, m_Settings.outputResolution.y, 4);

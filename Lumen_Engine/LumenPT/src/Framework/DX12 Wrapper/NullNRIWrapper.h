@@ -9,7 +9,7 @@ public:
 	NullNRIWrapper() {}
 	~NullNRIWrapper() {}
 
-	void Initialize(int a_screenWidth, int a_screenHeight) override {}
+	void Initialize(NRDWrapperInitParams a_InitParams) override {}
 
 
 protected:

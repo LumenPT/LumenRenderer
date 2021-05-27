@@ -9,7 +9,7 @@ public:
 	NullDLSSWrapper() {}
 	~NullDLSSWrapper() {}
 
-	void Initialize(int a_screenWidth, int a_screenHeight) override {}
+	void Initialize(DLSSWrapperInitParams a_InitParams) override {}
 
 
 protected:
