@@ -8,7 +8,7 @@ PTPrimitive::PTPrimitive(std::unique_ptr<MemoryBuffer> a_VertexBuffer, std::uniq
     , m_BoolBuffer(std::move(a_BoolBuffer))
     , m_GeometryAccelerationStructure(std::move(a_GeometryAccelerationStructure))
 {
-    
+   
 }
 
 PTPrimitive::~PTPrimitive()

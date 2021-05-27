@@ -53,6 +53,14 @@ struct DevicePrimitive
     bool*           m_IsEmissive;
 };
 
+struct DevicePrimitiveInstance
+{
+    DevicePrimitive m_Primitive;
+    // Other instance-specific data
+    float4 m_Position;
+    float4 m_AdditionColorIDK;
+};
+
 /*
  * A struct on the GPU containing pointers to the data buffers for a specific mesh.
  */

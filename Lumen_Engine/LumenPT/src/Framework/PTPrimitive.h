@@ -29,8 +29,8 @@ public:
 	// The geometry acceleration structure of the primitive. This is used when creating the instance acceleration structure of the owner mesh
 	std::unique_ptr<AccelerationStructure> m_GeometryAccelerationStructure; 
 
-	// Handle to the primitive's entry in the scene data table
-    // Controls what data is associated with the primitive and what instance ID it gets during IAS construction
-	SceneDataTableEntry<DevicePrimitive> m_SceneDataTableEntry;
+	// Copy of the data representing this primitive on the GPU
+	// May be partially overriden by mesh instance specific data 
+	DevicePrimitive m_DevicePrimitive; // Put this on the GPU
 private:
 };
