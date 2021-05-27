@@ -127,9 +127,9 @@ file(GLOB_RECURSE CPP_HEADER_FILES
 
 if(${USE_NVIDIA_DENOISER})
 	list(APPEND CPP_HEADER_FILES 
-	"vendor/RayTracingDenoiser/LumenPT/DX12Wrapper/NRIWrapper.h"
-	"vendor/RayTracingDenoiser/LumenPT/DX12Wrapper/Helper.h"
-	"vendor/RayTracingDenoiser/LumenPT/DX12Wrapper/Utils.h"
+	"vendor/RayTracingDenoiser/LumenPT/Nvidia/NRIWrapper.h"
+	"vendor/RayTracingDenoiser/LumenPT/Nvidia/Helper.h"
+	"vendor/RayTracingDenoiser/LumenPT/Nvidia/Utils.h"
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/_NRD_SDK/Integration/NRDIntegration.h"
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/_NRD_SDK/Integration/NRDIntegration.hpp"
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/External/MathLib/MathLib.h"
@@ -139,7 +139,7 @@ endif()
 
 if(${USE_NVIDIA_DLSS})
 	list(APPEND CPP_HEADER_FILES 
-	"vendor/DLSS_Private/LumenPT/DLSSWrapper.h"
+	"vendor/DLSS_Private/LumenPT/Nvidia/DLSSWrapper.h"
 
 	)
 endif()
@@ -153,15 +153,15 @@ file(GLOB_RECURSE CPP_SOURCE_FILES
 
 if(${USE_NVIDIA_DENOISER})
 	list(APPEND CPP_SOURCE_FILES
-	"vendor/RayTracingDenoiser/LumenPT/DX12Wrapper/NRIWrapper.cpp"
-	"vendor/RayTracingDenoiser/LumenPT/DX12Wrapper/Utils.cpp"
+	"vendor/RayTracingDenoiser/LumenPT/Nvidia/NRIWrapper.cpp"
+	"vendor/RayTracingDenoiser/LumenPT/Nvidia/Utils.cpp"
 	#"vendor/RayTracingDenoiser/NRD/Integration/NRDIntegration.cpp"
 	)
 endif()
 
 if(${USE_NVIDIA_DLSS})
 	list(APPEND CPP_SOURCE_FILES
-	"vendor/DLSS_Private/LumenPT/DLSSWrapper.cpp"
+	"vendor/DLSS_Private/LumenPT/Nvidia/DLSSWrapper.cpp"
 
 	)
 endif()

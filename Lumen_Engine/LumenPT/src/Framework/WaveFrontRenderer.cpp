@@ -27,18 +27,18 @@
 //#include "LumenPTConfig.h"
 
 #ifdef USE_NVIDIA_DENOISER
-#include "DX12Wrapper/NRIWrapper.h"
+#include "Nvidia/NRIWrapper.h"
 using Nri = NRIWrapper;
 #else
-#include "DX12 Wrapper/NullNRIWrapper.h"
+#include "Nvidia/NullNRIWrapper.h"
 using Nri = NullNRIWrapper;
 #endif
 
 #ifdef USE_NVIDIA_DLSS
-#include "DLSSWrapper.h"
+#include "Nvidia/DLSSWrapper.h"
 using Dlss = DLSSWrapper;
 #else
-#include "DX12 Wrapper/NullDLSSWrapper.h"
+#include "Nvidia/NullDLSSWrapper.h"
 using Dlss = NullDLSSWrapper;
 #endif
 
