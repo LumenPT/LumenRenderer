@@ -130,7 +130,7 @@ void PTScene::UpdateSceneAccelerationStructure()
 			// TODO: This needs to be changed to represent the index of the volumetrics shaders in the shader binding table
 			inst.sbtOffset = 1;
             inst.visibilityMask = WaveFront::TraceMaskType::VOLUMES;
-            inst.instanceId = ptVolume->m_SceneDataTableEntry.m_TableIndex;
+            inst.instanceId = ptvi.m_SceneDataTableEntry.m_TableIndex;
             inst.flags = OPTIX_INSTANCE_FLAG_NONE;
 
             // Get the transformation matrix from the transform of the instance

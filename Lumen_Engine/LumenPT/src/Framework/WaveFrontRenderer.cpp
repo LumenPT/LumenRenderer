@@ -253,9 +253,10 @@ namespace WaveFront
 
 		volume->m_AccelerationStructure = m_OptixSystem->BuildGeometryAccelerationStructure(buildOptions, buildInput);
 
-		volume->m_SceneDataTableEntry = m_Table->AddEntry<DeviceVolume>();
-		auto& entry = volume->m_SceneDataTableEntry.GetData();
-		entry.m_Grid = grid;
+		//This has been moved to volume instance
+		//volume->m_SceneDataTableEntry = m_Table->AddEntry<DeviceVolume>();
+		//auto& entry = volume->m_SceneDataTableEntry.GetData();
+		//entry.m_Grid = grid;
 
 		return volume;
 	}

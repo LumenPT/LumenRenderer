@@ -68,6 +68,8 @@ __global__ void __intersection__Volumetric()
     const float  ray_tmin = optixGetRayTmin();
     const float  ray_tmax = optixGetRayTmax();
 
+	printf("%f\n", grid.worldBBox().min()[0]);
+
     nanovdb::Ray<float> wRay(
         nanovdb::Vec3<float>(ray_orig.x, ray_orig.y, ray_orig.z),
         nanovdb::Vec3<float>(ray_dir.x, ray_dir.y, ray_dir.z),
