@@ -103,10 +103,16 @@ namespace WaveFront
 
         m_NRD = std::make_unique<Nri>();
         NRDWrapperInitParams nrdInitParams;
+        nrdInitParams.m_InputImageWidth = m_Settings.renderResolution.x;
+        nrdInitParams.m_InputImageHeight = m_Settings.renderResolution.y;
         m_NRD->Initialize(nrdInitParams);
 
         m_DLSS = std::make_unique<Dlss>();
         DLSSWrapperInitParams dlssInitParams;
+        dlssInitParams.m_InputImageWidth = m_Settings.renderResolution.x;
+        dlssInitParams.m_InputImageHeight = m_Settings.renderResolution.y;
+        dlssInitParams.m_OutputImageWidth = m_Settings.outputResolution.x;
+        dlssInitParams.m_OutputImageHeight = m_Settings.outputResolution.y;
         m_DLSS->Initialize(dlssInitParams);
 
         //Set up the OpenGL output buffer.
