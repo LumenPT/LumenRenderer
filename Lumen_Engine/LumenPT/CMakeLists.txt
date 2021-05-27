@@ -127,7 +127,7 @@ file(GLOB_RECURSE CPP_HEADER_FILES
 
 if(${USE_NVIDIA_DENOISER})
 	list(APPEND CPP_HEADER_FILES 
-	"vendor/RayTracingDenoiser/LumenPT/Nvidia/NRIWrapper.h"
+	"vendor/RayTracingDenoiser/LumenPT/Nvidia/NRDWrapper.h"
 	"vendor/RayTracingDenoiser/LumenPT/Nvidia/Helper.h"
 	"vendor/RayTracingDenoiser/LumenPT/Nvidia/Utils.h"
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/_NRD_SDK/Integration/NRDIntegration.h"
@@ -153,7 +153,7 @@ file(GLOB_RECURSE CPP_SOURCE_FILES
 
 if(${USE_NVIDIA_DENOISER})
 	list(APPEND CPP_SOURCE_FILES
-	"vendor/RayTracingDenoiser/LumenPT/Nvidia/NRIWrapper.cpp"
+	"vendor/RayTracingDenoiser/LumenPT/Nvidia/NRDWrapper.cpp"
 	"vendor/RayTracingDenoiser/LumenPT/Nvidia/Utils.cpp"
 	#"vendor/RayTracingDenoiser/NRD/Integration/NRDIntegration.cpp"
 	)

@@ -6,7 +6,7 @@
 #include "MotionVectors.h"
 #include "../Shaders/CppCommon/WaveFrontDataStructs.h"
 #include "PTServiceLocator.h"
-#include "Nvidia/INRIWrapper.h"
+#include "Nvidia/INRDWrapper.h"
 #include "Nvidia/IDLSSWrapper.h"
 
 #include "Renderer/LumenRenderer.h"

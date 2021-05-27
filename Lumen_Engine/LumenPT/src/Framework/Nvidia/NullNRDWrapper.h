@@ -1,6 +1,6 @@
 #pragma once
 
-#include "INRIWrapper.h"
+#include "INRDWrapper.h"
 
 class NullNRDWrapper : public INRDWrapper
 {

@@ -27,19 +27,19 @@
 //#include "LumenPTConfig.h"
 
 #ifdef USE_NVIDIA_DENOISER
-#include "Nvidia/NRIWrapper.h"
-using Nrd = NRDWrapper;
+#include "Nvidia/NRDWrapper.h"
+using NrdWrapper = NRDWrapper;
 #else
-#include "Nvidia/NullNRIWrapper.h"
-using Nrd = NullNRDWrapper;
+#include "Nvidia/NullNRDWrapper.h"
+using NrdWrapper = NullNRDWrapper;
 #endif
 
 #ifdef USE_NVIDIA_DLSS
 #include "Nvidia/DLSSWrapper.h"
-using Dlss = DLSSWrapper;
+using DlssWrapper = DLSSWrapper;
 #else
 #include "Nvidia/NullDLSSWrapper.h"
-using Dlss = NullDLSSWrapper;
+using DlssWrapper = NullDLSSWrapper;
 #endif
 
 #include "../../../Lumen/vendor/GLFW/include/GLFW/glfw3.h"
@@ -101,13 +101,13 @@ namespace WaveFront
         //Set the service locator's pointer to the OptixWrapper.
         m_ServiceLocator.m_OptixWrapper = m_OptixSystem.get();
 
-        m_NRD = std::make_unique<Nrd>();
+        m_NRD = std::make_unique<NrdWrapper>();
         NRDWrapperInitParams nrdInitParams;
         nrdInitParams.m_InputImageWidth = m_Settings.renderResolution.x;
         nrdInitParams.m_InputImageHeight = m_Settings.renderResolution.y;
         m_NRD->Initialize(nrdInitParams);
 
-        m_DLSS = std::make_unique<Dlss>();
+        m_DLSS = std::make_unique<DlssWrapper>();
         DLSSWrapperInitParams dlssInitParams;
         dlssInitParams.m_InputImageWidth = m_Settings.renderResolution.x;
         dlssInitParams.m_InputImageHeight = m_Settings.renderResolution.y;
