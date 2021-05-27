@@ -63,3 +63,10 @@ if(${USE_NVIDIA_DENOISER})
         "${CMAKE_CURRENT_SOURCE_DIR}/../LumenPT/vendor/RayTracingDenoiser/_NRI_SDK/Lib/Release/NRI.dll"
         $<TARGET_FILE_DIR:Sandbox>)
 endif()
+
+if(${USE_NVIDIA_DLSS})
+add_custom_command(TARGET Sandbox POST_BUILD
+	COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_CURRENT_SOURCE_DIR}/../LumenPT/vendor/DLSS_Private/bin"
+        $<TARGET_FILE_DIR:Sandbox>)
+endif()

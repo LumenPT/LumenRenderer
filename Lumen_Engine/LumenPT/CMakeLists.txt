@@ -137,6 +137,13 @@ if(${USE_NVIDIA_DENOISER})
 	)
 endif()
 
+if(${USE_NVIDIA_DLSS})
+	list(APPEND CPP_HEADER_FILES 
+	"vendor/DLSS_Private/LumenPT/DLSSWrapper.h"
+
+	)
+endif()
+
 #Add source files
 file(GLOB_RECURSE CPP_SOURCE_FILES 
 
@@ -152,6 +159,13 @@ if(${USE_NVIDIA_DENOISER})
 	)
 endif()
 
+if(${USE_NVIDIA_DLSS})
+	list(APPEND CPP_SOURCE_FILES
+	"vendor/DLSS_Private/LumenPT/DLSSWrapper.cpp"
+
+	)
+endif()
+
 set(LUMENPT_INCLUDES
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Include"
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Include/Cuda"
@@ -161,6 +175,7 @@ set(LUMENPT_INCLUDES
 	"${CMAKE_CURRENT_SOURCE_DIR}/../Lumen/src/AssetLoading"
 	"${CMAKE_CURRENT_SOURCE_DIR}/../Lumen/vendor/spdlog/include/"
 	"${CMAKE_CURRENT_SOURCE_DIR}/../Lumen/vendor/glm"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/"
 	#"${CMAKE_CURRENT_BINARY_DIR}/config"
 	${NANOVDB_HEADERS}
 )
@@ -175,6 +190,13 @@ if(${USE_NVIDIA_DENOISER})
 	#"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/NRI/Include"
 	#"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/NRD/Integration" 
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Include/Detex")
+endif()
+
+if(${USE_NVIDIA_DLSS})
+	list(APPEND LUMENPT_INCLUDES
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/DLSS_Private/Include"
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/DLSS_Private/LumenPT"
+	)
 endif()
 
 # Put all libraries into a variable
@@ -213,6 +235,19 @@ if(${USE_NVIDIA_DENOISER})
 	)
 endif()
 
+if(${USE_NVIDIA_DLSS})
+	file(GLOB_RECURSE DLSS_LIBS 
+
+	#${CMAKE_CURRENT_SOURCE_DIR}/vendor/DLSS_Private/Lib/x64/*_d_dbg.lib #TODO: use release version in release mode
+	${CMAKE_CURRENT_SOURCE_DIR}/vendor/DLSS_Private/Lib/x64/*_d.lib #TODO: use release version in release mode
+	)
+
+	list(APPEND LUMENPT_LIBS 
+	
+	${DLSS_LIBS}
+	)
+endif()
+
 # Add header and source files to library
 add_library (LumenPT STATIC ${CPP_HEADER_FILES} ${CPP_SOURCE_FILES})
 add_dependencies(LumenPT CUDAKernels)
@@ -228,6 +263,10 @@ endif()
 
 if(${USE_NVIDIA_DENOISER})
 	set_property(TARGET LumenPT APPEND PROPERTY COMPILE_DEFINITIONS USE_NVIDIA_DENOISER)
+endif()
+
+if(${USE_NVIDIA_DLSS})
+	set_property(TARGET LumenPT APPEND PROPERTY COMPILE_DEFINITIONS USE_NVIDIA_DLSS)
 endif()
 
 

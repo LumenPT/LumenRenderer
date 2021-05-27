@@ -28,8 +28,18 @@
 
 #ifdef USE_NVIDIA_DENOISER
 #include "DX12Wrapper/NRIWrapper.h"
+using Nri = DX12Wrapper;
 #else
 #include "DX12 Wrapper/NullNRIWrapper.h"
+using Nri = NullNRIWrapper;
+#endif
+
+#ifdef USE_NVIDIA_DLSS
+#include "DLSSWrapper.h"
+using Dlss = DLSSWrapper;
+#else
+#include "DX12 Wrapper/NullDLSSWrapper.h"
+using Dlss = NullDLSSWrapper;
 #endif
 
 #include "../../../Lumen/vendor/GLFW/include/GLFW/glfw3.h"
@@ -91,13 +101,11 @@ namespace WaveFront
         //Set the service locator's pointer to the OptixWrapper.
         m_ServiceLocator.m_OptixWrapper = m_OptixSystem.get();
 
-#ifdef USE_NVIDIA_DENOISER
-        m_DX12System = std::make_unique<NRIWrapper>();
-#else
-        m_DX12System = std::make_unique<NullNRIWrapper>();
-#endif
+        m_NRD = std::make_unique<Nri>();
+        m_NRD->Initialize(a_Settings.renderResolution.x, a_Settings.renderResolution.y);
 
-        m_DX12System->Initialize(a_Settings.renderResolution.x, a_Settings.renderResolution.y);
+        m_DLSS = std::make_unique<Dlss>();
+        m_DLSS->Initialize(a_Settings.renderResolution.x, a_Settings.renderResolution.y);
 
         //Set up the OpenGL output buffer.
         m_OutputBuffer = std::make_unique<CudaGLTexture>(GL_RGBA8, m_Settings.outputResolution.x, m_Settings.outputResolution.y, 4);

@@ -7,6 +7,7 @@
 #include "../Shaders/CppCommon/WaveFrontDataStructs.h"
 #include "PTServiceLocator.h"
 #include "DX12 Wrapper/INRIWrapper.h"
+#include "DX12 Wrapper/IDLSSWrapper.h"
 
 #include "Renderer/LumenRenderer.h"
 
@@ -153,8 +154,11 @@ namespace WaveFront
         //Optix system
         std::unique_ptr<OptixWrapper> m_OptixSystem;
 
-        //DX12 wrapper
-        std::unique_ptr<INRIWrapper> m_DX12System;
+        //NRI Wrapper
+        std::unique_ptr<INRIWrapper> m_NRD;
+
+        //DLSS Wrapper
+        std::unique_ptr<IDLSSWrapper> m_DLSS;
 
         //ReSTIR
         std::unique_ptr<ReSTIR> m_ReSTIR;
