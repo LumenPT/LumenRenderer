@@ -28,10 +28,10 @@
 
 #ifdef USE_NVIDIA_DENOISER
 #include "Nvidia/NRIWrapper.h"
-using Nri = NRIWrapper;
+using Nrd = NRDWrapper;
 #else
 #include "Nvidia/NullNRIWrapper.h"
-using Nri = NullNRIWrapper;
+using Nrd = NullNRDWrapper;
 #endif
 
 #ifdef USE_NVIDIA_DLSS
@@ -101,7 +101,7 @@ namespace WaveFront
         //Set the service locator's pointer to the OptixWrapper.
         m_ServiceLocator.m_OptixWrapper = m_OptixSystem.get();
 
-        m_NRD = std::make_unique<Nri>();
+        m_NRD = std::make_unique<Nrd>();
         NRDWrapperInitParams nrdInitParams;
         nrdInitParams.m_InputImageWidth = m_Settings.renderResolution.x;
         nrdInitParams.m_InputImageHeight = m_Settings.renderResolution.y;

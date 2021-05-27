@@ -6,12 +6,12 @@ struct NRDWrapperInitParams
 	int m_InputImageHeight = -1;
 };
 
-class INRIWrapper
+class INRDWrapper
 {
 public:
 
-	INRIWrapper() = default;
-	virtual ~INRIWrapper() = default;
+	INRDWrapper() = default;
+	virtual ~INRDWrapper() = default;
 
 	virtual void Initialize(NRDWrapperInitParams a_InitParams) = 0;
 

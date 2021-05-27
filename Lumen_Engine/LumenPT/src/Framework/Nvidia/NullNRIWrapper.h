@@ -2,12 +2,12 @@
 
 #include "INRIWrapper.h"
 
-class NullNRIWrapper : public INRIWrapper
+class NullNRDWrapper : public INRDWrapper
 {
 public:
 
-	NullNRIWrapper() {}
-	~NullNRIWrapper() {}
+	NullNRDWrapper() {}
+	~NullNRDWrapper() {}
 
 	void Initialize(NRDWrapperInitParams a_InitParams) override {}
 

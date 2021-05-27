@@ -155,7 +155,7 @@ namespace WaveFront
         std::unique_ptr<OptixWrapper> m_OptixSystem;
 
         //NRI Wrapper
-        std::unique_ptr<INRIWrapper> m_NRD;
+        std::unique_ptr<INRDWrapper> m_NRD;
 
         //DLSS Wrapper
         std::unique_ptr<IDLSSWrapper> m_DLSS;
