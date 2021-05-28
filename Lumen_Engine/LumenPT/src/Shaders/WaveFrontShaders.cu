@@ -145,7 +145,6 @@ __device__ __forceinline__ void ShadowRaysRayGen()
     //3. If no hit, accumulate result in buffer
     if(isIntersection == 0)
     {
-
         using namespace WaveFront;
 
         unsigned int resultIndex =
@@ -241,7 +240,7 @@ __device__ __forceinline__ void ReSTIRRayGenShading()
         unsigned int resultIndex =
             static_cast<unsigned int>(LightChannel::NUM_CHANNELS) * pixelIndex +
             static_cast<unsigned int>(LightChannel::DIRECT);
-
+    	
         launchParams.m_ResultBuffer[resultIndex] += rayData.contribution;
     }
 }

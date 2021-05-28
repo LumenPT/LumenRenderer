@@ -103,8 +103,11 @@ CPU_ONLY void ReSTIR::Run(
 	//Update the CDF for the provided light sources.
 	timer.reset();
 	BuildCDF(a_Lights);
-	if(a_DebugPrint) printf("Building CDF time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
-
+	if (a_DebugPrint)
+	{
+		auto size = WaveFront::GetAtomicCounter<WaveFront::TriangleLight>(a_Lights);
+		printf("Building CDF time required: %f millis.\n NumLight: %u\n", timer.measure(TimeUnit::MILLIS), size);
+	}
 	//Fill light bags with values from the CDF.
 	{
 		timer.reset();

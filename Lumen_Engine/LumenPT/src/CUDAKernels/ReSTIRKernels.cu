@@ -333,7 +333,7 @@ __global__ void GenerateShadowRayShading(WaveFront::AtomicBuffer<RestirShadowRay
             ray.direction = pixelToLight;
             ray.origin = pixelData.m_Position;
             ray.distance = l - 0.05f; //Make length a little bit shorter to prevent self-shadowing.
-
+            
             //Take the average contribution scaled after all reservoirs.
             ray.contribution = (reservoir.sample.unshadowedPathContribution * (reservoir.weight / static_cast<float>(ReSTIRSettings::numReservoirsPerPixel)));;
 
