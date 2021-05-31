@@ -24,6 +24,24 @@
 //#include "Lumen/Window.h"
 #include "Lumen/LumenApp.h"
 
+//#include "LumenPTConfig.h"
+
+#ifdef USE_NVIDIA_DENOISER
+#include "Nvidia/NRDWrapper.h"
+using NrdWrapper = NRDWrapper;
+#else
+#include "Nvidia/NullNRDWrapper.h"
+using NrdWrapper = NullNRDWrapper;
+#endif
+
+#ifdef USE_NVIDIA_DLSS
+#include "Nvidia/DLSSWrapper.h"
+using DlssWrapper = DLSSWrapper;
+#else
+#include "Nvidia/NullDLSSWrapper.h"
+using DlssWrapper = NullDLSSWrapper;
+#endif
+
 #include "../../../Lumen/vendor/GLFW/include/GLFW/glfw3.h"
 #include <Optix/optix_function_table_definition.h>
 #include <filesystem>
@@ -83,6 +101,19 @@ namespace WaveFront
         //Set the service locator's pointer to the OptixWrapper.
         m_ServiceLocator.m_OptixWrapper = m_OptixSystem.get();
 
+        m_NRD = std::make_unique<NrdWrapper>();
+        NRDWrapperInitParams nrdInitParams;
+        nrdInitParams.m_InputImageWidth = m_Settings.renderResolution.x;
+        nrdInitParams.m_InputImageHeight = m_Settings.renderResolution.y;
+        m_NRD->Initialize(nrdInitParams);
+
+        m_DLSS = std::make_unique<DlssWrapper>();
+        DLSSWrapperInitParams dlssInitParams;
+        dlssInitParams.m_InputImageWidth = m_Settings.renderResolution.x;
+        dlssInitParams.m_InputImageHeight = m_Settings.renderResolution.y;
+        dlssInitParams.m_OutputImageWidth = m_Settings.outputResolution.x;
+        dlssInitParams.m_OutputImageHeight = m_Settings.outputResolution.y;
+        m_DLSS->Initialize(dlssInitParams);
 
         //Set up the OpenGL output buffer.
         m_OutputBuffer = std::make_unique<CudaGLTexture>(GL_RGBA8, m_Settings.outputResolution.x, m_Settings.outputResolution.y, 4);

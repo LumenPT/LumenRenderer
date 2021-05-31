@@ -125,12 +125,46 @@ file(GLOB_RECURSE CPP_HEADER_FILES
 
 )
 
+if(${USE_NVIDIA_DENOISER})
+	list(APPEND CPP_HEADER_FILES 
+	"vendor/RayTracingDenoiser/LumenPT/Nvidia/NRDWrapper.h"
+	"vendor/RayTracingDenoiser/LumenPT/Nvidia/Helper.h"
+	"vendor/RayTracingDenoiser/LumenPT/Nvidia/Utils.h"
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/_NRD_SDK/Integration/NRDIntegration.h"
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/_NRD_SDK/Integration/NRDIntegration.hpp"
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/External/MathLib/MathLib.h"
+
+	)
+endif()
+
+if(${USE_NVIDIA_DLSS})
+	list(APPEND CPP_HEADER_FILES 
+	"vendor/DLSS_Private/LumenPT/Nvidia/DLSSWrapper.h"
+
+	)
+endif()
+
 #Add source files
 file(GLOB_RECURSE CPP_SOURCE_FILES 
 
 	${CMAKE_CURRENT_SOURCE_DIR}/src/*.c
 	${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp
 )
+
+if(${USE_NVIDIA_DENOISER})
+	list(APPEND CPP_SOURCE_FILES
+	"vendor/RayTracingDenoiser/LumenPT/Nvidia/NRDWrapper.cpp"
+	"vendor/RayTracingDenoiser/LumenPT/Nvidia/Utils.cpp"
+	#"vendor/RayTracingDenoiser/NRD/Integration/NRDIntegration.cpp"
+	)
+endif()
+
+if(${USE_NVIDIA_DLSS})
+	list(APPEND CPP_SOURCE_FILES
+	"vendor/DLSS_Private/LumenPT/Nvidia/DLSSWrapper.cpp"
+
+	)
+endif()
 
 set(LUMENPT_INCLUDES
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Include"
@@ -141,8 +175,29 @@ set(LUMENPT_INCLUDES
 	"${CMAKE_CURRENT_SOURCE_DIR}/../Lumen/src/AssetLoading"
 	"${CMAKE_CURRENT_SOURCE_DIR}/../Lumen/vendor/spdlog/include/"
 	"${CMAKE_CURRENT_SOURCE_DIR}/../Lumen/vendor/glm"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/"
+	#"${CMAKE_CURRENT_BINARY_DIR}/config"
 	${NANOVDB_HEADERS}
 )
+
+if(${USE_NVIDIA_DENOISER})
+	list(APPEND LUMENPT_INCLUDES
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/LumenPT" 
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/_NRD_SDK/Include"
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/_NRD_SDK/Integration"
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/_NRI_SDK/Include"
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/External"
+	#"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/NRI/Include"
+	#"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/NRD/Integration" 
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Include/Detex")
+endif()
+
+if(${USE_NVIDIA_DLSS})
+	list(APPEND LUMENPT_INCLUDES
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/DLSS_Private/Include"
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/DLSS_Private/LumenPT"
+	)
+endif()
 
 # Put all libraries into a variable
 set(LUMENPT_LIBS
@@ -165,6 +220,34 @@ set(LUMENPT_LIBS
 
 )
 
+if(${USE_NVIDIA_DENOISER})
+	list(APPEND LUMENPT_LIBS 
+	
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/_NRD_SDK/Lib/Release/NRD.lib"
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/_NRI_SDK/Lib/Release/NRI.lib"
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/_NRI_SDK/Lib/Release/NRI_Creation.lib"
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/_NRI_SDK/Lib/Release/NRI_Validation.lib"
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/_NRI_SDK/Lib/Release/NRI_D3D11.lib"
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/_NRI_SDK/Lib/Release/NRI_D3D12.lib"
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/_NRI_SDK/Lib/Release/NRI_VK.lib"
+
+	#NRD NRI NRI_D3D12 NRI_Validation
+	)
+endif()
+
+if(${USE_NVIDIA_DLSS})
+	file(GLOB_RECURSE DLSS_LIBS 
+
+	#${CMAKE_CURRENT_SOURCE_DIR}/vendor/DLSS_Private/Lib/x64/*_d_dbg.lib #TODO: use release version in release mode
+	${CMAKE_CURRENT_SOURCE_DIR}/vendor/DLSS_Private/Lib/x64/*_d.lib #TODO: use release version in release mode
+	)
+
+	list(APPEND LUMENPT_LIBS 
+	
+	${DLSS_LIBS}
+	)
+endif()
+
 # Add header and source files to library
 add_library (LumenPT STATIC ${CPP_HEADER_FILES} ${CPP_SOURCE_FILES})
 add_dependencies(LumenPT CUDAKernels)
@@ -173,9 +256,19 @@ set_property(TARGET LumenPT PROPERTY CUDA_ARCHITECTURES 52-real)
 set_property(TARGET LumenPT APPEND PROPERTY COMPILE_DEFINITIONS LUMEN_PT)
 set_property(TARGET LumenPT APPEND PROPERTY COMPILE_DEFINITIONS $<$<CONFIG:Debug>:CUDA_CHECK OPTIX_CHECK>)
 
+
 if(${USE_WAVEFRONT})
 	set_property(TARGET LumenPT APPEND PROPERTY COMPILE_DEFINITIONS WAVEFRONT)
 endif()
+
+if(${USE_NVIDIA_DENOISER})
+	set_property(TARGET LumenPT APPEND PROPERTY COMPILE_DEFINITIONS USE_NVIDIA_DENOISER)
+endif()
+
+if(${USE_NVIDIA_DLSS})
+	set_property(TARGET LumenPT APPEND PROPERTY COMPILE_DEFINITIONS USE_NVIDIA_DLSS)
+endif()
+
 
 assign_source_group(${CPP_HEADER_FILES})
 assign_source_group(${CPP_SOURCE_FILES})
@@ -185,3 +278,9 @@ target_include_directories(LumenPT PUBLIC ${LUMENPT_INCLUDES})
 
 # Define the link librarie
 target_link_libraries(LumenPT ${LUMENPT_LIBS} CUDAKernels)
+
+# Config file where CMake will specify the location of the project directory
+#configure_file(
+#	${CMAKE_CURRENT_SOURCE_DIR}/cmake/LumenPTConfig.h.in 
+#	${CMAKE_CURRENT_BINARY_DIR}/config/LumenPTConfig.h
+#)
