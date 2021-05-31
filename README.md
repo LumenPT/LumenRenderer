@@ -3,8 +3,7 @@ Standalone distribution of the Lumen path tracer.
 This is a student project that is being made over the course of 1 year by 6 students of Breda University of Applied Sciences (BUAS).
 Our goal is a real-time (30fps+) path tracer with support for volumetric bodies.
 
-![MicrosoftTeams-image (12)](https://user-images.githubusercontent.com/9714482/120172177-105aab00-c203-11eb-81ef-0d3046d9bd9f.png)
-
+![MicrosoftTeams-image (12)](https://user-images.githubusercontent.com/9714482/120190774-591d5e80-c219-11eb-8d01-3d9b8d7599f8.png)
 
 ## Project description
 The project is made from the ground up using C++, CUDA 10 and OptiX 7.1. A DirectX11 layer is also used for interaction with external libraries that do not natively support CUDA. Libraries such as DLSS (Nvidia's Deep Learning Super Sampling) and NRD (Nvidia's Real-Time Denoiser). We are targetting 30fps+ at 1440p resolutions on RTX3090 GPU's.
@@ -84,5 +83,8 @@ Note that Visual Studio versions above 16.6.3 are not guarranteed to work due to
 ### Colored specular highlights
 ![unknown](https://user-images.githubusercontent.com/9714482/120173799-b0fd9a80-c204-11eb-9c10-1e12e065890f.png)
 
-### Prototype homogenous volumetrics
+### Prototype for homogenous volumetrics
 ![unknown (1)](https://user-images.githubusercontent.com/9714482/120174052-f4580900-c204-11eb-984b-1b6ba9a9e5e9.png)
+
+### Realistic soft shadows
+![MicrosoftTeams-image (12)](https://user-images.githubusercontent.com/9714482/120172177-105aab00-c203-11eb-81ef-0d3046d9bd9f.png)
