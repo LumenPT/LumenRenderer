@@ -13,8 +13,11 @@
 
 #include <fstream>
 #include <filesystem>
+#include <glm/gtc/type_ptr.hpp>
 
 
+
+#include "../Framework/PTTexture.h"
 #include "Renderer/LumenRenderer.h"
 
 namespace fs = std::filesystem;
@@ -43,6 +46,8 @@ Lumen::SceneManager::GLTFResource LumenPTModelConverter::ConvertGLTF(std::string
 	std::string destPath = p.append(ms_ExtensionName);
 
 	OutputToFile(header, content.m_Blob, destPath);
+
+	content.m_Textures.clear();
 
 	return LoadFile(destPath);
 }
@@ -98,6 +103,15 @@ Lumen::SceneManager::GLTFResource LumenPTModelConverter::LoadFile(std::string a_
 
 			std::vector<uint8_t> arr(x * y);
 			memcpy(arr.data(), texData, x * y);
+
+            if (ht.m_TextureType == TextureType::EMetalRoughness)
+            {
+				for (int index = 0; index < x * y; ++index)
+				{
+					uchar4* data = reinterpret_cast<uchar4*>(&texData[index * 4]);
+					data->y = std::max(data->y, static_cast<unsigned char>(1));
+				}
+            }
 
 			textures.push_back(m_RendererRef->CreateTexture(texData, x, y));
 		}
@@ -161,11 +175,6 @@ Lumen::SceneManager::GLTFResource LumenPTModelConverter::LoadFile(std::string a_
 
 				ifs.read(reinterpret_cast<char*>(&hp), sizeof(hp));
 
-
-                if (j == 53)
-                {
-					printf("hammertime");
-                }
 				LumenRenderer::PrimitiveData primData;
 				primData.m_IndexSize = hp.m_IndexSize;
 				primData.m_IndexBinary.resize(hp.m_IndexBufferSize);
@@ -175,6 +184,11 @@ Lumen::SceneManager::GLTFResource LumenPTModelConverter::LoadFile(std::string a_
 				primData.m_VertexBinary.resize(hp.m_VertexBufferSize);
 				memcpy(primData.m_VertexBinary.data(), &dataBin[hp.m_VertexBufferOffset], hp.m_VertexBufferSize);
 
+
+				std::vector<Vertex> arr(primData.m_VertexBinary.size() / sizeof(Vertex));
+
+				memcpy(arr.data(), primData.m_VertexBinary.data(), primData.m_VertexBinary.size());
+
 				primData.m_Material = res.m_MaterialPool[hp.m_MaterialId];
 
 				primitives.push_back(m_RendererRef->CreatePrimitive(primData));
@@ -182,6 +196,27 @@ Lumen::SceneManager::GLTFResource LumenPTModelConverter::LoadFile(std::string a_
 			}
 
 			res.m_MeshPool.push_back(m_RendererRef->CreateMesh(primitives));
+		}
+
+		uint64_t numScenes;
+		ifs.read(reinterpret_cast<char*>(&numScenes), sizeof(numScenes));
+		for (size_t i = 0; i < numScenes; i++)
+		{
+			decltype(HeaderScene::m_Header) sceneHeader;
+			ifs.read(reinterpret_cast<char*>(&sceneHeader), sizeof(sceneHeader));
+
+			res.m_Scenes.push_back(m_RendererRef->CreateScene());
+			auto& scene = res.m_Scenes.back();
+
+			for (size_t j = 0; j < sceneHeader.m_NumMeshes; j++)
+			{
+				HeaderMeshInstance instance;
+				ifs.read(reinterpret_cast<char*>(&instance), sizeof(instance));
+
+				auto m = scene->AddMesh();
+				m->SetMesh(res.m_MeshPool[instance.m_MeshId]);
+				m->m_Transform = glm::make_mat4(instance.m_Transform);
+			}
 		}
 	}
 	else
@@ -230,10 +265,21 @@ LumenPTModelConverter::FileContent LumenPTModelConverter::GenerateContent(const 
 		m.m_Emission[2] = material.emissiveFactor[2];
 
 		m.m_DiffuseTextureId = material.pbrMetallicRoughness.baseColorTexture.index;
+        if (m.m_DiffuseTextureId != -1)
+		    fc.m_Textures[m.m_DiffuseTextureId].m_TextureType = TextureType::EDiffuse;
+
 		m.m_NormalMapId = material.normalTexture.index;
+		if (m.m_NormalMapId != -1)
+			fc.m_Textures[m.m_NormalMapId].m_TextureType = TextureType::ENormal;
 		m.m_MetallicRoughnessTextureId = material.pbrMetallicRoughness.metallicRoughnessTexture.index;
+
+		if (m.m_MetallicRoughnessTextureId != -1)
+			fc.m_Textures[m.m_MetallicRoughnessTextureId].m_TextureType = TextureType::EMetalRoughness;
+
 		m.m_EmissiveTextureId = material.emissiveTexture.index;
-    }
+		if (m.m_EmissiveTextureId != -1)
+			fc.m_Textures[m.m_EmissiveTextureId].m_TextureType = TextureType::EEmissive;
+	}
 
     for (auto& mesh : a_FxDoc.meshes)
     {
@@ -243,6 +289,12 @@ LumenPTModelConverter::FileContent LumenPTModelConverter::GenerateContent(const 
 			m.m_Primitives.push_back(PrimitiveToBlob(a_FxDoc, primitive, fc.m_Blob));
         }
 		m.m_Header.m_NumPrimitives = m.m_Primitives.size();
+    }
+
+    for (auto& fxScene : a_FxDoc.scenes)
+    {
+		fc.m_Scenes.push_back(MakeScene(a_FxDoc, fxScene));
+		
     }
 
 	fc.m_Blob.Trim();
@@ -257,6 +309,7 @@ LumenPTModelConverter::Header LumenPTModelConverter::GenerateHeader(const FileCo
 	auto numTex = a_Content.m_Textures.size();
 	auto numMat = a_Content.m_Materials.size();
 	auto numMesh = a_Content.m_Meshes.size();
+	auto numScenes = a_Content.m_Scenes.size();
 
 	h.m_Binary.Write(reinterpret_cast<char*>(&numTex), sizeof(numTex));
 	h.m_Binary.Write(a_Content.m_Textures.data(), a_Content.m_Textures.size() * sizeof(HeaderTexture));
@@ -268,6 +321,14 @@ LumenPTModelConverter::Header LumenPTModelConverter::GenerateHeader(const FileCo
     {
 		h.m_Binary.Write(&mesh.m_Header, sizeof(mesh.m_Header));
 		h.m_Binary.Write(mesh.m_Primitives.data(), mesh.m_Primitives.size() * sizeof(HeaderPrimitive));
+    }
+
+
+	h.m_Binary.Write(reinterpret_cast<char*>(&numScenes), sizeof(numScenes));
+    for (auto headerScene : a_Content.m_Scenes)
+    {
+		h.m_Binary.Write(&headerScene.m_Header, sizeof(headerScene.m_Header));
+		h.m_Binary.Write(headerScene.m_Meshes.data(), headerScene.m_Meshes.size() * sizeof(HeaderScene));
     }
 
 	h.m_Binary.Trim();
@@ -418,6 +479,8 @@ std::vector<uint8_t> LumenPTModelConverter::GenerateTangentBinary(std::vector<ui
 		texView[i].y = 1.f - texView[i].y;
 	}
 
+	const glm::vec2 defaultUv[3]{ {1.f, 1.f}, {0.f, 1.f}, {1.f, 0.f} };
+
 	//Loop over every triangle in the index buffer.
 	for (auto index = 0u; index < numIndices; index += 3)
 	{
@@ -449,17 +512,60 @@ std::vector<uint8_t> LumenPTModelConverter::GenerateTangentBinary(std::vector<ui
 		const glm::vec3* v0 = &vertexView[index1];
 		const glm::vec3* v1 = &vertexView[index2];
 		const glm::vec3* v2 = &vertexView[index3];
-		glm::vec2* uv0 = &texView[index1];
-		glm::vec2* uv1 = &texView[index2];
-		glm::vec2* uv2 = &texView[index3];
+
+		//UV coords per vertex.
+		const glm::vec2* uv0 = nullptr;
+		const glm::vec2* uv1 = nullptr;
+		const glm::vec2* uv2 = nullptr;
+
+		//No uv specified, use default.
+		if (texView.Empty())
+		{
+			uv0 = &defaultUv[0];
+			uv1 = &defaultUv[1];
+			uv2 = &defaultUv[2];
+		}
+		//Specified, so look up.
+		else
+		{
+			uv0 = &texView[index1];
+			uv1 = &texView[index2];
+			uv2 = &texView[index3];
+		}
+
+		//Some meshes have invalid UVs defined. In those cases, use the defaults.
+		float deltaUv0 = fabsf(glm::length(*uv0 - *uv1));
+		float deltaUv1 = fabsf(glm::length(*uv0 - *uv2));
+		float deltaUv2 = fabsf(glm::length(*uv2 - *uv1));
+		constexpr float epsilon = std::numeric_limits<float>::epsilon();
+
+		//Ensure that the UV coordinates have a volume.
+		if (deltaUv0 < epsilon || deltaUv1 < epsilon || deltaUv2 < epsilon)
+		{
+			uv0 = &defaultUv[0];
+			uv1 = &defaultUv[1];
+			uv2 = &defaultUv[2];
+		}
 
 		glm::vec3 deltaPos1 = *v1 - *v0;
 		glm::vec3 deltaPos2 = *v2 - *v0;
-
 		glm::vec2 deltaUV1 = *uv1 - *uv0;
 		glm::vec2 deltaUV2 = *uv2 - *uv0;
 
 		float cross = deltaUV1.x * deltaUV2.y - deltaUV1.y * deltaUV2.x;
+
+		//If the cross is 0, it means the texture coords span an infinitely flat line. Set to default to avoid pain.
+		if (cross == 0)
+		{
+			uv0 = &defaultUv[0];
+			uv1 = &defaultUv[1];
+			uv2 = &defaultUv[2];
+			deltaPos1 = *v1 - *v0;
+			deltaPos2 = *v2 - *v0;
+			deltaUV1 = *uv1 - *uv0;
+			deltaUV2 = *uv2 - *uv0;
+			cross = deltaUV1.x * deltaUV2.y - deltaUV1.y * deltaUV2.x;
+		}
 
 		//If cross is 0, it means the texture coordinates are a single point for two corners.
 		assert(cross != 0);
@@ -481,6 +587,9 @@ std::vector<uint8_t> LumenPTModelConverter::GenerateTangentBinary(std::vector<ui
 		//Normalize the tangent.
 		tangent = glm::normalize(tangent);
 
+		//Ensure the tangent is valid.
+		assert(glm::length(tangent) > 0.f);
+
 		auto tanVec4 = glm::vec4(tangent, 1.f);
 
 		//Put in the output buffer. Same tangent for every vertex that was processed.
@@ -488,29 +597,107 @@ std::vector<uint8_t> LumenPTModelConverter::GenerateTangentBinary(std::vector<ui
 		tangentView[index2] = tanVec4;
 		tangentView[index3] = tanVec4;
 	}
+	
 
 	return tanBinary;
 }
 
 std::vector<char> LumenPTModelConverter::InterleaveVertexBuffers(InterleaveInput& a_Input)
 {
-	VectorView<float3, uint8_t> posView(*a_Input.m_Pos);
-	VectorView<float2, uint8_t> texView(*a_Input.m_Tex);
-	VectorView<float3, uint8_t> normalView(*a_Input.m_Normal);
-	VectorView<float4, uint8_t> tangentView(*a_Input.m_Tangent);
+	VectorView<glm::vec3, uint8_t> posView(*a_Input.m_Pos);
+	VectorView<glm::vec2, uint8_t> texView(*a_Input.m_Tex);
+	VectorView<glm::vec3, uint8_t> normalView(*a_Input.m_Normal);
+	VectorView<glm::vec4, uint8_t> tangentView(*a_Input.m_Tangent);
 
 	std::vector<char> interleavedBinary(sizeof(Vertex) * posView.Size());
 	VectorView<Vertex, char> interleavedView(interleavedBinary);
 
 	for (size_t i = 0; i < posView.Size(); i++)
 	{
-		interleavedView[i].m_Position = posView[i];
-		interleavedView[i].m_UVCoord = texView[i];
-		interleavedView[i].m_Normal = normalView[i];
-		interleavedView[i].m_Tangent = tangentView[i];
+		interleavedView[i].m_Position = make_float3(posView[i].x, posView[i].y, posView[i].z);
+        if (!a_Input.m_Tex->empty())
+		    interleavedView[i].m_UVCoord = make_float2(texView[i].x, texView[i].y);
+		if (!a_Input.m_Normal->empty())
+			interleavedView[i].m_Normal = make_float3(normalView[i].x, normalView[i].y, normalView[i].z);
+		if (!a_Input.m_Tangent->empty())
+			interleavedView[i].m_Tangent = make_float4(tangentView[i].x, tangentView[i].y, tangentView[i].z, tangentView[i].w);
 	}
 
+	std::vector<Vertex> arr(interleavedView.Size());
+
+	memcpy(arr.data(), interleavedBinary.data(), interleavedBinary.size());
+
 	return interleavedBinary;
+}
+
+LumenPTModelConverter::HeaderScene LumenPTModelConverter::MakeScene(const fx::gltf::Document& a_FxDoc, const fx::gltf::Scene& a_Scene)
+{
+	HeaderScene hscene;
+
+    for (auto rootNode : a_Scene.nodes)
+    {
+		LoadNode(a_FxDoc, rootNode, hscene);
+    }
+
+	hscene.m_Header.m_NumMeshes = hscene.m_Meshes.size();
+
+	return hscene;
+}
+
+void LumenPTModelConverter::LoadNode(const fx::gltf::Document& a_FxDoc, uint32_t a_NodeId, HeaderScene& a_Scene,
+    glm::mat4 a_ParentTransform)
+{
+	const auto& node = a_FxDoc.nodes[a_NodeId];
+
+	auto localTransform = LoadNodeTransform(node);
+	auto worldTransform = a_ParentTransform * localTransform;
+
+	auto mat = worldTransform.GetTransformationMatrix();
+
+    if (node.mesh != -1)
+    {
+		auto& m = a_Scene.m_Meshes.emplace_back();
+		m.m_MeshId = node.mesh;
+
+		memcpy(m.m_Transform, &mat[0], sizeof(glm::mat4));
+    }
+
+    for (auto& ch : node.children)
+    {
+		LoadNode(a_FxDoc, a_NodeId, a_Scene, worldTransform);
+    }
+}
+
+Lumen::Transform LumenPTModelConverter::LoadNodeTransform(const fx::gltf::Node& a_Node)
+{
+    Lumen::Transform transform = glm::make_mat4(&a_Node.matrix[0]);
+
+    if (transform.GetTransformationMatrix() == glm::identity<glm::mat4>())
+    {
+		auto translation = glm::vec3(
+			a_Node.translation[0],
+			a_Node.translation[1],
+			a_Node.translation[2]
+		);
+
+		auto rotation = glm::quat(
+			a_Node.rotation[3],
+			a_Node.rotation[0],
+			a_Node.rotation[1],
+			a_Node.rotation[2]
+		);
+
+		auto scale = glm::vec3(
+			a_Node.scale[0],
+			a_Node.scale[1],
+			a_Node.scale[2]
+		);
+		transform.SetPosition(translation);
+		transform.SetRotation(rotation);
+		transform.SetScale(scale);
+    }
+
+	return transform;
 }
 
 
@@ -531,7 +718,7 @@ std::vector<uint8_t> LumenPTModelConverter::LoadBinary(const fx::gltf::Document&
 	uint32_t stride = std::max(attSize, bufferView.byteStride);
 
 	// Resize the output buffer to fit all the data that will be extracted
-	data.resize(bufferView.byteLength / stride * static_cast<uint64_t>(attSize));
+	data.resize(bufferAccessor.count * static_cast<uint64_t>(attSize));
 
 	// Offset from which to read in the buffer
 	auto bufferOffset = 0;

@@ -12,6 +12,8 @@
 
 //#include <string>
 #include <memory>
+#include <glm/gtx/compatibility.hpp>
+
 
 Lumen::SceneManager::~SceneManager()
 {
@@ -51,13 +53,13 @@ Lumen::SceneManager::GLTFResource* Lumen::SceneManager::LoadGLTF(std::string a_F
 	auto& res = m_LoadedScenes[fullPath];		// create new scene at path key
 
 	// First try to load an optimized version of the specified file, if such exists.
-	res = m_RenderPipeline->OpenCustomFileFormat(fullPath);
+	//res = m_RenderPipeline->OpenCustomFileFormat(fullPath);
 
     if (!res.m_Path.empty()) // If the path is not empty, then an optimized file was found for this model, and successfully loaded.
 		return &res;
 
 	// If no optimized version of the model was found, try to create one if the renderer specifies how.
-	res = m_RenderPipeline->CreateCustomFileFormat(fullPath);
+	//res = m_RenderPipeline->CreateCustomFileFormat(fullPath);
 	if (!res.m_Path.empty()) 
 		return &res;
 

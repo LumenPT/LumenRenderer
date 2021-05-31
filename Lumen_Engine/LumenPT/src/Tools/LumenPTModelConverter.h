@@ -62,12 +62,21 @@ private:
         };
     };
 
+    enum TextureType : uint64_t
+    {
+        EUnspecified = 0,
+        EDiffuse = 1,
+        ENormal,
+        EEmissive,
+        EMetalRoughness
+    };
+
     struct HeaderTexture
     {
         uint64_t m_Offset;
         uint64_t m_Size;
+        uint64_t m_TextureType;
     };
-
     struct HeaderMaterial
     {
         HeaderMaterial()
@@ -103,11 +112,27 @@ private:
         std::vector<HeaderPrimitive> m_Primitives;
     };
 
+    struct HeaderMeshInstance
+    {
+        int32_t m_MeshId;
+        float m_Transform[16];
+    };
+
+    struct HeaderScene
+    {
+        struct
+        {
+            uint32_t m_NumMeshes;
+        } m_Header;
+        std::vector<HeaderMeshInstance> m_Meshes;
+    };
+
     struct FileContent
     {
         std::vector<HeaderTexture> m_Textures;
         std::vector<HeaderMaterial> m_Materials;
         std::vector<HeaderMesh> m_Meshes;
+        std::vector<HeaderScene> m_Scenes;
 
         Blob m_Blob;
     };
@@ -137,6 +162,11 @@ private:
     };
 
     static std::vector<char> InterleaveVertexBuffers(InterleaveInput& a_Input);
+
+    static HeaderScene MakeScene(const fx::gltf::Document& a_FxDoc, const fx::gltf::Scene& a_Scene);
+    static void LoadNode(const fx::gltf::Document& a_FxDoc, uint32_t a_NodeId, HeaderScene& a_Scene, glm::mat4 a_ParentTransform = glm::identity<glm::mat4>());
+    static Lumen::Transform LoadNodeTransform(const fx::gltf::Node& a_Node);
+
 
     static std::vector<uint8_t> LoadBinary(const fx::gltf::Document& a_Doc, uint32_t a_AccessorIndx);
     static uint32_t GetComponentCount(fx::gltf::Accessor& a_Accessor); // Return how many components the accessor uses
