@@ -23,6 +23,7 @@
 #include "MotionVectors.h"
 //#include "Lumen/Window.h"
 #include "Lumen/LumenApp.h"
+#include "DX11Wrapper.h"
 
 #include "../../../Lumen/vendor/GLFW/include/GLFW/glfw3.h"
 #include <Optix/optix_function_table_definition.h>
@@ -30,6 +31,8 @@
 #include <glm/gtx/compatibility.hpp>
 #include <sutil/Matrix.h>
 #include "../Framework/PTMeshInstance.h"
+
+
 
 sutil::Matrix4x4 ConvertGLMtoSutilMat4(const glm::mat4& glmMat)
 {
@@ -50,6 +53,9 @@ namespace WaveFront
 {
     void WaveFrontRenderer::Init(const WaveFrontSettings& a_Settings)
     {
+        std::unique_ptr<DX11Wrapper> pDXWrapper = std::make_unique<DX11Wrapper>();
+        pDXWrapper->Init(); //only for testing rn
+
         m_BlendCounter = 0;
         m_FrameIndex = 0;
         m_Settings = a_Settings;
