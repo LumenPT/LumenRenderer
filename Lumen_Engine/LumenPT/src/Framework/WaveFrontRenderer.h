@@ -154,6 +154,9 @@ namespace WaveFront
         //Optix system
         std::unique_ptr<OptixWrapper> m_OptixSystem;
 
+        //DX11System
+        std::unique_ptr<DX11Wrapper> m_DX11Wrapper;
+
         //NRI Wrapper
         std::unique_ptr<INRDWrapper> m_NRD;
 

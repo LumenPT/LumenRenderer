@@ -71,8 +71,11 @@ namespace WaveFront
 {
     void WaveFrontRenderer::Init(const WaveFrontSettings& a_Settings)
     {
-        std::unique_ptr<DX11Wrapper> pDXWrapper = std::make_unique<DX11Wrapper>();
-        pDXWrapper->Init(); //only for testing rn
+        m_DX11Wrapper = std::make_unique<DX11Wrapper>();
+        m_ServiceLocator.m_DX11Wrapper = m_DX11Wrapper.get();
+        m_DX11Wrapper->Init();
+
+        m_DX11Wrapper->GetDevice();
 
         m_BlendCounter = 0;
         m_FrameIndex = 0;
