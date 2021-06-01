@@ -6,6 +6,8 @@
 #include "MotionVectors.h"
 #include "../Shaders/CppCommon/WaveFrontDataStructs.h"
 #include "PTServiceLocator.h"
+#include "Nvidia/INRDWrapper.h"
+#include "Nvidia/IDLSSWrapper.h"
 
 #include "Renderer/LumenRenderer.h"
 
@@ -151,6 +153,12 @@ namespace WaveFront
 
         //Optix system
         std::unique_ptr<OptixWrapper> m_OptixSystem;
+
+        //NRI Wrapper
+        std::unique_ptr<INRDWrapper> m_NRD;
+
+        //DLSS Wrapper
+        std::unique_ptr<IDLSSWrapper> m_DLSS;
 
         //ReSTIR
         std::unique_ptr<ReSTIR> m_ReSTIR;
