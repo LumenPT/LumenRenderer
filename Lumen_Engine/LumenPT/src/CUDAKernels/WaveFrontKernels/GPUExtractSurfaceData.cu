@@ -139,7 +139,7 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
             output.m_Position = currRay.m_Origin + currRay.m_Direction * currIntersection.m_IntersectionT;
             output.m_IncomingRayDirection = currRay.m_Direction;
             output.m_Metallic = metal;
-            output.m_Roughness = 0.0001f;
+            output.m_Roughness = roughness;
             output.m_TransportFactor = currRay.m_Contribution;
             output.m_Emissive = (emissive.x > 0 || emissive.y > 0 || emissive.z > 0);
             if (output.m_Emissive)

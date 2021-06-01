@@ -268,13 +268,14 @@ public:
 		//meshLight->m_Transform.SetPosition(glm::vec3(0.f, 0.f, 15.0f));
 		//meshLight->m_Transform.SetScale(glm::vec3(1.0f));
 
-		std::string vndbFilePath = { p.string() };
-		//vndbFilePath.append("/Sandbox/assets/volume/Sphere.vndb");
-		vndbFilePath.append("/Sandbox/assets/volume/bunny.vdb");
-		auto volumeRes = m_SceneManager->m_VolumeManager.LoadVDB(vndbFilePath);
+		//TODO uncomment but also destroyu
+		//std::string vndbFilePath = { p.string() };
+		////vndbFilePath.append("/Sandbox/assets/volume/Sphere.vndb");
+		//vndbFilePath.append("/Sandbox/assets/volume/bunny.vdb");
+		//auto volumeRes = m_SceneManager->m_VolumeManager.LoadVDB(vndbFilePath);
 
-		auto volume = lumenPT->m_Scene->AddVolume();
-		volume->SetVolume(volumeRes->m_Volume);
+		//auto volume = lumenPT->m_Scene->AddVolume();
+		//volume->SetVolume(volumeRes->m_Volume);
 
 
 		contextLayer->GetPipeline()->StartRendering();
