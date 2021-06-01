@@ -58,10 +58,20 @@ Lumen::SceneManager::GLTFResource* Lumen::SceneManager::LoadGLTF(std::string a_F
     if (!res.m_Path.empty()) // If the path is not empty, then an optimized file was found for this model, and successfully loaded.
 		return &res;
 
+	auto begin = std::chrono::high_resolution_clock::now();
+
 	// If no optimized version of the model was found, try to create one if the renderer specifies how.
 	//res = m_RenderPipeline->CreateCustomFileFormat(fullPath);
-	if (!res.m_Path.empty()) 
+	if (!res.m_Path.empty())
+	{
+		auto end = std::chrono::high_resolution_clock::now();
+
+		auto milli = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
+
+		printf("\n3D model conversion took %llu milliseconds.\n", milli);
+
 		return &res;
+	}
 
 	// If res.m_Path is still empty, the renderer does not use an optimized model file format, and the application is free to continue with default model loading.
 

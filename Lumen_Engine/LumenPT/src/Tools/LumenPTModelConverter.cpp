@@ -23,6 +23,7 @@
 namespace fs = std::filesystem;
 using namespace fx::gltf;
 
+
 Lumen::SceneManager::GLTFResource LumenPTModelConverter::ConvertGLTF(std::string a_SourcePath)
 {
 	auto workDir = fs::current_path();
@@ -41,6 +42,8 @@ Lumen::SceneManager::GLTFResource LumenPTModelConverter::ConvertGLTF(std::string
 
 	auto content = GenerateContent(fxDoc, p);
 	auto header = GenerateHeader(content);
+
+	volatile auto dbgfc = &content;
 
 	p.erase(p.begin() + p.find('.'), p.end());
 	std::string destPath = p.append(ms_ExtensionName);
@@ -79,8 +82,6 @@ Lumen::SceneManager::GLTFResource LumenPTModelConverter::LoadFile(std::string a_
 		auto dataSize = fileSize - sizeof(headerSize) - headerSize;
 		std::vector<char> dataBin(dataSize);
 		ifs.read(dataBin.data(), dataSize);
-
-		printf("shit's loaded like my nuts :)....... :(");
 
 		// Move the cursor back to the beginning of the header, right after the number signifying the size of the header
 		ifs.seekg(sizeof(headerSize), ifs.beg);
@@ -210,6 +211,7 @@ Lumen::SceneManager::GLTFResource LumenPTModelConverter::LoadFile(std::string a_
 
 			for (size_t j = 0; j < sceneHeader.m_NumMeshes; j++)
 			{
+				
 				HeaderMeshInstance instance;
 				ifs.read(reinterpret_cast<char*>(&instance), sizeof(instance));
 
@@ -328,7 +330,7 @@ LumenPTModelConverter::Header LumenPTModelConverter::GenerateHeader(const FileCo
     for (auto headerScene : a_Content.m_Scenes)
     {
 		h.m_Binary.Write(&headerScene.m_Header, sizeof(headerScene.m_Header));
-		h.m_Binary.Write(headerScene.m_Meshes.data(), headerScene.m_Meshes.size() * sizeof(HeaderScene));
+		h.m_Binary.Write(headerScene.m_Meshes.data(), headerScene.m_Meshes.size() * sizeof(HeaderMeshInstance));
     }
 
 	h.m_Binary.Trim();
@@ -664,7 +666,7 @@ void LumenPTModelConverter::LoadNode(const fx::gltf::Document& a_FxDoc, uint32_t
 
     for (auto& ch : node.children)
     {
-		LoadNode(a_FxDoc, a_NodeId, a_Scene, worldTransform);
+		LoadNode(a_FxDoc, ch, a_Scene, worldTransform);
     }
 }
 
