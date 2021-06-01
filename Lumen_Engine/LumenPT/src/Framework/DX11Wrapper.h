@@ -8,7 +8,7 @@
 class DX11Wrapper
 {
 public:
-	static void Init();
+	void Init();
 
 private:
 
