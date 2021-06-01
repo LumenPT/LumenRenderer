@@ -1,9 +1,12 @@
 #pragma once
 
+class PTServiceLocator;
+
 struct NRDWrapperInitParams
 {
 	int m_InputImageWidth = -1;
 	int m_InputImageHeight = -1;
+	PTServiceLocator* m_pServiceLocator = nullptr;
 };
 
 class INRDWrapper
@@ -17,4 +20,5 @@ public:
 
 
 protected:
+
 };

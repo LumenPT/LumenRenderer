@@ -148,12 +148,12 @@ public:
 		std::string p_string2{ p2.string() };
 		std::replace(p_string2.begin(), p_string2.end(), '\\', '/');
 
-		const std::string meshPath = p_string.append("/Sandbox/assets/models/tavern/");
+		const std::string meshPath = p_string.append("/Sandbox/assets/models/Sponza/");
 		const std::string meshPath2 = p_string2.append("/Sandbox/assets/models/EmissiveSphere/");
 		//Base path for meshes.
 
 		//Mesh name
-		const std::string meshName = "scene.gltf";
+		const std::string meshName = "Sponza.gltf";
 		const std::string meshName2 = "EmissiveSphere.gltf";
 
 		//p_string.append("/Sandbox/assets/models/Sponza/Sponza.gltf");
@@ -209,7 +209,7 @@ public:
 				mesh->SetEmissiveness(Lumen::EmissionMode::ENABLED, glm::vec3(1.f, 1.f, 1.f), 3000.f);	//Make more bright
 				mesh->UpdateAccelRemoveThis();
 			    //mesh->m_Transform.SetPosition(glm::vec3(0.f, 0.f, 15.0f));
-				//mesh->m_Transform.SetScale(glm::vec3(1.0f));
+				mesh->m_Transform.SetScale(glm::vec3(1.0f));
 			}
 		}
 

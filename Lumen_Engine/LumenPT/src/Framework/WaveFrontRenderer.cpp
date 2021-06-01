@@ -122,6 +122,7 @@ namespace WaveFront
         dlssInitParams.m_InputImageHeight = m_Settings.renderResolution.y;
         dlssInitParams.m_OutputImageWidth = m_Settings.outputResolution.x;
         dlssInitParams.m_OutputImageHeight = m_Settings.outputResolution.y;
+        dlssInitParams.m_pServiceLocator = &m_ServiceLocator;
         m_DLSS->Initialize(dlssInitParams);
 
         //Set up the OpenGL output buffer.
