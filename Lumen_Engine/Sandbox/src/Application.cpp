@@ -189,7 +189,7 @@ public:
 		uint32_t seed = 38947987;
 		seed = RandomInt(seed);
 
-		//lumenPT->m_Scene = res->m_Scenes[0];
+		lumenPT->m_Scene = res->m_Scenes[0];
 		for(int i = 0; i < 30; ++i)
 		{
 			for (auto& node : res2->m_NodePool)

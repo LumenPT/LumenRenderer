@@ -23,9 +23,20 @@ namespace WaveFront
         {
             //Add at index - 1 because the counter gives the total size, which starts at 1.
             //IMPORTANT: atomicAdd returns old value. https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#arithmetic-functions
+            
             const uint32_t index = atomicAdd(&counter, 1);
             assert(index < maxSize);
             data[index] = *a_Data;
+
+            if (index == 0)
+            {
+                printf("");
+                auto err = cudaGetLastError();
+                if (err != cudaSuccess)
+                {
+                    printf("err: %u", err);
+                }
+            }
         }
 
         /*
