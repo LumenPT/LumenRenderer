@@ -60,9 +60,13 @@ message("----------------------------------------------")
 
 add_custom_command(
 	OUTPUT ${CUDA_FILES_OUTPUT}
+	COMMAND if exist "${CUDA_FILES_OUTPUT_DIR}\\" 
+			${CMAKE_COMMAND} -E rm -rf "${CUDA_FILES_OUTPUT_DIR}\\" &&
+			${CMAKE_COMMAND} -E echo "[INFO]: Cleaned up shader directory: ${CUDA_FILES_OUTPUT_DIR}"
 	COMMAND ${CMAKE_COMMAND} -E make_directory ${CUDA_FILES_OUTPUT_DIR}
-	COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_OBJECTS:CUDAShaders> ${CUDA_FILES_OUTPUT_DIR}
-	#COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_OBJECTS:CudaPTX> ${CUDA_FILES_OUTPUT_DIR}
+	#COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_OBJECTS:CUDAShaders> ${CUDA_FILES_OUTPUT_DIR}
+	COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_OBJECTS:CUDAShaders> ${CUDA_FILES_OUTPUT_DIR} &&
+			${CMAKE_COMMAND} -E echo "[INFO]: Copied $<TARGET_OBJECTS:CUDAShaders> to ${CUDA_FILES_OUTPUT_DIR}"
 	DEPENDS CUDAShaders
 	VERBATIM
 	COMMAND_EXPAND_LISTS)
