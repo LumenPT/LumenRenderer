@@ -4,6 +4,8 @@
 
 #include "Lumen/ModelLoading/ILumenScene.h"
 
+#include "Lumen/ModelLoading/SceneManager.h"
+
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
@@ -31,10 +33,15 @@ public:
 	// Structu used to initialize a primitive
 	struct PrimitiveData
 	{
+		PrimitiveData() : m_Interleaved(false) {}
+		bool m_Interleaved;
+
 		VectorView<glm::vec3, uint8_t> m_Positions;
 		VectorView<glm::vec2, uint8_t> m_TexCoords;
 		VectorView<glm::vec3, uint8_t> m_Normals;
 		VectorView<glm::vec4, uint8_t> m_Tangents;
+
+		std::vector<uint8_t> m_VertexBinary;
 
 		// Perhaps temporary solution till we decide how we'll handle the indices
 		std::vector<uint8_t> m_IndexBinary;
@@ -47,9 +54,11 @@ public:
 	struct MaterialData
 	{
 		glm::vec4 m_DiffuseColor;
-		glm::vec4 m_EmssivionVal;
+		glm::vec3 m_EmissionVal;
 		std::shared_ptr<Lumen::ILumenTexture> m_DiffuseTexture;
 		std::shared_ptr<Lumen::ILumenTexture> m_NormalMap;
+		std::shared_ptr<Lumen::ILumenTexture> m_MetallicRoughnessTexture;
+		std::shared_ptr<Lumen::ILumenTexture> m_EmissiveTexture;
 	};
 
 	// Struct used to initialize a scene
@@ -91,6 +100,9 @@ public:
 	// Create a primitive from the provided primitive data
 	virtual void StartRendering() = 0;
 	virtual void PerformDeferredOperations() {};
+
+	virtual Lumen::SceneManager::GLTFResource OpenCustomFileFormat(const std::string& a_OriginalFilePath);
+	virtual Lumen::SceneManager::GLTFResource CreateCustomFileFormat(const std::string& a_OriginalFilePath);
 
 	virtual std::unique_ptr<Lumen::ILumenPrimitive> CreatePrimitive(PrimitiveData& a_MeshData) = 0;
 	// Create a mesh from the provided primitives

@@ -181,6 +181,9 @@ set(LUMENPT_INCLUDES
 	"${CMAKE_CURRENT_SOURCE_DIR}/../Lumen/vendor/glm"
 	"${CMAKE_CURRENT_SOURCE_DIR}/src/"
 	#"${CMAKE_CURRENT_BINARY_DIR}/config"
+	"${CMAKE_CURRENT_SOURCE_DIR}/../Lumen/vendor/fx"
+	"${CMAKE_CURRENT_SOURCE_DIR}/../Lumen/vendor/nlohmann/include"
+	"${CMAKE_CURRENT_BINARY_DIR}/config"
 	${NANOVDB_HEADERS}
 )
 
