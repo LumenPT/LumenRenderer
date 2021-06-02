@@ -36,7 +36,7 @@ inline void CheckCudaErr(const cudaError& a_err)
 
         std::fprintf(
             stderr,
-            "Optix error occured: %s \n Description: %s",
+            "CUDA error occured: %s \n Description: %s",
             errorName.c_str(),
             errorMessage.c_str());
 
@@ -58,22 +58,22 @@ inline void CheckCudaLastErr()
 
 }
 
-#if defined(OPTIX_NOCHECK)  || ! defined(_DEBUG)
+#if defined(OPTIX_NOCHECK)  || (!defined(_DEBUG) && !defined(OPTIX_CHECK))
 #define CHECKOPTIXRESULT
 #elif defined(OPTIX_CHECK) || defined(_DEBUG)
 #define CHECKOPTIXRESULT(x)\
     CheckOptixRes(x);
 #endif
 
-#if defined(CUDA_NOCHECK)  || ! defined(_DEBUG)
+#if defined(CUDA_NOCHECK)  || (!defined(_DEBUG) && !defined(CUDA_CHECK))
 #define CHECKCUDAERROR 
 #elif defined(CUDA_CHECK) || defined(_DEBUG)
 #define CHECKCUDAERROR(x)\
     CheckCudaErr(x);
 #endif
 
-#if defined(CUDA_NOCHECK) || ! defined(_DEBUG)
-#define CHECKLASTCUDAERROR CheckCudaLastErr();
+#if defined(CUDA_NOCHECK) || (!defined(_DEBUG) && !defined(CUDA_CHECK))
+#define CHECKLASTCUDAERROR
 #elif defined(CUDA_CHECK) || defined(_DEBUG)
 #define CHECKLASTCUDAERROR\
     CheckCudaLastErr();

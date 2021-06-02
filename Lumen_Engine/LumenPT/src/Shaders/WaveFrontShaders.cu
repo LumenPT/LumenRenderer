@@ -42,7 +42,7 @@ extern "C"
 __device__ __forceinline__ void IntersectionRaysRayGen()
 {
 
-
+    using namespace WaveFront;
  
     //1. Get ray definition from buffer
     const unsigned idx = optixGetLaunchIndex().x;
@@ -60,6 +60,7 @@ __device__ __forceinline__ void IntersectionRaysRayGen()
 
     const OptixTraversableHandle scene = launchParams.m_TraversableHandle;
 
+    //Solid trace
     optixTrace(
         scene,
         rayData.m_Origin,
@@ -67,7 +68,7 @@ __device__ __forceinline__ void IntersectionRaysRayGen()
         launchParams.m_MinMaxDistance.x,
         launchParams.m_MinMaxDistance.y,
         0.f, //Ray Time, can be 0 in our case.
-        OptixVisibilityMask(255),
+        TraceMaskType::SOLIDS,
         OPTIX_RAY_FLAG_NONE,
         0, //SBT offset for selecting the SBT records to use
         0, //SBT stride for selecting the SBT records to use, multiplied with SBT-GAS index
@@ -78,6 +79,35 @@ __device__ __forceinline__ void IntersectionRaysRayGen()
     //3. Store IntersectionData in buffer
     launchParams.m_IntersectionBuffer->Add(&intersection);
 
+
+    //TODO: implement volumetric trace and storing of data.
+    WaveFront::VolumetricIntersectionData volIntersection{};
+    volIntersection.m_RayArrayIndex = idx;
+    volIntersection.m_PixelIndex = rayData.m_PixelIndex;
+
+    unsigned int volIntersectionPtr_Up = 0;
+    unsigned int volIntersectionPtr_Low = 0;
+
+    PackPointer(&volIntersection, volIntersectionPtr_Up, volIntersectionPtr_Low);
+
+    //Volumetric trace
+    optixTrace(
+        scene,
+        rayData.m_Origin,
+        rayData.m_Direction,
+        launchParams.m_MinMaxDistance.x,
+        min(launchParams.m_MinMaxDistance.y, intersection.m_IntersectionT),
+        0.f,
+        TraceMaskType::VOLUMES,
+        OPTIX_RAY_FLAG_NONE,
+        0,
+        0,
+        0,
+        volIntersectionPtr_Up,
+        volIntersectionPtr_Low);
+
+    launchParams.m_VolumetricIntersectionBuffer->Add(&volIntersection);
+
     return;
 
 }
@@ -85,6 +115,8 @@ __device__ __forceinline__ void IntersectionRaysRayGen()
 extern "C"
 __device__ __forceinline__ void ShadowRaysRayGen()
 {
+
+    using namespace WaveFront;
 
     unsigned int idx = optixGetLaunchIndex().x;
     const WaveFront::ShadowRayData& rayData = *launchParams.m_ShadowRayBatch->GetData(idx);
@@ -101,17 +133,18 @@ __device__ __forceinline__ void ShadowRaysRayGen()
         launchParams.m_MinMaxDistance.x,
         rayData.m_MaxDistance,
         0.f,
-        OptixVisibilityMask(255),
+        TraceMaskType::SOLIDS,
         OPTIX_RAY_FLAG_NONE,
         0,
         1,
         0,
         isIntersection);
 
+	//TODO: volumetric shadows
+
     //3. If no hit, accumulate result in buffer
     if(isIntersection == 0)
     {
-
         using namespace WaveFront;
 
         unsigned int resultIndex =
@@ -128,6 +161,9 @@ __device__ __forceinline__ void ShadowRaysRayGen()
 extern "C"
 __device__ __forceinline__ void ReSTIRRayGen()
 {
+
+    using namespace WaveFront;
+
     //Launch as a 1D Array so that idx.x corresponds to the literal ray index.
     unsigned int idx = optixGetLaunchIndex().x;
 
@@ -145,7 +181,7 @@ __device__ __forceinline__ void ReSTIRRayGen()
         launchParams.m_MinMaxDistance.x, //Prevent self shadowing so offset a little bit.
         rayData.distance,   //Max distance already has a small offset to prevent self-shadowing.
         0.f,
-        OptixVisibilityMask(255),
+        TraceMaskType::SOLIDS,
         OPTIX_RAY_FLAG_NONE,
         0,
         0,
@@ -159,28 +195,84 @@ __device__ __forceinline__ void ReSTIRRayGen()
     }
 }
 
+extern "C"
+__device__ __forceinline__ void ReSTIRRayGenShading()
+{
+
+    using namespace WaveFront;
+
+    //Launch as a 1D Array so that idx.x corresponds to the literal ray index.
+    unsigned int idx = optixGetLaunchIndex().x;
+
+    //Retrieve the data.
+    const RestirShadowRayShading& rayData = *launchParams.m_ReSTIRShadowRayShadingBatch->GetData(idx);
+    const OptixTraversableHandle scene = launchParams.m_TraversableHandle;
+    auto reservoirIndex = rayData.index;
+
+    unsigned int intersected = 0;
+
+    optixTrace(
+        scene,
+        rayData.origin,
+        rayData.direction,
+        launchParams.m_MinMaxDistance.x, //Prevent self shadowing so offset a little bit.
+        rayData.distance,   //Max distance already has a small offset to prevent self-shadowing.
+        0.f,
+        TraceMaskType::SOLIDS,
+        OPTIX_RAY_FLAG_NONE,
+        0,
+        0,
+        0,
+        intersected  //Pass the reservoir index so that it can be set to 0 when a hit is found.
+    );
+
+    //If occluded, set reservoir weight to 0 so it won't be reused next frame.
+    if (intersected != 0)
+    {
+        launchParams.m_Reservoirs[reservoirIndex].weight = 0.f;
+    }
+    //Not occluded, so add the contribution to the output buffer right away.
+    else
+    {
+        using namespace WaveFront;
+
+        const auto pixelIndex = reservoirIndex / ReSTIRSettings::numReservoirsPerPixel;
+        unsigned int resultIndex =
+            static_cast<unsigned int>(LightChannel::NUM_CHANNELS) * pixelIndex +
+            static_cast<unsigned int>(LightChannel::DIRECT);
+    	
+        launchParams.m_ResultBuffer[resultIndex] += rayData.contribution;
+    }
+}
 
 
 extern "C"
 __global__ void __raygen__WaveFrontRG()
 {
 
+    using namespace WaveFront;
+
 	switch (launchParams.m_TraceType)
 	{
-    case WaveFront::RayType::INTERSECTION_RAY:
+    case RayType::INTERSECTION_RAY:
         //Primary rays
         IntersectionRaysRayGen();
         break;
-    case WaveFront::RayType::SHADOW_RAY:
+    case RayType::SHADOW_RAY:
         //Shadow rays
         ShadowRaysRayGen();
         break;
-    case WaveFront::RayType::RESTIR_RAY:
+    case RayType::RESTIR_RAY:
         {
             //ReSTIR Rays.
             ReSTIRRayGen();
         }
-
+        break;
+    case RayType::RESTIR_SHADING_RAY:
+    {
+        //ReSTIR Rays.
+        ReSTIRRayGenShading();
+    }
         break;
 	}
 
@@ -193,15 +285,17 @@ extern "C"
 __global__ void __miss__WaveFrontMS()
 {
 
+    //using namespace WaveFront;
+
     /*switch (launchParams.m_TraceType)
     {
-    case WaveFront::RayType::INTERSECTION_RAY:
+    case RayType::INTERSECTION_RAY:
         return;
         break;
-    case WaveFront::RayType::SHADOW_RAY:
+    case RayType::SHADOW_RAY:
         return;
         break;
-    case WaveFront::RayType::RESTIR_RAY:
+    case RayType::RESTIR_RAY:
         return;
         break;
     }*/
@@ -215,17 +309,20 @@ extern "C"
 __global__ void __anyhit__WaveFrontAH()
 {
 
+    using namespace WaveFront;
+
     switch (launchParams.m_TraceType)
     {
-    case WaveFront::RayType::INTERSECTION_RAY:
+    case RayType::INTERSECTION_RAY:
         break;
-    case WaveFront::RayType::SHADOW_RAY:
+    case RayType::SHADOW_RAY:
         {
             optixSetPayload_0(1);
             optixTerminateRay();
         }
         break;
-    case WaveFront::RayType::RESTIR_RAY:
+    case RayType::RESTIR_SHADING_RAY:
+    case RayType::RESTIR_RAY:
         {
             //Any hit is enough.
             optixSetPayload_0(1);
@@ -243,9 +340,11 @@ extern "C"
 __global__ void __closesthit__WaveFrontCH()
 {
 
+    using namespace WaveFront;
+
     switch (launchParams.m_TraceType)
     {
-    case WaveFront::RayType::INTERSECTION_RAY:
+    case RayType::INTERSECTION_RAY:
         {
             //If closest hit found, return IntersectionData.
             const unsigned int intersectionPtr_Up = optixGetPayload_0();
@@ -260,9 +359,10 @@ __global__ void __closesthit__WaveFrontCH()
 
         }    
         break;
-    case WaveFront::RayType::SHADOW_RAY:
+    case RayType::SHADOW_RAY:
         break;
-    case WaveFront::RayType::RESTIR_RAY:
+    case RayType::RESTIR_RAY:
+    case RayType::RESTIR_SHADING_RAY:
         //Get the reservoir and set its weight to 0 so that it is no longer considered a valid candidate.
         //reSTIRParams.reservoirs[optixGetAttribute_0()].weight = 0.f;
         //optixTerminateRay();

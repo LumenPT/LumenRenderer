@@ -41,12 +41,25 @@ CPU_ON_GPU void ShadeDirect(
     const uint3 a_ResolutionAndDepth,
     const SurfaceData* a_TemporalSurfaceDatBuffer,
     const SurfaceData* a_SurfaceDataBuffer,
+    const VolumetricData* a_VolumetricDataBuffer,
     AtomicBuffer<ShadowRayData>* const a_ShadowRays,
-    const TriangleLight* const a_Lights,
+	AtomicBuffer<ShadowRayData>* const a_VolumetricShadowRays,
+    const AtomicBuffer<TriangleLight>* const a_Lights,
     const unsigned a_Seed,
     const unsigned a_CurrentDepth,
-    const CDF* const a_CDF = nullptr
+    const CDF* const a_CDF = nullptr,
+	float3* a_Output = nullptr		//TODO: remove a_Output
     );
+
+/*
+ * When a light is hit at depth 0, it needs to be visualized on the screen.
+ * This kernel does that.
+ */
+CPU_ON_GPU void ResolveDirectLightHits(
+    const SurfaceData* a_SurfaceDataBuffer,
+    const unsigned a_NumPixels,
+    float3* a_OutputChannels
+);
 
 /*
  *

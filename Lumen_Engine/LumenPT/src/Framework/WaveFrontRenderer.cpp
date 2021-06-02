@@ -15,7 +15,6 @@
 #include "SceneDataTable.h"
 #include "../CUDAKernels/WaveFrontKernels.cuh"
 #include "../CUDAKernels/WaveFrontKernels/EmissiveLookup.cuh"
-#include "../Shaders/CppCommon/LumenPTConsts.h"
 #include "../Shaders/CppCommon/WaveFrontDataStructs.h"
 #include "CudaUtilities.h"
 #include "ReSTIR.h"
@@ -25,11 +24,30 @@
 //#include "Lumen/Window.h"
 #include "Lumen/LumenApp.h"
 
+//#include "LumenPTConfig.h"
+
+#ifdef USE_NVIDIA_DENOISER
+#include "Nvidia/NRDWrapper.h"
+using NrdWrapper = NRDWrapper;
+#else
+#include "Nvidia/NullNRDWrapper.h"
+using NrdWrapper = NullNRDWrapper;
+#endif
+
+#ifdef USE_NVIDIA_DLSS
+#include "Nvidia/DLSSWrapper.h"
+using DlssWrapper = DLSSWrapper;
+#else
+#include "Nvidia/NullDLSSWrapper.h"
+using DlssWrapper = NullDLSSWrapper;
+#endif
+
 #include "../../../Lumen/vendor/GLFW/include/GLFW/glfw3.h"
 #include <Optix/optix_function_table_definition.h>
 #include <filesystem>
 #include <glm/gtx/compatibility.hpp>
 #include <sutil/Matrix.h>
+#include "../Framework/PTMeshInstance.h"
 
 sutil::Matrix4x4 ConvertGLMtoSutilMat4(const glm::mat4& glmMat)
 {
@@ -61,34 +79,54 @@ namespace WaveFront
         //Init CUDA
         cudaFree(0);
         m_CUDAContext = 0;
-        
 
         //TODO: Ensure shader names match what we put down here.
         OptixWrapper::InitializationData optixInitData;
         optixInitData.m_CUDAContext = m_CUDAContext;
-        optixInitData.m_ProgramData.m_ProgramPath = LumenPTConsts::gs_ShaderPathBase + "WaveFrontShaders.ptx";;
-        optixInitData.m_ProgramData.m_ProgramLaunchParamName = "launchParams";
-        optixInitData.m_ProgramData.m_ProgramRayGenFuncName = "__raygen__WaveFrontRG";
-        optixInitData.m_ProgramData.m_ProgramMissFuncName = "__miss__WaveFrontMS";
-        optixInitData.m_ProgramData.m_ProgramAnyHitFuncName = "__anyhit__WaveFrontAH";
-        optixInitData.m_ProgramData.m_ProgramClosestHitFuncName = "__closesthit__WaveFrontCH";
-        optixInitData.m_ProgramData.m_MaxNumHitResultAttributes = 2;
-        optixInitData.m_ProgramData.m_MaxNumPayloads = 2;
+		optixInitData.m_SolidProgramData.m_ProgramPath = a_Settings.m_ShadersFilePathSolids;
+        optixInitData.m_SolidProgramData.m_ProgramLaunchParamName = "launchParams";
+        optixInitData.m_SolidProgramData.m_ProgramRayGenFuncName = "__raygen__WaveFrontRG";
+        optixInitData.m_SolidProgramData.m_ProgramMissFuncName = "__miss__WaveFrontMS";
+        optixInitData.m_SolidProgramData.m_ProgramAnyHitFuncName = "__anyhit__WaveFrontAH";
+        optixInitData.m_SolidProgramData.m_ProgramClosestHitFuncName = "__closesthit__WaveFrontCH";
+        optixInitData.m_VolumetricProgramData.m_ProgramPath = a_Settings.m_ShadersFilePathVolumetrics;
+        optixInitData.m_VolumetricProgramData.m_ProgramIntersectionFuncName = "__intersection__Volumetric";
+        optixInitData.m_VolumetricProgramData.m_ProgramAnyHitFuncName = "__anyhit__Volumetric";
+        optixInitData.m_VolumetricProgramData.m_ProgramClosestHitFuncName = "__closesthit__Volumetric";
+        optixInitData.m_PipelineMaxNumHitResultAttributes = 2;
+        optixInitData.m_PipelineMaxNumPayloads = 5;
 
         m_OptixSystem = std::make_unique<OptixWrapper>(optixInitData);
 
         //Set the service locator's pointer to the OptixWrapper.
         m_ServiceLocator.m_OptixWrapper = m_OptixSystem.get();
 
+        m_NRD = std::make_unique<NrdWrapper>();
+        NRDWrapperInitParams nrdInitParams;
+        nrdInitParams.m_InputImageWidth = m_Settings.renderResolution.x;
+        nrdInitParams.m_InputImageHeight = m_Settings.renderResolution.y;
+        m_NRD->Initialize(nrdInitParams);
+
+        m_DLSS = std::make_unique<DlssWrapper>();
+        DLSSWrapperInitParams dlssInitParams;
+        dlssInitParams.m_InputImageWidth = m_Settings.renderResolution.x;
+        dlssInitParams.m_InputImageHeight = m_Settings.renderResolution.y;
+        dlssInitParams.m_OutputImageWidth = m_Settings.outputResolution.x;
+        dlssInitParams.m_OutputImageHeight = m_Settings.outputResolution.y;
+        m_DLSS->Initialize(dlssInitParams);
 
         //Set up the OpenGL output buffer.
         m_OutputBuffer = std::make_unique<CudaGLTexture>(GL_RGBA8, m_Settings.outputResolution.x, m_Settings.outputResolution.y, 4);
         //SetRenderResolution(glm::uvec2(m_Settings.outputResolution.x, m_Settings.outputResolution.y));
         ResizeBuffers();
-        //TODO: number of lights will be dynamic per frame but this is temporary.
+        
+		//Set up buffers.
+		const unsigned numPixels = m_Settings.renderResolution.x * m_Settings.renderResolution.y;
+		
+		//TODO: number of lights will be dynamic per frame but this is temporary.
         constexpr auto numLights = 3;
 
-        m_TriangleLights.Resize(sizeof(TriangleLight) * numLights);
+        CreateAtomicBuffer<WaveFront::TriangleLight>(&m_TriangleLights, 1000000);
 
         //Temporary lights, stored in the buffer.
         TriangleLight lights[numLights];
@@ -98,6 +136,7 @@ namespace WaveFront
         lights[1].radiance = { 150000, 150000, 150000 };
         lights[2].radiance = { 150000, 150000, 105000 };
 
+        
 
         //Actually set the triangle lights to have an area.
         lights[0].p0 = {605.f, 700.f, -5.f};
@@ -107,34 +146,34 @@ namespace WaveFront
         lights[1].p0 = { 5.f, 700.f, -5.f };
         lights[1].p1 = { 0.f, 700.f, 5.f };
         lights[1].p2 = { -5.f, 700.f, -5.f };
+        
 
         lights[2].p0 = { -595.f, 700.f, -5.f };
         lights[2].p1 = { -600.f, 700.f, 5.f };
         lights[2].p2 = { -605.f, 700.f, -5.f };
 
-        //Calculate the area per light.
-        for(int i = 0; i < 3; ++i)
-        {
-            float3 vec1 = (lights[i].p0 - lights[i].p1);
-            float3 vec2 = (lights[i].p0 - lights[i].p2);
-            lights[i].area = sqrt(pow((vec1.y * vec2.z - vec2.y * vec1.z), 2) + pow((vec1.x * vec2.z - vec2.x * vec1.z), 2) + pow((vec1.x * vec2.y - vec2.x * vec1.y), 2)) / 2.f;
-        }
+		//Calculate the area per light.
+		for (int i = 0; i < 3; ++i)
+		{
+			float3 vec1 = (lights[i].p0 - lights[i].p1);
+			float3 vec2 = (lights[i].p0 - lights[i].p2);
+			lights[i].area = sqrt(pow((vec1.y * vec2.z - vec2.y * vec1.z), 2) + pow((vec1.x * vec2.z - vec2.x * vec1.z), 2) + pow((vec1.x * vec2.y - vec2.x * vec1.y), 2)) / 2.f;
+		}
 
-        //Calculate the normal for each light.
-        for(int i = 0; i < 3; ++i)
-        {
-            glm::vec3 arm1 = normalize(glm::vec3(lights[i].p0.x - lights[i].p2.x, lights[i].p0.y - lights[i].p2.y, lights[i].p0.z - lights[i].p2.z));
-            glm::vec3 arm2 = normalize(glm::vec3(lights[i].p0.x - lights[i].p1.x, lights[i].p0.y - lights[i].p1.y, lights[i].p0.z - lights[i].p1.z));
-            glm::vec3 normal = normalize(glm::cross(arm2, arm1));
-            lights[i].normal = { normal.x, normal.y, normal.z };
-        }
+		//Calculate the normal for each light.
+		for (int i = 0; i < 3; ++i)
+		{
+			glm::vec3 arm1 = normalize(glm::vec3(lights[i].p0.x - lights[i].p2.x, lights[i].p0.y - lights[i].p2.y, lights[i].p0.z - lights[i].p2.z));
+			glm::vec3 arm2 = normalize(glm::vec3(lights[i].p0.x - lights[i].p1.x, lights[i].p0.y - lights[i].p1.y, lights[i].p0.z - lights[i].p1.z));
+			glm::vec3 normal = normalize(glm::cross(arm2, arm1));
+			lights[i].normal = { normal.x, normal.y, normal.z };
+		}
 
-
-        m_TriangleLights.Write(&lights[0], sizeof(TriangleLight) * numLights, 0);
+        //m_TriangleLights.Write(&lights[0], sizeof(TriangleLight) * numLights, 0);
 
         //Set the service locator pointer to point to the m'table.
-        m_Table = std::make_unique<SceneDataTable>();
-        m_ServiceLocator.m_SceneDataTable = m_Table.get();
+        /*m_Table = std::make_unique<SceneDataTable>();
+        m_ServiceLocator.m_SceneDataTable = m_Table.get();*/
         CHECKLASTCUDAERROR;
 
         m_ServiceLocator.m_Renderer = this;
@@ -207,9 +246,114 @@ namespace WaveFront
         return m_IntermediateSettings.blendOutput;
     }
 
+	std::shared_ptr<Lumen::ILumenVolume> WaveFrontRenderer::CreateVolume(const std::string& a_FilePath)
+	{
+		//TODO tell optix to create a volume acceleration structure.
+		auto volume = std::make_shared<PTVolume>(a_FilePath, m_ServiceLocator);
+
+		uint32_t geomFlags[1] = { OPTIX_GEOMETRY_FLAG_NONE };
+
+		OptixAccelBuildOptions buildOptions = {};
+		buildOptions.buildFlags = OPTIX_BUILD_FLAG_PREFER_FAST_TRACE;
+		buildOptions.operation = OPTIX_BUILD_OPERATION_BUILD;
+		buildOptions.motionOptions = {};
+
+		OptixAabb aabb = { -1.5f, -1.5f, -1.5f, 1.5f, 1.5f, 1.5f };
+
+		auto grid = volume->GetHandle()->grid<float>();
+		auto bbox = grid->worldBBox();
+
+		nanovdb::Vec3<double> temp = bbox.min();
+		float bboxMinX = bbox.min()[0];
+		float bboxMinY = bbox.min()[1];
+		float bboxMinZ = bbox.min()[2];
+		float bboxMaxX = bbox.max()[0];
+		float bboxMaxY = bbox.max()[1];
+		float bboxMaxZ = bbox.max()[2];
+
+		aabb = { bboxMinX, bboxMinY, bboxMinZ, bboxMaxX, bboxMaxY, bboxMaxZ };
+
+		MemoryBuffer aabb_buffer(sizeof(OptixAabb));
+		aabb_buffer.Write(aabb);
+
+		OptixBuildInput buildInput = {};
+		buildInput.type = OPTIX_BUILD_INPUT_TYPE_CUSTOM_PRIMITIVES;
+		buildInput.customPrimitiveArray.aabbBuffers = &*aabb_buffer;
+		buildInput.customPrimitiveArray.numPrimitives = 1;
+		buildInput.customPrimitiveArray.flags = geomFlags;
+		buildInput.customPrimitiveArray.numSbtRecords = 1;
+
+		volume->m_AccelerationStructure = m_OptixSystem->BuildGeometryAccelerationStructure(buildOptions, buildInput);
+
+		//volume->m_SceneDataTableEntry = m_Table->AddEntry<DeviceVolume>();
+		auto& entry = volume->m_SceneDataTableEntry.GetData();
+		entry.m_Grid = grid;
+
+		return volume;
+	}
+
     void WaveFrontRenderer::TraceFrame()
     {
         CHECKLASTCUDAERROR;
+
+        //Retrieve the acceleration structure and scene data table once.
+        m_OptixSystem->UpdateSBT();
+        CHECKLASTCUDAERROR;
+
+        auto* sceneDataTableAccessor = static_cast<PTScene*>(m_Scene.get())->m_SceneDataTable->GetDevicePointer();
+        CHECKLASTCUDAERROR;
+
+        auto accelerationStructure = std::static_pointer_cast<PTScene>(m_Scene)->GetSceneAccelerationStructure();
+        cudaDeviceSynchronize();
+        CHECKLASTCUDAERROR;
+
+        //Timer to measure how long each frame takes.
+        Timer timer;
+        ResetAtomicBuffer<WaveFront::TriangleLight>(&m_TriangleLights);
+        auto lightBuffer = m_TriangleLights.GetDevicePtr<AtomicBuffer<WaveFront::TriangleLight>>();
+
+        for (auto& meshInstance : m_Scene->m_MeshInstances)
+        {
+            //Only run when emission is not disabled, and override is active OR the GLTF has specified valid emissive triangles and mode is set to ENABLED.
+            if (meshInstance->GetEmissionMode() != Lumen::EmissionMode::DISABLED 
+                && ((meshInstance->GetMesh()->GetEmissiveness() && meshInstance->GetEmissionMode() == Lumen::EmissionMode::ENABLED)
+                || meshInstance->GetEmissionMode() == Lumen::EmissionMode::OVERRIDE))
+            {
+                PTMeshInstance* asPTInstance = reinterpret_cast<PTMeshInstance*>(meshInstance.get());
+
+                //Loop over all instances.
+
+                for (auto& prim : meshInstance->GetMesh()->m_Primitives)
+                {
+                    auto ptPrim = static_cast<PTPrimitive*>(prim.get());
+
+                    //Find the primitive instance in the data table.
+                    auto& entryMap = asPTInstance->GetInstanceEntryMap();
+                    auto entry = &entryMap.at(prim.get());
+
+                    AddToLightBufferWrap(
+                        ptPrim->m_VertBuffer->GetDevicePtr<Vertex>(),
+                        ptPrim->m_IndexBuffer->GetDevicePtr<uint32_t>(),
+                        ptPrim->m_BoolBuffer->GetDevicePtr<bool>(),
+                        ptPrim->m_IndexBuffer->GetSize() / sizeof(uint32_t),
+                        lightBuffer,
+                        sceneDataTableAccessor,
+                        entry->m_TableIndex);
+                }
+                
+            }
+            else
+            {
+                continue;
+            }
+        }
+
+        //Don't render if there is no light in the scene as everything will be black anyway.
+        const unsigned int numLightsInScene = GetAtomicCounter<WaveFront::TriangleLight>(&m_TriangleLights);
+        if (numLightsInScene == 0)
+        {
+            return;
+        }
 
         bool recordingSnapshot = m_StartSnapshot;
         if (m_StartSnapshot)
@@ -218,21 +362,6 @@ namespace WaveFront
             m_FrameSnapshot = std::make_unique<FrameSnapshot>();
             m_StartSnapshot = false;
         }
-
-        //add to lights buffer? in traceframe
-
-        Timer timer;
-        //add lights to mesh in scene
-            //add mesh
-            //keep instances in scene
-            //for each instance, add all emissive triangles to light buffer with world space pos
-
-        //Get instances from scene
-            //check which instances are emissives to optimize the looping over instances
-            //inside of these instances you compare which triangles are emissive through boolean buffer
-            //add those to lights buffer in world space
-                //where to keep lights buffer?? - scene! yes!
-        auto trianglePtr = m_TriangleLights.GetDevicePtr<AtomicBuffer<WaveFront::TriangleLight>>();
 
         bool resizeBuffers = false, resizeOutputBuffer = false;
         {
@@ -398,17 +527,7 @@ namespace WaveFront
         const unsigned counterDefault = 0;
         SetAtomicCounter<ShadowRayData>(&m_ShadowRays, counterDefault);
         SetAtomicCounter<IntersectionData>(&m_IntersectionData, counterDefault);
-        CHECKLASTCUDAERROR;
-
-        //Retrieve the acceleration structure and scene data table once.
-        m_OptixSystem->UpdateSBT();
-        CHECKLASTCUDAERROR;
-
-        auto* sceneDataTableAccessor = m_Table->GetDevicePointer();
-        CHECKLASTCUDAERROR;
-
-        auto accelerationStructure = std::static_pointer_cast<PTScene>(m_Scene)->GetSceneAccelerationStructure();
-        cudaDeviceSynchronize();
+		SetAtomicCounter<VolumetricIntersectionData>(&m_VolumetricIntersectionData, counterDefault);
         CHECKLASTCUDAERROR;
 
         //Pass the buffers to the optix shader for shading.
@@ -416,7 +535,9 @@ namespace WaveFront
         rayLaunchParameters.m_TraceType = RayType::INTERSECTION_RAY;
         rayLaunchParameters.m_MinMaxDistance = { 0.01f, 5000.f };
         rayLaunchParameters.m_IntersectionBuffer = m_IntersectionData.GetDevicePtr<AtomicBuffer<IntersectionData>>();
+		rayLaunchParameters.m_VolumetricIntersectionBuffer = m_VolumetricIntersectionData.GetDevicePtr<AtomicBuffer<VolumetricIntersectionData>>();
         rayLaunchParameters.m_IntersectionRayBatch = m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>();
+        rayLaunchParameters.m_SceneData = sceneDataTableAccessor;
         rayLaunchParameters.m_TraversableHandle = accelerationStructure;
         rayLaunchParameters.m_ResolutionAndDepth = uint3{ m_Settings.renderResolution.x, m_Settings.renderResolution.y, m_Settings.depth };
 
@@ -456,6 +577,17 @@ namespace WaveFront
                 m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>(),
                 m_SurfaceData[surfaceDataBufferIndex].GetDevicePtr<SurfaceData>(),
                 sceneDataTableAccessor);
+
+            unsigned numVolumeIntersections = 0;
+            m_VolumetricIntersectionData.Read(&numVolumeIntersections, sizeof(numVolumeIntersections), 0);
+            const auto volumetricDataBufferIndex = 0;
+            ExtractVolumetricData(
+                numVolumeIntersections,
+                m_VolumetricIntersectionData.GetDevicePtr<AtomicBuffer<VolumetricIntersectionData>>(),
+                m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>(),
+                m_VolumetricData[volumetricDataBufferIndex].GetDevicePtr<VolumetricData>(),
+                sceneDataTableAccessor);
+
             cudaDeviceSynchronize();
             CHECKLASTCUDAERROR;
 
@@ -485,11 +617,12 @@ namespace WaveFront
                 uint3{ m_Settings.renderResolution.x, m_Settings.renderResolution.y, m_Settings.depth },
                 m_SurfaceData[surfaceDataBufferIndex].GetDevicePtr<SurfaceData>(),
                 m_SurfaceData[temporalIndex].GetDevicePtr<SurfaceData>(),
+				m_VolumetricData[volumetricDataBufferIndex].GetDevicePtr<VolumetricData>(),
                 m_IntersectionData.GetDevicePtr<AtomicBuffer<IntersectionData>>(),
                 m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>(),
                 m_ShadowRays.GetDevicePtr<AtomicBuffer<ShadowRayData>>(),
-                m_TriangleLights.GetDevicePtr<TriangleLight>(),
-                3,
+				m_VolumetricShadowRays.GetDevicePtr<AtomicBuffer<ShadowRayData>>(),
+                &m_TriangleLights,
                 camPosition,
                 camForward,
                 accelerationStructure,  //ReSTIR needs to check visibility early on so it does an optix launch for this scene.
@@ -520,6 +653,7 @@ namespace WaveFront
 
             //Reset the intersection data so that the next frame can re-fill it.
             ResetAtomicBuffer<IntersectionData>(&m_IntersectionData);
+			ResetAtomicBuffer<VolumetricIntersectionData>(&m_VolumetricIntersectionData);
 
             //Swap the ReSTIR buffers around.
             m_ReSTIR->SwapBuffers();
@@ -599,7 +733,6 @@ namespace WaveFront
 
         m_SnapshotReady = recordingSnapshot;
         CHECKLASTCUDAERROR;
-
     }
 
     std::unique_ptr<MemoryBuffer> WaveFrontRenderer::InterleaveVertexData(const PrimitiveData& a_MeshData) const
@@ -614,6 +747,8 @@ namespace WaveFront
                 v.m_UVCoord = make_float2(a_MeshData.m_TexCoords[i].x, a_MeshData.m_TexCoords[i].y);
             if (!a_MeshData.m_Normals.Empty())
                 v.m_Normal = make_float3(a_MeshData.m_Normals[i].x, a_MeshData.m_Normals[i].y, a_MeshData.m_Normals[i].z);
+            if (!a_MeshData.m_Tangents.Empty())
+                v.m_Tangent = make_float4(a_MeshData.m_Tangents[i].x, a_MeshData.m_Tangents[i].y, a_MeshData.m_Tangents[i].z, a_MeshData.m_Tangents[i].w);
         }
         return std::make_unique<MemoryBuffer>(vertices);
     }
@@ -661,26 +796,50 @@ namespace WaveFront
             {
                 correctedIndices.push_back(indexView[i]);
             }
-
+        }
+        //Gotta copy over even when they are 32 bit.
+        else
+        {
+            VectorView<uint32_t, uint8_t> indexView(a_PrimitiveData.m_IndexBinary);
+            for (size_t i = 0; i < indexView.Size(); i++)
+            {
+                correctedIndices.push_back(indexView[i]);
+            }
         }
         
         //printf("Index buffer Size %i \n", static_cast<int>(correctedIndices.size()));
         std::unique_ptr<MemoryBuffer> indexBuffer = std::make_unique<MemoryBuffer>(correctedIndices);
 
-        uint8_t numVertices = sizeof(vertexBuffer) / sizeof(Vertex);
-        //vertexBuffer->GetDevicePtr<Vertex>();
-        std::unique_ptr<MemoryBuffer> emissiveBuffer = std::make_unique<MemoryBuffer>((numVertices / 3) * sizeof(bool));
-        //std::unique_ptr<MemoryBuffer> indexBuffer = std::make_unique<MemoryBuffer>(a_PrimitiveData.m_IndexBinary);
+        uint32_t numIndices = correctedIndices.size();
+        const size_t memSize = (numIndices / 3) * sizeof(bool);
+        std::unique_ptr<MemoryBuffer> emissiveBuffer = std::make_unique<MemoryBuffer>(memSize); //might be wrong
 
-        //std::unique_ptr<MemoryBuffer> primMat = std::make_unique<MemoryBuffer>(a_PrimitiveData.m_Material);
-        //std::unique_ptr<MemoryBuffer> primMat = static_cast<Material*>(a_PrimitiveData.m_Material.get())->GetDeviceMaterial();
-        CHECKLASTCUDAERROR;
-        // TODO: @Jochem might wanna uncomment this at some point idk
-        //FindEmissives(vertexBuffer->GetDevicePtr<Vertex>(), emissiveBuffer->GetDevicePtr<bool>(), indexBuffer->GetDevicePtr<uint32_t>(),
-        //    static_cast<PTMaterial*>(a_PrimitiveData.m_Material.get())->GetDeviceMaterial(), numVertices);
-        CHECKLASTCUDAERROR;
+        //Initialize with false so that nothing is emissive by default.
+        cudaMemset(emissiveBuffer->GetDevicePtr(), 0, memSize);
 
-        // add bool buffer pointer to device prim pointer
+        unsigned int numLights = 0; //number of emissive triangles in this primitive
+
+        auto emissiveColor = std::static_pointer_cast<PTMaterial>(a_PrimitiveData.m_Material)->GetEmissiveColor();
+        if (emissiveColor != glm::vec3(0.f))
+        {
+
+            cudaDeviceSynchronize();
+            CHECKLASTCUDAERROR;
+
+            FindEmissivesWrap(
+                vertexBuffer->GetDevicePtr<Vertex>(),
+                indexBuffer->GetDevicePtr<uint32_t>(),
+                emissiveBuffer->GetDevicePtr<bool>(),
+                std::static_pointer_cast<PTMaterial>(a_PrimitiveData.m_Material)->GetDeviceMaterial(),
+                numIndices,
+                numLights
+            );
+
+
+
+            cudaDeviceSynchronize();
+            CHECKLASTCUDAERROR;
+        }
 
 
         
@@ -708,23 +867,22 @@ namespace WaveFront
 
         auto gAccel = m_OptixSystem->BuildGeometryAccelerationStructure(buildOptions, buildInput);
 
-        auto prim = std::make_unique<PTPrimitive>(std::move(vertexBuffer), std::move(indexBuffer), std::move(emissiveBuffer), std::move(gAccel));
-
+        std::unique_ptr<PTPrimitive> prim = std::make_unique<PTPrimitive>(std::move(vertexBuffer), std::move(indexBuffer), std::move(emissiveBuffer), std::move(gAccel));
         prim->m_Material = a_PrimitiveData.m_Material;
+        prim->m_ContainEmissive = numLights > 0 ? true : false;
+        prim->m_NumLights = numLights;
 
-        prim->m_SceneDataTableEntry = m_Table->AddEntry<DevicePrimitive>();
-        auto& entry = prim->m_SceneDataTableEntry.GetData();
-        entry.m_VertexBuffer = prim->m_VertBuffer->GetDevicePtr<Vertex>();
-        entry.m_IndexBuffer = prim->m_IndexBuffer->GetDevicePtr<unsigned int>();
-        entry.m_Material = static_cast<PTMaterial*>(prim->m_Material.get())->GetDeviceMaterial();
-        entry.m_IsEmissive = prim->m_BoolBuffer->GetDevicePtr<bool>();
+        prim->m_DevicePrimitive.m_VertexBuffer = prim->m_VertBuffer->GetDevicePtr<Vertex>();
+        prim->m_DevicePrimitive.m_IndexBuffer = prim->m_IndexBuffer->GetDevicePtr<unsigned int>();
+        prim->m_DevicePrimitive.m_Material = std::static_pointer_cast<PTMaterial>(prim->m_Material)->GetDeviceMaterial();
+        prim->m_DevicePrimitive.m_IsEmissive = prim->m_BoolBuffer->GetDevicePtr<bool>();
         CHECKLASTCUDAERROR;
 
         return prim;
     }
 
     std::shared_ptr<Lumen::ILumenMesh> WaveFrontRenderer::CreateMesh(
-        std::vector<std::unique_ptr<Lumen::ILumenPrimitive>>& a_Primitives)
+        std::vector<std::shared_ptr<Lumen::ILumenPrimitive>>& a_Primitives)
     {
         //TODO Let optix build the medium level acceleration structure and return the mesh handle for it.
 
@@ -750,56 +908,6 @@ namespace WaveFront
         CHECKLASTCUDAERROR;
 
         return mat;
-    }
-
-    std::shared_ptr<Lumen::ILumenVolume> WaveFrontRenderer::CreateVolume(const std::string& a_FilePath)
-    {
-        //TODO tell optix to create a volume acceleration structure.
-        std::shared_ptr<Lumen::ILumenVolume> volume = std::make_shared<PTVolume>(a_FilePath, m_ServiceLocator);
-
-        //volumetric_bookmark
-    //TODO: add volume records to sbt
-    /*volume->m_RecordHandle = m_ShaderBindingTableGenerator->AddHitGroup<DeviceVolume>();
-    auto& rec = volume->m_RecordHandle.GetRecord();
-    rec.m_Header = GetProgramGroupHeader("VolumetricHit");
-    rec.m_Data.m_Grid = volume->m_Handle.grid<float>();*/
-
-        uint32_t geomFlags[1] = { OPTIX_GEOMETRY_FLAG_NONE };
-
-        OptixAccelBuildOptions buildOptions = {};
-        buildOptions.buildFlags = OPTIX_BUILD_FLAG_PREFER_FAST_TRACE;
-        buildOptions.operation = OPTIX_BUILD_OPERATION_BUILD;
-        buildOptions.motionOptions = {};
-
-        OptixAabb aabb = { -1.5f, -1.5f, -1.5f, 1.5f, 1.5f, 1.5f };
-
-        auto grid = std::static_pointer_cast<PTVolume>(volume)->GetHandle()->grid<float>();
-        auto bbox = grid->worldBBox();
-
-        nanovdb::Vec3<double> temp = bbox.min();
-        float bboxMinX = bbox.min()[0];
-        float bboxMinY = bbox.min()[1];
-        float bboxMinZ = bbox.min()[2];
-        float bboxMaxX = bbox.max()[0];
-        float bboxMaxY = bbox.max()[1];
-        float bboxMaxZ = bbox.max()[2];
-
-        aabb = { bboxMinX, bboxMinY, bboxMinZ, bboxMaxX, bboxMaxY, bboxMaxZ };
-
-        MemoryBuffer aabb_buffer(sizeof(OptixAabb));
-        aabb_buffer.Write(aabb);
-
-        OptixBuildInput buildInput = {};
-        buildInput.type = OPTIX_BUILD_INPUT_TYPE_CUSTOM_PRIMITIVES;
-        buildInput.customPrimitiveArray.aabbBuffers = &*aabb_buffer;
-        buildInput.customPrimitiveArray.numPrimitives = 1;
-        buildInput.customPrimitiveArray.flags = geomFlags;
-        buildInput.customPrimitiveArray.numSbtRecords = 1;
-
-        std::static_pointer_cast<PTVolume>(volume)->m_AccelerationStructure = m_OptixSystem->BuildGeometryAccelerationStructure(buildOptions, buildInput);
-        CHECKLASTCUDAERROR;
-
-        return volume;
     }
 
     std::shared_ptr<Lumen::ILumenScene> WaveFrontRenderer::CreateScene(SceneData a_SceneData)
@@ -828,7 +936,6 @@ namespace WaveFront
         // Explicitly destroy the scene before the scene data table to avoid
         // Dereferencing invalid memory addresses
         m_Scene.reset();
-        m_Table.reset();
     }
 
     unsigned WaveFrontRenderer::GetOutputTexture()
@@ -864,14 +971,22 @@ namespace WaveFront
         //Create atomic buffers. This automatically sets the counter to 0 and size to max.
         CreateAtomicBuffer<IntersectionRayData>(&m_Rays, numPrimaryRays);
         CreateAtomicBuffer<ShadowRayData>(&m_ShadowRays, numShadowRays);
-        CreateAtomicBuffer<IntersectionData>(&m_IntersectionData, numPixels);
+		CreateAtomicBuffer<ShadowRayData>(&m_VolumetricShadowRays, numShadowRays);
+		CreateAtomicBuffer<IntersectionData>(&m_IntersectionData, numPixels);
+		CreateAtomicBuffer<VolumetricIntersectionData>(&m_VolumetricIntersectionData, numPixels);
 
-        //Initialize each surface data buffer.
-        for (int i = 0; i < 3; ++i)
-        {
-            //Note; Only allocates memory and stores the size on the GPU. It does not actually fill any data in yet.
-            m_SurfaceData[i].Resize(numPixels * sizeof(SurfaceData));
-        }
+
+		//Initialize each surface data buffer.
+		for (auto& surfaceDataBuffer : m_SurfaceData)
+		{
+			//Note; Only allocates memory and stores the size on the GPU. It does not actually fill any data in yet.
+			surfaceDataBuffer.Resize(numPixels * sizeof(SurfaceData));
+		}
+
+		for (auto& volumetricDataBuffer : m_VolumetricData)
+		{
+			volumetricDataBuffer.Resize(numPixels * sizeof(VolumetricData));
+		}
 
         m_MotionVectors.Init(make_uint2(m_Settings.renderResolution.x, m_Settings.renderResolution.y));
 

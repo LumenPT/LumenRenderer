@@ -28,3 +28,13 @@ function(changePath REGEX_MATCH REGEX_REPLACE RESULT_VAR_NAME)
 	set(${RESULT_VAR_NAME} ${RESULT} PARENT_SCOPE)
 	
 endfunction()
+
+function(printList)
+
+    foreach(ARG IN LISTS ARGN)
+
+        message("${ARG}")
+
+    endforeach()
+
+endfunction()

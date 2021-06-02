@@ -1,67 +1,116 @@
 #include "EmissiveLookup.cuh"
-//#include "../../Framework/CudaUtilities.h"
+#include "../../Framework/CudaUtilities.h"
 #include "../../Framework/PTMaterial.h"
 #include <sutil/vec_math.h>
 #include <cuda_runtime.h>
+#include <cuda_runtime_api.h>
+#include <cassert>
+#include <device_launch_parameters.h>
+#include "../../Shaders/CppCommon/SceneDataTableAccessor.h"
+#include <Lumen/ModelLoading/MeshInstance.h>
 
-CPU_ON_GPU void FindEmissives(const Vertex* a_Vertices, bool* a_EmissiveBools, const uint32_t* a_Indices, const DeviceMaterial* a_Mat, const uint8_t a_VertexBufferSize, unsigned int& a_NumLights)
+
+CPU_ONLY void FindEmissivesWrap(
+    const Vertex* a_Vertices,
+    const uint32_t* a_Indices,
+    bool* a_Emissives,
+    const DeviceMaterial* a_Mat,
+    const uint32_t a_IndexBufferSize,
+    unsigned int& a_NumLights)
 {
+    unsigned int* numLightsPtr;
+    cudaMalloc(&numLightsPtr, sizeof(unsigned int));
+
+    FindEmissives <<<1, 1>>> (a_Vertices, a_Indices, a_Emissives, a_Mat, a_IndexBufferSize, numLightsPtr);
+    cudaDeviceSynchronize();
+    cudaMemcpy(&a_NumLights, numLightsPtr, sizeof(unsigned int), cudaMemcpyDeviceToHost);
+}
+
+CPU_ON_GPU void FindEmissives(
+    const Vertex* a_Vertices,
+    const uint32_t* a_Indices,
+    bool* a_Emissives,
+    const DeviceMaterial* a_Mat,
+    const uint32_t a_IndexBufferSize,
+    unsigned int* a_NumLights)
+{
+
     //const auto devMat = a_Mat->GetDeviceMaterial();
 
     //pack these into triangle
     //find texture coordinates on this triangle (rather than just vertices
     //sample texture at area of triangle through UVs
 
-    for (unsigned int i = 0; i < a_VertexBufferSize; i++)
+    for (unsigned int baseIndex = 0; baseIndex < a_IndexBufferSize; baseIndex+=3)
     {
-        if (i % 3 == 0) 
+
+        //looped over 3 vertices, construct triangle
+
+        const unsigned index0 = a_Indices[baseIndex + 0];
+        const unsigned index1 = a_Indices[baseIndex + 1];
+        const unsigned index2 = a_Indices[baseIndex + 2];
+
+        const Vertex& vert0 = a_Vertices[index0];
+        const Vertex& vert1 = a_Vertices[index1];
+        const Vertex& vert2 = a_Vertices[index2];
+        
+        //calculate triangle area using Heron's formula
+        //const float a = sqrtf(
+        //    powf((vert0.m_UVCoord.y - vert0.m_UVCoord.x), 2) *
+        //    powf((vert1.m_UVCoord.y - vert1.m_UVCoord.x), 2));
+        //const float b = sqrtf(
+        //    powf((vert1.m_UVCoord.y - vert1.m_UVCoord.x), 2) *
+        //    powf((vert2.m_UVCoord.y - vert2.m_UVCoord.x), 2));
+        //const float c = sqrtf(
+        //    powf((vert2.m_UVCoord.y - vert2.m_UVCoord.x), 2) *
+        //    powf((vert0.m_UVCoord.y - vert0.m_UVCoord.x), 2));
+        //
+        //const float semiPerim = 0.5f * (a + b + c);
+        //const float texCoordArea = sqrtf(semiPerim *
+        //    (semiPerim - a) *
+        //    (semiPerim - b) *
+        //    (semiPerim - c));
+
+        constexpr float oneThird = 1.f / 3.f;
+
+        const float2 UVCentroid = (vert0.m_UVCoord + vert1.m_UVCoord + vert2.m_UVCoord) * oneThird;
+
+        //auto diffuseTexture = a_Mat->m_DiffuseTexture;
+        auto emissiveTexture = a_Mat->m_EmissiveTexture;
+
+        //float4 diffuseColor = a_Mat->m_DiffuseColor;
+
+        //if(diffuseTexture)
+        //{
+        //    diffuseColor *= tex2D<float4>(diffuseTexture, UVCentroid.x, UVCentroid.y);
+        //}
+
+        float4 emissiveColor = a_Mat->m_EmissionColor;
+
+        if(emissiveTexture)
         {
-            //looped over 3 vertices, construct triangle
-            const Vertex& vert0 = a_Vertices[i - 2];
-            const Vertex& vert1 = a_Vertices[i - 1];
-            const Vertex& vert2 = a_Vertices[i];
-            
-            //calculate triangle area using Heron's formula
-            //const float a = sqrtf(
-            //    powf((vert0.m_UVCoord.y - vert0.m_UVCoord.x), 2) *
-            //    powf((vert1.m_UVCoord.y - vert1.m_UVCoord.x), 2));
-            //const float b = sqrtf(
-            //    powf((vert1.m_UVCoord.y - vert1.m_UVCoord.x), 2) *
-            //    powf((vert2.m_UVCoord.y - vert2.m_UVCoord.x), 2));
-            //const float c = sqrtf(
-            //    powf((vert2.m_UVCoord.y - vert2.m_UVCoord.x), 2) *
-            //    powf((vert0.m_UVCoord.y - vert0.m_UVCoord.x), 2));
-            //
-            //const float semiPerim = 0.5f * (a + b + c);
-            //const float texCoordArea = sqrtf(semiPerim *
-            //    (semiPerim - a) *
-            //    (semiPerim - b) *
-            //    (semiPerim - c));
-
-            const float2 UVCentroid = make_float2(
-                (vert0.m_UVCoord.x + vert1.m_UVCoord.x + vert2.m_UVCoord.x) / 3, 
-                (vert0.m_UVCoord.y + vert1.m_UVCoord.y + vert2.m_UVCoord.y) / 3);
-
             //sample emission at UVCentroid
-            float4 diffCol = tex2D<float4>(a_Mat->m_DiffuseTexture, UVCentroid.x, UVCentroid.y);
-            float4 emissCol = tex2D<float4>(a_Mat->m_EmissiveTexture, UVCentroid.x, UVCentroid.y);
-            float4 chanEmissCol = make_float4(a_Mat->m_EmissionColor.x, a_Mat->m_EmissionColor.y, a_Mat->m_EmissionColor.z, 1.0f);
-            emissCol *= chanEmissCol;
+            const float4 emissiveTextureColor = tex2D<float4>(emissiveTexture, UVCentroid.x, UVCentroid.y);
+            emissiveColor *= emissiveTextureColor;
+        }
 
-            float3 emission = make_float3(diffCol.x * emissCol.x, diffCol.y * emissCol.y, diffCol.z * emissCol.z);
-            float3 nullVec = make_float3(0, 0, 0);
+        const float4 finalEmission = emissiveColor;
 
-            //if diffuse is not transparent and emission is not 0
-            if (diffCol.w != 0.0f && emission.x != 0.0f && emission.y != 0.0f && emission.z != 0.0f)
-            {
-                a_EmissiveBools[i - 2] = true;
-                a_NumLights++;
-                continue;
-            }
+        assert(!isnan(finalEmission.x));
+        assert(!isnan(finalEmission.y));
+        assert(!isnan(finalEmission.z));
+        assert(!isnan(finalEmission.w));
 
-            a_EmissiveBools[i - 2] = false;
+        const unsigned triangleIndex = baseIndex / 3; //Base index goes up by three each loop, divide by three to get the num of triangles before current value.
+        //if emission not equal to 0
+        if ((finalEmission.x > 0.0f || finalEmission.y > 0.0f || finalEmission.z > 0.0f) && finalEmission.w > 0.f)
+        {
+            a_Emissives[triangleIndex] = true;
+            (*a_NumLights)++;
             continue;
         }
+
+        a_Emissives[triangleIndex] = false;
 
         //const Vertex& vertex = a_Vertices[i];
         //
@@ -74,69 +123,151 @@ CPU_ON_GPU void FindEmissives(const Vertex* a_Vertices, bool* a_EmissiveBools, c
     }
 }
 
-
-
-CPU_ON_GPU void AddToLightBuffer(const Vertex* a_Vertices, const uint32_t* a_Indices, 
-    const bool* a_Emissives, const uint8_t a_VertexBufferSize, WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights,
-    /* unsigned int& a_LightIndex,*/ sutil::Matrix4x4 a_TransformMat)
+CPU_ONLY void AddToLightBufferWrap(
+    const Vertex* a_Vertices,
+    const uint32_t* a_Indices,
+    const bool* a_Emissives,
+    const uint32_t a_IndexBufferSize,
+    WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights,
+    SceneDataTableAccessor* a_SceneDataTable,
+    unsigned a_InstanceId)
 {
-    //Loop over triangles in primitive
-    for (unsigned int i = 0; i < a_VertexBufferSize; i+=3)
+    const unsigned int numTriangles = a_IndexBufferSize / 3;
+    const int blockSize = 256;
+    const int numBlocks = (numTriangles + blockSize - 1) / blockSize;
+
+    AddToLightBuffer <<<numBlocks, blockSize>>> (a_Vertices, a_Indices, a_Emissives, a_IndexBufferSize, a_Lights, a_SceneDataTable, a_InstanceId);
+}
+
+CPU_ON_GPU void AddToLightBuffer(
+    const Vertex* a_Vertices,
+    const uint32_t* a_Indices,
+    const bool* a_Emissives,
+    const uint32_t a_IndexBufferSize,
+    WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights,
+    SceneDataTableAccessor* a_SceneDataTable,
+    unsigned a_InstanceId)
+{
+
+    const unsigned numTriangles = a_IndexBufferSize / 3; //Num of triangles we are processing (max bound).
+    const unsigned int index = blockIdx.x * blockDim.x + threadIdx.x; //First triangle index this thread executes on.
+    const unsigned int stride = blockDim.x * gridDim.x; //Stride is too handle the entire buffer of elements.
+    //If there are more elements than the total amount of threads. 
+
+    for(unsigned int triangleIndex = index; triangleIndex < numTriangles; triangleIndex += stride)
     {
+        const unsigned baseIndex = triangleIndex * 3; //We run this function for each triangle, triangle has 3 vertices.
+
+        assert(a_SceneDataTable->GetTableEntry<DevicePrimitive>(a_InstanceId) != nullptr);
+        const auto devicePrimitiveInstance = a_SceneDataTable->GetTableEntry<DevicePrimitiveInstance>(a_InstanceId);
+        const auto devicePrimitive = devicePrimitiveInstance->m_Primitive;
+
+        //TODO this can be optimized in case of override.
         //check first vertex of triangle to see if its in emissive buffer
-        if (a_Emissives[i - 2] == true)
-        //if (i % 3 == 0 && a_Emissives[i - 2] == true)
+        if ((devicePrimitiveInstance->m_EmissionMode == Lumen::EmissionMode::ENABLED && a_Emissives[triangleIndex] == true) || devicePrimitiveInstance->m_EmissionMode == Lumen::EmissionMode::OVERRIDE)
         {
-            const Vertex& vert0 = a_Vertices[i - 2];
-            const Vertex& vert1 = a_Vertices[i - 1];
-            const Vertex& vert2 = a_Vertices[i];
+            const unsigned index0 = a_Indices[baseIndex + 0];
+            const unsigned index1 = a_Indices[baseIndex + 1];
+            const unsigned index2 = a_Indices[baseIndex + 2];
+
+            const Vertex& vert0 = a_Vertices[index0];
+            const Vertex& vert1 = a_Vertices[index1];
+            const Vertex& vert2 = a_Vertices[index2];
 
             //check if normal is here
-
-            //calculate triangle area using Heron's formula
-            const float a = sqrtf(
-                powf((vert0.m_UVCoord.y - vert0.m_UVCoord.x), 2) *
-                powf((vert1.m_UVCoord.y - vert1.m_UVCoord.x), 2));
-            const float b = sqrtf(
-                powf((vert1.m_UVCoord.y - vert1.m_UVCoord.x), 2) *
-                powf((vert2.m_UVCoord.y - vert2.m_UVCoord.x), 2));
-            const float c = sqrtf(
-                powf((vert2.m_UVCoord.y - vert2.m_UVCoord.x), 2) *
-                powf((vert0.m_UVCoord.y - vert0.m_UVCoord.x), 2));
-            
-            const float semiPerim = 0.5f * (a + b + c);
-            const float texCoordArea = sqrtf(semiPerim *
-                (semiPerim - a) *
-                (semiPerim - b) *
-                (semiPerim - c));
-
-            //transform vertex pos to worldspace
-            //transform * vertexpos
-
             float4 tempWorldPos;
-            WaveFront::TriangleLight light;
+            WaveFront::TriangleLight light{};
             //Need it this way because need float3 to float4 and back conversions
             //Light vertex 0
-            tempWorldPos = { vert0.m_Position.x, vert0.m_Position.y, vert0.m_Position.z, 0.0f };
-            tempWorldPos = a_TransformMat * tempWorldPos;
-            light.p0 = { tempWorldPos.x, tempWorldPos.y, tempWorldPos.z };
+            tempWorldPos = make_float4(vert0.m_Position, 1.f);
+            tempWorldPos = devicePrimitiveInstance->m_Transform * tempWorldPos;
+            light.p0 = make_float3(tempWorldPos);
             //Light vertex 1
-            tempWorldPos = { vert1.m_Position.x, vert1.m_Position.y, vert1.m_Position.z, 0.0f };
-            tempWorldPos = a_TransformMat * tempWorldPos;
-            light.p1 = { tempWorldPos.x, tempWorldPos.y, tempWorldPos.z };
+            tempWorldPos = { vert1.m_Position.x, vert1.m_Position.y, vert1.m_Position.z, 1.0f };
+            tempWorldPos = devicePrimitiveInstance->m_Transform * tempWorldPos;
+            light.p1 = make_float3(tempWorldPos);
             //Light vertex 2
-            tempWorldPos = { vert2.m_Position.x, vert2.m_Position.y, vert2.m_Position.z, 0.0f };
-            tempWorldPos = a_TransformMat * tempWorldPos;
-            light.p2 = { tempWorldPos.x, tempWorldPos.y, tempWorldPos.z };
+            tempWorldPos = { vert2.m_Position.x, vert2.m_Position.y, vert2.m_Position.z, 1.0f };
+            tempWorldPos = devicePrimitiveInstance->m_Transform * tempWorldPos;
+            light.p2 = make_float3(tempWorldPos);
 
-            light.radiance = {2000, 2000, 2000};
-            light.normal = (vert0.m_Normal + vert1.m_Normal + vert2.m_Normal) * 0.33f;
-            light.area = texCoordArea;  //should be worldspace area, not UV area
-            //a_Lights[a_LightIndex + (i - 2)] = light; //wrongwrongwrong
+            constexpr float oneThird = 1.f / 3.f;
+            const float2 UVCentroid = (vert0.m_UVCoord + vert1.m_UVCoord + vert2.m_UVCoord) * oneThird;
 
+            auto mat = devicePrimitiveInstance->m_Primitive.m_Material;
+
+            //float4 diffuseColor = a_Mat->m_DiffuseColor;
+
+            //if (diffuseTexture)
+            //{
+            //    diffuseColor *= tex2D<float4>(diffuseTexture, UVCentroid.x, UVCentroid.y);
+            //}
+
+            //Emissive mode
+            float4 emissive = make_float4(0.f);
+
+            //When enabled, just read the GLTF data and scale it accordingly.
+            if (devicePrimitiveInstance->m_EmissionMode == Lumen::EmissionMode::ENABLED)
+            {
+                emissive = tex2D<float4>(mat->m_EmissiveTexture, UVCentroid.x, UVCentroid.y);
+                emissive *= mat->m_EmissionColor * devicePrimitiveInstance->m_EmissiveColorAndScale.w;
+            }
+            //When override, take the ovverride emissive color and scale it up.
+            else if (devicePrimitiveInstance->m_EmissionMode == Lumen::EmissionMode::OVERRIDE)
+            {
+                emissive = devicePrimitiveInstance->m_EmissiveColorAndScale * devicePrimitiveInstance->m_EmissiveColorAndScale.w;
+            }
+
+            light.radiance = make_float3(emissive);
+            light.normal = (vert0.m_Normal + vert1.m_Normal + vert2.m_Normal) * oneThird;
+
+            const float3 vec1 = light.p0 - light.p1;
+            const float3 vec2 = light.p0 - light.p2;
+
+            light.area = sqrtf(
+                pow((vec1.y * vec2.z - vec2.y * vec1.z), 2) +
+                pow((vec1.x * vec2.z - vec2.x * vec1.z), 2) +
+                pow((vec1.x * vec2.y - vec2.x * vec1.y), 2)
+            ) / 2.0f;
+
+            a_Lights->Add(&light);
 
             //Add light to lightbuffer, but to know where the end of the buffer is, keep track of lightIndex.
             //Dont know how many lights have already been added to buffer.
         }
+        
     }
+
 }
+
+//CPU_ON_GPU void AddToLightBuffer2()
+//{
+//    /*WaveFront::TriangleLight* light;
+//
+//    light->p0 = { 75.f, 75.f, 75.f };
+//    light->p1 = { 100.f,75.f, 100.f };
+//    light->p2 = { 25.f, 100.f, 25.f };
+//
+//    light->radiance = { 2000, 2000, 2000 };
+//    light->normal = {0.f, -1.f, 0.f};
+//
+//    float3 vec1 = light->p0 - light->p1;
+//    float3 vec2 = light->p0 - light->p2;
+//
+//    light->area = sqrtf(
+//        pow((vec1.y * vec2.z - vec2.y * vec1.z), 2) +
+//        pow((vec1.x * vec2.z - vec2.x * vec1.z), 2) +
+//        pow((vec1.x * vec2.y - vec2.x * vec1.y), 2)
+//    ) / 2.0f;
+//
+//    light->area = sqrtf(
+//        pow((vec1.y * vec2.z - vec2.y * vec1.z), 2) +
+//        pow((vec1.x * vec2.z - vec2.x * vec1.z), 2) +
+//        pow((vec1.x * vec2.y - vec2.x * vec1.y), 2)
+//    ) / 2.0f;
+//
+//    a_Lights->Add(light);*/
+//    cudaDeviceSynchronize();
+//    printf("calling AddToLightBuffer2\n");
+//
+//}

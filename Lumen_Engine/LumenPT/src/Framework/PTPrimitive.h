@@ -25,12 +25,12 @@ public:
 
 	std::unique_ptr<MemoryBuffer> m_VertBuffer; // Memory buffer containing the vertex data of the primitive
 	std::unique_ptr<MemoryBuffer> m_IndexBuffer; // Memory buffer containing the index data if such exists
-	std::unique_ptr<MemoryBuffer> m_BoolBuffer; // ???????
+	std::unique_ptr<MemoryBuffer> m_BoolBuffer; // Indicating which triangles are emissive
 	// The geometry acceleration structure of the primitive. This is used when creating the instance acceleration structure of the owner mesh
 	std::unique_ptr<AccelerationStructure> m_GeometryAccelerationStructure; 
 
-	// Handle to the primitive's entry in the scene data table
-    // Controls what data is associated with the primitive and what instance ID it gets during IAS construction
-	SceneDataTableEntry<DevicePrimitive> m_SceneDataTableEntry;
+	// Copy of the data representing this primitive on the GPU
+	// May be partially overriden by mesh instance specific data 
+	DevicePrimitive m_DevicePrimitive; // Put this on the GPU
 private:
 };

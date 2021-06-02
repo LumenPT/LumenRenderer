@@ -1,18 +1,44 @@
 #include "GPUShadingKernels.cuh"
+#include "../VolumetricKernels/GPUVolumetricShadingKernels.cuh"
+#include "../../Shaders/CppCommon/RenderingUtility.h"
 #include <device_launch_parameters.h>
 #include <sutil/vec_math.h>
 
-#include "../../Shaders/CppCommon/RenderingUtility.h"
+CPU_ON_GPU void ResolveDirectLightHits(
+    const SurfaceData* a_SurfaceDataBuffer,
+    const unsigned a_NumPixels,
+    float3* a_OutputChannels
+)
+{
+    const unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
+    const unsigned int stride = blockDim.x * gridDim.x;
+
+    //Handles cases where there are less threads than there are pixels.
+    //i becomes index and is to be used by in functions where you need the pixel index.
+    //i will update to a new pixel index if there is less threads than there are pixels.
+    for (unsigned int i = index; i < a_NumPixels; i += stride)
+    {
+        auto& pixel = a_SurfaceDataBuffer[i];
+        //If the surface is emissive, store its light directly in the output buffer.
+        if (pixel.m_Emissive)
+        {
+            a_OutputChannels[static_cast<int>(WaveFront::LightChannel::NUM_CHANNELS) * index + static_cast<int>(WaveFront::LightChannel::DIRECT)] = pixel.m_Color;
+        }
+    }
+}
 
 CPU_ON_GPU void ShadeDirect(
     const uint3 a_ResolutionAndDepth,
     const SurfaceData* a_TemporalSurfaceDatBuffer,
     const SurfaceData* a_SurfaceDataBuffer,
+    const VolumetricData* a_VolumetricDataBuffer,
     AtomicBuffer<ShadowRayData>* const a_ShadowRays,
-    const TriangleLight* const a_Lights,
+	AtomicBuffer<ShadowRayData>* const a_VolumetricShadowRays,
+    const AtomicBuffer<TriangleLight>* const a_Lights,
     const unsigned a_Seed,
     const unsigned a_CurrentDepth,
-    const CDF* const a_CDF
+    const CDF* const a_CDF,
+	float3* a_Output
 )
 {
     const unsigned int numPixels = a_ResolutionAndDepth.x * a_ResolutionAndDepth.y;
@@ -26,6 +52,10 @@ CPU_ON_GPU void ShadeDirect(
     //i will update to a new pixel index if there is less threads than there are pixels.
     for (unsigned int i = index; i < numPixels; i += stride)
     {
+
+        //TODO: return some form of light transform factor after resolving the distances in the volume.
+        VolumetricShadeDirect(i, a_ResolutionAndDepth, a_VolumetricDataBuffer, a_VolumetricShadowRays, a_Lights, a_CDF, a_Output);
+
         // Get intersection.
         const SurfaceData& surfaceData = a_SurfaceDataBuffer[i];
 
@@ -36,7 +66,7 @@ CPU_ON_GPU void ShadeDirect(
             float pdf;
             a_CDF->Get(RandomFloat(seed), index, pdf);
 
-            auto light = a_Lights[index];
+            auto& light = *a_Lights->GetData(index);
 
             //Pick random point on light.
             const float u = RandomFloat(seed);

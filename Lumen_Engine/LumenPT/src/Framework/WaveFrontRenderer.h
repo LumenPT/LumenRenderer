@@ -6,6 +6,8 @@
 #include "MotionVectors.h"
 #include "../Shaders/CppCommon/WaveFrontDataStructs.h"
 #include "PTServiceLocator.h"
+#include "Nvidia/INRDWrapper.h"
+#include "Nvidia/IDLSSWrapper.h"
 
 #include "Renderer/LumenRenderer.h"
 
@@ -23,6 +25,11 @@ namespace WaveFront
 {
     struct WaveFrontSettings
     {
+
+        std::filesystem::path m_ShadersFilePathSolids;
+
+        std::filesystem::path m_ShadersFilePathVolumetrics;
+
         //The maximum path length in the scene.
         std::uint32_t depth;
 
@@ -49,7 +56,7 @@ namespace WaveFront
         void PerformDeferredOperations() override;
 
         std::unique_ptr<Lumen::ILumenPrimitive> CreatePrimitive(PrimitiveData& a_PrimitiveData) override;
-        std::shared_ptr<Lumen::ILumenMesh> CreateMesh(std::vector<std::unique_ptr<Lumen::ILumenPrimitive>>& a_Primitives) override;
+        std::shared_ptr<Lumen::ILumenMesh> CreateMesh(std::vector<std::shared_ptr<Lumen::ILumenPrimitive>>& a_Primitives) override;
         std::shared_ptr<Lumen::ILumenTexture> CreateTexture(void* a_PixelData, uint32_t a_Width, uint32_t a_Height) override;
         std::shared_ptr<Lumen::ILumenMaterial> CreateMaterial(const MaterialData& a_MaterialData) override;
         std::shared_ptr<Lumen::ILumenVolume> CreateVolume(const std::string& a_FilePath) override;
@@ -114,14 +121,23 @@ namespace WaveFront
         //The surface data per pixel. 0 and 1 are used for the current and previous frame. 2 is used for any other depth.
         MemoryBuffer m_SurfaceData[3];
 
+        //The volumetric data per pixel.
+        MemoryBuffer m_VolumetricData[1];
+
         //Intersection points passed to Optix.
         MemoryBuffer m_IntersectionData;
+
+		//Volumetric intersection data passed to Optix
+		MemoryBuffer m_VolumetricIntersectionData;
 
         //Buffer containing intersection rays.
         MemoryBuffer m_Rays;
 
         //Buffer containing shadow rays.
         MemoryBuffer m_ShadowRays;
+
+        //Buffer containing volumetric shadow rays.
+        MemoryBuffer m_VolumetricShadowRays;
 
         //Buffer used for output of separate channels of light.
         MemoryBuffer m_PixelBufferSeparate;
@@ -137,6 +153,12 @@ namespace WaveFront
 
         //Optix system
         std::unique_ptr<OptixWrapper> m_OptixSystem;
+
+        //NRI Wrapper
+        std::unique_ptr<INRDWrapper> m_NRD;
+
+        //DLSS Wrapper
+        std::unique_ptr<IDLSSWrapper> m_DLSS;
 
         //ReSTIR
         std::unique_ptr<ReSTIR> m_ReSTIR;
@@ -169,9 +191,6 @@ namespace WaveFront
         bool m_StopRendering;
 
         GLuint m_OutputTexture;
-
-        //Kamen's lookup table
-        std::unique_ptr<SceneDataTable> m_Table;
 
         // The Frame Snapshot is used to define what to record when the output layer requests that
         // See TraceFrame() ##ToolsBookmark for example

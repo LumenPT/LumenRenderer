@@ -31,6 +31,7 @@ CPU_ONLY void ReSTIR::Initialize(const ReSTIRSettings& a_Settings)
 		//At most one shadow ray per reservoir. Always resize even when big enough already, because this is initialization so it should not happen often.
 		const size_t size = static_cast<size_t>(m_Settings.width) * static_cast<size_t>(m_Settings.height) * m_Settings.numReservoirsPerPixel;
 		WaveFront::CreateAtomicBuffer<RestirShadowRay>(&m_ShadowRays, size);
+		WaveFront::CreateAtomicBuffer<RestirShadowRayShading>(&m_ShadowRaysShading, size);
 	}
 
 	//Reservoirs
@@ -63,14 +64,14 @@ CPU_ONLY void ReSTIR::Initialize(const ReSTIRSettings& a_Settings)
 CPU_ONLY void ReSTIR::Run(
 	const WaveFront::SurfaceData* const a_CurrentPixelData,
 	const WaveFront::SurfaceData* const a_PreviousPixelData,
-	const WaveFront::TriangleLight* a_Lights,
-	const unsigned a_NumLights,
+	const MemoryBuffer const* a_Lights,
 	const float3& a_CameraPosition,
 	const std::uint32_t a_Seed,
 	const OptixTraversableHandle a_OptixSceneHandle,
 	WaveFront::AtomicBuffer<WaveFront::ShadowRayData>* a_WaveFrontShadowRayBuffer,
 	const WaveFront::OptixWrapper* a_OptixSystem,
 	WaveFront::MotionVectorBuffer* a_MotionVectorBuffer,
+	float3* a_OutputBuffer,
 	bool a_DebugPrint
 )
 {
@@ -101,18 +102,22 @@ CPU_ONLY void ReSTIR::Run(
 
 	//Update the CDF for the provided light sources.
 	timer.reset();
-	BuildCDF(a_Lights, a_NumLights);
-	if(a_DebugPrint) printf("Building CDF time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
-
+	BuildCDF(a_Lights);
+	if (a_DebugPrint)
+	{
+		auto size = WaveFront::GetAtomicCounter<WaveFront::TriangleLight>(a_Lights);
+		printf("Building CDF time required: %f millis.\n NumLight: %u\n", timer.measure(TimeUnit::MILLIS), size);
+	}
 	//Fill light bags with values from the CDF.
 	{
 		timer.reset();
-		FillLightBags(m_Settings.numLightBags, m_Settings.numLightsPerBag, static_cast<CDF*>(m_Cdf.GetDevicePtr()), static_cast<LightBagEntry*>(m_LightBags.GetDevicePtr()), a_Lights, a_Seed);
+		FillLightBags(m_Settings.numLightBags, m_Settings.numLightsPerBag, static_cast<CDF*>(m_Cdf.GetDevicePtr()), static_cast<LightBagEntry*>(m_LightBags.GetDevicePtr()), a_Lights->GetDevicePtr<WaveFront::AtomicBuffer<WaveFront::TriangleLight>>(), a_Seed);
 		if (a_DebugPrint) printf("Filling light bags time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
 	}
 
 	/*
 	 * Pick primary samples in parallel. Store the samples in the reservoirs.
+	 * This also resolves directly hitting lights with the camera.
 	 */
 	seed = WangHash(seed);
 	timer.reset();
@@ -128,12 +133,13 @@ CPU_ONLY void ReSTIR::Run(
 	const unsigned int numRaysGenerated = GenerateReSTIRShadowRays(&m_ShadowRays, static_cast<Reservoir*>(m_Reservoirs[currentIndex].GetDevicePtr()), a_CurrentPixelData, numReservoirs);
 	if (a_DebugPrint) printf("ReSTIR Shadow Ray Generation time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
 
+
 	//Parameters for optix launch.
 	WaveFront::OptixLaunchParameters params;
 	params.m_TraversableHandle = a_OptixSceneHandle;
 	params.m_Reservoirs = static_cast<Reservoir*>(m_Reservoirs[currentIndex].GetDevicePtr());
 	params.m_ReSTIRShadowRayBatch = m_ShadowRays.GetDevicePtr<WaveFront::AtomicBuffer<RestirShadowRay>>();
-	params.m_MinMaxDistance = { 0.1f, 5000.f };	//TODO use actual numbers but idk which ones are okay ish?
+	params.m_MinMaxDistance = { 0.1f, 10000.f };	//TODO use actual numbers but idk which ones are okay ish?
 	params.m_ResolutionAndDepth = make_uint3(m_Settings.width, m_Settings.height, 1);
 	params.m_TraceType = WaveFront::RayType::RESTIR_RAY;
 
@@ -181,14 +187,42 @@ CPU_ONLY void ReSTIR::Run(
 		if (a_DebugPrint) printf("Spatial sampling time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
 	}
 
-	timer.reset();
-	GenerateWaveFrontShadowRays(
-		static_cast<Reservoir*>(m_Reservoirs[currentIndex].GetDevicePtr()),
-		a_CurrentPixelData,
-		a_WaveFrontShadowRayBuffer,
-		numPixels
-	);
-	if (a_DebugPrint) printf("Generating wavefront shadow rays time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
+	{
+		/*
+		 * This is disabled because using the regular shadow rays meant not being able to set reservoirs to 0.
+		 */
+		 //timer.reset();
+		 //GenerateWaveFrontShadowRays(
+		 //	static_cast<Reservoir*>(m_Reservoirs[currentIndex].GetDevicePtr()),
+		 //	a_CurrentPixelData,
+		 //	a_WaveFrontShadowRayBuffer,
+		 //	numPixels
+		 //);
+		 //if (a_DebugPrint) printf("Generating wavefront shadow rays time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
+	}
+
+	{
+		/*
+		 * Instead of regular shadow rays, make more ReSTIRShadowRays.
+		 * Then do another optix launch to resolve them.
+		 */
+		timer.reset();
+		const unsigned int numRaysGenerated = GenerateReSTIRShadowRaysShading(&m_ShadowRaysShading, static_cast<Reservoir*>(m_Reservoirs[currentIndex].GetDevicePtr()), a_CurrentPixelData, numPixels);
+		if (a_DebugPrint) printf("ReSTIR Shading Ray Generation time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
+
+	    //Parameters for optix launch.
+		params.m_TraceType = WaveFront::RayType::RESTIR_SHADING_RAY;
+		params.m_ResultBuffer = a_OutputBuffer;
+		params.m_ReSTIRShadowRayShadingBatch = m_ShadowRaysShading.GetDevicePtr<WaveFront::AtomicBuffer<RestirShadowRayShading>>();
+
+		//Tell Optix to resolve all shadow rays, which sets reservoir weight to 0 when occluded.
+		if (numRaysGenerated > 0)
+		{
+			timer.reset();
+			a_OptixSystem->TraceRays(numRaysGenerated, params);
+			if (a_DebugPrint) printf("Tracing ReSTIR Shading Ray time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
+		}
+	}
 
 	//Ensure CUDA is done executing now.
 	cudaDeviceSynchronize();
@@ -200,7 +234,7 @@ CPU_ONLY void ReSTIR::Run(
 	m_SwapDirtyFlag = false;
 }
 
-void ReSTIR::BuildCDF(const WaveFront::TriangleLight* a_Lights, const unsigned a_NumLights)
+void ReSTIR::BuildCDF(const MemoryBuffer const* a_Lights)
 {
 	/*
      * Resize buffers based on the amount of lights and update data.
@@ -208,7 +242,8 @@ void ReSTIR::BuildCDF(const WaveFront::TriangleLight* a_Lights, const unsigned a
      */
      //CDF
 	{
-		const auto cdfNeededSize = sizeof(CDF) + (a_NumLights * sizeof(float));
+		const auto numLights = WaveFront::GetAtomicCounter<WaveFront::TriangleLight>(a_Lights);
+		const auto cdfNeededSize = sizeof(CDF) + (numLights * sizeof(float));
 		//Allocate enough memory for the CDF struct and the fixed sum entries.
 		if (m_Cdf.GetSize() < cdfNeededSize)
 		{
@@ -216,7 +251,7 @@ void ReSTIR::BuildCDF(const WaveFront::TriangleLight* a_Lights, const unsigned a
 		}
 
 		//Insert the light data in the CDF.
-		FillCDF(static_cast<CDF*>(m_Cdf.GetDevicePtr()), a_Lights, a_NumLights);
+		FillCDF(static_cast<CDF*>(m_Cdf.GetDevicePtr()), a_Lights->GetDevicePtr<WaveFront::AtomicBuffer<WaveFront::TriangleLight>>(), numLights);
 	}
 }
 
