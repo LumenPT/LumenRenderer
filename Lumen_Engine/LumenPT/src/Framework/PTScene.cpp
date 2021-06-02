@@ -45,7 +45,7 @@ Lumen::VolumeInstance* PTScene::AddVolume()
     // Create the new mesh of the path tracer volume instance type
     auto ptVolInst = std::make_unique<PTVolumeInstance>(m_Services);
     // Set the scene reference for the new instance
-    ptVolInst->m_SceneRef = this;
+    ptVolInst->SetSceneRef(this);
     // Add the instance to the list of all instances and return a raw pointer to it
     m_VolumeInstances.push_back(std::move(ptVolInst));
     return m_VolumeInstances.back().get();

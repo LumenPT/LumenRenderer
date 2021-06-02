@@ -312,6 +312,8 @@ namespace WaveFront
         const unsigned int numLightsInScene = GetAtomicCounter<WaveFront::TriangleLight>(&m_TriangleLights);
         if (numLightsInScene == 0)
         {
+            // Are you sure there are lights in the scene? Then restart the application, weird bugs man.
+            __debugbreak();
             return;
         }
 
