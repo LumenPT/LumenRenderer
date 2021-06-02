@@ -5,6 +5,8 @@
 #include <Cuda/cuda/helpers.h>
 #include <cassert>
 
+#include "CUDAKernels/disney.cuh"
+
 namespace WaveFront
 {
 
@@ -14,9 +16,7 @@ namespace WaveFront
         CPU_GPU SurfaceData(float3 a_Position, 
             float3 a_Normal,
             float a_IntersectionT,
-            float3 a_Color,
-            float a_Metallic,
-            float a_Roughness,
+            ShadingData a_ShadingData,
             bool a_Emissive,
             float3 a_IncomingRayDirection,
             float3 a_TransportFactor)
@@ -24,9 +24,7 @@ namespace WaveFront
         m_Position(a_Position),
         m_Normal(a_Normal),
         m_IntersectionT(a_IntersectionT),
-        m_Color(a_Color),
-        m_Metallic(a_Metallic),
-        m_Roughness(a_Roughness),
+    	m_ShadingData(a_ShadingData),
         m_Emissive(a_Emissive),
         m_IncomingRayDirection(a_IncomingRayDirection),
         m_TransportFactor(a_TransportFactor)
@@ -45,12 +43,10 @@ namespace WaveFront
         float m_IntersectionT;
         //Direction of the ray that caused the intersection.
         float3 m_IncomingRayDirection;
-        //Color at the point of intersection. If m_Emissive is false it is the diffuse color otherwise it is the emissive color.
-        float3 m_Color;
-        //Metallic factor at the point of intersection.
-        float m_Metallic;
-        //Roughness factor at the point of intersection.
-        float m_Roughness;
+
+    	//Shading related data such as color, roughness, metallicness and transmission. etc.
+        ShadingData m_ShadingData;  
+    	
         //Defines if the color at the intersection is emissive or diffuse.
         bool m_Emissive;
         //The amount of light that is transported as a scalar-factor.

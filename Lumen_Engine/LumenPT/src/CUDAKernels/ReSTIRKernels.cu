@@ -6,6 +6,7 @@
 #include <cuda/device_atomic_functions.h>
 #include <cassert>
 
+#include "disney.cuh"
 #include "../Framework/CudaUtilities.h"
 
 #define CUDA_BLOCK_SIZE 512
@@ -816,14 +817,18 @@ __device__ __inline__ void Resample(LightSample* a_Input, const WaveFront::Surfa
     const float solidAngle = (cosOut * a_Input->area) / (lDistance * lDistance);
 
     //BSDF is equal to material color for now.
-    const auto brdf = MicrofacetBRDF(pixelToLightDir, -a_PixelData->m_IncomingRayDirection, a_PixelData->m_Normal,
-                                     a_PixelData->m_Color, a_PixelData->m_Metallic, a_PixelData->m_Roughness);
+    //const auto brdf = MicrofacetBRDF(pixelToLightDir, -a_PixelData->m_IncomingRayDirection, a_PixelData->m_Normal,
+    //                                 a_PixelData->m_Color, a_PixelData->m_Metallic, a_PixelData->m_Roughness);
 
     //The unshadowed contribution (contributed if no obstruction is between the light and surface) takes the BRDF,
     //geometry factor and solid angle into account. Also the light radiance.
     //The only thing missing from this is the scaling with the rest of the scene based on the reservoir PDF.
     //Note: No need to multiply with transport factor because this is depth 0. It is always {1, 1, 1}.
+    //const auto unshadowedPathContribution = brdf * solidAngle * cosIn * a_Output->radiance;
+
+    const auto bsdf = EvaluateBSDF();
     const auto unshadowedPathContribution = brdf * solidAngle * cosIn * a_Output->radiance;
+	
     a_Output->unshadowedPathContribution = unshadowedPathContribution;
 
     assert(unshadowedPathContribution.x >= 0 && unshadowedPathContribution.y >= 0 && unshadowedPathContribution.z >= 0);
