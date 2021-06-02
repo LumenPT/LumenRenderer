@@ -9,6 +9,7 @@ CPU_ON_GPU void ExtractVolumetricDataGpu(
     const WaveFront::AtomicBuffer<WaveFront::IntersectionRayData>* a_Rays,
     const WaveFront::AtomicBuffer<WaveFront::VolumetricIntersectionData>* a_IntersectionData,
     WaveFront::VolumetricData* a_OutPut,
+    uint2 a_Resolution,
     SceneDataTableAccessor* a_SceneDataTable)
 {
 
@@ -19,7 +20,7 @@ CPU_ON_GPU void ExtractVolumetricDataGpu(
 
         const VolumetricIntersectionData* currIntersection = a_IntersectionData->GetData(i);
         const IntersectionRayData* currRay = a_Rays->GetData(currIntersection->m_RayArrayIndex);
-        unsigned int pixelIndex = currIntersection->m_PixelIndex;
+        unsigned int pixelIndex = currIntersection->m_PixelIndex.m_Y * a_Resolution.x + currIntersection->m_PixelIndex.m_X;
 
 
         //TODO: for each intersection fill a VolumetricData struct and place in the right pixel index.
@@ -27,7 +28,7 @@ CPU_ON_GPU void ExtractVolumetricDataGpu(
         //eg. incoming ray direction, entryIntersectionT, exitIntersectionT, position, etc.
 
         auto& output = a_OutPut[pixelIndex];
-        output.m_PixelIndex = pixelIndex;
+        output.m_PixelIndex = currIntersection->m_PixelIndex;
         output.m_PositionEntry = currRay->m_Origin + currRay->m_Direction * currIntersection->m_EntryT;
         output.m_PositionExit = currRay->m_Origin + currRay->m_Direction * currIntersection->m_ExitT;
 		output.m_IncomingRayDirection = currRay->m_Direction;

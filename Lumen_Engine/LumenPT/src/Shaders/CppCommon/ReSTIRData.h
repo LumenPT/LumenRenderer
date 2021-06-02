@@ -5,6 +5,7 @@
  */
 
 #include "CudaDefines.h"
+#include "./WaveFrontDataStructs/PixelIndex.h"
 #include "WaveFrontDataStructs/LightData.h"
 
 #include <Optix/optix.h>
@@ -80,10 +81,12 @@ struct RestirShadowRay
  */
 struct RestirShadowRayShading
 {
+
     float3 origin;      //Ray origin.
     float3 direction;   //Ray direction, normalized.
     float distance;     //The distance of the light source from the origin along the ray direction.
     unsigned index;     //The index into the reservoir buffer at which to set weight to 0 when occluded.
+    WaveFront::PixelIndex pixelIndex;
     float3 contribution;    //The potential contribution if un-occluded.
 };
 
@@ -100,6 +103,7 @@ struct LightSample
     float area;
     float3 unshadowedPathContribution;       //Contribution with geometry and BSDF taken into account.
     float solidAnglePdf;                    //solid angle PDF which is used to weight this samples importance.
+    int  s = sizeof(RestirShadowRayShading);
 };
 
 /*

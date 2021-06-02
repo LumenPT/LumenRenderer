@@ -6,25 +6,35 @@
 
 CPU_ON_GPU void ResolveDirectLightHits(
     const SurfaceData* a_SurfaceDataBuffer,
-    const unsigned a_NumPixels,
-    float3* a_OutputChannels
+    const uint2 a_Resolution,
+    cudaSurfaceObject_t a_Output
 )
 {
-    const unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
-    const unsigned int stride = blockDim.x * gridDim.x;
 
-    //Handles cases where there are less threads than there are pixels.
-    //i becomes index and is to be used by in functions where you need the pixel index.
-    //i will update to a new pixel index if there is less threads than there are pixels.
-    for (unsigned int i = index; i < a_NumPixels; i += stride)
+    const unsigned int pixelX = blockIdx.x * blockDim.x + threadIdx.x;
+    const unsigned int pixelY = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if(pixelX < a_Resolution.x && pixelY < a_Resolution.y)
     {
-        auto& pixel = a_SurfaceDataBuffer[i];
+
+        const unsigned int pixelDataIndex = PIXEL_DATA_INDEX(pixelX, pixelY, a_Resolution.x);
+
+        auto& pixelData = a_SurfaceDataBuffer[pixelDataIndex];
         //If the surface is emissive, store its light directly in the output buffer.
-        if (pixel.m_Emissive)
+        if (pixelData.m_Emissive)
         {
-            a_OutputChannels[static_cast<int>(WaveFront::LightChannel::NUM_CHANNELS) * index + static_cast<int>(WaveFront::LightChannel::DIRECT)] = pixel.m_Color;
+            surf2DLayeredwrite<float4>(
+                make_float4(pixelData.m_Color, 1.f),
+                a_Output,
+                pixelX * sizeof(float4),
+                pixelY,
+                static_cast<unsigned int>(LightChannel::DIRECT),
+                cudaBoundaryModeTrap);
         }
+
     }
+
+    
 }
 
 CPU_ON_GPU void ShadeDirect(
@@ -38,26 +48,24 @@ CPU_ON_GPU void ShadeDirect(
     const unsigned a_Seed,
     const unsigned a_CurrentDepth,
     const CDF* const a_CDF,
-	float3* a_Output
+	cudaSurfaceObject_t a_Output
 )
 {
-    const unsigned int numPixels = a_ResolutionAndDepth.x * a_ResolutionAndDepth.y;
-    const unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
-    const unsigned int stride = blockDim.x * gridDim.x;
 
-    auto seed = WangHash(a_Seed + index);
+    const unsigned int pixelX = blockIdx.x * blockDim.x + threadIdx.x;
+    const unsigned int pixelY = blockIdx.y * blockDim.y + threadIdx.y;
 
-    //Handles cases where there are less threads than there are pixels.
-    //i becomes index and is to be used by in functions where you need the pixel index.
-    //i will update to a new pixel index if there is less threads than there are pixels.
-    for (unsigned int i = index; i < numPixels; i += stride)
+    auto seed = WangHash(a_Seed + pixelX  * pixelY);
+
+    if(pixelX < a_ResolutionAndDepth.x && pixelY < a_ResolutionAndDepth.y)
     {
 
         //TODO: return some form of light transform factor after resolving the distances in the volume.
-        VolumetricShadeDirect(i, a_ResolutionAndDepth, a_VolumetricDataBuffer, a_VolumetricShadowRays, a_Lights, a_CDF, a_Output);
+        VolumetricShadeDirect({ pixelX, pixelY }, a_ResolutionAndDepth, a_VolumetricDataBuffer, a_VolumetricShadowRays, a_Lights, a_CDF, a_Output);
 
         // Get intersection.
-        const SurfaceData& surfaceData = a_SurfaceDataBuffer[i];
+        const unsigned int pixelDataIndex = pixelY * a_ResolutionAndDepth.x + pixelX;
+        const SurfaceData& surfaceData = a_SurfaceDataBuffer[pixelDataIndex];
 
         if (surfaceData.m_IntersectionT > 0.f)
         {
@@ -91,7 +99,7 @@ CPU_ON_GPU void ShadeDirect(
             //Light is not facing towards the surface or too close to the surface.
             if (cosIn <= 0.f || lDistance <= 0.01f)
             {
-                continue;
+                return;
             }
 
             //Geometry term G(x).
@@ -113,11 +121,11 @@ CPU_ON_GPU void ShadeDirect(
              * NOTE: Channel is Indirect because this runs at greater depth. This is direct light for an indirect bounce.
              */
             ShadowRayData shadowRay(
-                i,
+                PixelIndex{ pixelX, pixelY },
                 surfaceData.m_Position,
                 pixelToLightDir,
                 lDistance - 0.2f,
-                unshadowedPathContribution,
+                make_float4(unshadowedPathContribution, 1.f),
                 LightChannel::INDIRECT);
 
             a_ShadowRays->Add(&shadowRay);

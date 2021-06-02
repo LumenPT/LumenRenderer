@@ -55,7 +55,7 @@ CPU_ON_GPU void GeneratePrimaryRay(
         direction.y = -(direction.y * 2.0f - 1.0f);
         direction = normalize(direction.x * a_U + direction.y * a_V + a_W);
 
-        IntersectionRayData ray{i, origin, direction, make_float3(1.f, 1.f, 1.f) };
+        IntersectionRayData ray{{screenX, screenY}, origin, direction, make_float3(1.f, 1.f, 1.f) };
         a_Buffer->Set(i, &ray); //Set because primary rays are ALWAYS a ray per pixel. No need to do atomic indexing. The atomic counter is manually set later.
     }
 }

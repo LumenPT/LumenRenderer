@@ -3,43 +3,70 @@
 
 CPU_ON_GPU void MergeOutputChannels(
     const uint2 a_Resolution,
-    const float3* const a_Input,
-    float3* const a_Output,
+    const cudaSurfaceObject_t a_Input,
+    const cudaSurfaceObject_t a_Output,
     const bool a_BlendOutput,
     const unsigned a_BlendCount
 )
 {
-    const unsigned int numPixels = a_Resolution.x * a_Resolution.y;
-    const unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
-    const unsigned int stride = blockDim.x * gridDim.x;
+    const unsigned int pixelX = blockIdx.x * blockDim.x + threadIdx.x;
+    const unsigned int pixelY = blockIdx.y * blockDim.y + threadIdx.y;
 
-    for (int i = index; i < numPixels; i += stride)
+    constexpr unsigned int numChannels = static_cast<unsigned>(LightChannel::NUM_CHANNELS);
+
+    if (pixelX < a_Resolution.x && pixelY < a_Resolution.y)
     {
-        const float3* first = &a_Input[i * static_cast<unsigned>(LightChannel::NUM_CHANNELS)];
+
+
+        float4 mergedColor = { 0.f };
+        for(unsigned int channelIndex = 0; channelIndex < numChannels; ++channelIndex)
+        {
+
+            float4 channelColor{ 0.f };
+            surf2DLayeredread<float4>(
+                &channelColor,
+                a_Input,
+                pixelX * sizeof(float4),
+                pixelY,
+                channelIndex,
+                cudaBoundaryModeTrap);
+
+            mergedColor += channelColor;
+
+        }
 
         //If enabled, average between frames.
         if(a_BlendOutput)
         {
-            float3 oldValue = a_Output[i];
-            float3 newValue = { 0.f };
-            for (int channel = 0; channel < static_cast<unsigned>(LightChannel::NUM_CHANNELS); ++channel)
-            {
-                newValue += first[channel];
-            }
+            float4 oldValue = { 0.f };
+            surf2Dread<float4>(
+                &oldValue,
+                a_Output,
+                pixelX * sizeof(float4),
+                pixelY,
+                cudaBoundaryModeTrap);
+
             //Average results over the total blended frame count (so every frame counts just as much).
-            a_Output[i] = ((oldValue * static_cast<float>(a_BlendCount)) + newValue) / static_cast<float>(a_BlendCount + 1);
+            float4 newValue = ((oldValue * static_cast<float>(a_BlendCount)) + newValue) / static_cast<float>(a_BlendCount + 1);
+            surf2Dwrite<float4>(
+                newValue,
+                a_Output,
+                pixelX * sizeof(float4),
+                pixelY,
+                cudaBoundaryModeTrap);
+            
         }
         //No blending so instead overwrite previous frame data.
         else
         {
-            //Reset to 0. NOT NEEDED: Already done in wavefront when blending is disabled.
-            //a_Output[i] = { 0.f };
 
-            //Mix the results.
-            for(int channel = 0; channel < static_cast<unsigned>(LightChannel::NUM_CHANNELS); ++channel)
-            {
-                a_Output[i] += first[channel];
-            }
+            surf2Dwrite<float4>(
+                mergedColor,
+                a_Output,
+                pixelX * sizeof(float4),
+                pixelY,
+                cudaBoundaryModeTrap);
+
         }
 
     }

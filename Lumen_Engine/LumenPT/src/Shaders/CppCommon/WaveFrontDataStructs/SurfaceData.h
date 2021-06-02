@@ -1,5 +1,6 @@
 #pragma once
 #include "../CudaDefines.h"
+#include "PixelIndex.h"
 
 #include <Optix/optix.h>
 #include <Cuda/cuda/helpers.h>
@@ -36,7 +37,7 @@ namespace WaveFront
         CPU_GPU SurfaceData() = default;
 
         //The index of the pixel that this surface data belongs to.
-        unsigned m_Index;
+        PixelIndex m_PixelIndex;
         //Position of the intersection in world-space
         float3 m_Position;
         //Normal at the point of intersection.

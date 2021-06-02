@@ -14,22 +14,22 @@ CPU_ON_GPU void ShadeIndirect(
     const unsigned a_Seed
 )
 {
-    const unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
-    const unsigned int stride = blockDim.x * gridDim.x;
+    const unsigned int pixelX = blockIdx.x * blockDim.x + threadIdx.x;
+    const unsigned int pixelY = blockIdx.y * blockDim.y + threadIdx.y;
 
     //Outside of loop because multiple items can be processed by one thread. RandomFloat modifies the seed from within the loop so no repetition occurs.
-    auto seed = WangHash(a_Seed + WangHash(index));
+    auto seed = WangHash(a_Seed + WangHash(pixelX * pixelY));
 
     //Loop over the amount of intersections.
-    for (int i = index; i < a_NumIntersections; i += stride)
+    if (pixelX < a_ResolutionAndDepth.x && pixelY < a_ResolutionAndDepth.y)
     {
-        auto& intersection = *a_Intersections->GetData(i);
-        auto& surfaceData = a_SurfaceDataBuffer[intersection.m_PixelIndex];
+        const unsigned int pixelDataIndex = PIXEL_DATA_INDEX(pixelX, pixelY, a_ResolutionAndDepth.x);
+        auto& surfaceData = a_SurfaceDataBuffer[pixelDataIndex];
 
         //If the surface is emissive or not intersected, terminate.
         if(surfaceData.m_Emissive || surfaceData.m_IntersectionT <= 0.f)
         {
-            continue;
+            return;
         }
 
         //Apply russian roulette based on the surface color (dark absorbs more, so terminates sooner).
@@ -39,7 +39,7 @@ CPU_ON_GPU void ShadeIndirect(
         //Path termination.
         if (russianRouletteWeight < rand)
         {
-            continue;
+            return;
         }
 
         assert(surfaceData.m_TransportFactor.x >= 0 && surfaceData.m_TransportFactor.y >= 0 && surfaceData.m_TransportFactor.z >= 0);
@@ -54,7 +54,7 @@ CPU_ON_GPU void ShadeIndirect(
          */
         if(dot(surfaceData.m_Normal, surfaceData.m_IncomingRayDirection) >= -10.f * EPSILON)
         {
-            continue;
+            return;
         }
 
         //Calculate a diffuse reflection direction based on the surface roughness. Also retrieves the PDF for that direction being chosen on the full sphere.
@@ -82,7 +82,7 @@ CPU_ON_GPU void ShadeIndirect(
          * Because half the domain is removed, the BRDF PDF can be doubled after this passes.
          */
         const auto bounceDotN = dot(bounceDirection, surfaceData.m_Normal);
-        if (bounceDotN <= 0.f) continue;
+        if (bounceDotN <= 0.f) return;
 
         //Double BRDF PDF because half the domain is terminated above.
         brdfPdf *= 2.f;
@@ -99,7 +99,7 @@ CPU_ON_GPU void ShadeIndirect(
         assert(pathContribution.x >= 0 && pathContribution.y >= 0 && pathContribution.z >= 0);
 
         //Finally add the ray to the ray buffer.
-        IntersectionRayData ray{intersection.m_PixelIndex, surfaceData.m_Position, bounceDirection, pathContribution};
+        IntersectionRayData ray{{pixelX, pixelY}, surfaceData.m_Position, bounceDirection, pathContribution};
         a_IntersectionRays->Add(&ray);
     }
 

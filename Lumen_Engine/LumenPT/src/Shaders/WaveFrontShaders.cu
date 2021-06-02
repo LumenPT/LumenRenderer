@@ -148,11 +148,14 @@ __device__ __forceinline__ void ShadowRaysRayGen()
 
         using namespace WaveFront;
 
-        unsigned int resultIndex =
-            static_cast<unsigned int>(LightChannel::NUM_CHANNELS) * rayData.m_PixelIndex +
-            static_cast<unsigned int>(rayData.m_OutputChannel);
+        surf2DLayeredwrite<float4>(
+            rayData.m_PotentialRadiance,
+            launchParams.m_ResultBuffer,
+            rayData.m_PixelIndex.m_X * sizeof(float4),
+            rayData.m_PixelIndex.m_Y,
+            static_cast<unsigned short int>(LightChannel::NUM_CHANNELS),
+            cudaBoundaryModeTrap);
 
-        launchParams.m_ResultBuffer[resultIndex] += rayData.m_PotentialRadiance;
     }
 
     return;
@@ -237,12 +240,13 @@ __device__ __forceinline__ void ReSTIRRayGenShading()
     {
         using namespace WaveFront;
 
-        const auto pixelIndex = reservoirIndex / ReSTIRSettings::numReservoirsPerPixel;
-        unsigned int resultIndex =
-            static_cast<unsigned int>(LightChannel::NUM_CHANNELS) * pixelIndex +
-            static_cast<unsigned int>(LightChannel::DIRECT);
-
-        launchParams.m_ResultBuffer[resultIndex] += rayData.contribution;
+        surf2DLayeredwrite<float4>(
+            make_float4(rayData.contribution, 1.f),
+            launchParams.m_ResultBuffer,
+            rayData.pixelIndex.m_X * sizeof(float4),
+            rayData.pixelIndex.m_Y,
+            static_cast<unsigned int>(LightChannel::DIRECT),
+            cudaBoundaryModeTrap);
     }
 }
 

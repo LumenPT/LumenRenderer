@@ -1,5 +1,6 @@
 #pragma once
 #include "../CudaDefines.h"
+#include "PixelIndex.h"
 #include "LightData.h"
 
 #include <Optix/optix.h>
@@ -14,20 +15,20 @@ namespace WaveFront
 
         CPU_GPU ShadowRayData()
             :
-        m_PixelIndex(0),
+        m_PixelIndex({0,0}),
         m_Origin(make_float3(0.f, 0.f, 0.f)),
         m_Direction(make_float3(0.f, 0.f, 0.f)),
         m_MaxDistance(0.f),
-        m_PotentialRadiance(make_float3(0.f, 0.f, 0.f)),
+        m_PotentialRadiance(make_float4(0.f, 0.f, 0.f, 0.f)),
         m_OutputChannel(LightChannel::DIRECT)
         {}
 
         CPU_GPU ShadowRayData(
-            unsigned int a_PixelIndex,
+            const PixelIndex& a_PixelIndex,
             const float3& a_Origin,
             const float3& a_Direction,
             const float& a_MaxDistance,
-            const float3& a_PotentialRadiance,
+            const float4& a_PotentialRadiance,
             LightChannel a_OutputChannel)
             :
         m_PixelIndex(a_PixelIndex),
@@ -51,11 +52,11 @@ namespace WaveFront
 
 
 
-        unsigned int m_PixelIndex;
+        PixelIndex m_PixelIndex;
         float3 m_Origin;
         float3 m_Direction;
         float m_MaxDistance;
-        float3 m_PotentialRadiance;
+        float4 m_PotentialRadiance;
         LightChannel m_OutputChannel;
 
     };

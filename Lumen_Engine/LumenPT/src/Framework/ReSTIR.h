@@ -1,5 +1,6 @@
 #pragma once
 #include <cinttypes>
+#include <cuda.h>
 
 #include "../CUDAKernels/ReSTIRKernels.cuh"
 #include "../Shaders/CppCommon/ReSTIRData.h"
@@ -39,7 +40,7 @@ public:
 		WaveFront::AtomicBuffer<WaveFront::ShadowRayData>* a_WaveFrontShadowRayBuffer,
         const WaveFront::OptixWrapper* a_OptixSystem,
 		WaveFront::MotionVectorBuffer* a_MotionVectorBuffer,
-		float3* a_OutputBuffer,
+		cudaSurfaceObject_t a_OutputBuffer,
 		bool a_DebugPrint = false
 	);
 

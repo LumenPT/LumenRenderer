@@ -71,7 +71,7 @@ CPU_ONLY void ReSTIR::Run(
 	WaveFront::AtomicBuffer<WaveFront::ShadowRayData>* a_WaveFrontShadowRayBuffer,
 	const WaveFront::OptixWrapper* a_OptixSystem,
 	WaveFront::MotionVectorBuffer* a_MotionVectorBuffer,
-	float3* a_OutputBuffer,
+	cudaSurfaceObject_t a_OutputBuffer,
 	bool a_DebugPrint
 )
 {
@@ -204,7 +204,7 @@ CPU_ONLY void ReSTIR::Run(
 		 * Then do another optix launch to resolve them.
 		 */
 		timer.reset();
-		const unsigned int numRaysGenerated = GenerateReSTIRShadowRaysShading(&m_ShadowRaysShading, static_cast<Reservoir*>(m_Reservoirs[currentIndex].GetDevicePtr()), a_CurrentPixelData, numPixels);
+		const unsigned int numRaysGenerated = GenerateReSTIRShadowRaysShading(&m_ShadowRaysShading, static_cast<Reservoir*>(m_Reservoirs[currentIndex].GetDevicePtr()), a_CurrentPixelData, dimensions);
 		if (a_DebugPrint) printf("ReSTIR Shading Ray Generation time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
 
 	    //Parameters for optix launch.

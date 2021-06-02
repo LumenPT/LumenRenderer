@@ -76,13 +76,13 @@ namespace WaveFront
             const float3& a_CameraPosition,
             const float3& a_CameraDirection,
             const OptixTraversableHandle a_OptixSceneHandle,
-            const WaveFront::OptixWrapper* a_OptixSystem,
+            const OptixWrapper* a_OptixSystem,
             const unsigned a_Seed,
             ReSTIR* a_ReSTIR,
             unsigned a_Currentdepth,
-            WaveFront::MotionVectorBuffer* a_MotionVectorBuffer,
+            MotionVectorBuffer* a_MotionVectorBuffer,
             const unsigned a_NumIntersections,
-            float3* a_Output = nullptr
+            cudaSurfaceObject_t a_Output
         )
         :
         m_ResolutionAndDepth(a_ResolutionAndDepth),
@@ -109,7 +109,6 @@ namespace WaveFront
 
         CPU_ONLY ~ShadingLaunchParameters() = default;
 
-        //Read only
         const uint3 m_ResolutionAndDepth;
         const SurfaceData* const m_CurrentSurfaceData;
         const SurfaceData* const m_TemporalSurfaceData;
@@ -125,10 +124,10 @@ namespace WaveFront
         const unsigned m_NumIntersections;
         AtomicBuffer<IntersectionRayData>* m_RayBuffer;
         ReSTIR* m_ReSTIR;
-        float3* m_Output;
+        cudaSurfaceObject_t m_Output;
         AtomicBuffer<ShadowRayData>* m_ShadowRays;
         AtomicBuffer<ShadowRayData>* m_VolumetricShadowRays;
-        WaveFront::MotionVectorBuffer* m_MotionVectorBuffer;
+        MotionVectorBuffer* m_MotionVectorBuffer;
     };
 
     struct PostProcessLaunchParameters
@@ -137,8 +136,8 @@ namespace WaveFront
         CPU_ONLY PostProcessLaunchParameters(
             const uint2& a_RenderResolution,
             const uint2& a_OutputResolution,
-            const float3* const a_WavefrontOutput,
-            float3* const a_ProcessedOutput,
+            const cudaSurfaceObject_t a_PixelBufferMultiChannel,
+            const cudaSurfaceObject_t a_PixelBufferSingleChannel,
             uchar4* const a_FinalOutput,
             const bool a_BlendOutput,
             const unsigned a_BlendCount
@@ -146,8 +145,8 @@ namespace WaveFront
             :
             m_RenderResolution(a_RenderResolution),
             m_OutputResolution(a_OutputResolution),
-            m_WavefrontOutput(a_WavefrontOutput),
-            m_ProcessedOutput(a_ProcessedOutput),
+            m_PixelBufferMultiChannel(a_PixelBufferMultiChannel),
+            m_PixelBufferSingleChannel(a_PixelBufferSingleChannel),
             m_FinalOutput(a_FinalOutput),
             m_BlendOutput(a_BlendOutput),
             m_BlendCount(a_BlendCount)
@@ -157,8 +156,8 @@ namespace WaveFront
 
         const uint2& m_RenderResolution;
         const uint2& m_OutputResolution;
-        const float3* const m_WavefrontOutput;
-        float3* const m_ProcessedOutput;
+        const cudaSurfaceObject_t m_PixelBufferMultiChannel;
+        const cudaSurfaceObject_t m_PixelBufferSingleChannel;
         uchar4* const m_FinalOutput;
         const bool m_BlendOutput;
         const unsigned m_BlendCount;

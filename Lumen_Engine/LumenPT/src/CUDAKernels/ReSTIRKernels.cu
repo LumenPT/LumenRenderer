@@ -5,10 +5,13 @@
 #include <cuda_runtime_api.h>
 #include <cuda/device_atomic_functions.h>
 #include <cassert>
+#include <cmath>
 
 #include "../Framework/CudaUtilities.h"
 
 #define CUDA_BLOCK_SIZE 512
+
+#define CUDA_BLOCK_SIZE_GRID dim3{32, 32, 1}
 
 __host__ void ResetReservoirs(int a_NumReservoirs, Reservoir* a_ReservoirPointer)
 {
@@ -283,7 +286,7 @@ __global__ void GenerateShadowRay(WaveFront::AtomicBuffer<RestirShadowRay>* a_At
 /*
  * Generate the shadow rays used for final shading.
  */
-__host__ unsigned int GenerateReSTIRShadowRaysShading(MemoryBuffer* a_AtomicBuffer, Reservoir* a_Reservoirs, const WaveFront::SurfaceData* a_PixelData, unsigned a_NumPixels)
+__host__ unsigned int GenerateReSTIRShadowRaysShading(MemoryBuffer* a_AtomicBuffer, Reservoir* a_Reservoirs, const WaveFront::SurfaceData* a_PixelData, uint2 a_Resolution)
 {
     //Counter that is atomically incremented. Copy it to the GPU.
     WaveFront::ResetAtomicBuffer<RestirShadowRayShading>(a_AtomicBuffer);
@@ -291,12 +294,16 @@ __host__ unsigned int GenerateReSTIRShadowRaysShading(MemoryBuffer* a_AtomicBuff
     const auto devicePtr = a_AtomicBuffer->GetDevicePtr<WaveFront::AtomicBuffer<RestirShadowRayShading>>();
 
     //Call in parallel.
-    const int blockSize = CUDA_BLOCK_SIZE;
-    const int numBlocks = (a_NumPixels + blockSize - 1) / blockSize;
+    const dim3 blockSize = CUDA_BLOCK_SIZE_GRID;
+
+    const unsigned gridWidth = static_cast<unsigned>(std::ceil(static_cast<float>(a_Resolution.x) / static_cast<float>(blockSize.x)));
+    const unsigned gridHeight = static_cast<unsigned>(std::ceil(static_cast<float>(a_Resolution.y) / static_cast<float>(blockSize.y)));
+
+    const dim3 numBlocks {gridWidth, gridHeight, 1};
 
     for (int depth = 0; depth < ReSTIRSettings::numReservoirsPerPixel; ++depth)
     {
-        GenerateShadowRayShading <<<numBlocks, blockSize >>> (devicePtr, a_Reservoirs, a_PixelData, a_NumPixels, depth);
+        GenerateShadowRayShading <<<numBlocks, blockSize >>> (devicePtr, a_Reservoirs, a_PixelData, a_Resolution, depth);
     }
     cudaDeviceSynchronize();
 
@@ -306,18 +313,27 @@ __host__ unsigned int GenerateReSTIRShadowRaysShading(MemoryBuffer* a_AtomicBuff
     return WaveFront::GetAtomicCounter<RestirShadowRayShading>(a_AtomicBuffer);
 }
 
-__global__ void GenerateShadowRayShading(WaveFront::AtomicBuffer<RestirShadowRayShading>* a_AtomicBuffer, Reservoir* a_Reservoirs, const WaveFront::SurfaceData* a_PixelData, unsigned a_NumPixels, unsigned a_Depth)
+__global__ void GenerateShadowRayShading(WaveFront::AtomicBuffer<RestirShadowRayShading>* a_AtomicBuffer, Reservoir* a_Reservoirs, const WaveFront::SurfaceData* a_PixelData, uint2 a_Resolution, unsigned a_Depth)
 {
-    int index = blockIdx.x * blockDim.x + threadIdx.x;
-    if (index >= a_NumPixels) return;
 
-    const WaveFront::SurfaceData pixelData = a_PixelData[index];
+    const unsigned int pixelX = blockIdx.x * blockDim.x + threadIdx.x;
+    const unsigned int pixelY = blockIdx.y * blockDim.y + threadIdx.y;
+
+    //Make sure to not go out of bounds.
+    if(pixelX >= a_Resolution.x || pixelY >= a_Resolution.y)
+    {
+        return;
+    }
+
+    const unsigned int pixelDataIndex = PIXEL_DATA_INDEX(pixelX, pixelY, a_Resolution.x);
+
+    const WaveFront::SurfaceData pixelData = a_PixelData[pixelDataIndex];
 
     //Only run for valid intersections.
     if (pixelData.m_IntersectionT > 0.f && !pixelData.m_Emissive)
     {
         //If the reservoir has a weight, add a shadow ray.
-        const auto reservoirIndex = RESERVOIR_INDEX(index, a_Depth, ReSTIRSettings::numReservoirsPerPixel);
+        const auto reservoirIndex = RESERVOIR_INDEX(pixelDataIndex, a_Depth, ReSTIRSettings::numReservoirsPerPixel);
         const Reservoir reservoir = a_Reservoirs[reservoirIndex];
 
         if (reservoir.weight > 0.f)
@@ -330,6 +346,7 @@ __global__ void GenerateShadowRayShading(WaveFront::AtomicBuffer<RestirShadowRay
 
             RestirShadowRayShading ray;
             ray.index = reservoirIndex;
+            ray.pixelIndex = { pixelX, pixelY };
             ray.direction = pixelToLight;
             ray.origin = pixelData.m_Position;
             ray.distance = l - 0.05f; //Make length a little bit shorter to prevent self-shadowing.
@@ -892,7 +909,13 @@ __global__ void GenerateWaveFrontShadowRaysInternal(Reservoir* a_Reservoirs, con
 
                 //TODO ensure no shadow acne.
                 //TODO: Pass pixel index to shadow ray data.
-                auto data = WaveFront::ShadowRayData{ pixel->m_Index, pixel->m_Position, toLightDir, l - 0.005f, contribution, WaveFront::LightChannel::DIRECT };
+                auto data =
+                    WaveFront::ShadowRayData{
+                        pixel->m_PixelIndex,
+                        pixel->m_Position,
+                        toLightDir, l - 0.005f,
+                        make_float4(contribution, 1.f),
+                        WaveFront::LightChannel::DIRECT };
                 a_AtomicBuffer->Add(&data);
             }
         }
