@@ -26,7 +26,6 @@ include(${CMAKE_SOURCE_DIR}/cmake/functions.cmake)
 assign_source_group(${HEADER_FILES})
 assign_source_group(${SOURCE_FILES})
 
-#set_property(TARGET Sandbox PROPERTY CUDA_RESOLVE_DEVICE_SYMBOLS ON)
 set_property(TARGET Sandbox PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 set_property(TARGET Sandbox APPEND PROPERTY COMPILE_DEFINITIONS GLFW_INCLUDE_NONE)
 
@@ -51,6 +50,13 @@ add_custom_command(TARGET Sandbox POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_CURRENT_SOURCE_DIR}/../LumenPT/vendor/Dlls"
         $<TARGET_FILE_DIR:Sandbox>)
+
+get_property(WORKING_DIR TARGET Sandbox PROPERTY VS_DEBUGGER_WORKING_DIRECTORY)
+
+add_custom_command(TARGET Sandbox POST_BUILD
+	COMMAND if exist "${WORKING_DIR}/Config.json" 
+			${CMAKE_COMMAND} -E rm "${WORKING_DIR}/Config.json" &&
+			${CMAKE_COMMAND} -E echo "[INFO]: Cleaned up ${WORKING_DIR}/Config.json")
 
 if(${USE_NVIDIA_DENOISER})
 	add_custom_command(TARGET Sandbox POST_BUILD
