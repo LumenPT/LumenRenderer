@@ -53,7 +53,7 @@ Lumen::SceneManager::GLTFResource* Lumen::SceneManager::LoadGLTF(std::string a_F
 	auto& res = m_LoadedScenes[fullPath];		// create new scene at path key
 
 	// First try to load an optimized version of the specified file, if such exists.
-	//res = m_RenderPipeline->OpenCustomFileFormat(fullPath);
+	res = m_RenderPipeline->OpenCustomFileFormat(fullPath);
 
     if (!res.m_Path.empty()) // If the path is not empty, then an optimized file was found for this model, and successfully loaded.
 		return &res;
@@ -61,7 +61,7 @@ Lumen::SceneManager::GLTFResource* Lumen::SceneManager::LoadGLTF(std::string a_F
 	auto begin = std::chrono::high_resolution_clock::now();
 
 	// If no optimized version of the model was found, try to create one if the renderer specifies how.
-	//res = m_RenderPipeline->CreateCustomFileFormat(fullPath);
+	res = m_RenderPipeline->CreateCustomFileFormat(fullPath);
 	if (!res.m_Path.empty())
 	{
 		auto end = std::chrono::high_resolution_clock::now();
@@ -200,7 +200,7 @@ void Lumen::SceneManager::InitializeDefaultResources()
 
 void Lumen::SceneManager::LoadNodes(fx::gltf::Document& a_Doc, GLTFResource& a_Res, int a_NodeId, bool a_Root, const glm::mat4& a_TransformMat)
 {
-	std::cout << "[GLTF] Started loading node with ID: " << a_NodeId << std::endl;
+	//std::cout << "[GLTF] Started loading node with ID: " << a_NodeId << std::endl;
 
 	auto& node = a_Doc.nodes[a_NodeId];
 	glm::mat4 transform = glm::make_mat4(&node.matrix[0]);
@@ -265,7 +265,7 @@ void Lumen::SceneManager::LoadNodes(fx::gltf::Document& a_Doc, GLTFResource& a_R
 		}
 	}
 
-	std::cout << "[GLTF] Finished loading node with ID: " << a_NodeId << std::endl;
+	//std::cout << "[GLTF] Finished loading node with ID: " << a_NodeId << std::endl;
 }
 
 void Lumen::SceneManager::LoadMeshes(fx::gltf::Document& a_Doc, GLTFResource& a_Res)

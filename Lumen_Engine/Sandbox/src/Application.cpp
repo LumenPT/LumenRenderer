@@ -174,6 +174,8 @@ public:
 
 		printf("\n\nTime elapsed to load model: %li milliseconds\n\n", milli);
 
+		//__debugbreak();
+
 		auto res2 = m_SceneManager->LoadGLTF(meshName2, meshPath2);
 
 		auto lumenPT = contextLayer->GetPipeline();
