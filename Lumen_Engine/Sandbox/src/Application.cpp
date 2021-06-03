@@ -217,6 +217,7 @@ public:
 			mesh->m_Transform.SetPosition(glm::vec3(xOffset, 100.f + (p * p), 0.f));
 			mesh->m_Transform.SetScale(glm::vec3(2.0f * (static_cast<float>((i + 1) * 2) / 4.f)));
 			xOffset += 50;
+			mesh->m_Name = std::string("Light ") + std::to_string(i);
 		}
 		
 		//
