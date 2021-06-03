@@ -1,5 +1,5 @@
 # LumenRenderer
-The Lumen Renderer is not related to or affiliated with Unreal Engine 5's Lumen system.
+**The Lumen Renderer is not related to or affiliated with Unreal Engine 5's Lumen system.**
 
 
 Standalone distribution of the Lumen path tracer.
