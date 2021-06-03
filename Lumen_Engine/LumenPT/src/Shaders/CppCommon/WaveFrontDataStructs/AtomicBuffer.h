@@ -27,16 +27,6 @@ namespace WaveFront
             const uint32_t index = atomicAdd(&counter, 1);
             assert(index < maxSize);
             data[index] = *a_Data;
-
-            if (index == 0)
-            {
-                printf("");
-                auto err = cudaGetLastError();
-                if (err != cudaSuccess)
-                {
-                    printf("err: %u", err);
-                }
-            }
         }
 
         /*
