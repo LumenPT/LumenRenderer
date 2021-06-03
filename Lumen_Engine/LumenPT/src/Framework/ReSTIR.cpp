@@ -64,13 +64,11 @@ CPU_ONLY void ReSTIR::Initialize(const ReSTIRSettings& a_Settings)
 CPU_ONLY void ReSTIR::Run(
 	const WaveFront::SurfaceData* const a_CurrentPixelData,
 	const WaveFront::SurfaceData* const a_PreviousPixelData,
-	const MemoryBuffer const* a_Lights,
-	const float3& a_CameraPosition,
-	const std::uint32_t a_Seed,
+	const WaveFront::MotionVectorBuffer* const a_MotionVectorBuffer,
+	const WaveFront::OptixWrapper* const a_OptixWrapper,
 	const OptixTraversableHandle a_OptixSceneHandle,
-	WaveFront::AtomicBuffer<WaveFront::ShadowRayData>* a_WaveFrontShadowRayBuffer,
-	const WaveFront::OptixWrapper* a_OptixSystem,
-	WaveFront::MotionVectorBuffer* a_MotionVectorBuffer,
+	const MemoryBuffer* const a_Lights,
+	const std::uint32_t a_Seed,
 	cudaSurfaceObject_t a_OutputBuffer,
 	bool a_DebugPrint
 )
@@ -108,7 +106,13 @@ CPU_ONLY void ReSTIR::Run(
 	//Fill light bags with values from the CDF.
 	{
 		timer.reset();
-		FillLightBags(m_Settings.numLightBags, m_Settings.numLightsPerBag, static_cast<CDF*>(m_Cdf.GetDevicePtr()), static_cast<LightBagEntry*>(m_LightBags.GetDevicePtr()), a_Lights->GetDevicePtr<WaveFront::AtomicBuffer<WaveFront::TriangleLight>>(), a_Seed);
+		FillLightBags(
+			m_Settings.numLightBags, 
+			m_Settings.numLightsPerBag, 
+			static_cast<CDF*>(m_Cdf.GetDevicePtr()), 
+			static_cast<LightBagEntry*>(m_LightBags.GetDevicePtr()), 
+			a_Lights->GetDevicePtr<WaveFront::AtomicBuffer<WaveFront::TriangleLight>>(), 
+			a_Seed);
 		if (a_DebugPrint) printf("Filling light bags time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
 	}
 
@@ -132,7 +136,7 @@ CPU_ONLY void ReSTIR::Run(
 
 
 	//Parameters for optix launch.
-	WaveFront::OptixLaunchParameters params;
+	WaveFront::OptixLaunchParameters params {};
 	params.m_TraversableHandle = a_OptixSceneHandle;
 	params.m_Reservoirs = static_cast<Reservoir*>(m_Reservoirs[currentIndex].GetDevicePtr());
 	params.m_ReSTIRShadowRayBatch = m_ShadowRays.GetDevicePtr<WaveFront::AtomicBuffer<RestirShadowRay>>();
@@ -144,7 +148,7 @@ CPU_ONLY void ReSTIR::Run(
 	if(numRaysGenerated > 0)
 	{
 		timer.reset();
-		a_OptixSystem->TraceRays(numRaysGenerated, params);
+		a_OptixWrapper->TraceRays(numRaysGenerated, params);
 		if (a_DebugPrint) printf("Tracing ReSTIR shadow rays time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
 	}
 
@@ -186,20 +190,6 @@ CPU_ONLY void ReSTIR::Run(
 
 	{
 		/*
-		 * This is disabled because using the regular shadow rays meant not being able to set reservoirs to 0.
-		 */
-		 //timer.reset();
-		 //GenerateWaveFrontShadowRays(
-		 //	static_cast<Reservoir*>(m_Reservoirs[currentIndex].GetDevicePtr()),
-		 //	a_CurrentPixelData,
-		 //	a_WaveFrontShadowRayBuffer,
-		 //	numPixels
-		 //);
-		 //if (a_DebugPrint) printf("Generating wavefront shadow rays time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
-	}
-
-	{
-		/*
 		 * Instead of regular shadow rays, make more ReSTIRShadowRays.
 		 * Then do another optix launch to resolve them.
 		 */
@@ -216,7 +206,7 @@ CPU_ONLY void ReSTIR::Run(
 		if (numRaysGenerated > 0)
 		{
 			timer.reset();
-			a_OptixSystem->TraceRays(numRaysGenerated, params);
+			a_OptixWrapper->TraceRays(numRaysGenerated, params);
 			if (a_DebugPrint) printf("Tracing ReSTIR Shading Ray time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
 		}
 	}
@@ -248,7 +238,10 @@ void ReSTIR::BuildCDF(const MemoryBuffer const* a_Lights)
 		}
 
 		//Insert the light data in the CDF.
-		FillCDF(static_cast<CDF*>(m_Cdf.GetDevicePtr()), a_Lights->GetDevicePtr<WaveFront::AtomicBuffer<WaveFront::TriangleLight>>(), numLights);
+		FillCDF(static_cast<CDF*>(
+			m_Cdf.GetDevicePtr()), 
+			a_Lights->GetDevicePtr<WaveFront::AtomicBuffer<WaveFront::TriangleLight>>(), 
+			numLights);
 	}
 }
 

@@ -563,27 +563,23 @@ namespace WaveFront
             /*
              * Call the shading kernels.
              */
+
             ShadingLaunchParameters shadingLaunchParams(
                 uint3{ m_Settings.renderResolution.x, m_Settings.renderResolution.y, m_Settings.depth },
                 m_SurfaceData[surfaceDataBufferIndex].GetDevicePtr<SurfaceData>(),
                 m_SurfaceData[temporalIndex].GetDevicePtr<SurfaceData>(),
-				m_VolumetricData[volumetricDataBufferIndex].GetDevicePtr<VolumetricData>(),
-                m_IntersectionData.GetDevicePtr<AtomicBuffer<IntersectionData>>(),
+                m_VolumetricData[volumetricDataBufferIndex].GetDevicePtr<VolumetricData>(),
+                m_MotionVectors.GetMotionVectorBuffer()->GetDevicePtr<MotionVectorBuffer>(),
+                &m_TriangleLights,
+                accelerationStructure,
+                m_OptixSystem.get(),
+                depth,
+                seed,
                 m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>(),
                 m_ShadowRays.GetDevicePtr<AtomicBuffer<ShadowRayData>>(),
-				m_VolumetricShadowRays.GetDevicePtr<AtomicBuffer<ShadowRayData>>(),
-                &m_TriangleLights,
-                camPosition,
-                camForward,
-                accelerationStructure,  //ReSTIR needs to check visibility early on so it does an optix launch for this scene.
-                m_OptixSystem.get(),
-                seed, //Use the frame count as the random seed.
-                m_ReSTIR.get(), //ReSTIR, can not be nullptr.
-                depth,  //The current depth.
-                m_MotionVectors.GetMotionVectorBuffer()->GetDevicePtr<MotionVectorBuffer>(),
-                numIntersectionRays,
-                m_PixelBufferSeparate->GetSurfaceObject()
-            );
+                m_VolumetricShadowRays.GetDevicePtr<AtomicBuffer<ShadowRayData>>(),
+                m_ReSTIR.get(),
+                m_PixelBufferSeparate->GetSurfaceObject());
 
             //Reset the ray buffer so that indirect shading can fill it again.
             ResetAtomicBuffer<IntersectionRayData>(&m_Rays);

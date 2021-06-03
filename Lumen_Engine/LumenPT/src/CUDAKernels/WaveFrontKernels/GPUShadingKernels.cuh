@@ -40,16 +40,14 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(unsigned a_NumIntersections,
  */
 CPU_ON_GPU void ShadeDirect(
     const uint3 a_ResolutionAndDepth,
-    const SurfaceData* a_TemporalSurfaceDatBuffer,
     const SurfaceData* a_SurfaceDataBuffer,
     const VolumetricData* a_VolumetricDataBuffer,
-    AtomicBuffer<ShadowRayData>* const a_ShadowRays,
-	AtomicBuffer<ShadowRayData>* const a_VolumetricShadowRays,
     const AtomicBuffer<TriangleLight>* const a_Lights,
     const unsigned a_Seed,
-    const unsigned a_CurrentDepth,
-    const CDF* const a_CDF = nullptr,
-	cudaSurfaceObject_t a_Output = 0		//TODO: remove a_Output
+    const CDF* const a_CDF,
+    AtomicBuffer<ShadowRayData>* const a_ShadowRays,
+    AtomicBuffer<ShadowRayData>* const a_VolumetricShadowRays,
+    cudaSurfaceObject_t a_Output		//TODO: remove a_Output
     );
 
 /*
@@ -72,12 +70,8 @@ CPU_ON_GPU void ShadeSpecular();
  */
 CPU_ON_GPU void ShadeIndirect(
     const uint3 a_ResolutionAndDepth,
-    const float3 a_CameraPosition,
     const SurfaceData* a_SurfaceDataBuffer,
-    const AtomicBuffer<IntersectionData>* a_Intersections,
     AtomicBuffer<IntersectionRayData>* a_IntersectionRays,
-    const unsigned a_NumIntersections,
-    const unsigned a_CurrentDepth,
     const unsigned a_Seed
 );
 

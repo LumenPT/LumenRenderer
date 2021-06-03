@@ -5,12 +5,8 @@
 
 CPU_ON_GPU void ShadeIndirect(
     const uint3 a_ResolutionAndDepth,
-    const float3 a_CameraPosition,
     const SurfaceData* a_SurfaceDataBuffer,
-    const AtomicBuffer<IntersectionData>* a_Intersections,
     AtomicBuffer<IntersectionRayData>* a_IntersectionRays,
-    const unsigned a_NumIntersections,
-    const unsigned a_CurrentDepth,
     const unsigned a_Seed
 )
 {

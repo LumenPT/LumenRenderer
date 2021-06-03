@@ -603,15 +603,23 @@ __host__ void TemporalNeighbourSampling(
     const WaveFront::SurfaceData* a_PreviousPixelData,
     const std::uint32_t a_Seed,
     uint2 a_Dimensions,
-    WaveFront::MotionVectorBuffer* a_MotionVectorBuffer
+    const WaveFront::MotionVectorBuffer* const a_MotionVectorBuffer
 )
 {
     const unsigned numReservoirs = a_Dimensions.x * a_Dimensions.y * ReSTIRSettings::numReservoirsPerPixel;
     const int blockSize = CUDA_BLOCK_SIZE;
     const int numBlocks = (numReservoirs + blockSize - 1) / blockSize;
 
-    CombineTemporalSamplesInternal << <numBlocks, blockSize >> > (a_CurrentReservoirs, a_PreviousReservoirs,
-                                                                  a_CurrentPixelData, a_PreviousPixelData, a_Seed, numReservoirs, a_Dimensions, a_MotionVectorBuffer);
+    CombineTemporalSamplesInternal << <numBlocks, blockSize >> > (
+        a_CurrentReservoirs, 
+        a_PreviousReservoirs,
+        a_CurrentPixelData, 
+        a_PreviousPixelData, 
+        a_Seed, 
+        numReservoirs, 
+        a_Dimensions, 
+        a_MotionVectorBuffer);
+
     cudaDeviceSynchronize();
     CHECKLASTCUDAERROR;
 }
@@ -625,7 +633,7 @@ __global__ void CombineTemporalSamplesInternal(
     const std::uint32_t a_Seed,
     unsigned a_NumReservoirs,
     uint2 a_Dimensions,
-    WaveFront::MotionVectorBuffer* a_MotionVectorBuffer
+    const WaveFront::MotionVectorBuffer* const a_MotionVectorBuffer
 )
 {
     int index = blockIdx.x * blockDim.x + threadIdx.x;

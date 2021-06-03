@@ -94,7 +94,7 @@ __host__ void TemporalNeighbourSampling(
     const WaveFront::SurfaceData* a_PreviousPixelData,
     const std::uint32_t a_Seed,
     uint2 a_Dimensions,
-    WaveFront::MotionVectorBuffer* a_MotionVectorBuffer
+    const WaveFront::MotionVectorBuffer* const a_MotionVectorBuffer
 );
 
 __global__ void CombineTemporalSamplesInternal(
@@ -105,7 +105,7 @@ __global__ void CombineTemporalSamplesInternal(
     const std::uint32_t a_Seed,
     unsigned a_NumReservoirs,
     uint2 a_Dimensions,
-    WaveFront::MotionVectorBuffer* a_MotionVectorBuffer
+    const WaveFront::MotionVectorBuffer* const a_MotionVectorBuffer
 );
 
 /*
