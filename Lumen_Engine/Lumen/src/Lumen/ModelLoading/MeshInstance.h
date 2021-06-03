@@ -4,6 +4,8 @@
 #include "Transform.h"
 #include "Lumen/Renderer/ILumenResources.h"
 
+#include <string>
+
 namespace Lumen
 {
     /*
@@ -23,7 +25,11 @@ namespace Lumen
         virtual ~MeshInstance() = default;
 
         MeshInstance()
-        : m_AdditionalColor(1.0f, 1.0f, 1.0f, 1.0f), m_EmissiveOverride(1.f), m_EmissionScale(1.f), m_EmissionMode(Lumen::EmissionMode::ENABLED)
+            : m_AdditionalColor(1.0f, 1.0f, 1.0f, 1.0f)
+            , m_EmissiveOverride(1.f)
+            , m_EmissionScale(1.f)
+            , m_EmissionMode(Lumen::EmissionMode::ENABLED)
+            , m_Name("Unnamed mesh instance")
         {
             
         }
@@ -73,6 +79,7 @@ namespace Lumen
 
 
         Transform m_Transform;
+        std::string m_Name;
     protected:
         //Emissive instance properties.
         glm::vec3 m_EmissiveOverride;       //Emission color if overridden.

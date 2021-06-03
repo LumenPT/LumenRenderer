@@ -1,11 +1,12 @@
+#include "../../lmnpch.h"
+
 #include "ModelLoaderWidget.h"
 
-#include "ImGui/imgui.h"
+#include "../ImGui/imgui.h"
 
 #include "Lumen/../AssetLoading/AssetLoading.h"
 #include "Lumen/ModelLoading/ILumenScene.h"
 
-#include "Tools/ImGuiUtil.h"
 
 
 #include <glad/glad.h>
@@ -362,8 +363,7 @@ void ModelLoaderWidget::DirectoryNagivation()
 		// Make a menu item for each directory
 		for (auto entry : entries)
 		{
-			ImGuiUtil::DisplayImage(m_Icons[entry.m_Type], glm::ivec2(8));
-			ImGui::SameLine();
+			//ImGui::SameLine();
 
 			if (ImGui::MenuItem(entry.m_Name.c_str()))
 			{

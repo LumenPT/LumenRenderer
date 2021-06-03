@@ -19,7 +19,8 @@
 
 #include "Tools/ImGuiUtil.h"
 
-#include "ModelLoaderWidget.h"
+#include "Lumen/ToolUI/ModelLoaderWidget.h"
+#include "Lumen/ToolUI/SceneGraph.h"
 
 #include "Glad/glad.h"
 
@@ -29,7 +30,6 @@
 
 #include <iostream>
 
-#include "../../LumenPT/src/Framework/CudaUtilities.h"
 
 OutputLayer::OutputLayer()
 	: m_CameraMovementSpeed(300.0f)
@@ -108,6 +108,7 @@ void OutputLayer::OnAttach()
 	}
 
 	m_ModelLoaderWidget = std::make_unique<ModelLoaderWidget>(*m_LayerServices->m_SceneManager, m_Renderer->m_Scene);
+	m_SceneGraph = std::make_unique<Lumen::SceneGraph>();
 }
 
 void OutputLayer::OnUpdate()
@@ -402,6 +403,7 @@ void OutputLayer::OnImGuiRender()
 	/////////////////////////////////////////////////
 
 	m_ModelLoaderWidget->Display();
+	m_SceneGraph->Display(*m_Renderer->m_Scene);
 }
 
 void OutputLayer::OnEvent(Lumen::Event& a_Event)
