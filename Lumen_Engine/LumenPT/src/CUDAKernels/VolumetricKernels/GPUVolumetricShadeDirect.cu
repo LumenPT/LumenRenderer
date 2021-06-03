@@ -14,8 +14,7 @@ GPU_ONLY void VolumetricShadeDirect(
 	cudaSurfaceObject_t a_Output)
 {
 
-	const unsigned int pixelDataIndex = a_PixelIndex.m_Y * a_ResolutionAndDepth.x + a_PixelIndex.m_X;
-
+	const unsigned int pixelDataIndex = PIXEL_DATA_INDEX(a_PixelIndex.m_X, a_PixelIndex.m_Y, a_ResolutionAndDepth.x);
 	const auto& intersection = a_VolumetricDataBuffer[pixelDataIndex];
 	
 

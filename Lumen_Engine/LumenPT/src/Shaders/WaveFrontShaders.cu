@@ -148,8 +148,20 @@ __device__ __forceinline__ void ShadowRaysRayGen()
 
         using namespace WaveFront;
 
+        float4 color{ 0.f };
+
+        surf2DLayeredread<float4>(
+            &color,
+            launchParams.m_ResultBuffer,
+            rayData.m_PixelIndex.m_X * sizeof(float4),
+            rayData.m_PixelIndex.m_Y,
+            static_cast<unsigned int>(rayData.m_OutputChannel),
+            cudaBoundaryModeTrap);
+
+        color += rayData.m_PotentialRadiance;
+
         surf2DLayeredwrite<float4>(
-            rayData.m_PotentialRadiance,
+            color,
             launchParams.m_ResultBuffer,
             rayData.m_PixelIndex.m_X * sizeof(float4),
             rayData.m_PixelIndex.m_Y,
@@ -240,8 +252,20 @@ __device__ __forceinline__ void ReSTIRRayGenShading()
     {
         using namespace WaveFront;
 
+        float4 color{ 0.f };
+
+        surf2DLayeredread<float4>(
+            &color,
+            launchParams.m_ResultBuffer,
+            rayData.pixelIndex.m_X * sizeof(float4),
+            rayData.pixelIndex.m_Y,
+            static_cast<unsigned int>(LightChannel::DIRECT),
+            cudaBoundaryModeTrap);
+
+        color += make_float4(rayData.contribution, 1.f);
+
         surf2DLayeredwrite<float4>(
-            make_float4(rayData.contribution, 1.f),
+            color,
             launchParams.m_ResultBuffer,
             rayData.pixelIndex.m_X * sizeof(float4),
             rayData.pixelIndex.m_Y,

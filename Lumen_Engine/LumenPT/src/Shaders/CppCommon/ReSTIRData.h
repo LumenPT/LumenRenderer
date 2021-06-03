@@ -103,7 +103,6 @@ struct LightSample
     float area;
     float3 unshadowedPathContribution;       //Contribution with geometry and BSDF taken into account.
     float solidAnglePdf;                    //solid angle PDF which is used to weight this samples importance.
-    int  s = sizeof(RestirShadowRayShading);
 };
 
 /*

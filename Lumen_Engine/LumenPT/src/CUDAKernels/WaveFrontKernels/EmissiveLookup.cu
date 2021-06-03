@@ -225,9 +225,9 @@ CPU_ON_GPU void AddToLightBuffer(
             const float3 vec2 = light.p0 - light.p2;
 
             light.area = sqrtf(
-                pow((vec1.y * vec2.z - vec2.y * vec1.z), 2) +
-                pow((vec1.x * vec2.z - vec2.x * vec1.z), 2) +
-                pow((vec1.x * vec2.y - vec2.x * vec1.y), 2)
+                powf((vec1.y * vec2.z - vec2.y * vec1.z), 2) +
+                powf((vec1.x * vec2.z - vec2.x * vec1.z), 2) +
+                powf((vec1.x * vec2.y - vec2.x * vec1.y), 2)
             ) / 2.0f;
 
             a_Lights->Add(&light);
