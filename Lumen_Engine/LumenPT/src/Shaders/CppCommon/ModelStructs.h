@@ -40,6 +40,27 @@ struct DeviceMaterial
     m_NormalTexture(0)
     {}
 
+    //Transmission
+    cudaTextureObject_t m_TransmissionTexture;
+    float m_TransmissionFactor;
+
+    //Clearcoat
+    cudaTextureObject_t m_ClearCoatTexture;
+    cudaTextureObject_t m_ClearCoatRoughnessTexture;
+    float m_ClearCoatFactor;
+    float m_ClearCoatRoughnessFactor;
+
+    //Refraction
+    float m_IndexOfRefraction;
+
+    //Specular
+    float m_SpecularFactor;
+    float m_SpecularTintFactor;
+
+    //Subsurface scattering. //NOTE: This is not provided by GLTF at the moment. 
+    float m_SubSurfaceFactor;
+
+
     NONAMESPACE::float4 m_DiffuseColor;
     NONAMESPACE::float4 m_EmissionColor;
     cudaTextureObject_t m_DiffuseTexture;

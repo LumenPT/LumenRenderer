@@ -39,6 +39,19 @@ private:
     // Make sure to update this if you are expanding the materials beyond what already exists.
     DeviceMaterial CreateDeviceMaterial() const;
 
+//Don't let the mouse see this or we're boned!
+public:
+    void SetClearCoatTexture(std::shared_ptr<Lumen::ILumenTexture> a_Texture) override;
+    void SetClearCoatRoughnessTexture(std::shared_ptr<Lumen::ILumenTexture> a_Texture) override;
+    void SetTransmissionTexture(std::shared_ptr<Lumen::ILumenTexture> a_Texture) override;
+    void SetClearCoatFactor(float a_Factor) override;
+    void SetClearCoatRoughnessFactor(float a_Factor) override;
+    void SetIndexOfRefraction(float a_Factor) override;
+    void SetTransmissionFactor(float a_Factor) override;
+    void SetSpecularFactor(float a_Factor) override;
+    void SetSpecularTintFactor(float a_Factor) override;
+    void SetSubSurfaceFactor(float a_Factor) override;
+
 private:
     // Material data is kept here instead of the base class to account for API-specific implementation details   
     float4 m_DiffuseColor;
@@ -47,6 +60,18 @@ private:
     std::shared_ptr<class PTTexture> m_EmissiveTexture;
     std::shared_ptr<class PTTexture> m_MetalRoughnessTexture;
     std::shared_ptr<class PTTexture> m_NormalTexture;
+
+    std::shared_ptr<class PTTexture> m_TransmissionTexture;
+    std::shared_ptr<class PTTexture> m_ClearCoatTexture;
+    std::shared_ptr<class PTTexture> m_ClearCoatRoughnessTexture;
+
+    float m_TransmissionFactor;
+    float m_ClearCoatFactor;
+    float m_ClearCoatRoughnessFactor;
+    float m_IndexOfRefraction;
+    float m_SpecularFactor;
+    float m_SpecularTintFactor;
+    float m_SubSurfaceFactor;
 
     // A flag to keep track if the GPU representation of the material needs to be updated after something was changed
     mutable bool m_DeviceMaterialDirty;

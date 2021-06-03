@@ -35,12 +35,32 @@ enum BSDFType
 
 struct ShadingData
 {
-	float3 color;			//The albedo surface color.		
-	uint4 parameters;
+	float3 color;			//The albedo surface color.
+
+	union
+	{
+		uint4 parameters;
+		unsigned char paramsAsChar[16];	//Aliasing to char.
+		float paramsAsFloat[4];			//Aliasing to float
+	};
 	/* 16 uchars:   x: 0..7 = metallic, 8..15 = subsurface, 16..23 = specular, 24..31 = roughness;
 					y: 0..7 = specTint, 8..15 = anisotropic, 16..23 = sheen, 24..31 = sheenTint;
 					z: 0..7 = clearcoat, 8..15 = clearcoatGloss, 16..23 = transmission, 24..31 = dummy;
 					w: eta (32-bit float). */
+
+#define SET_METALLIC(X) (shadingData.paramsAsChar[0] = (static_cast<unsigned char>((X) * static_cast<unsigned char>(255))))
+#define SET_SUBSURFACE(X) (shadingData.paramsAsChar[1] = (static_cast<unsigned char>((X) * static_cast<unsigned char>(255))))
+#define SET_SPECULAR(X) (shadingData.paramsAsChar[2] = (static_cast<unsigned char>((X) * static_cast<unsigned char>(255))))
+#define SET_ROUGHNESS(X) (shadingData.paramsAsChar[3] = (static_cast<unsigned char>((X) * static_cast<unsigned char>(255))))
+
+#define SET_SPECTINT(X) (shadingData.paramsAsChar[4] = (X))
+
+#define SET_CLEARCOAT(X) (shadingData.paramsAsChar[8] = (static_cast<unsigned char>((X) * static_cast<unsigned char>(255))))
+#define SET_CLEARCOATGLOSS(X) (shadingData.paramsAsChar[9] = (static_cast<unsigned char>((X) * static_cast<unsigned char>(255))))
+#define SET_TRANSMISSION(X) (shadingData.paramsAsChar[10] = (static_cast<unsigned char>((X) * static_cast<unsigned char>(255))))
+
+#define SET_ETA(X) (shadingData.paramsAsFloat[3] = (X))
+
 
 #define METALLIC CHAR2FLT( shadingData.parameters.x, 0 )
 #define SUBSURFACE CHAR2FLT( shadingData.parameters.x, 8 )

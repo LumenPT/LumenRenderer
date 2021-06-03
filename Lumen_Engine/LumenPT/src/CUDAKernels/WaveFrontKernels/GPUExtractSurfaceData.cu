@@ -3,7 +3,7 @@
 #include <Lumen/ModelLoading/MeshInstance.h>
 #include <device_launch_parameters.h>
 #include <sutil/vec_math.h>
-
+#include "../disney.cuh"
 
 CPU_ON_GPU void ExtractSurfaceDataGpu(
     unsigned a_NumIntersections,
@@ -58,6 +58,11 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
             const float3 finalColor = make_float3(textureColor * material->m_DiffuseColor);
             const float4 metalRoughness = tex2D<float4>(material->m_MetalRoughnessTexture, texCoords.x, texCoords.y);
 
+            //Disney BSDF textures
+            const float4 clearCoat = tex2D<float4>(material->m_ClearCoatTexture, texCoords.x, texCoords.y);
+            const float4 clearCoatRoughness = tex2D<float4>(material->m_ClearCoatRoughnessTexture, texCoords.x, texCoords.y);
+            const float4 transmission = tex2D<float4>(material->m_TransmissionTexture, texCoords.x, texCoords.y);
+
             //Emissive mode
             float4 emissive = make_float4(0.f);
 
@@ -95,6 +100,7 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
             //Transform the normal to world space
             float4 surfaceNormalWorld = devicePrimitiveInstance.m_Transform * make_float4(surfaceNormal, 0.f);
 
+
             //TODO normal mapping
             //float3 tangent = 
             //    normalize(
@@ -130,24 +136,65 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
             //Can't have perfect specular surfaces. 0 is never acceptable.
             assert(roughness > 0.f && roughness <= 1.f);
 
+            //The final normal to be used by all shading.
+            float3 normal = normalize(make_float3(surfaceNormalWorld));
+
+            //Determine if we're in the surface or outside of it. Assume outside IOR as 1.0 (air).
+            float eta = 1.f;
+            if(dot(normal, currRay.m_Direction) > 0.f)
+            {
+                //Invert if in material.
+                normal *= -1.f;
+                eta = material->m_IndexOfRefraction;// /1.f;   //Because leaving a surface always goes to air, it's just divided by 1.0
+            }
+            else
+            {
+                //Entering material so ETA is air / material ior
+                eta = 1.f / material->m_IndexOfRefraction;
+            }
+
             //The surface data to write to. Local copy for fast access.
             SurfaceData output;
             output.m_Index = currIntersection.m_PixelIndex;
             output.m_IntersectionT = currIntersection.m_IntersectionT;
-            output.m_Normal = normalize(make_float3(surfaceNormalWorld));
-            output.m_Color = finalColor;
+            output.m_Normal = normal;
             output.m_Position = currRay.m_Origin + currRay.m_Direction * currIntersection.m_IntersectionT;
             output.m_IncomingRayDirection = currRay.m_Direction;
-            output.m_Metallic = metal;
-            output.m_Roughness = roughness;
             output.m_TransportFactor = currRay.m_Contribution;
+
+            auto& shadingData = output.m_ShadingData;
+            shadingData.parameters = make_uint4(0u, 0u, 0u, 0u);    //Default init to 0 for all.
+
+            //Set output color.
+            output.m_ShadingData.color = finalColor;
+
+            SET_METALLIC(metal);
+            SET_ROUGHNESS(roughness);
+
+            SET_SUBSURFACE(material->m_SubSurfaceFactor);
+
+            SET_SPECULAR(material->m_SpecularFactor);
+            SET_SPECTINT(material->m_SpecularTintFactor);   //Note: GLTF provides a color too, but it's not used by Jaccos BSDF but we can add it easily.
+
+            //Multiply factors with textures.
+            const float finalClearCoat = material->m_ClearCoatFactor * clearCoat.x;
+            const float clearCoatGloss = 1.f - (material->m_ClearCoatRoughnessFactor * clearCoatRoughness.x);    //Invert from rough to gloss.
+            const float finalTranmission = material->m_TransmissionFactor * transmission.x;
+
+            SET_CLEARCOAT(finalClearCoat);
+            SET_CLEARCOATGLOSS(clearCoatGloss);
+            SET_TRANSMISSION(finalTranmission);
+
+            //Index of refraction.
+            SET_ETA(eta);
+            
             output.m_Emissive = (emissive.x > 0 || emissive.y > 0 || emissive.z > 0);
             if (output.m_Emissive)
             {
                 //Clamp between 0 and 1. TODO this is not HDR friendly so remove when we do that.
-                output.m_Color = make_float3(emissive);
-                float max = fmaxf(output.m_Color.x, fmaxf(output.m_Color.y, output.m_Color.z));
-                output.m_Color /= max;
+                output.m_ShadingData.color = make_float3(emissive);
+                float max = fmaxf(output.m_ShadingData.color.x, fmaxf(output.m_ShadingData.color.y, output.m_ShadingData.color.z));
+                output.m_ShadingData.color /= max;
             }
 
             a_OutPut[surfaceDataIndex] = output;

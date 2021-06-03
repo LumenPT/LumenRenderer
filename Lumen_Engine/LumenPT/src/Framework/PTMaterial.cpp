@@ -8,7 +8,12 @@
 #include "Cuda/vector_functions.h"
 
 PTMaterial::PTMaterial()
-    : m_DeviceMaterialDirty(true)
+    : m_DiffuseColor(), m_EmissiveColor(), m_TransmissionFactor(0), m_ClearCoatFactor(0), m_ClearCoatRoughnessFactor(0),
+      m_IndexOfRefraction(1.f),
+      m_SpecularFactor(0),
+      m_SpecularTintFactor(0),
+      m_SubSurfaceFactor(0),
+      m_DeviceMaterialDirty(true)
 {
     // Allocate the GPU memory for the GPU material representation
     m_DeviceMemoryBuffer = std::make_unique<MemoryBuffer>(sizeof(DeviceMaterial));
@@ -108,5 +113,90 @@ DeviceMaterial PTMaterial::CreateDeviceMaterial() const
         m.m_DiffuseTexture = **m_DiffuseTexture;
     }
 
+
+    //Disney BSDF stuff
+    m.m_TransmissionFactor = m_TransmissionFactor;
+    m.m_ClearCoatFactor = m_ClearCoatFactor;
+    m.m_IndexOfRefraction = m_IndexOfRefraction;
+    m.m_ClearCoatRoughnessFactor = m_ClearCoatRoughnessFactor;
+    m.m_SpecularFactor = m_SpecularFactor;
+    m.m_SpecularTintFactor = m_SpecularTintFactor;
+    m.m_SubSurfaceFactor = m_SubSurfaceFactor;
+
+    if(m_TransmissionTexture)
+    {
+        m.m_TransmissionFactor = **m_TransmissionTexture;
+    }
+
+    if(m_ClearCoatTexture)
+    {
+        m.m_ClearCoatTexture = **m_ClearCoatTexture;
+    }
+
+    if(m_ClearCoatRoughnessTexture)
+    {
+        m.m_ClearCoatRoughnessFactor = **m_ClearCoatRoughnessTexture;
+    }
+
     return m;
+}
+
+void PTMaterial::SetClearCoatTexture(std::shared_ptr<Lumen::ILumenTexture> a_Texture)
+{
+    m_ClearCoatTexture = *reinterpret_cast<std::shared_ptr<PTTexture>*>(&a_Texture);
+    m_DeviceMaterialDirty = true;
+}
+
+void PTMaterial::SetClearCoatRoughnessTexture(std::shared_ptr<Lumen::ILumenTexture> a_Texture)
+{
+    m_ClearCoatRoughnessTexture = *reinterpret_cast<std::shared_ptr<PTTexture>*>(&a_Texture);
+    m_DeviceMaterialDirty = true;
+}
+
+void PTMaterial::SetTransmissionTexture(std::shared_ptr<Lumen::ILumenTexture> a_Texture)
+{
+    m_TransmissionTexture = *reinterpret_cast<std::shared_ptr<PTTexture>*>(&a_Texture);
+    m_DeviceMaterialDirty = true;
+}
+
+void PTMaterial::SetClearCoatFactor(float a_Factor)
+{
+    m_ClearCoatFactor = a_Factor;
+    m_DeviceMaterialDirty = true;
+}
+
+void PTMaterial::SetClearCoatRoughnessFactor(float a_Factor)
+{
+    m_ClearCoatRoughnessFactor = a_Factor;
+    m_DeviceMaterialDirty = true;
+}
+
+void PTMaterial::SetIndexOfRefraction(float a_Factor)
+{
+    m_IndexOfRefraction = a_Factor;
+    m_DeviceMaterialDirty = true;
+}
+
+void PTMaterial::SetTransmissionFactor(float a_Factor)
+{
+    m_TransmissionFactor = a_Factor;
+    m_DeviceMaterialDirty = true;
+}
+
+void PTMaterial::SetSpecularFactor(float a_Factor)
+{
+    m_SpecularFactor = a_Factor;
+    m_DeviceMaterialDirty = true;
+}
+
+void PTMaterial::SetSpecularTintFactor(float a_Factor)
+{
+    m_SpecularTintFactor = a_Factor;
+    m_DeviceMaterialDirty = true;
+}
+
+void PTMaterial::SetSubSurfaceFactor(float a_Factor)
+{
+    m_SubSurfaceFactor = a_Factor;
+    m_DeviceMaterialDirty = true;
 }
