@@ -153,7 +153,7 @@ __device__ __forceinline__ void ShadowRaysRayGen()
             launchParams.m_ResultBuffer,
             rayData.m_PixelIndex.m_X * sizeof(float4),
             rayData.m_PixelIndex.m_Y,
-            static_cast<unsigned short int>(LightChannel::NUM_CHANNELS),
+            static_cast<unsigned int>(rayData.m_OutputChannel),
             cudaBoundaryModeTrap);
 
     }

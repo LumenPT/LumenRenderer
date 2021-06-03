@@ -61,6 +61,8 @@ inline void CheckCudaErr(const cudaError& a_err, const char* a_File, int a_Line)
 inline void CheckCudaLastErr(const char* a_File, int a_Line)
 {
 
+    cudaDeviceSynchronize();
+
     cudaError err = cudaGetLastError();
     CheckCudaErr(err, a_File, a_Line);
 

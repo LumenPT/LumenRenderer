@@ -75,7 +75,7 @@ CPU_ONLY void ExtractSurfaceData(
 CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
 {
 
-    const dim3 blockSize {32, 32 ,1};
+    const dim3 blockSize {16, 16 ,1};
 
     const unsigned blockSizeWidth = 
         static_cast<unsigned>(std::ceil(static_cast<float>(a_ShadingParams.m_ResolutionAndDepth.x) / static_cast<float>(blockSize.x)));

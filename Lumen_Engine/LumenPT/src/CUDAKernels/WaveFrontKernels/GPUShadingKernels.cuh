@@ -76,6 +76,7 @@ CPU_ON_GPU void ShadeIndirect(
 );
 
 
+
 CPU_ON_GPU void DEBUGShadePrimIntersections(
     const uint3 a_ResolutionAndDepth,
     const SurfaceData* a_CurrentSurfaceData,

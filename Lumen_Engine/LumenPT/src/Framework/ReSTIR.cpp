@@ -74,7 +74,7 @@ CPU_ONLY void ReSTIR::Run(
 )
 {
 	assert(m_SwapDirtyFlag && "SwapBuffers has to be called once per frame for ReSTIR to properly work.");
-	assert(a_OptixSystem && "Optix System cannot be nullptr!");
+	assert(a_OptixWrapper && "Optix System cannot be nullptr!");
 
 	//Index of the reservoir buffers (current and temporal).
 	const auto currentIndex = m_SwapChainIndex;
