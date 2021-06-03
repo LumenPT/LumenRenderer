@@ -179,7 +179,7 @@ namespace WaveFront
         m_ServiceLocator.m_Renderer = this;
         m_FrameSnapshot = std::make_unique<NullFrameSnapshot>();
 
-
+        m_ModelConverter.SetRendererRef(*this);
     }
 
     void WaveFrontRenderer::BeginSnapshot()
@@ -779,11 +779,28 @@ namespace WaveFront
         m_OGLCallCondition.notify_all();
     }
 
+    Lumen::SceneManager::GLTFResource WaveFrontRenderer::OpenCustomFileFormat(const std::string& a_OriginalFilePath)
+    {
+        std::filesystem::path p(a_OriginalFilePath);
+        p.replace_extension(LumenPTModelConverter::ms_ExtensionName);
+
+        return m_ModelConverter.LoadFile(p.string());
+    }
+
+    Lumen::SceneManager::GLTFResource WaveFrontRenderer::CreateCustomFileFormat(const std::string& a_OriginalFilePath)
+    {
+        return m_ModelConverter.ConvertGLTF(a_OriginalFilePath);
+    }
+
     std::unique_ptr<Lumen::ILumenPrimitive> WaveFrontRenderer::CreatePrimitive(PrimitiveData& a_PrimitiveData)
     {
         //TODO let optix build the acceleration structure and return the handle.
+        std::unique_ptr<MemoryBuffer> vertexBuffer;
+        if (!a_PrimitiveData.m_Interleaved)
+            vertexBuffer = InterleaveVertexData(a_PrimitiveData);
+        else
+            vertexBuffer = std::make_unique<MemoryBuffer>(a_PrimitiveData.m_VertexBinary);
 
-        auto vertexBuffer = InterleaveVertexData(a_PrimitiveData);
         cudaDeviceSynchronize();
         auto err = cudaGetLastError();
         std::vector<uint32_t> correctedIndices;
@@ -861,7 +878,7 @@ namespace WaveFront
         buildInput.triangleArray.vertexBuffers = &**vertexBuffer;
         buildInput.triangleArray.vertexFormat = OPTIX_VERTEX_FORMAT_FLOAT3;
         buildInput.triangleArray.vertexStrideInBytes = sizeof(Vertex);
-        buildInput.triangleArray.numVertices = a_PrimitiveData.m_Positions.Size();
+        buildInput.triangleArray.numVertices = vertexBuffer->GetSize() / sizeof(Vertex);
         buildInput.triangleArray.numSbtRecords = 1;
         buildInput.triangleArray.flags = &geomFlags;
 
@@ -903,7 +920,10 @@ namespace WaveFront
         auto mat = std::make_shared<PTMaterial>();
         mat->SetDiffuseColor(a_MaterialData.m_DiffuseColor);
         mat->SetDiffuseTexture(a_MaterialData.m_DiffuseTexture);
-        mat->SetEmission(a_MaterialData.m_EmssivionVal);
+        mat->SetEmission(a_MaterialData.m_EmissionVal);
+        mat->SetEmissiveTexture(a_MaterialData.m_EmissiveTexture);
+        mat->SetMetalRoughnessTexture(a_MaterialData.m_MetallicRoughnessTexture);
+        mat->SetNormalTexture(a_MaterialData.m_NormalMap);
 
         CHECKLASTCUDAERROR;
 

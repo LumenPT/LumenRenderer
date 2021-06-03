@@ -100,12 +100,15 @@ DeviceMaterial PTMaterial::CreateDeviceMaterial() const
     m.m_EmissionColor = m_EmissiveColor;
 
     //Should always have a default loaded.
-    m.m_MetalRoughnessTexture = **m_MetalRoughnessTexture;
+    if (m_MetalRoughnessTexture)
+        m.m_MetalRoughnessTexture = **m_MetalRoughnessTexture;
 
     //Should always be default loaded
-    m.m_NormalTexture = **m_NormalTexture;
+    if (m_NormalTexture)
+        m.m_NormalTexture = **m_NormalTexture;
 
-    m.m_EmissiveTexture = **m_EmissiveTexture;
+    if (m_EmissiveTexture)
+        m.m_EmissiveTexture = **m_EmissiveTexture;
 
 
     if (m_DiffuseTexture)

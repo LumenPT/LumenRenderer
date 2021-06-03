@@ -64,7 +64,7 @@ namespace Lumen
         ILumenMesh(std::vector<std::shared_ptr<ILumenPrimitive>>& a_Primitives)
             : m_Primitives(std::move(a_Primitives)) 
         {
-            for (auto& prim : a_Primitives)
+            for (auto& prim : m_Primitives)
             {
                 if (prim->m_ContainEmissive)
                 {

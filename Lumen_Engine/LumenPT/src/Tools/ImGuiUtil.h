@@ -4,11 +4,6 @@
 
 #include "cstdint"
 #include "Renderer/Camera.h"
-#include "Renderer/Camera.h"
-#include "Renderer/Camera.h"
-#include "Renderer/Camera.h"
-#include "Renderer/Camera.h"
-#include "Renderer/Camera.h"
 
 class CudaGLTexture;
 
