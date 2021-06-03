@@ -92,7 +92,7 @@ public:
 		settings.m_ShadersFilePathSolids = config.GetFileShaderSolids();
 		settings.m_ShadersFilePathVolumetrics = config.GetFileShaderVolumetrics();
 
-		settings.depth = 1;
+		settings.depth = 5;
 		settings.minIntersectionT = 0.1f;
 		settings.maxIntersectionT = 5000.f;
 		settings.renderResolution = { 800, 600 };
@@ -192,6 +192,10 @@ public:
 		seed = RandomInt(seed);
 
 		lumenPT->m_Scene = res->m_Scenes[0];
+
+		//make sponza normal sized.
+		lumenPT->m_Scene->m_MeshInstances[0]->m_Transform.SetScale({ 1.f, 1.f, 1.f });
+
 		for(int i = 0; i < 30; ++i)
 		{
 			for (auto& node : res2->m_NodePool)
@@ -216,6 +220,8 @@ public:
 			float p = i;
 			mesh->m_Transform.SetPosition(glm::vec3(xOffset, 100.f + (p * p), 0.f));
 			mesh->m_Transform.SetScale(glm::vec3(2.0f * (static_cast<float>((i + 1) * 2) / 4.f)));
+			mesh->SetEmissiveness(Lumen::EmissionMode::OVERRIDE, glm::vec3(1.f, 1.f, 1.f), 50.f);
+			mesh->UpdateAccelRemoveThis();
 			xOffset += 50;
 		}
 		

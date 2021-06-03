@@ -142,11 +142,17 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
                 normal *= -1.f;
                 tangent *= -1.f;
                 eta = material->m_IndexOfRefraction;// /1.f;   //Because leaving a surface always goes to air, it's just divided by 1.0
+
+                //TODO remove
+                eta = 1.4f;
             }
             else
             {
                 //Entering material so ETA is air / material ior
                 eta = 1.f / material->m_IndexOfRefraction;
+
+                //TODO remove
+                eta = 1.f / 1.4f;
             }
 
             //The surface data to write to. Local copy for fast access.
@@ -198,21 +204,21 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
             else 
             {
                 //TODO remove
-                shadingData.SetMetallic(metal);
-                shadingData.SetRoughness(roughness);
+                shadingData.SetMetallic(0.f);
+                shadingData.SetRoughness(1.f);
                 shadingData.SetSubSurface(0.f);
                 shadingData.SetSpecular(0.f);
-                shadingData.SetSpecTint(0.5f);
-                shadingData.SetLuminance(0.f);
+                shadingData.SetSpecTint(0.f);
+                shadingData.SetLuminance(1.f);
                 shadingData.SetAnisotropic(0.f);
-                shadingData.SetClearCoat(0.5f);
-                shadingData.SetClearCoatGloss(0.5f);
+                shadingData.SetClearCoat(0.f);
+                shadingData.SetClearCoatGloss(0.f);
                 shadingData.SetTint(make_float3(1.f, 1.f, 1.f));
-                shadingData.SetSheen(0.5f);
-                shadingData.SetSheenTint(0.5f);
-                shadingData.SetTransmission(0.7f);
-                shadingData.SetTransmittance(make_float3(1.f, 1.f, 1.f));
-                shadingData.SetETA(eta);
+                shadingData.SetSheen(0.f);
+                shadingData.SetSheenTint(0.f);
+                shadingData.SetTransmission(0.f);
+                shadingData.SetTransmittance(make_float3(0.9f, 0.9f, 0.9f));
+                shadingData.SetETA(1.f);
             }
 
             output.m_Emissive = (emissive.x > 0 || emissive.y > 0 || emissive.z > 0);
@@ -220,8 +226,8 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
             {
                 //Clamp between 0 and 1. TODO this is not HDR friendly so remove when we do that.
                 output.m_ShadingData.color = make_float3(emissive);
-                float max = fmaxf(output.m_ShadingData.color.x, fmaxf(output.m_ShadingData.color.y, output.m_ShadingData.color.z));
-                output.m_ShadingData.color /= max;
+                float maximum = fmaxf(output.m_ShadingData.color.x, fmaxf(output.m_ShadingData.color.y, output.m_ShadingData.color.z));
+                output.m_ShadingData.color /= maximum;
             }
 
             a_OutPut[surfaceDataIndex] = output;

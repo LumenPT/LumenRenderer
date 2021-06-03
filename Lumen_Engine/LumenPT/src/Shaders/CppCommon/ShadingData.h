@@ -1,4 +1,5 @@
 #pragma once
+#include <cuda/cuda_runtime_api.h>
 
 #define CHAR2FLT(a,s) (((float)(((a)>>s)&255))*(1.0f/255.0f))
 
@@ -39,6 +40,8 @@ struct ShadingData
 #define CHAR_INDEX_1 8
 #define CHAR_INDEX_2 16
 #define CHAR_INDEX_3 24
+
+#if defined(__CUDACC__)
 
 	__device__ __forceinline__ void SetColor(float3& a_Data)
 	{
@@ -133,4 +136,5 @@ struct ShadingData
 		a_Data &= ~(255 << a_Offset);	//Overwrite with 0. Flip to make everything 1 except the overwritten chars. 
 		a_Data |= a_Char << a_Offset;	//Write new data.
 	}
+#endif
 };

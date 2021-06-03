@@ -1,317 +1,11 @@
 #pragma once
 
+#include <cuda_runtime_api.h>
 #include "bsdf_math.cuh"
 #include "ggxmdf.cuh"
 #include "frosted.cuh"
 #include "../Shaders/CppCommon/ShadingData.h"
-
-
-///*
-/// NOTE: Below code is incomplete.
-// * The below code has been copied from LightHouse2: https://github.com/jbikker/lighthouse2/blob/master/lib/RenderCore_Optix7Filter/kernels/bsdfs/disney.h
-// */
-//
-///*
-//# Copyright Disney Enterprises, Inc.  All rights reserved.
-//#
-//# Licensed under the Apache License, Version 2.0 (the "License");
-//# you may not use this file except in compliance with the License
-//# and the following modification to it: Section 6 Trademarks.
-//# deleted and replaced with:
-//#
-//# 6. Trademarks. This License does not grant permission to use the
-//# trade names, trademarks, service marks, or product names of the
-//# Licensor and its affiliates, except as required for reproducing
-//# the content of the NOTICE file.
-//#
-//# You may obtain a copy of the License at
-//# http://www.apache.org/licenses/LICENSE-2.0
-//# Adapted to C++ by Miles Macklin 2016
-//*/
-//
-//enum BSDFType
-//{
-//	eReflected,
-//	eTransmitted,
-//	eSpecular
-//};
-//
-//__device__ static inline bool Refract(const float3& wi, const float3& n, const float eta, float3& wt)
-//{
-//	float cosThetaI = dot(n, wi);
-//	float sin2ThetaI = max(0.0f, 1.0f - cosThetaI * cosThetaI);
-//	float sin2ThetaT = eta * eta * sin2ThetaI;
-//	if (sin2ThetaT >= 1) return false; // TIR
-//	float cosThetaT = sqrtf(1.0f - sin2ThetaT);
-//	wt = eta * (wi * -1.0f) + (eta * cosThetaI - cosThetaT) * float3(n);
-//	return true;
-//}
-//
-//__device__ static inline float SchlickFresnel(const float u)
-//{
-//	const float m = clamp(1 - u, 0.0f, 1.0f);
-//	return float(m * m) * (m * m) * m;
-//}
-//
-//__device__ static inline float GTR1(const float NDotH, const float a)
-//{
-//	if (a >= 1) return INVPI;
-//	const float a2 = a * a;
-//	const float t = 1 + (a2 - 1) * NDotH * NDotH;
-//	return (a2 - 1) / (PI * logf(a2) * t);
-//}
-//
-//__device__ static inline float GTR2(const float NDotH, const float a)
-//{
-//	const float a2 = a * a;
-//	const float t = 1.0f + (a2 - 1.0f) * NDotH * NDotH;
-//	return a2 / (PI * t * t);
-//}
-//
-//__device__ static inline float SmithGGX(const float NDotv, const float alphaG)
-//{
-//	const float a = alphaG * alphaG;
-//	const float b = NDotv * NDotv;
-//	return 1 / (NDotv + sqrtf(a + b - a * b));
-//}
-//
-//__device__ static float Fr(const float VDotN, const float eio)
-//{
-//	const float SinThetaT2 = sqr(eio) * (1.0f - VDotN * VDotN);
-//	if (SinThetaT2 > 1.0f) return 1.0f; // TIR
-//	const float LDotN = sqrtf(1.0f - SinThetaT2);
-//	// todo: reformulate to remove this division
-//	const float eta = 1.0f / eio;
-//	const float r1 = (VDotN - eta * LDotN) / (VDotN + eta * LDotN);
-//	const float r2 = (LDotN - eta * VDotN) / (LDotN + eta * VDotN);
-//	return 0.5f * (sqr(r1) + sqr(r2));
-//}
-//
-//__device__ static inline float3 SafeNormalize(const float3& a)
-//{
-//	const float ls = dot(a, a);
-//	if (ls > 0.0f) return a * (1.0f / sqrtf(ls)); else return make_float3(0);
-//}
-//
-//__device__ static float BSDFPdf(const ShadingData& shadingData, const float3& N, const float3& wo, const float3& wi)
-//{
-//	float bsdfPdf = 0.0f, brdfPdf;
-//	if (dot(wi, N) <= 0.0f) brdfPdf = INV2PI * SUBSURFACE * 0.5f; else
-//	{
-//		const float F = Fr(dot(N, wo), ETA);
-//		const float3 half = SafeNormalize(wi + wo);
-//		const float cosThetaHalf = abs(dot(half, N));
-//		const float pdfHalf = GTR2(cosThetaHalf, ROUGHNESS) * cosThetaHalf;
-//		// calculate pdf for each method given outgoing light vector
-//		const float pdfSpec = 0.25f * pdfHalf / max(1.e-6f, dot(wi, half));
-//		const float pdfDiff = abs(dot(wi, N)) * INVPI * (1.0f - SUBSURFACE);
-//		bsdfPdf = pdfSpec * F;
-//		brdfPdf = lerp(pdfDiff, pdfSpec, 0.5f);
-//	}
-//	return lerp(brdfPdf, bsdfPdf, TRANSMISSION);
-//}
-//
-//// evaluate the BSDF for a given pair of directions
-//__device__ static float3 BSDFEval(const ShadingData& shadingData,
-//	const float3& N, const float3& wo, const float3& wi)
-//{
-//	const float NDotL = dot(N, wi);
-//	const float NDotV = dot(N, wo);
-//	const float3 H = normalize(wi + wo);
-//	const float NDotH = dot(N, H);
-//	const float LDotH = dot(wi, H);
-//	const float3 Cdlin = shadingData.color;
-//	const float Cdlum = .3f * Cdlin.x + .6f * Cdlin.y + .1f * Cdlin.z; // luminance approx.
-//	const float3 Ctint = Cdlum > 0.0f ? Cdlin / Cdlum : make_float3(1.0f); // normalize lum. to isolate hue+sat
-//	const float3 Cspec0 = lerp(SPECULAR * .08f * lerp(make_float3(1.0f), Ctint, SPECTINT), Cdlin, METALLIC);
-//	float3 bsdf = make_float3(0);
-//	float3 brdf = make_float3(0);
-//	if (TRANSMISSION > 0.0f)
-//	{
-//		// evaluate BSDF
-//		if (NDotL <= 0)
-//		{
-//			// transmission Fresnel
-//			const float F = Fr(NDotV, ETA);
-//			bsdf = make_float3((1.0f - F) / abs(NDotL) * (1.0f - METALLIC) * TRANSMISSION);
-//		}
-//		else
-//		{
-//			// specular lobe
-//			const float a = ROUGHNESS;
-//			const float Ds = GTR2(NDotH, a);
-//
-//			// Fresnel term with the microfacet normal
-//			const float FH = Fr(LDotH, ETA);
-//			const float3 Fs = lerp(Cspec0, make_float3(1.0f), FH);
-//			const float Gs = SmithGGX(NDotV, a) * SmithGGX(NDotL, a);
-//			bsdf = (Gs * Ds) * Fs;
-//		}
-//	}
-//	if (TRANSMISSION < 1.0f)
-//	{
-//		// evaluate BRDF
-//		if (NDotL <= 0)
-//		{
-//			if (SUBSURFACE > 0.0f)
-//			{
-//				// take sqrt to account for entry/exit of the ray through the medium
-//				// this ensures transmitted light corresponds to the diffuse model
-//				const float3 s = make_float3(sqrtf(shadingData.color.x), sqrtf(shadingData.color.y), sqrtf(shadingData.color.z));
-//				const float FL = SchlickFresnel(abs(NDotL)), FV = SchlickFresnel(NDotV);
-//				const float Fd = (1.0f - 0.5f * FL) * (1.0f - 0.5f * FV);
-//				brdf = INVPI * s * SUBSURFACE * Fd * (1.0f - METALLIC);
-//			}
-//		}
-//		else
-//		{
-//			// specular
-//			const float a = ROUGHNESS;
-//			const float Ds = GTR2(NDotH, a);
-//
-//			// Fresnel term with the microfacet normal
-//			const float FH = SchlickFresnel(LDotH);
-//			const float3 Fs = lerp(Cspec0, make_float3(1), FH);
-//			const float Gs = SmithGGX(NDotV, a) * SmithGGX(NDotL, a);
-//
-//			// Diffuse fresnel - go from 1 at normal incidence to .5 at grazing
-//			// and mix in diffuse retro-reflection based on roughness
-//			const float FL = SchlickFresnel(NDotL), FV = SchlickFresnel(NDotV);
-//			const float Fd90 = 0.5 + 2.0f * LDotH * LDotH * a;
-//			const float Fd = lerp(1.0f, Fd90, FL) * lerp(1.0f, Fd90, FV);
-//
-//			// clearcoat (ior = 1.5 -> F0 = 0.04)
-//			const float Dr = GTR1(NDotH, lerp(.1, .001, CLEARCOATGLOSS));
-//			const float Fc = lerp(.04f, 1.0f, FH);
-//			const float Gr = SmithGGX(NDotL, .25) * SmithGGX(NDotV, .25);
-//
-//			brdf = INVPI * Fd * Cdlin * (1.0f - METALLIC) * (1.0f - SUBSURFACE) + Gs * Fs * Ds + CLEARCOAT * Gr * Fc * Dr;
-//		}
-//	}
-//
-//	return lerp(brdf, bsdf, TRANSMISSION);
-//}
-//
-//// generate an importance sampled BSDF direction
-//__device__ static void BSDFSample(const ShadingData& shadingData,
-//	const float3& T, const float3& B, const float3& N, const float3& wo, float3& wi, float& pdf, BSDFType& type, const float r3, const float r4)
-//{
-//	if (r3 < TRANSMISSION)
-//	{
-//		// sample BSDF
-//		float F = Fr(dot(N, wo), ETA);
-//		if (r4 < F) // sample reflectance or transmission based on Fresnel term
-//		{
-//			// sample reflection
-//			const float r1 = r3 / TRANSMISSION;
-//			const float r2 = r4 / F;
-//			const float cosThetaHalf = sqrtf((1.0f - r2) / (1.0f + (sqr(ROUGHNESS) - 1.0f) * r2));
-//			const float sinThetaHalf = sqrtf(max(0.0f, 1.0f - sqr(cosThetaHalf)));
-//			float sinPhiHalf, cosPhiHalf;
-//			__sincosf(r1 * TWOPI, &sinPhiHalf, &cosPhiHalf);
-//			float3 half = T * (sinThetaHalf * cosPhiHalf) + B * (sinThetaHalf * sinPhiHalf) + N * cosThetaHalf;
-//			if (dot(half, wo) <= 0.0f) half *= -1.0f; // ensure half angle in same hemisphere as wo
-//			type = eReflected;
-//			wi = reflect(wo * -1.0f, half);
-//		}
-//		else // sample transmission
-//		{
-//			pdf = 0;
-//			if (Refract(wo, N, ETA, wi)) type = eSpecular, pdf = (1.0f - F) * TRANSMISSION;
-//			return;
-//		}
-//	}
-//	else // sample BRDF
-//	{
-//		const float r1 = (r3 - TRANSMISSION) / (1 - TRANSMISSION);
-//		if (r4 < 0.5f)
-//		{
-//			// sample diffuse	
-//			const float r2 = r4 * 2;
-//			float3 d;
-//			if (r2 < SUBSURFACE)
-//			{
-//				const float r5 = r2 / SUBSURFACE;
-//				d = DiffuseReflectionUniform(r1, r5), type = eTransmitted, d.z *= -1.0f;
-//			}
-//			else
-//			{
-//				const float r5 = (r2 - SUBSURFACE) / (1 - SUBSURFACE);
-//				d = DiffuseReflectionCosWeighted(r1, r5), type = eReflected;
-//			}
-//			wi = T * d.x + B * d.y + N * d.z;
-//		}
-//		else
-//		{
-//			// sample specular
-//			const float r2 = (r4 - 0.5f) * 2.0f;
-//			const float cosThetaHalf = sqrtf((1.0f - r2) / (1.0f + (sqr(ROUGHNESS) - 1.0f) * r2));
-//			const float sinThetaHalf = sqrtf(max(0.0f, 1.0f - sqr(cosThetaHalf)));
-//			float sinPhiHalf, cosPhiHalf;
-//			__sincosf(r1 * TWOPI, &sinPhiHalf, &cosPhiHalf);
-//			float3 half = T * (sinThetaHalf * cosPhiHalf) + B * (sinThetaHalf * sinPhiHalf) + N * cosThetaHalf;
-//			if (dot(half, wo) <= 0.0f) half *= -1.0f; // ensure half angle in same hemisphere as wi
-//			wi = reflect(wo * -1.0f, half);
-//			type = eReflected;
-//		}
-//	}
-//	pdf = BSDFPdf(shadingData, N, wo, wi);
-//}
-//
-//// ----------------------------------------------------------------
-//
-///*
-// * The below function evaluates the BSDF for a set of directions during a surface interaction.
-// * Note: all directions point away from the surface.
-// *
-// * @ShadingData contains the surface properties such as metallic/roughness/sheen/transmission etc.
-// * @iN is the normal of the surface.
-// * @wo is the incoming ray direction inverted.
-// * @wi is the outgoing direction.
-// * @pdf Represents the PDF of the evaluated BSDF.
-// *
-// * @returns the float3 BSDF.
-// */
-//__device__ static float3 EvaluateBSDF(const ShadingData& shadingData, const float3& iN,
-//	const float3 wo, const float3 wi, float& pdf)
-//{
-//	const float3 bsdf = BSDFEval(shadingData, iN, wo, wi);
-//	pdf = BSDFPdf(shadingData, iN, wo, wi);
-//	return bsdf;
-//}
-//
-///*
-// * The below function returns the BSDF for a surface interactions for an incoming.
-// * Note: all directions point away from the surface.
-// *
-// * @shadingData contains the surface and material data.
-// * @iN The surface normal.
-// * @T The geometry surface tangent.
-// * @wo The inverse incoming ray direction (surface to ray origin).
-// * @r3 Random uniform float between 0 and 1 (inclusive).
-// * @r4 Random uniform float between 0 and 1 (inclusive).
-// *
-// * @wi The generated outgoing direction.
-// * @pdf The generated PDF for the sampled direction.
-// *
-// */
-//__device__ static float3 SampleBSDF(const ShadingData& shadingData,
-//	const float3& iN, const float3& T, const float3& wo,
-//	const float r3, const float r4, float3& wi, float& pdf)
-//{
-//	BSDFType type;
-//	const float3 B = normalize(cross(T, iN));
-//	const float3 Tfinal = cross(B, iN);
-//	BSDFSample(shadingData, Tfinal, B, iN, wo, wi, pdf, type, r3, r4);
-//	return BSDFEval(shadingData, iN, wo, wi);
-//}
-//
-
-
-
-/*
- * Below code is more complex and scary so I commented it out and pretend it doesn't exist so it can't hurt me.
- */
+#include <sutil/vec_math.h>
 
 
 /* disney2.h - License information:
@@ -340,7 +34,7 @@ __forceinline__ __device__ float schlick_fresnel( const float u ) { const float 
 __forceinline__ __device__ void mix_spectra( const float3& a, const float3& b, const float t, float3& result ) { result = (1.0f - t) * a + t * b; }
 __forceinline__ __device__ void mix_one_with_spectra( const float3& b, const float t, float3& result ) { result = (1.0f - t) + t * b; }
 __forceinline__ __device__ void mix_spectra_with_one( const float3& a, const float t, float3& result ) { result = (1.0f - t) * a + t; }
-__forceinline__ __device__ float clearcoat_roughness( const ShadingData& shadingData ) { return mix( 0.1f, 0.001f, CLEARCOATGLOSS ); }
+__forceinline__ __device__ float clearcoat_roughness( const ShadingData& shadingData ) { return lerp( 0.1f, 0.001f, CLEARCOATGLOSS ); }
 __forceinline__ __device__ void DisneySpecularFresnel( const ShadingData& shadingData, const float3& o, const float3& h, float3& value )
 {
 	mix_one_with_spectra( TINT, SPECTINT, value );
@@ -352,7 +46,7 @@ __forceinline__ __device__ void DisneySpecularFresnel( const ShadingData& shadin
 __forceinline__ __device__ void DisneyClearcoatFresnel( const ShadingData& shadingData, const float3& o, const float3& h, float3& value )
 {
 	const float cos_oh = fabs( dot( o, h ) );
-	value = make_float3( mix( 0.04f, 1.0f, schlick_fresnel( cos_oh ) ) * 0.25f * CLEARCOAT );
+	value = make_float3( lerp( 0.04f, 1.0f, schlick_fresnel( cos_oh ) ) * 0.25f * CLEARCOAT );
 }
 __forceinline__ __device__ bool force_above_surface( float3& direction, const float3& normal )
 {
@@ -367,7 +61,7 @@ __forceinline__ __device__ float Fr_L( float VDotN, float eio )
 	if (VDotN < 0.0f) eio = 1.0f / eio, VDotN = fabs( VDotN );
 	const float SinThetaT2 = (1.0f - sqr( VDotN )) * sqr( eio );
 	if (SinThetaT2 > 1.0f) return 1.0f; // TIR
-	const float LDotN = min( sqrtf( max( 0.0f, 1.0f - SinThetaT2 ) ), 1.0f );
+	const float LDotN = fminf( sqrtf( fmaxf( 0.0f, 1.0f - SinThetaT2 ) ), 1.0f );
 	const float r1 = (VDotN - eio * LDotN) / (VDotN + eio * LDotN);
 	const float r2 = (LDotN - eio * VDotN) / (LDotN + eio * VDotN);
 	return 0.5f * (sqr( r1 ) + sqr( r2 ));
@@ -375,7 +69,7 @@ __forceinline__ __device__ float Fr_L( float VDotN, float eio )
 __forceinline__ __device__ bool Refract_L( const float3& wi, const float3& n, const float eta, float3& wt )
 {
 	const float cosThetaI = fabs( dot( n, wi ) );
-	const float sin2ThetaI = max( 0.0f, 1.0f - cosThetaI * cosThetaI );
+	const float sin2ThetaI = fmaxf( 0.0f, 1.0f - cosThetaI * cosThetaI );
 	const float sin2ThetaT = eta * eta * sin2ThetaI;
 	if (sin2ThetaT >= 1) return false; // TIR
 	const float cosThetaT = sqrtf( 1.0f - sin2ThetaT );
@@ -429,15 +123,16 @@ __forceinline__ __device__ float evaluate_diffuse( const ShadingData& shadingDat
 	if (SUBSURFACE != 1.0f)
 	{
 		const float fd90 = 0.5f + 2.0f * sqr( cos_ih ) * ROUGHNESS;
-		fd = mix( 1.0f, fd90, fl ) * mix( 1.0f, fd90, fv );
+		const float one = 1.f;
+		fd = lerp( one, fd90, fl ) * lerp( one, fd90, fv );
 	}
 	if (SUBSURFACE > 0)
 	{
 		// Based on Hanrahan-Krueger BRDF approximation of isotropic BSRDF. 1.25 is used to (roughly) preserve albedo.
 		const float fss90 = sqr( cos_ih ) * ROUGHNESS; // "flatten" retroreflection based on roughness
-		const float fss = mix( 1.0f, fss90, fl ) * mix( 1.0f, fss90, fv );
+		const float fss = lerp( 1.0f, fss90, fl ) * lerp( 1.0f, fss90, fv );
 		const float ss = 1.25f * (fss * (1.0f / (fabs( cos_on ) + fabs( cos_in )) - 0.5f) + 0.5f);
-		fd = mix( fd, ss, SUBSURFACE );
+		fd = lerp( fd, ss, SUBSURFACE );
 	}
 	value = shadingData.color * fd * INVPI * (1.0f - METALLIC);
 	return fabs( cos_in ) * INVPI;
@@ -528,7 +223,7 @@ __forceinline__ __device__ float3 SampleBSDF( const ShadingData& shadingData, fl
 	// not a dielectric: normalize r0 to r3
 	const float r3 = (r0 - TRANSMISSION) / (1 - TRANSMISSION);
 	// compute component weights and cdf
-	float4 weights = make_float4( lerp( LUMINANCE, 0, METALLIC ), lerp( SHEEN, 0, METALLIC ), lerp( SPECULAR, 1, METALLIC ), CLEARCOAT * 0.25f );
+	float4 weights = make_float4( lerp( LUMINANCE, 0.f, METALLIC ), lerp( SHEEN, 0.f, METALLIC ), lerp( SPECULAR, 1.f, METALLIC ), CLEARCOAT * 0.25f );
 	weights *= 1.0f / (weights.x + weights.y + weights.z + weights.w);
 	const float4 cdf = make_float4( weights.x, weights.x + weights.y, weights.x + weights.y + weights.z, 0 );
 	// sample a random component
@@ -664,7 +359,7 @@ __forceinline__ __device__ float3 EvaluateBSDF( const ShadingData& shadingData, 
 	const float3 B = normalize( cross( iN, iT ) );
 	const float3 T = normalize( cross( iN, B ) );
 	// compute component weights
-	float4 weights = make_float4( lerp( LUMINANCE, 0, METALLIC ), lerp( SHEEN, 0, METALLIC ), lerp( SPECULAR, 1, METALLIC ), CLEARCOAT * 0.25f );
+	float4 weights = make_float4( lerp( LUMINANCE, 0.f, METALLIC ), lerp( SHEEN, 0.f, METALLIC ), lerp( SPECULAR, 1.f, METALLIC ), CLEARCOAT * 0.25f );
 	weights *= 1.0f / (weights.x + weights.y + weights.z + weights.w);
 	// compute pdf
 	pdf = 0;

@@ -91,9 +91,6 @@ private:
         int32_t m_NormalMapId;
         int32_t m_MetallicRoughnessTextureId;
         int32_t m_EmissiveTextureId;
-
-        int32_t m_TransmittanceTextureId;
-        int32_t m_Transmittance
     };
 
     struct HeaderPrimitive 
