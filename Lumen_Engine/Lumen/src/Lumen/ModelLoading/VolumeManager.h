@@ -9,7 +9,8 @@
 #include <nanovdb/util/IO.h>
 #include "nanovdb/util/CudaDeviceBuffer.h"
 #include "Lumen/Renderer/ILumenResources.h"
-#include "Lumen/Renderer/LumenRenderer.h"
+
+class LumenRenderer;
 
 namespace Lumen
 {
