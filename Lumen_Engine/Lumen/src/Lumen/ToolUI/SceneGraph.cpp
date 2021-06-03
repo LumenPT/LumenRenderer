@@ -13,12 +13,7 @@ void Lumen::SceneGraph::Display(ILumenScene& a_Scene)
     {
         for (auto& meshInstance : a_Scene.m_MeshInstances)
         {
-            if (m_SelectedMeshInstance == meshInstance.get())
-            {
-                //ImGui::PushStyleColor(imguicol_te, ImVec4(0.0f, 1.0f, 0.0f, 1.0f));
-            }
-
-            if (ImGui::MenuItem(meshInstance->m_Name.c_str(), 0))
+            if (ImGui::Selectable(meshInstance->m_Name.c_str(), m_SelectedMeshInstance == meshInstance.get()))
                 m_SelectedMeshInstance = meshInstance.get();
         }
         ImGui::ListBoxFooter();
@@ -28,7 +23,10 @@ void Lumen::SceneGraph::Display(ILumenScene& a_Scene)
     {
         auto& transform = m_SelectedMeshInstance->m_Transform;
         TransformEditor(transform);
+        m_SelectedMeshInstance;
     }
+
+    ImGui::End();
 }
 
 void Lumen::SceneGraph::TransformEditor(Transform& a_Transform)

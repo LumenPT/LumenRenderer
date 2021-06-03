@@ -56,12 +56,14 @@ public:
     PTScene* GetSceneRef() { return m_SceneRef; }
 
 
-private:
     void UpdateRaytracingData();
+private:
+    void MarkSceneDataAsDirty() { m_SceneDataDirty = true; }
 private:
 
     std::unique_ptr<AccelerationStructure> m_AccelerationStructure;
     std::unordered_map<Lumen::ILumenPrimitive*, SceneDataTableEntry<DevicePrimitiveInstance>> m_EntryMap;
+    bool m_SceneDataDirty;
     std::unordered_map<Lumen::ILumenPrimitive*, uint32_t> m_LastUsedPrimitiveIDs;
 
 };

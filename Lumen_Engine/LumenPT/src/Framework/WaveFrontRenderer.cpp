@@ -299,8 +299,9 @@ namespace WaveFront
         //Retrieve the acceleration structure and scene data table once.
         m_OptixSystem->UpdateSBT();
         CHECKLASTCUDAERROR;
+        auto* sceneDataTableAccessor = static_cast<PTScene*>(m_Scene.get())->GetSceneDataTableAccessor();
 
-        auto* sceneDataTableAccessor = static_cast<PTScene*>(m_Scene.get())->m_SceneDataTable->GetDevicePointer();
+        auto milli = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
         CHECKLASTCUDAERROR;
 
         auto accelerationStructure = std::static_pointer_cast<PTScene>(m_Scene)->GetSceneAccelerationStructure();

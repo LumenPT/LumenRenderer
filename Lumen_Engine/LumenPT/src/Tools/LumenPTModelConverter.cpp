@@ -206,18 +206,33 @@ Lumen::SceneManager::GLTFResource LumenPTModelConverter::LoadFile(std::string a_
 			decltype(HeaderScene::m_Header) sceneHeader;
 			ifs.read(reinterpret_cast<char*>(&sceneHeader), sizeof(sceneHeader));
 
+
+
 			res.m_Scenes.push_back(m_RendererRef->CreateScene());
 			auto& scene = res.m_Scenes.back();
+
+			scene->m_Name.resize(sceneHeader.m_NameLength);
+			ifs.read(scene->m_Name.data(), sceneHeader.m_NameLength);
+
+			uint32_t unnamedCounter = 0;
 
 			for (size_t j = 0; j < sceneHeader.m_NumMeshes; j++)
 			{
 				
-				HeaderMeshInstance instance;
-				ifs.read(reinterpret_cast<char*>(&instance), sizeof(instance));
-
+				decltype(HeaderMeshInstance::m_Header) instanceHeader;
+				ifs.read(reinterpret_cast<char*>(&instanceHeader), sizeof(instanceHeader));
+				
 				auto m = scene->AddMesh();
-				m->SetMesh(res.m_MeshPool[instance.m_MeshId]);
-				m->m_Transform = glm::make_mat4(instance.m_Transform);
+				m->SetMesh(res.m_MeshPool[instanceHeader.m_MeshId]);
+				m->m_Transform = glm::make_mat4(instanceHeader.m_Transform);
+				m->m_Name.resize(instanceHeader.m_NameLength);
+				ifs.read(m->m_Name.data(), m->m_Name.size());
+
+                if (m->m_Name.empty())
+                {
+					m->m_Name = std::string("Mesh ") + std::to_string(unnamedCounter++);
+                }
+
 			}
 		}
 	}
@@ -330,7 +345,13 @@ LumenPTModelConverter::Header LumenPTModelConverter::GenerateHeader(const FileCo
     for (auto headerScene : a_Content.m_Scenes)
     {
 		h.m_Binary.Write(&headerScene.m_Header, sizeof(headerScene.m_Header));
-		h.m_Binary.Write(headerScene.m_Meshes.data(), headerScene.m_Meshes.size() * sizeof(HeaderMeshInstance));
+		h.m_Binary.Write(headerScene.m_Name.data(), headerScene.m_Name.size());
+        for (auto& mesh : headerScene.m_Meshes)
+        {
+			h.m_Binary.Write(&mesh.m_Header, sizeof(mesh.m_Header));
+			h.m_Binary.Write(mesh.m_Name.data(), mesh.m_Name.size());
+		    //h.m_Binary.Write(headerScene.m_Meshes.data(), headerScene.m_Meshes.size() * sizeof(HeaderMeshInstance));            
+        }
     }
 
 	h.m_Binary.Trim();
@@ -641,7 +662,9 @@ LumenPTModelConverter::HeaderScene LumenPTModelConverter::MakeScene(const fx::gl
 		LoadNode(a_FxDoc, rootNode, hscene);
     }
 
+	hscene.m_Name = a_Scene.name;
 	hscene.m_Header.m_NumMeshes = hscene.m_Meshes.size();
+	hscene.m_Header.m_NameLength = hscene.m_Name.size();
 
 	return hscene;
 }
@@ -659,9 +682,11 @@ void LumenPTModelConverter::LoadNode(const fx::gltf::Document& a_FxDoc, uint32_t
     if (node.mesh != -1)
     {
 		auto& m = a_Scene.m_Meshes.emplace_back();
-		m.m_MeshId = node.mesh;
+		m.m_Header.m_MeshId = node.mesh;
 
-		memcpy(m.m_Transform, &mat[0], sizeof(glm::mat4));
+		memcpy(m.m_Header.m_Transform, &mat[0], sizeof(glm::mat4));
+		m.m_Name = node.name;
+		m.m_Header.m_NameLength = node.name.size();
     }
 
     for (auto& ch : node.children)
