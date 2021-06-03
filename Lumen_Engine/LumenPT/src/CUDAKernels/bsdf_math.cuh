@@ -14,6 +14,7 @@
 #include "../Shaders/CppCommon/WaveFrontDataStructs.h"
 #include "../CUDAKernels/RandomUtilities.cuh"
 
+#define sqr(a) ((a)*(a))
 
 #if defined(__CUDACC__) || defined(WIN32) || defined(__linux__)
 #ifndef LH2_DEVFUNC
@@ -37,7 +38,6 @@
 #define cosf cos
 #define logf log
 #define powf pow
-#define sqr(a) ((a)*(a))
 #define adjoint false
 #endif
 
@@ -76,8 +76,6 @@
 #endif
 
 
-
-#define CHAR2FLT(a,s) (((float)(((a)>>s)&255))*(1.0f/255.0f))
 
 __device__ __forceinline__ void SetupTangentSpace(const float3& N, float3& T, float3& B)
 {

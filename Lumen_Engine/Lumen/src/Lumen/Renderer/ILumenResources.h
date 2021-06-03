@@ -30,11 +30,23 @@ namespace Lumen
         //Disney BSDF stuff
         virtual void SetClearCoatTexture(std::shared_ptr<ILumenTexture> a_Texture) = 0;
         virtual void SetClearCoatRoughnessTexture(std::shared_ptr<ILumenTexture> a_Texture) = 0;
-        virtual void SetTransmissionTexture(std::shared_ptr<ILumenTexture> a_Texture) = 0;
         virtual void SetClearCoatFactor(float a_Factor) = 0;
         virtual void SetClearCoatRoughnessFactor(float a_Factor) = 0;
-        virtual void SetIndexOfRefraction(float a_Factor) = 0;
+
+        virtual void SetLuminance(float a_Factor) = 0;
+        virtual void SetSheenFactor(float a_Factor) = 0;
+        virtual void SetSheenTintFactor(float a_Factor) = 0;
+
+        virtual void SetAnisotropic(float a_Factor) = 0;
+
+        virtual void SetTintTexture(std::shared_ptr<ILumenTexture> a_Texture) = 0;
+        virtual void SetTintFactor(const glm::vec3& a_Factor) = 0;
+
+        virtual void SetTransmissionTexture(std::shared_ptr<ILumenTexture> a_Texture) = 0;
         virtual void SetTransmissionFactor(float a_Factor) = 0;
+        virtual void SetTransmittanceFactor(glm::vec3& a_Factor) = 0;
+        virtual void SetIndexOfRefraction(float a_Factor) = 0;
+
         virtual void SetSpecularFactor(float a_Factor) = 0;
         virtual void SetSpecularTintFactor(float a_Factor) = 0;
         virtual void SetSubSurfaceFactor(float a_Factor) = 0;

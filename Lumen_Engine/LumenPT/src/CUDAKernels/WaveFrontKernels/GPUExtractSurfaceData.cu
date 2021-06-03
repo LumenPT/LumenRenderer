@@ -58,11 +58,6 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
             const float3 finalColor = make_float3(textureColor * material->m_DiffuseColor);
             const float4 metalRoughness = tex2D<float4>(material->m_MetalRoughnessTexture, texCoords.x, texCoords.y);
 
-            //Disney BSDF textures
-            const float4 clearCoat = tex2D<float4>(material->m_ClearCoatTexture, texCoords.x, texCoords.y);
-            const float4 clearCoatRoughness = tex2D<float4>(material->m_ClearCoatRoughnessTexture, texCoords.x, texCoords.y);
-            const float4 transmission = tex2D<float4>(material->m_TransmissionTexture, texCoords.x, texCoords.y);
-
             //Emissive mode
             float4 emissive = make_float4(0.f);
 
@@ -102,14 +97,14 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
 
 
             //TODO normal mapping
-            //float3 tangent = 
-            //    normalize(
-            //        (make_float3(A->m_Tangent) * A->m_Tangent.w) * W + 
-            //        (make_float3(B->m_Tangent) * B->m_Tangent.w) * U + 
-            //        (make_float3(C->m_Tangent) * C->m_Tangent.w) * V
-            //    );
-            //assert(!isnan(length(tangent)));
-            //assert(length(tangent) > 0);
+            float3 tangent = 
+                normalize(
+                    (make_float3(A->m_Tangent) * A->m_Tangent.w) * W + 
+                    (make_float3(B->m_Tangent) * B->m_Tangent.w) * U + 
+                    (make_float3(C->m_Tangent) * C->m_Tangent.w) * V
+                );
+            assert(!isnan(length(tangent)));
+            assert(length(tangent) > 0);
 
             ////tangent = normalize(tangent);
             ////assert(!isnan(length(tangent)));
@@ -145,6 +140,7 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
             {
                 //Invert if in material.
                 normal *= -1.f;
+                tangent *= -1.f;
                 eta = material->m_IndexOfRefraction;// /1.f;   //Because leaving a surface always goes to air, it's just divided by 1.0
             }
             else
@@ -161,6 +157,7 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
             output.m_Position = currRay.m_Origin + currRay.m_Direction * currIntersection.m_IntersectionT;
             output.m_IncomingRayDirection = currRay.m_Direction;
             output.m_TransportFactor = currRay.m_Contribution;
+            output.m_Tangent = tangent;
 
             auto& shadingData = output.m_ShadingData;
             shadingData.parameters = make_uint4(0u, 0u, 0u, 0u);    //Default init to 0 for all.
@@ -168,26 +165,56 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
             //Set output color.
             output.m_ShadingData.color = finalColor;
 
-            SET_METALLIC(metal);
-            SET_ROUGHNESS(roughness);
+            //TODO enable this.
+            if(false)
+            {
+                //Multiply factors with textures.
+                const float4 clearCoat = tex2D<float4>(material->m_ClearCoatTexture, texCoords.x, texCoords.y);
+                const float4 clearCoatRoughness = tex2D<float4>(material->m_ClearCoatRoughnessTexture, texCoords.x, texCoords.y);
+                const float4 transmission = tex2D<float4>(material->m_TransmissionTexture, texCoords.x, texCoords.y);
+                const float4 tint = tex2D<float4>(material->m_TintTexture, texCoords.x, texCoords.y);
 
-            SET_SUBSURFACE(material->m_SubSurfaceFactor);
+                const float3 finalTintColor = make_float3(tint.x, tint.y, tint.z) * material->m_TintFactor;
+                const float finalClearCoat = material->m_ClearCoatFactor * clearCoat.x;
+                const float clearCoatGloss = 1.f - (material->m_ClearCoatRoughnessFactor * clearCoatRoughness.x);    //Invert from rough to gloss.
+                const float finalTranmission = material->m_TransmissionFactor * transmission.x;
 
-            SET_SPECULAR(material->m_SpecularFactor);
-            SET_SPECTINT(material->m_SpecularTintFactor);   //Note: GLTF provides a color too, but it's not used by Jaccos BSDF but we can add it easily.
+                shadingData.SetMetallic(metal);
+                shadingData.SetRoughness(roughness);
+                shadingData.SetSubSurface(material->m_SubSurfaceFactor);
+                shadingData.SetSpecular(material->m_SpecularFactor);
+                shadingData.SetSpecTint(material->m_SpecularTintFactor);
+                shadingData.SetLuminance(material->m_Luminance);
+                shadingData.SetAnisotropic(material->m_Anisotropic);
+                shadingData.SetClearCoat(finalClearCoat);
+                shadingData.SetClearCoatGloss(clearCoatGloss);
+                shadingData.SetTint(finalTintColor);
+                shadingData.SetSheen(material->m_SheenFactor);
+                shadingData.SetSheenTint(material->m_SheenTintFactor);
+                shadingData.SetTransmission(finalTranmission);
+                shadingData.SetTransmittance(material->m_TransmittanceFactor);
+                shadingData.SetETA(eta);
+            }
+            else 
+            {
+                //TODO remove
+                shadingData.SetMetallic(metal);
+                shadingData.SetRoughness(roughness);
+                shadingData.SetSubSurface(0.f);
+                shadingData.SetSpecular(0.f);
+                shadingData.SetSpecTint(0.5f);
+                shadingData.SetLuminance(0.f);
+                shadingData.SetAnisotropic(0.f);
+                shadingData.SetClearCoat(0.5f);
+                shadingData.SetClearCoatGloss(0.5f);
+                shadingData.SetTint(make_float3(1.f, 1.f, 1.f));
+                shadingData.SetSheen(0.5f);
+                shadingData.SetSheenTint(0.5f);
+                shadingData.SetTransmission(0.7f);
+                shadingData.SetTransmittance(make_float3(1.f, 1.f, 1.f));
+                shadingData.SetETA(eta);
+            }
 
-            //Multiply factors with textures.
-            const float finalClearCoat = material->m_ClearCoatFactor * clearCoat.x;
-            const float clearCoatGloss = 1.f - (material->m_ClearCoatRoughnessFactor * clearCoatRoughness.x);    //Invert from rough to gloss.
-            const float finalTranmission = material->m_TransmissionFactor * transmission.x;
-
-            SET_CLEARCOAT(finalClearCoat);
-            SET_CLEARCOATGLOSS(clearCoatGloss);
-            SET_TRANSMISSION(finalTranmission);
-
-            //Index of refraction.
-            SET_ETA(eta);
-            
             output.m_Emissive = (emissive.x > 0 || emissive.y > 0 || emissive.z > 0);
             if (output.m_Emissive)
             {

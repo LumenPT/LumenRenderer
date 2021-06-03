@@ -5,7 +5,7 @@
 #include <Cuda/cuda/helpers.h>
 #include <cassert>
 
-#include "CUDAKernels/disney.cuh"
+#include "../ShadingData.h"
 
 namespace WaveFront
 {
@@ -39,6 +39,8 @@ namespace WaveFront
         float3 m_Position;
         //Normal at the point of intersection.
         float3 m_Normal;
+        //Tangent at the point of intersection.
+        float3 m_Tangent;
         //Distance along the ray at which the intersection occurs.
         float m_IntersectionT;
         //Direction of the ray that caused the intersection.

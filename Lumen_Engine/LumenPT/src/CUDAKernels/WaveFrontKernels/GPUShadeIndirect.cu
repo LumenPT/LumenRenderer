@@ -2,6 +2,7 @@
 #include <device_launch_parameters.h>
 
 #include "../../Shaders/CppCommon/RenderingUtility.h"
+#include "../disney.cuh"
 
 CPU_ON_GPU void ShadeIndirect(
     const uint3 a_ResolutionAndDepth,
@@ -33,7 +34,7 @@ CPU_ON_GPU void ShadeIndirect(
         }
 
         //Apply russian roulette based on the surface color (dark absorbs more, so terminates sooner).
-        const float russianRouletteWeight = clamp(fmaxf(surfaceData.m_Color.x, fmaxf(surfaceData.m_Color.y, surfaceData.m_Color.z)), 0.f, 1.f);
+        const float russianRouletteWeight = clamp(fmaxf(surfaceData.m_ShadingData.color.x, fmaxf(surfaceData.m_ShadingData.color.y, surfaceData.m_ShadingData.color.z)), 0.f, 1.f);
         const float rand = RandomFloat(seed);
         
         //Path termination.
@@ -57,10 +58,14 @@ CPU_ON_GPU void ShadeIndirect(
             continue;
         }
 
+        //Reference for macro usage.
+        auto& shadingData = surfaceData.m_ShadingData;
+
+        //TODO replace with BSDF sampling (needs tangent).
         //Calculate a diffuse reflection direction based on the surface roughness. Also retrieves the PDF for that direction being chosen on the full sphere.
         float brdfPdf;
         float3 bounceDirection;
-        SampleHemisphere(surfaceData.m_IncomingRayDirection, surfaceData.m_Normal, surfaceData.m_Roughness, seed, bounceDirection, brdfPdf);
+        SampleHemisphere(surfaceData.m_IncomingRayDirection, surfaceData.m_Normal, ROUGHNESS, seed, bounceDirection, brdfPdf);
 
         if(brdfPdf <= 0)
         {
@@ -93,7 +98,7 @@ CPU_ON_GPU void ShadeIndirect(
          * When mirroring, a high PDF way larger than 1 will scale down the contribution because now it comes from just one direction.
          */
         const auto invViewDir = -surfaceData.m_IncomingRayDirection;
-        const auto brdf = MicrofacetBRDF(invViewDir, bounceDirection, surfaceData.m_Normal, surfaceData.m_Color, surfaceData.m_Metallic, surfaceData.m_Roughness);
+        const auto brdf = MicrofacetBRDF(invViewDir, bounceDirection, surfaceData.m_Normal, shadingData.color, METALLIC, ROUGHNESS);
         pathContribution *= ((brdf * bounceDotN) / brdfPdf);
 
         assert(pathContribution.x >= 0 && pathContribution.y >= 0 && pathContribution.z >= 0);

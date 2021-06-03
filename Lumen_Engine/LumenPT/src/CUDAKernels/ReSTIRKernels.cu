@@ -826,8 +826,18 @@ __device__ __inline__ void Resample(LightSample* a_Input, const WaveFront::Surfa
     //Note: No need to multiply with transport factor because this is depth 0. It is always {1, 1, 1}.
     //const auto unshadowedPathContribution = brdf * solidAngle * cosIn * a_Output->radiance;
 
-    const auto bsdf = EvaluateBSDF();
-    const auto unshadowedPathContribution = brdf * solidAngle * cosIn * a_Output->radiance;
+    float pdf = 0.f;
+    const auto bsdf = EvaluateBSDF(a_PixelData->m_ShadingData, a_PixelData->m_Normal, a_PixelData->m_Tangent, -a_PixelData->m_IncomingRayDirection, pixelToLightDir, pdf);
+
+    //If contribution to lobe is 0, just discard.
+    if(pdf <= 0.f)
+    {
+        a_Output->unshadowedPathContribution = make_float3(0.f, 0.f, 0.f);
+        a_Output->solidAnglePdf = 0;
+        return;
+    }
+
+    const auto unshadowedPathContribution = (bsdf / pdf) * solidAngle * cosIn * a_Output->radiance;
 	
     a_Output->unshadowedPathContribution = unshadowedPathContribution;
 

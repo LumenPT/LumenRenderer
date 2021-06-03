@@ -12,7 +12,8 @@ PTMaterial::PTMaterial()
       m_IndexOfRefraction(1.f),
       m_SpecularFactor(0),
       m_SpecularTintFactor(0),
-      m_SubSurfaceFactor(0),
+      m_SubSurfaceFactor(0), m_Luminance(0), m_Anisotropic(0),
+      m_SheenFactor(0.f), m_SheenTintFactor(0), m_TintFactor(make_float3(0.f)),
       m_DeviceMaterialDirty(true)
 {
     // Allocate the GPU memory for the GPU material representation
@@ -141,6 +142,18 @@ DeviceMaterial PTMaterial::CreateDeviceMaterial() const
         m.m_ClearCoatRoughnessFactor = **m_ClearCoatRoughnessTexture;
     }
 
+    if (m_TintTexture)
+    {
+        m.m_TintTexture = **m_TintTexture;
+    }
+
+    m.m_Luminance = m_Luminance;
+    m.m_SheenFactor = m_SheenFactor;
+    m.m_SheenTintFactor = m_SheenTintFactor;
+    m.m_TintFactor = m_TintFactor;
+    m.m_Anisotropic = m_Anisotropic;
+    m.m_TransmittanceFactor = m_Transmittance;
+
     return m;
 }
 
@@ -201,5 +214,47 @@ void PTMaterial::SetSpecularTintFactor(float a_Factor)
 void PTMaterial::SetSubSurfaceFactor(float a_Factor)
 {
     m_SubSurfaceFactor = a_Factor;
+    m_DeviceMaterialDirty = true;
+}
+
+void PTMaterial::SetLuminance(float a_Factor)
+{
+    m_Luminance = a_Factor;
+    m_DeviceMaterialDirty = true;
+}
+
+void PTMaterial::SetTintTexture(std::shared_ptr<Lumen::ILumenTexture> a_Texture)
+{
+    m_TintTexture = *reinterpret_cast<std::shared_ptr<PTTexture>*>(&a_Texture);
+    m_DeviceMaterialDirty = true;
+}
+
+void PTMaterial::SetTintFactor(const glm::vec3& a_Factor)
+{
+    m_TintFactor = make_float3(a_Factor.x, a_Factor.y, a_Factor.z);
+    m_DeviceMaterialDirty = true;
+}
+
+void PTMaterial::SetAnisotropic(float a_Factor)
+{
+    m_Anisotropic = a_Factor;
+    m_DeviceMaterialDirty = true;
+}
+
+void PTMaterial::SetSheenFactor(float a_Factor)
+{
+    m_SheenFactor = a_Factor;
+    m_DeviceMaterialDirty = true;
+}
+
+void PTMaterial::SetSheenTintFactor(float a_Factor)
+{
+    m_SheenTintFactor = a_Factor;
+    m_DeviceMaterialDirty = true;
+}
+
+void PTMaterial::SetTransmittanceFactor(glm::vec3& a_Factor)
+{
+    m_Transmittance = make_float3(a_Factor.x, a_Factor.y, a_Factor.z);
     m_DeviceMaterialDirty = true;
 }
