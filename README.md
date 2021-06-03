@@ -1,6 +1,8 @@
 # LumenRenderer
-**_The Lumen Renderer is not related to or affiliated with Unreal Engine 5's Lumen system._**
 
+___
+**(The Lumen Renderer is not related to or affiliated with Unreal Engine 5's Lumen system.)**
+___
 
 Standalone distribution of the Lumen path tracer.
 This is a student project that is being made over the course of 1 year by 6 students of Breda University of Applied Sciences (BUAS).
