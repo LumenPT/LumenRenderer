@@ -73,6 +73,9 @@ struct DeviceMaterial
     float m_Luminance;
     float m_Anisotropic;
 
+    float m_MetallicFactor;
+    float m_RoughnessFactor;
+
     float m_SheenTintFactor;
     float m_SheenFactor;
     float3 m_TintFactor;

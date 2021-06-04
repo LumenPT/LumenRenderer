@@ -53,18 +53,19 @@ public:
 	// Struct used to initialize a material
 	struct MaterialData
 	{
-		MaterialData(): m_DiffuseColor(1.f, 1.f, 1.f, 1.f), m_EmissionVal(0.f, 0.f, 0.f), m_TransmissionFactor(0.f), m_ClearCoatFactor(0),
-		                m_ClearCoatRoughnessFactor(0),
-		                m_IndexOfRefraction(0),
-		                m_SpecularFactor(0),
-		                m_SpecularTintFactor(0), m_SubSurfaceFactor(0),
-		                m_Luminance(0),
-		                m_Anisotropic(0),
-		                m_SheenFactor(0), m_SheenTintFactor(0),
-		                m_TintFactor(1.f, 1.f, 1.f),
-		                m_Transmittance(1.f, 1.f, 1.f)
-		{
-		}
+		MaterialData(): m_DiffuseColor(1.f, 1.f, 1.f, 1.f), m_EmissionVal(0.f, 0.f, 0.f), m_TransmissionFactor(0.f),
+                        m_ClearCoatFactor(0),
+                        m_ClearCoatRoughnessFactor(0),
+                        m_IndexOfRefraction(0),
+                        m_SpecularFactor(0),
+                        m_SpecularTintFactor(0), m_SubSurfaceFactor(0),
+                        m_Luminance(0),
+                        m_Anisotropic(0),
+                        m_SheenFactor(0), m_SheenTintFactor(0), m_MetallicFactor(1.f), m_RoughnessFactor(1.f),
+                        m_TintFactor(1.f, 1.f, 1.f),
+                        m_Transmittance(1.f, 1.f, 1.f)
+        {
+        }
 
 		glm::vec4 m_DiffuseColor;
 		glm::vec3 m_EmissionVal;
@@ -90,6 +91,8 @@ public:
 		float m_Anisotropic;
 		float m_SheenFactor;
 		float m_SheenTintFactor;
+		float m_MetallicFactor;
+		float m_RoughnessFactor;
 		glm::vec3 m_TintFactor;
 		glm::vec3 m_Transmittance;
 	};

@@ -13,7 +13,8 @@ PTMaterial::PTMaterial()
       m_SpecularFactor(0),
       m_SpecularTintFactor(0),
       m_SubSurfaceFactor(0), m_Luminance(0), m_Anisotropic(0),
-      m_SheenFactor(0.f), m_SheenTintFactor(0), m_TintFactor(make_float3(0.f)),
+      m_SheenFactor(0.f), m_SheenTintFactor(0), m_MetallicFactor(1.f), m_RoughnessFactor(1.f),
+      m_TintFactor(make_float3(0.f)), m_Transmittance(),
       m_DeviceMaterialDirty(true)
 {
     // Allocate the GPU memory for the GPU material representation
@@ -154,6 +155,9 @@ DeviceMaterial PTMaterial::CreateDeviceMaterial() const
     m.m_Anisotropic = m_Anisotropic;
     m.m_TransmittanceFactor = m_Transmittance;
 
+    m.m_MetallicFactor = m_MetallicFactor;
+    m.m_RoughnessFactor = m_RoughnessFactor;
+
     return m;
 }
 
@@ -256,5 +260,17 @@ void PTMaterial::SetSheenTintFactor(float a_Factor)
 void PTMaterial::SetTransmittanceFactor(const glm::vec3& a_Factor)
 {
     m_Transmittance = make_float3(a_Factor.x, a_Factor.y, a_Factor.z);
+    m_DeviceMaterialDirty = true;
+}
+
+void PTMaterial::SetMetallicFactor(float a_Factor)
+{
+    m_MetallicFactor = a_Factor;
+    m_DeviceMaterialDirty = true;
+}
+
+void PTMaterial::SetRoughnessFactor(float a_Factor)
+{
+    m_RoughnessFactor = a_Factor;
     m_DeviceMaterialDirty = true;
 }

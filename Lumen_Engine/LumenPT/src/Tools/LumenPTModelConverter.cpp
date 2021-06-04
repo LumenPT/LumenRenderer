@@ -178,6 +178,10 @@ Lumen::SceneManager::GLTFResource LumenPTModelConverter::LoadFile(std::string a_
 			matData.m_TintFactor = glm::vec3(hm.m_TintFactor[0], hm.m_TintFactor[1], hm.m_TintFactor[2]);
 			matData.m_Transmittance = glm::vec3(hm.m_Transmittance[0], hm.m_Transmittance[1], hm.m_Transmittance[2]);
 
+			matData.m_MetallicFactor = hm.m_MetallicFactor;
+			matData.m_RoughnessFactor = hm.m_RoughnessFactor;
+
+
 
 
 			res.m_MaterialPool.push_back(m_RendererRef->CreateMaterial(matData));
@@ -305,6 +309,9 @@ LumenPTModelConverter::FileContent LumenPTModelConverter::GenerateContent(const 
 		if (m.m_EmissiveTextureId != -1)
 			fc.m_Textures[m.m_EmissiveTextureId].m_TextureType = TextureType::EEmissive;
 
+		//Extract the metal roughness scaling factors.
+		m.m_MetallicFactor = material.pbrMetallicRoughness.metallicFactor;
+		m.m_RoughnessFactor = material.pbrMetallicRoughness.roughnessFactor;
 
 		//Add the Disney stuff
 

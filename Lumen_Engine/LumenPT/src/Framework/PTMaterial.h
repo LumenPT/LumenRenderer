@@ -58,6 +58,8 @@ public:
     void SetSheenFactor(float a_Factor) override;
     void SetSheenTintFactor(float a_Factor) override;
     void SetTransmittanceFactor(const glm::vec3& a_Factor) override;
+    void SetMetallicFactor(float a_Factor) override;
+    void SetRoughnessFactor(float a_Factor) override;
 private:
     // Material data is kept here instead of the base class to account for API-specific implementation details   
     float4 m_DiffuseColor;
@@ -83,6 +85,8 @@ private:
     float m_Anisotropic;
     float m_SheenFactor;
     float m_SheenTintFactor;
+    float m_MetallicFactor;
+    float m_RoughnessFactor;
     float3 m_TintFactor;
     float3 m_Transmittance;
 

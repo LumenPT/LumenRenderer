@@ -227,7 +227,7 @@ public:
 			float p = i;
 			mesh->m_Transform.SetPosition(glm::vec3(xOffset, 100.f + (p * p), 0.f));
 			mesh->m_Transform.SetScale(glm::vec3(2.0f * (static_cast<float>((i + 1) * 2) / 4.f)));
-			mesh->SetEmissiveness(Lumen::EmissionMode::OVERRIDE, glm::vec3(1.f, 1.f, 1.f), 50.f);
+			mesh->SetEmissiveness(Lumen::EmissionMode::OVERRIDE, glm::vec3(1.f, 1.f, 1.f), 25.f);
 			mesh->UpdateAccelRemoveThis();
 			xOffset += 50;
 		}
@@ -235,27 +235,35 @@ public:
 		//GLASS
 		auto mesh = lumenPT->m_Scene->AddMesh();
 		mesh->SetMesh(res2->m_MeshPool[0]);
-		mesh->m_Transform.SetPosition(glm::vec3(0.f, 50.f, 0.f));
+		mesh->m_Transform.SetPosition(glm::vec3(30.f, 50.f, 70.f));
 		mesh->m_Transform.SetScale(glm::vec3(50.f, 50.f, 50.f));
 		uchar4 whitePixel = { 255,255,255,255 };
-		uchar4 diffusePixel{ 0, 255, 255, 0 };
+		uchar4 diffusePixel{ 200, 200, 255, 0 };
 		uchar4 normal = { 128, 128, 255, 0 };
 		auto whiteTexture = lumenPT->CreateTexture(&whitePixel, 1, 1);
 		auto diffuseTexture = lumenPT->CreateTexture(&diffusePixel, 1, 1);
 		auto normalTexture = lumenPT->CreateTexture(&normal, 1, 1);
 		LumenRenderer::MaterialData matData;
-		//TODO create the right textures for these (default ones).
 		auto mat = lumenPT->CreateMaterial(matData);
 		mat->SetClearCoatRoughnessTexture(whiteTexture);
 		mat->SetClearCoatTexture(whiteTexture);
-		mat->SetDiffuseTexture(whiteTexture);
+		mat->SetDiffuseTexture(diffuseTexture);
 		mat->SetEmissiveTexture(whiteTexture);
-		mat->SetMetalRoughnessTexture(diffuseTexture);
+		mat->SetMetalRoughnessTexture(whiteTexture);
 		mat->SetNormalTexture(normalTexture);
 		mat->SetTintTexture(whiteTexture);
 		mat->SetTransmissionTexture(whiteTexture);
 
-		mat->SetTransmissionFactor(1.f);
+		mat->SetTransmissionFactor(0.f);
+		mat->SetIndexOfRefraction(1.53f);
+		mat->SetTransmittanceFactor({ 1.f, 1.f, 1.f });
+		mat->SetLuminance(1.f);
+
+		mat->SetClearCoatFactor(0.f);
+		mat->SetClearCoatRoughnessFactor(0.f);
+
+		mat->SetRoughnessFactor(0.01f);
+		mat->SetMetallicFactor(1.f);
 		
 		mesh->SetOverrideMaterial(mat);
 		mesh->UpdateAccelRemoveThis();

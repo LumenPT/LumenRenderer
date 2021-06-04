@@ -83,9 +83,9 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
             assert(!isnan(emissive.z));
             assert(!isnan(emissive.w));
 
-
-            const float metal = metalRoughness.z;
-            const float roughness = metalRoughness.y;
+            //Multiply metallic and roughness with their scalar factors.
+            const float metal = metalRoughness.z * material->m_MetallicFactor;
+            const float roughness = metalRoughness.y * material->m_RoughnessFactor;
             
             //Calculate the surface normal based on the texture and normal provided.
 

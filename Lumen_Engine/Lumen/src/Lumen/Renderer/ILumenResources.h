@@ -51,6 +51,9 @@ namespace Lumen
         virtual void SetSpecularTintFactor(float a_Factor) = 0;
         virtual void SetSubSurfaceFactor(float a_Factor) = 0;
 
+        virtual void SetMetallicFactor(float a_Factor) = 0;
+        virtual void SetRoughnessFactor(float a_Factor) = 0;
+
         //TODO add disney BSDF getter functions.
 
         virtual glm::vec4 GetDiffuseColor() const = 0;

@@ -84,23 +84,23 @@ private:
     struct HeaderMaterial
     {
         HeaderMaterial()
-            : m_Color{ 0.f, 0.f, 0.f, 0.f }, m_Emission{ 0.f, 0.f, 0.f }, m_DiffuseTextureId(-1)
-            , m_NormalMapId(-1)
-            , m_EmissiveTextureId(-1)
-            , m_TransmissionTextureId(-1), m_ClearCoatTextureId(-1), m_ClearCoatRoughnessTextureId(-1),
-            m_TintTextureId(-1), m_TransmissionFactor(0),
-            m_ClearCoatFactor(0),
-            m_ClearCoatRoughnessFactor(0),
-            m_IndexOfRefraction(0),
-            m_SpecularFactor(0),
-            m_SpecularTintFactor(0),
-            m_SubSurfaceFactor(0),
-            m_Luminance(0), m_Anisotropic(0),
-            m_SheenFactor(0),
-            m_SheenTintFactor(0),
-            m_TintFactor{ 0.f, 0.f, 0.f },
-            m_Transmittance{ 0.f, 0.f, 0.f },
-            m_MetallicRoughnessTextureId(-1)
+            : m_Color{0.f, 0.f, 0.f, 0.f}, m_Emission{0.f, 0.f, 0.f}, m_DiffuseTextureId(-1)
+              , m_NormalMapId(-1)
+              , m_EmissiveTextureId(-1)
+              , m_TransmissionTextureId(-1), m_ClearCoatTextureId(-1), m_ClearCoatRoughnessTextureId(-1),
+              m_TintTextureId(-1), m_TransmissionFactor(0),
+              m_ClearCoatFactor(0),
+              m_ClearCoatRoughnessFactor(0),
+              m_IndexOfRefraction(0),
+              m_SpecularFactor(0),
+              m_SpecularTintFactor(0),
+              m_SubSurfaceFactor(0),
+              m_Luminance(0), m_Anisotropic(0),
+              m_SheenFactor(0),
+              m_SheenTintFactor(0), m_MetallicFactor(1.f), m_RoughnessFactor(1.f),
+              m_TintFactor{0.f, 0.f, 0.f},
+              m_Transmittance{0.f, 0.f, 0.f},
+              m_MetallicRoughnessTextureId(-1)
         {
         }
 
@@ -128,6 +128,8 @@ private:
         float m_Anisotropic;
         float m_SheenFactor;
         float m_SheenTintFactor;
+        float m_MetallicFactor;
+        float m_RoughnessFactor;
         float m_TintFactor[3];
         float m_Transmittance[3];
 
