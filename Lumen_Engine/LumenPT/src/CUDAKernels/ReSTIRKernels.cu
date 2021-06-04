@@ -9,7 +9,7 @@
 #include "disney.cuh"
 #include "../Framework/CudaUtilities.h"
 
-#define CUDA_BLOCK_SIZE 512
+#define CUDA_BLOCK_SIZE 256
 
 __host__ void ResetReservoirs(int a_NumReservoirs, Reservoir* a_ReservoirPointer)
 {
@@ -67,7 +67,10 @@ __global__ void FillCDFInternal(CDF* a_Cdf, const WaveFront::AtomicBuffer<WaveFr
 
         assert(radiance.x >= 0.f && radiance.y >= 0.f && radiance.z >= 0.f && "Radiance needs to be positive, no taking away the light in the soul");
 
-        a_Cdf->Insert((radiance.x + radiance.y + radiance.z) / 3.f);
+        const float weight = (radiance.x + radiance.y + radiance.z) / 3.f;
+        assert(weight >= 0.f);
+    	
+        a_Cdf->Insert(weight);
     }
 }
 
@@ -102,7 +105,7 @@ __global__ void FillLightBagsInternal(unsigned a_NumLightBags, unsigned a_NumLig
 }
 
 __host__ void PickPrimarySamples(const LightBagEntry* const a_LightBags, Reservoir* a_Reservoirs, const ReSTIRSettings& a_Settings, const WaveFront::SurfaceData * const a_PixelData, const std::uint32_t a_Seed)
-{
+{	
     /*
      * This functions uses a single light bag per block.
      * This means that all threads within a block operate on the same light bag data in the cache.
@@ -111,6 +114,7 @@ __host__ void PickPrimarySamples(const LightBagEntry* const a_LightBags, Reservo
     const auto numReservoirs = (a_Settings.width * a_Settings.height * a_Settings.numReservoirsPerPixel);
     const int blockSize = CUDA_BLOCK_SIZE;
     const int numBlocks = (numReservoirs + blockSize - 1) / blockSize;
+	
     PickPrimarySamplesInternal<<<numBlocks, blockSize>>>
     (
         a_LightBags,
@@ -127,7 +131,7 @@ __host__ void PickPrimarySamples(const LightBagEntry* const a_LightBags, Reservo
 
 __global__ void PickPrimarySamplesInternal(const LightBagEntry* const a_LightBags, Reservoir* a_Reservoirs, unsigned a_NumPrimarySamples, unsigned a_NumReservoirs, unsigned a_NumLightBags, unsigned a_NumLightsPerBag, const WaveFront::SurfaceData * const a_PixelData, const std::uint32_t a_Seed)
 {
-    int index = blockIdx.x * blockDim.x + threadIdx.x;
+	int index = blockIdx.x * blockDim.x + threadIdx.x;
     if (index >= a_NumReservoirs)
     {
         return;
@@ -219,11 +223,6 @@ __global__ void PickPrimarySamplesInternal(const LightBagEntry* const a_LightBag
         //Dividing scales the value up.
         const auto pdf = lightSample.solidAnglePdf / initialPdf;
 
-        if(isnan(pdf))
-        {
-            printf("NAN FOUND!: %f %f %f", pdf, lightSample.solidAnglePdf, initialPdf);
-        }
-    	
         assert(!isnan(lightSample.solidAnglePdf));
         assert(!isinf(lightSample.solidAnglePdf));
         assert(lightSample.solidAnglePdf >= 0.f);
@@ -354,11 +353,11 @@ __global__ void GenerateShadowRayShading(WaveFront::AtomicBuffer<RestirShadowRay
             ray.distance = l - 0.05f; //Make length a little bit shorter to prevent self-shadowing.
 
             //Take the average contribution scaled after all reservoirs.
-            ray.contribution = (reservoir.sample.unshadowedPathContribution * (reservoir.weight / static_cast<float>(ReSTIRSettings::numReservoirsPerPixel)));;
-
+            ray.contribution = (reservoir.sample.unshadowedPathContribution * (reservoir.weight / static_cast<float>(ReSTIRSettings::numReservoirsPerPixel)));
+        	
             //TODO: this is a slow operation. Perhaps it's better to create multiple shadow rays per thread, store them locally, then add them at once?
             a_AtomicBuffer->Add(&ray);
-        } 
+        }
     }
 }
 

@@ -190,9 +190,12 @@ struct CDF
      */
     GPU_ONLY void Insert(float a_Weight)
     {
+        assert(a_Weight >= 0.f);//Light needs a value at least.
+    	
         //Important: This is not thread safe. Build from a single thread.
         sum += a_Weight;
-        data[size] = sum;
+        data[size] = sum;     
+    	
         ++size;
     }
 
@@ -219,7 +222,7 @@ struct CDF
         }
 
         //Pdf is proportional to all entries in the dataset.
-        a_LightIndex = entry;
+        a_LightIndex = entry;    	
         a_LightPdf = (higher - lower) / sum;
     }
 
