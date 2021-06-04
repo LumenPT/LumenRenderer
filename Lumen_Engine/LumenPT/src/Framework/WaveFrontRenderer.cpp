@@ -93,7 +93,7 @@ namespace WaveFront
         const auto numOutputChannels = static_cast<unsigned>(LightChannel::NUM_CHANNELS);
 
         const cudaExtent pixelBufferSizeSeparate = cudaExtent{ m_Settings.renderResolution.x, m_Settings.renderResolution.y, numOutputChannels };
-        const cudaExtent pixelBufferSizeCombined = cudaExtent{ m_Settings.renderResolution.x, m_Settings.renderResolution.y, 1 };
+        const cudaExtent pixelBufferSizeCombined = cudaExtent{ m_Settings.renderResolution.x, m_Settings.renderResolution.y, 0 };
 
         cudaTextureDesc pixelBufferDesc {};
         memset(&pixelBufferDesc, 0, sizeof(pixelBufferDesc));
@@ -636,7 +636,7 @@ namespace WaveFront
             m_Settings.blendOutput,
             m_BlendCounter
         );
-    
+
         //Post processing using CUDA kernel.
         PostProcess(postProcessLaunchParams);
         cudaDeviceSynchronize();
@@ -918,7 +918,7 @@ namespace WaveFront
         m_PixelBufferSeparate->Resize({ m_Settings.renderResolution.x, m_Settings.renderResolution.y, numOutputChannels });
 
         //Single channel pixel buffer.
-        m_PixelBufferCombined->Resize({m_Settings.renderResolution.x, m_Settings.renderResolution.y, 1});
+        m_PixelBufferCombined->Resize({m_Settings.renderResolution.x, m_Settings.renderResolution.y, 0});
 
         //Initialize the ray buffers. Note: These are not initialized but Reset() is called when the waves start.
         const auto numPrimaryRays = numPixels;

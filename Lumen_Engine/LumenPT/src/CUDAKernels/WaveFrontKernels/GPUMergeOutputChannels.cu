@@ -19,6 +19,7 @@ CPU_ON_GPU void MergeOutputChannels(
 
 
         float4 mergedColor = { 0.f };
+#pragma unroll 
         for(unsigned int channelIndex = 0; channelIndex < numChannels; ++channelIndex)
         {
 
@@ -39,6 +40,7 @@ CPU_ON_GPU void MergeOutputChannels(
         if(a_BlendOutput)
         {
             float4 oldValue = { 0.f };
+
             surf2Dread<float4>(
                 &oldValue,
                 a_Output,
@@ -47,7 +49,7 @@ CPU_ON_GPU void MergeOutputChannels(
                 cudaBoundaryModeTrap);
 
             //Average results over the total blended frame count (so every frame counts just as much).
-            float4 newValue = ((oldValue * static_cast<float>(a_BlendCount)) + newValue) / static_cast<float>(a_BlendCount + 1);
+            float4 newValue = ((oldValue * static_cast<float>(a_BlendCount)) + mergedColor) / static_cast<float>(a_BlendCount + 1);
             surf2Dwrite<float4>(
                 newValue,
                 a_Output,
