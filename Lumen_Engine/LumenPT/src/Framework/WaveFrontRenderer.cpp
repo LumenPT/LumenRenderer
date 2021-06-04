@@ -917,6 +917,16 @@ namespace WaveFront
     std::shared_ptr<Lumen::ILumenMaterial> WaveFrontRenderer::CreateMaterial(
         const MaterialData& a_MaterialData)
     {
+    	//Make sure textures are not nullptr.
+        assert(a_MaterialData.m_ClearCoatRoughnessTexture);
+        assert(a_MaterialData.m_ClearCoatTexture);
+        assert(a_MaterialData.m_DiffuseTexture);
+        assert(a_MaterialData.m_EmissiveTexture);
+        assert(a_MaterialData.m_MetallicRoughnessTexture);
+        assert(a_MaterialData.m_TintTexture);
+        assert(a_MaterialData.m_TransmissionTexture);
+        assert(a_MaterialData.m_NormalMap);
+    	
         auto mat = std::make_shared<PTMaterial>();
         mat->SetDiffuseColor(a_MaterialData.m_DiffuseColor);
         mat->SetDiffuseTexture(a_MaterialData.m_DiffuseTexture);

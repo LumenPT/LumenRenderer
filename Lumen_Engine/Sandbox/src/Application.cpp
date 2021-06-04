@@ -151,13 +151,19 @@ public:
 		std::string p_string2{ p2.string() };
 		std::replace(p_string2.begin(), p_string2.end(), '\\', '/');
 
+		std::filesystem::path p3 = std::filesystem::current_path();
+		std::string p_string3{ p3.string() };
+		std::replace(p_string3.begin(), p_string3.end(), '\\', '/');
+
 		const std::string meshPath = p_string.append("/Sandbox/assets/models/Sponza/");
 		const std::string meshPath2 = p_string2.append("/Sandbox/assets/models/EmissiveSphere/");
+		const std::string meshPath3 = p_string3.append("/Sandbox/assets/models/Glass/");
 		//Base path for meshes.
 
 		//Mesh name
 		const std::string meshName = "Sponza.gltf";
 		const std::string meshName2 = "EmissiveSphere.gltf";
+		const std::string meshName3 = "scene.gltf";
 
 		//p_string.append("/Sandbox/assets/models/Sponza/Sponza.gltf");
 		LMN_TRACE(p_string);
@@ -177,6 +183,7 @@ public:
 		//__debugbreak();
 
 		auto res2 = m_SceneManager->LoadGLTF(meshName2, meshPath2);
+		auto res3 = m_SceneManager->LoadGLTF(meshName3, meshPath3);
 
 		auto lumenPT = contextLayer->GetPipeline();
 
@@ -224,6 +231,46 @@ public:
 			mesh->UpdateAccelRemoveThis();
 			xOffset += 50;
 		}
+
+		//GLASS
+		auto mesh = lumenPT->m_Scene->AddMesh();
+		mesh->SetMesh(res2->m_MeshPool[0]);
+		mesh->m_Transform.SetPosition(glm::vec3(0.f, 50.f, 0.f));
+		mesh->m_Transform.SetScale(glm::vec3(50.f, 50.f, 50.f));
+		uchar4 whitePixel = { 255,255,255,255 };
+		uchar4 diffusePixel{ 0, 255, 255, 0 };
+		uchar4 normal = { 128, 128, 255, 0 };
+		auto whiteTexture = lumenPT->CreateTexture(&whitePixel, 1, 1);
+		auto diffuseTexture = lumenPT->CreateTexture(&diffusePixel, 1, 1);
+		auto normalTexture = lumenPT->CreateTexture(&normal, 1, 1);
+		LumenRenderer::MaterialData matData;
+		//TODO create the right textures for these (default ones).
+		auto mat = lumenPT->CreateMaterial(matData);
+		mat->SetClearCoatRoughnessTexture(whiteTexture);
+		mat->SetClearCoatTexture(whiteTexture);
+		mat->SetDiffuseTexture(whiteTexture);
+		mat->SetEmissiveTexture(whiteTexture);
+		mat->SetMetalRoughnessTexture(diffuseTexture);
+		mat->SetNormalTexture(normalTexture);
+		mat->SetTintTexture(whiteTexture);
+		mat->SetTransmissionTexture(whiteTexture);
+
+		mat->SetTransmissionFactor(1.f);
+		
+		mesh->SetOverrideMaterial(mat);
+		mesh->UpdateAccelRemoveThis();
+		
+		//for (auto& node : res3->m_NodePool)
+		//{
+		//	auto meshId = node->m_MeshID;
+		//	if (meshId >= 0)
+		//	{
+		//		auto mesh = lumenPT->m_Scene->AddMesh();
+		//		mesh->SetMesh(res3->m_MeshPool[meshId]);
+		//		mesh->m_Transform.SetScale({ 10.f, 10.f, 10.f });
+		//		mesh->m_Transform.SetPosition({0.f, 50.f, 0.f});
+		//	}
+		//}
 		
 		//
 		//for(auto& node: res->m_NodePool)
