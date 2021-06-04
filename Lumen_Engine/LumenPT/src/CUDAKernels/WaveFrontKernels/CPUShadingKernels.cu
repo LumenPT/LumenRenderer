@@ -64,7 +64,7 @@ CPU_ONLY void ExtractSurfaceData(
     SurfaceData* a_OutPut, 
     SceneDataTableAccessor* a_SceneDataTable)
 {
-    const int blockSize = 256;
+    const int blockSize = 512;
     const int numBlocks = (a_NumIntersections + blockSize - 1) / blockSize;
 
     ExtractSurfaceDataGpu<<<numBlocks, blockSize>>>(a_NumIntersections, a_IntersectionData, a_Rays, a_OutPut, a_SceneDataTable);
@@ -74,7 +74,7 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
 {
     //Calculate how many blocks and threads should be used based on the amount of pixels.
     const int numPixels = a_ShadingParams.m_ResolutionAndDepth.x * a_ShadingParams.m_ResolutionAndDepth.y;
-    const int blockSize = 512;
+    const int blockSize = 256;  //NOTE: Too high threead number exceeds register limit and then we die in pain. If changing this, ALWAYS make sure it still works.
     const int numBlocks = (numPixels + blockSize - 1) / blockSize;
 
     auto seed = WangHash(a_ShadingParams.m_Seed);
@@ -124,7 +124,7 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
             a_ShadingParams.m_OptixSystem,
             a_ShadingParams.m_MotionVectorBuffer,
             a_ShadingParams.m_Output,
-            true
+            false
         );
     }
     else
@@ -137,9 +137,8 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
         //}
 
         CDF* cdfPtr = a_ShadingParams.m_ReSTIR->GetCdfGpuPointer();
-
+    	
         //Generate shadow rays for direct lights.
-
         ShadeDirect << <numBlocks, blockSize >> > (
             a_ShadingParams.m_ResolutionAndDepth,
             a_ShadingParams.m_TemporalSurfaceData,
@@ -154,13 +153,16 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
 			a_ShadingParams.m_Output);
     }
 
+    cudaDeviceSynchronize();
+    CHECKLASTCUDAERROR;
+	
     //Update the seed.
     seed = WangHash(a_ShadingParams.m_Seed);
 
     //Generate secondary rays only when there's a wave after this.
     if(a_ShadingParams.m_CurrentDepth < a_ShadingParams.m_ResolutionAndDepth.z - 1)
     {
-        const int blockSize = 512;
+        const int blockSize = 256;  //NOTE: When changing this, ensure it runs in Debug mode because register slimit may be reached.
         const int numBlocks = (a_ShadingParams.m_NumIntersections + blockSize - 1) / blockSize;
 
         ShadeIndirect << <numBlocks, blockSize >> > (
@@ -173,7 +175,10 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
             a_ShadingParams.m_CurrentDepth,
             seed);
 
+
+    	
         cudaDeviceSynchronize();
+        CHECKLASTCUDAERROR;
     }
 
     //const int blockSize = 512;

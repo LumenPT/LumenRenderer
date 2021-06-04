@@ -638,7 +638,8 @@ namespace WaveFront
             //Reset the ray buffer so that indirect shading can fill it again.
             ResetAtomicBuffer<IntersectionRayData>(&m_Rays);
             cudaDeviceSynchronize();
-
+            CHECKLASTCUDAERROR;
+        	
             Shade(shadingLaunchParams);
             cudaDeviceSynchronize();
             CHECKLASTCUDAERROR;
@@ -996,6 +997,8 @@ namespace WaveFront
 
     void WaveFrontRenderer::ResizeBuffers()
     {
+        printf("\n\nRESIZING WAVEFRONT BUFFERS!!\n\n");
+    	
         CHECKLASTCUDAERROR;
 
         ////Set up the OpenGL output buffer.

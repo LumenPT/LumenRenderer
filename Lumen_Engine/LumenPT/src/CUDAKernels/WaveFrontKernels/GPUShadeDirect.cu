@@ -52,11 +52,11 @@ CPU_ON_GPU void ShadeDirect(
     //i becomes index and is to be used by in functions where you need the pixel index.
     //i will update to a new pixel index if there is less threads than there are pixels.
     for (unsigned int i = index; i < numPixels; i += stride)
-    {
-
+    {        
+    	
         //TODO: return some form of light transform factor after resolving the distances in the volume.
         VolumetricShadeDirect(i, a_ResolutionAndDepth, a_VolumetricDataBuffer, a_VolumetricShadowRays, a_Lights, a_CDF, a_Output);
-
+    	
         // Get intersection.
         const SurfaceData& surfaceData = a_SurfaceDataBuffer[i];
 
@@ -98,11 +98,13 @@ CPU_ON_GPU void ShadeDirect(
             //Geometry term G(x).
             const float solidAngle = (cosOut * light.area) / (lDistance * lDistance);
 
+            
+        	
             float bsdfPdf = 0.f;
             const auto bsdf = EvaluateBSDF(surfaceData.m_ShadingData, surfaceData.m_Normal, surfaceData.m_Tangent, -surfaceData.m_IncomingRayDirection, pixelToLightDir, bsdfPdf);
-
+        	
             //If no contribution, don't make a shadow ray.
-            if(bsdfPdf <= 0.f)
+            if(bsdfPdf <= EPSILON)
             {
                 return;
             }
@@ -129,6 +131,8 @@ CPU_ON_GPU void ShadeDirect(
                 lDistance - 0.2f,
                 unshadowedPathContribution,
                 LightChannel::INDIRECT);
+
+            
 
             a_ShadowRays->Add(&shadowRay);
         }

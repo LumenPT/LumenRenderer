@@ -235,24 +235,25 @@ public:
 		//GLASS
 		auto mesh = lumenPT->m_Scene->AddMesh();
 		mesh->SetMesh(res2->m_MeshPool[0]);
-		mesh->m_Transform.SetPosition(glm::vec3(30.f, 50.f, 70.f));
+		mesh->m_Transform.SetPosition(glm::vec3(200.f, 50.f, 70.f));
 		mesh->m_Transform.SetScale(glm::vec3(50.f, 50.f, 50.f));
 		uchar4 whitePixel = { 255,255,255,255 };
-		uchar4 diffusePixel{ 200, 200, 255, 0 };
+		uchar4 diffusePixel{ 255, 255, 255, 0 };
 		uchar4 normal = { 128, 128, 255, 0 };
 		auto whiteTexture = lumenPT->CreateTexture(&whitePixel, 1, 1);
 		auto diffuseTexture = lumenPT->CreateTexture(&diffusePixel, 1, 1);
 		auto normalTexture = lumenPT->CreateTexture(&normal, 1, 1);
 		LumenRenderer::MaterialData matData;
+		matData.m_ClearCoatRoughnessTexture = whiteTexture;
+		matData.m_ClearCoatTexture = whiteTexture;
+		matData.m_DiffuseTexture = whiteTexture;
+		matData.m_EmissiveTexture = whiteTexture;
+		matData.m_MetallicRoughnessTexture = whiteTexture;
+		matData.m_NormalMap = normalTexture;
+		matData.m_TintTexture = whiteTexture;
+		matData.m_TransmissionTexture = whiteTexture;
 		auto mat = lumenPT->CreateMaterial(matData);
-		mat->SetClearCoatRoughnessTexture(whiteTexture);
-		mat->SetClearCoatTexture(whiteTexture);
-		mat->SetDiffuseTexture(diffuseTexture);
-		mat->SetEmissiveTexture(whiteTexture);
-		mat->SetMetalRoughnessTexture(whiteTexture);
-		mat->SetNormalTexture(normalTexture);
-		mat->SetTintTexture(whiteTexture);
-		mat->SetTransmissionTexture(whiteTexture);
+
 
 		mat->SetTransmissionFactor(0.f);
 		mat->SetIndexOfRefraction(1.53f);

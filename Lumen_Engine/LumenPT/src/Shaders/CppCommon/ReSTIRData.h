@@ -118,6 +118,8 @@ struct Reservoir
      */
     GPU_ONLY INLINE bool Update(const LightSample& a_Sample, float a_Weight, std::uint32_t a_Seed)
     {
+        assert(!isnan(a_Weight));
+        assert(!isinf(a_Weight));
         assert(a_Weight >= 0.f);
 
         //Append weight to total.

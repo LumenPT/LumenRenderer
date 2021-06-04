@@ -218,6 +218,24 @@ __global__ void PickPrimarySamplesInternal(const LightBagEntry* const a_LightBag
         //The final PDF for the light in this reservoir is the solid angle divided by the original PDF of the light being chosen based on radiance.
         //Dividing scales the value up.
         const auto pdf = lightSample.solidAnglePdf / initialPdf;
+
+        if(isnan(pdf))
+        {
+            printf("NAN FOUND!: %f %f %f", pdf, lightSample.solidAnglePdf, initialPdf);
+        }
+    	
+        assert(!isnan(lightSample.solidAnglePdf));
+        assert(!isinf(lightSample.solidAnglePdf));
+        assert(lightSample.solidAnglePdf >= 0.f);
+
+        assert(!isnan(initialPdf));
+        assert(!isinf(initialPdf));
+        assert(initialPdf > 0.f);
+    	
+        assert(!isnan(pdf));
+        assert(!isinf(pdf));
+        assert(pdf >= 0.f);
+    	
         fresh.Update(lightSample, pdf, seed);
     }
 
@@ -468,6 +486,11 @@ __global__ void SpatialNeighbourSamplingInternal(Reservoir* a_Reservoirs, Reserv
                 //First sample needs no resampling.
                 auto* reservoir = toCombineReservoirs[0];
                 const float weight = static_cast<float>(reservoir->sampleCount) * reservoir->weight * reservoir->sample.solidAnglePdf;
+
+                assert(!isnan(weight));
+                assert(!isinf(weight));
+                assert(weight >= 0.f);
+            	
                 output.Update(reservoir->sample, weight, a_Seed);
                 sampleCountSum += reservoir->sampleCount;
 
@@ -478,6 +501,11 @@ __global__ void SpatialNeighbourSamplingInternal(Reservoir* a_Reservoirs, Reserv
                     LightSample resampled;
                     Resample(&(reservoir->sample), toCombinePixelData[0], &resampled);
                     const float weight = static_cast<float>(reservoir->sampleCount) * reservoir->weight * resampled.solidAnglePdf;
+
+                    assert(!isnan(weight));
+                    assert(!isinf(weight));
+                    assert(weight >= 0.f);
+                	
                     output.Update(resampled, weight, a_Seed);
                     sampleCountSum += reservoir->sampleCount;
                 }
@@ -509,6 +537,11 @@ __global__ void SpatialNeighbourSamplingInternal(Reservoir* a_Reservoirs, Reserv
                 //First sample needs no resampling.
                 auto* reservoir = toCombineReservoirs[0];
                 const float weight = static_cast<float>(reservoir->sampleCount) * reservoir->weight * reservoir->sample.solidAnglePdf;
+
+                assert(!isnan(weight));
+                assert(!isinf(weight));
+                assert(weight >= 0.f);
+            	
                 output.Update(reservoir->sample, weight, a_Seed);
                 sampleCountSum += reservoir->sampleCount;
 
@@ -526,6 +559,10 @@ __global__ void SpatialNeighbourSamplingInternal(Reservoir* a_Reservoirs, Reserv
 
                     const float weight = static_cast<float>(otherReservoir->sampleCount) * otherReservoir->weight * resampled.solidAnglePdf;
 
+                    assert(!isnan(weight));
+                    assert(!isinf(weight));
+                    assert(weight >= 0.f);
+                	
                     output.Update(resampled, weight, a_Seed);
 
                     sampleCountSum += otherReservoir->sampleCount;
@@ -695,6 +732,10 @@ __device__ __inline__ void CombineUnbiased(Reservoir* a_OutputReservoir, const W
 
         const float weight = static_cast<float>(otherReservoir->sampleCount) * otherReservoir->weight * resampled.solidAnglePdf;
 
+        assert(!isnan(weight));
+        assert(!isinf(weight));
+        assert(weight >= 0.f);
+    	
         output.Update(resampled, weight, a_Seed);
 
         sampleCountSum += otherReservoir->sampleCount;
@@ -765,6 +806,10 @@ __device__ __inline__ void CombineBiased(Reservoir* a_OutputReservoir, int a_Cou
 
         const float weight = static_cast<float>(reservoir->sampleCount) * reservoir->weight * resampled.solidAnglePdf;
 
+        assert(!isnan(weight));
+        assert(!isinf(weight));
+        assert(weight >= 0.f);
+    	
         assert(resampled.solidAnglePdf >= 0.f);
 
         output.Update(resampled, weight, a_Seed);
@@ -829,8 +874,9 @@ __device__ __inline__ void Resample(LightSample* a_Input, const WaveFront::Surfa
     float pdf = 0.f;
     const auto bsdf = EvaluateBSDF(a_PixelData->m_ShadingData, a_PixelData->m_Normal, a_PixelData->m_Tangent, -a_PixelData->m_IncomingRayDirection, pixelToLightDir, pdf);
 
-    //If contribution to lobe is 0, just discard.
-    if(pdf <= 0.f)
+    //If contribution to lobe is 0, just discard. Also goes for NAN which is sometimes sadly present with specular vertices.
+    const auto added = pdf + bsdf.x + bsdf.y + bsdf.z;
+    if(pdf <= EPSILON || isnan(added) || isinf(added))
     {
         a_Output->unshadowedPathContribution = make_float3(0.f, 0.f, 0.f);
         a_Output->solidAnglePdf = 0;

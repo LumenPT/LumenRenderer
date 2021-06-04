@@ -20,7 +20,6 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
         const IntersectionRayData currRay = *a_Rays->GetData(currIntersection.m_RayArrayIndex);
         unsigned int surfaceDataIndex = currIntersection.m_PixelIndex;
 
-
         if (currIntersection.IsIntersection())
         {
             // Get ray used to calculate intersection.
