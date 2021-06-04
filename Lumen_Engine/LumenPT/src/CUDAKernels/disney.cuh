@@ -183,14 +183,16 @@ __forceinline__ __device__ float3 SampleBSDF( const ShadingData& shadingData, fl
 	// calculate tangent matrix
 	const float3 B = normalize( cross( iN, iT ) );
 	const float3 T = normalize( cross( iN, B ) );
+	
 	// consider (rough) dielectrics
 	if (r0 < TRANSMISSION)
 	{
+		
 		specular = true;
 		const float r3 = r0 / TRANSMISSION;
 		const float3 wol = World2Tangent( wow, iN, T, B );
 		const float eta = flip < 0 ? (1 / ETA) : ETA;
-		if (eta == 1) return make_float3( 0 );
+		if (eta == 1) return make_float3( 0 );			//NOTE: I guess this is not possible, as the ray would just continue unobstructed.
 		const float3 beer = make_float3(
 			expf( -shadingData.transmittance.x * distance * 2.0f ),
 			expf( -shadingData.transmittance.y * distance * 2.0f ),

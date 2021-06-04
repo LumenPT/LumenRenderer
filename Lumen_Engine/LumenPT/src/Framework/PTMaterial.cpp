@@ -130,7 +130,7 @@ DeviceMaterial PTMaterial::CreateDeviceMaterial() const
 
     if(m_TransmissionTexture)
     {
-        m.m_TransmissionFactor = **m_TransmissionTexture;
+        m.m_TransmissionTexture = **m_TransmissionTexture;
     }
 
     if(m_ClearCoatTexture)
@@ -140,7 +140,7 @@ DeviceMaterial PTMaterial::CreateDeviceMaterial() const
 
     if(m_ClearCoatRoughnessTexture)
     {
-        m.m_ClearCoatRoughnessFactor = **m_ClearCoatRoughnessTexture;
+        m.m_ClearCoatTexture = **m_ClearCoatRoughnessTexture;
     }
 
     if (m_TintTexture)

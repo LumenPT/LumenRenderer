@@ -227,18 +227,29 @@ public:
 			float p = i;
 			mesh->m_Transform.SetPosition(glm::vec3(xOffset, 100.f + (p * p), 0.f));
 			mesh->m_Transform.SetScale(glm::vec3(2.0f * (static_cast<float>((i + 1) * 2) / 4.f)));
-			mesh->SetEmissiveness(Lumen::EmissionMode::OVERRIDE, glm::vec3(1.f, 1.f, 1.f), 25.f);
+			mesh->SetEmissiveness(Lumen::EmissionMode::OVERRIDE, glm::vec3(1.f, 1.f, 1.f), 50.f);
 			mesh->UpdateAccelRemoveThis();
 			xOffset += 50;
 		}
 
+		////Add one very bright light.
+		//{
+		//	//The SUN!
+		//	auto mesh = lumenPT->m_Scene->AddMesh();
+		//	mesh->SetMesh(res2->m_MeshPool[0]);
+		//	mesh->m_Transform.SetPosition(glm::vec3(100.f, 120.f, 0.f));
+		//	mesh->m_Transform.SetScale(glm::vec3(40.f));
+		//	mesh->SetEmissiveness(Lumen::EmissionMode::OVERRIDE, glm::vec3(1.f, 1.f, 1.f), 100.f);
+		//	mesh->UpdateAccelRemoveThis();
+		//}
+
 		//GLASS
 		auto mesh = lumenPT->m_Scene->AddMesh();
 		mesh->SetMesh(res2->m_MeshPool[0]);
-		mesh->m_Transform.SetPosition(glm::vec3(200.f, 50.f, 70.f));
+		mesh->m_Transform.SetPosition(glm::vec3(000.f, 50.f, 70.f));
 		mesh->m_Transform.SetScale(glm::vec3(50.f, 50.f, 50.f));
 		uchar4 whitePixel = { 255,255,255,255 };
-		uchar4 diffusePixel{ 255, 255, 255, 0 };
+		uchar4 diffusePixel{ 255, 190, 190, 0 };
 		uchar4 normal = { 128, 128, 255, 0 };
 		auto whiteTexture = lumenPT->CreateTexture(&whitePixel, 1, 1);
 		auto diffuseTexture = lumenPT->CreateTexture(&diffusePixel, 1, 1);
@@ -256,15 +267,23 @@ public:
 
 
 		mat->SetTransmissionFactor(0.f);
-		mat->SetIndexOfRefraction(1.53f);
 		mat->SetTransmittanceFactor({ 1.f, 1.f, 1.f });
-		mat->SetLuminance(1.f);
+		mat->SetIndexOfRefraction(1.f);
+		mat->SetTintFactor(glm::vec3{1.f, 0.2f, 0.2f});
 
+
+		
+		mat->SetLuminance(0.2f);
+
+		mat->SetSheenFactor(0.f);
+		mat->SetSheenTintFactor(0.f);
+		
 		mat->SetClearCoatFactor(0.f);
 		mat->SetClearCoatRoughnessFactor(0.f);
 
 		mat->SetRoughnessFactor(0.01f);
-		mat->SetMetallicFactor(1.f);
+		mat->SetMetallicFactor(0.f);
+		mat->SetAnisotropic(1.f);
 		
 		mesh->SetOverrideMaterial(mat);
 		mesh->UpdateAccelRemoveThis();

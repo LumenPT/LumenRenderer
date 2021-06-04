@@ -133,26 +133,8 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
             //The final normal to be used by all shading.
             float3 normal = normalize(make_float3(surfaceNormalWorld));
 
-            //Determine if we're in the surface or outside of it. Assume outside IOR as 1.0 (air).
-            float eta = 1.f;
-            if(dot(normal, currRay.m_Direction) > 0.f)
-            {
-                //Invert if in material.
-                normal *= -1.f;
-                tangent *= -1.f;
-                eta = material->m_IndexOfRefraction;// /1.f;   //Because leaving a surface always goes to air, it's just divided by 1.0
-
-                //TODO remove
-                eta = 1.4f;
-            }
-            else
-            {
-                //Entering material so ETA is air / material ior
-                eta = 1.f / material->m_IndexOfRefraction;
-
-                //TODO remove
-                eta = 1.f / 1.4f;
-            }
+            //ETA is air to surface.
+            float eta = 1.f / material->m_IndexOfRefraction;
 
             //The surface data to write to. Local copy for fast access.
             SurfaceData output;
@@ -199,6 +181,17 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
                 shadingData.SetTransmission(finalTranmission);
                 shadingData.SetTransmittance(material->m_TransmittanceFactor);
                 shadingData.SetETA(eta);
+
+            	
+            	//Useful debug print to show whether or not all information is correctly packed in the struct.
+            	/*
+            	if(material->m_IndexOfRefraction > 1.5f)
+            	{
+                    printf("Shading properties:\n eta: %f\n metallic: %f\n roughness: %f\n subsurface: %f\n specular: %f\n spectint: %f\n luminance: %f\n"\
+                        " anisotropic: %f\n clearcoat: %f\n clearcoat: %f\n tint: %f %f %f\n sheen: %f\n sheentint: %f\n transmission: %f\n transmittance: %f %f %f\n"
+                        , ETA, METALLIC, ROUGHNESS, SUBSURFACE, SPECULAR, SPECTINT, LUMINANCE, ANISOTROPIC, CLEARCOAT, CLEARCOATGLOSS, TINT.x, TINT.y, TINT.z, SHEEN, SHEENTINT, TRANSMISSION, shadingData.transmittance.x, shadingData.transmittance.y, shadingData.transmittance.z);
+            	}
+            	*/
             }
             else 
             {
