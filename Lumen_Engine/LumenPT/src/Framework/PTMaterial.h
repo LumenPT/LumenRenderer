@@ -57,7 +57,7 @@ public:
     void SetAnisotropic(float a_Factor) override;
     void SetSheenFactor(float a_Factor) override;
     void SetSheenTintFactor(float a_Factor) override;
-    void SetTransmittanceFactor(glm::vec3& a_Factor) override;
+    void SetTransmittanceFactor(const glm::vec3& a_Factor) override;
 private:
     // Material data is kept here instead of the base class to account for API-specific implementation details   
     float4 m_DiffuseColor;
@@ -81,13 +81,10 @@ private:
     float m_SubSurfaceFactor;
     float m_Luminance;
     float m_Anisotropic;
-
-    //float m_SheenRoughnessFactor;
     float m_SheenFactor;
     float m_SheenTintFactor;
-
     float3 m_TintFactor;
-    float3 m_Transmittance; //Beers law stuff.
+    float3 m_Transmittance;
 
     // A flag to keep track if the GPU representation of the material needs to be updated after something was changed
     mutable bool m_DeviceMaterialDirty;

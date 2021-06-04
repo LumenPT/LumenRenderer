@@ -115,9 +115,6 @@ CPU_ON_GPU void ShadeIndirect(
         //Also scale by the BSDF PDF right away.
         pathContribution *= bsdf * fabsf(dot(surfaceData.m_Normal, bounceDirection)) * (1.f/pdf);
 
-
-        printf("T factor: %f %f %f\n:", pathContribution.x, pathContribution.y, pathContribution.z);
-
         assert(pathContribution.x >= 0 && pathContribution.y >= 0 && pathContribution.z >= 0);
 
         //Finally add the ray to the ray buffer.

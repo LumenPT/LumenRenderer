@@ -15,21 +15,21 @@ public:
     ~LumenPTModelConverter() {};
 
     Lumen::SceneManager::GLTFResource ConvertGLTF(std::string a_SourcePath);
-    
+
     Lumen::SceneManager::GLTFResource LoadFile(std::string a_SourcePath);
 
     void SetRendererRef(LumenRenderer& a_Renderer);
 
     const static inline std::string ms_ExtensionName = ".ollad";
-    
+
 private:
-    struct Blob 
+    struct Blob
     {
         Blob()
             : m_Data(1024)
             , m_Offset(0) {}
-        void ExtendToFit(uint64_t a_ChunkSize) 
-        {            
+        void ExtendToFit(uint64_t a_ChunkSize)
+        {
             auto s = m_Data.size();
             while (s < m_Offset + a_ChunkSize)
             {
@@ -39,7 +39,7 @@ private:
             m_Data.resize(s);
         }
 
-        uint64_t Write(const void* a_Src, uint64_t a_Size) 
+        uint64_t Write(const void* a_Src, uint64_t a_Size)
         {
             ExtendToFit(a_Size);
             memcpy(m_Data.data() + m_Offset, a_Src, a_Size);
@@ -68,7 +68,11 @@ private:
         EDiffuse = 1,
         ENormal,
         EEmissive,
-        EMetalRoughness
+        EMetalRoughness,
+        ETransmissive,
+        EClearCoat,
+        EClearCoatRoughness,
+        ETint
     };
 
     struct HeaderTexture
@@ -80,20 +84,57 @@ private:
     struct HeaderMaterial
     {
         HeaderMaterial()
-            : m_DiffuseTextureId(-1)
+            : m_Color{ 0.f, 0.f, 0.f, 0.f }, m_Emission{ 0.f, 0.f, 0.f }, m_DiffuseTextureId(-1)
             , m_NormalMapId(-1)
             , m_EmissiveTextureId(-1)
-            , m_MetallicRoughnessTextureId(-1)
-        {}
+            , m_TransmissionTextureId(-1), m_ClearCoatTextureId(-1), m_ClearCoatRoughnessTextureId(-1),
+            m_TintTextureId(-1), m_TransmissionFactor(0),
+            m_ClearCoatFactor(0),
+            m_ClearCoatRoughnessFactor(0),
+            m_IndexOfRefraction(0),
+            m_SpecularFactor(0),
+            m_SpecularTintFactor(0),
+            m_SubSurfaceFactor(0),
+            m_Luminance(0), m_Anisotropic(0),
+            m_SheenFactor(0),
+            m_SheenTintFactor(0),
+            m_TintFactor{ 0.f, 0.f, 0.f },
+            m_Transmittance{ 0.f, 0.f, 0.f },
+            m_MetallicRoughnessTextureId(-1)
+        {
+        }
+
         float m_Color[4];
         float m_Emission[3];
         int32_t m_DiffuseTextureId;
         int32_t m_NormalMapId;
         int32_t m_MetallicRoughnessTextureId;
         int32_t m_EmissiveTextureId;
+
+        //Disney BSDF stuff
+        int32_t m_TransmissionTextureId;
+        int32_t m_ClearCoatTextureId;
+        int32_t m_ClearCoatRoughnessTextureId;
+        int32_t m_TintTextureId;
+
+        float m_TransmissionFactor;
+        float m_ClearCoatFactor;
+        float m_ClearCoatRoughnessFactor;
+        float m_IndexOfRefraction;
+        float m_SpecularFactor;
+        float m_SpecularTintFactor;
+        float m_SubSurfaceFactor;
+        float m_Luminance;
+        float m_Anisotropic;
+        float m_SheenFactor;
+        float m_SheenTintFactor;
+        float m_TintFactor[3];
+        float m_Transmittance[3];
+
+
     };
 
-    struct HeaderPrimitive 
+    struct HeaderPrimitive
     {
         uint64_t m_VertexBufferOffset;
         uint64_t m_VertexBufferSize;
@@ -167,6 +208,15 @@ private:
     static void LoadNode(const fx::gltf::Document& a_FxDoc, uint32_t a_NodeId, HeaderScene& a_Scene, glm::mat4 a_ParentTransform = glm::identity<glm::mat4>());
     static Lumen::Transform LoadNodeTransform(const fx::gltf::Node& a_Node);
 
+    template<typename T>
+    static T JsonGetOrDefault(const nlohmann::json& a_Json, const std::string& a_Key, const T& a_DefaultValue)
+    {
+        if(a_Json.contains(a_Key))
+        {
+            return a_Json[a_Key];
+        }
+        return a_DefaultValue;
+    }
 
     static std::vector<uint8_t> LoadBinary(const fx::gltf::Document& a_Doc, uint32_t a_AccessorIndx);
     static uint32_t GetComponentCount(fx::gltf::Accessor& a_Accessor); // Return how many components the accessor uses
@@ -174,7 +224,7 @@ private:
 
     LumenRenderer* m_RendererRef;
 
-    std::shared_ptr<Lumen::ILumenTexture> m_DefaultDiffuseTexture;
+    std::shared_ptr<Lumen::ILumenTexture> m_DefaultWhiteTexture;
     std::shared_ptr<Lumen::ILumenTexture> m_DefaultMetalRoughnessTexture;
     std::shared_ptr<Lumen::ILumenTexture> m_DefaultNormalTexture;
     std::shared_ptr<Lumen::ILumenTexture> m_DefaultEmissiveTexture;

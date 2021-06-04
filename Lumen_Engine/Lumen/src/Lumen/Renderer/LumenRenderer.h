@@ -59,6 +59,26 @@ public:
 		std::shared_ptr<Lumen::ILumenTexture> m_NormalMap;
 		std::shared_ptr<Lumen::ILumenTexture> m_MetallicRoughnessTexture;
 		std::shared_ptr<Lumen::ILumenTexture> m_EmissiveTexture;
+
+		//Disney!
+		std::shared_ptr<Lumen::ILumenTexture> m_TransmissionTexture;
+		std::shared_ptr<Lumen::ILumenTexture> m_ClearCoatTexture;
+		std::shared_ptr<Lumen::ILumenTexture> m_ClearCoatRoughnessTexture;
+		std::shared_ptr<Lumen::ILumenTexture> m_TintTexture;
+
+		float m_TransmissionFactor;
+		float m_ClearCoatFactor;
+		float m_ClearCoatRoughnessFactor;
+		float m_IndexOfRefraction;
+		float m_SpecularFactor;
+		float m_SpecularTintFactor;
+		float m_SubSurfaceFactor;
+		float m_Luminance;
+		float m_Anisotropic;
+		float m_SheenFactor;
+		float m_SheenTintFactor;
+		glm::vec3 m_TintFactor;
+		glm::vec3 m_Transmittance;
 	};
 
 	// Struct used to initialize a scene

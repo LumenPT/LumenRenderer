@@ -253,7 +253,7 @@ void PTMaterial::SetSheenTintFactor(float a_Factor)
     m_DeviceMaterialDirty = true;
 }
 
-void PTMaterial::SetTransmittanceFactor(glm::vec3& a_Factor)
+void PTMaterial::SetTransmittanceFactor(const glm::vec3& a_Factor)
 {
     m_Transmittance = make_float3(a_Factor.x, a_Factor.y, a_Factor.z);
     m_DeviceMaterialDirty = true;

@@ -44,7 +44,7 @@ namespace Lumen
 
         virtual void SetTransmissionTexture(std::shared_ptr<ILumenTexture> a_Texture) = 0;
         virtual void SetTransmissionFactor(float a_Factor) = 0;
-        virtual void SetTransmittanceFactor(glm::vec3& a_Factor) = 0;
+        virtual void SetTransmittanceFactor(const glm::vec3& a_Factor) = 0;
         virtual void SetIndexOfRefraction(float a_Factor) = 0;
 
         virtual void SetSpecularFactor(float a_Factor) = 0;

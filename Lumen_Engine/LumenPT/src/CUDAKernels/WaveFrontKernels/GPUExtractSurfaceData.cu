@@ -172,7 +172,7 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
             output.m_ShadingData.color = finalColor;
 
             //TODO enable this.
-            if(false)
+            if(true)
             {
                 //Multiply factors with textures.
                 const float4 clearCoat = tex2D<float4>(material->m_ClearCoatTexture, texCoords.x, texCoords.y);
