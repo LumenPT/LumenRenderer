@@ -222,6 +222,13 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
                 output.m_ShadingData.color /= maximum;
             }
 
+        	//Good way to check if normals are correctly oriented (black = backside).
+        	////TODO remove
+        	////visualize normal orientation.
+         //   output.m_Emissive = true;
+         //   const float d = fmaxf(0.f, dot(output.m_Normal, -currRay.m_Direction));
+         //   output.m_ShadingData.color = make_float3(d, d, d);
+
             a_OutPut[surfaceDataIndex] = output;
         }
     }

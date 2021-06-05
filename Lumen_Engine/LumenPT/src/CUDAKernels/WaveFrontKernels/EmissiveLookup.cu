@@ -224,6 +224,11 @@ CPU_ON_GPU void AddToLightBuffer(
                 light.radiance = make_float3(emissive);
                 light.normal = (vert0.m_Normal + vert1.m_Normal + vert2.m_Normal) * oneThird;
 
+        		//Transform the normal to world space.
+                float4 tempNormal = make_float4(light.normal, 0.0f);   //No translation for normals so last components = 0.f.
+                tempNormal = devicePrimitiveInstance->m_Transform * tempNormal;
+                light.normal = normalize(make_float3(tempNormal));
+
                 const float3 vec1 = light.p0 - light.p1;
                 const float3 vec2 = light.p0 - light.p2;
 

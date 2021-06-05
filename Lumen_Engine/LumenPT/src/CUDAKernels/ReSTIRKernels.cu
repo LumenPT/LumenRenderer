@@ -849,7 +849,7 @@ __device__ __inline__ void Resample(LightSample* a_Input, const WaveFront::Surfa
     //Lambertian term clamped between 0 and 1. SurfaceN dot ToLight
     const float cosOut = fmax(dot(a_Input->normal, -pixelToLightDir), 0.f);
     //Light normal at sample point dotted with light direction. Invert light dir for this (light to pixel instead of pixel to light)
-
+	
     //Light is not facing towards the surface or too close to the surface.
     if(cosIn <= 0 || cosOut <= 0 || lDistance <= 0.01f)
     {
@@ -872,7 +872,7 @@ __device__ __inline__ void Resample(LightSample* a_Input, const WaveFront::Surfa
 
     float pdf = 0.f;
     const auto bsdf = EvaluateBSDF(a_PixelData->m_ShadingData, a_PixelData->m_Normal, a_PixelData->m_Tangent, -a_PixelData->m_IncomingRayDirection, pixelToLightDir, pdf);
-
+	
     //If contribution to lobe is 0, just discard. Also goes for NAN which is sometimes sadly present with specular vertices.
     const auto added = pdf + bsdf.x + bsdf.y + bsdf.z;
     if(pdf <= EPSILON || isnan(added) || isinf(added))
