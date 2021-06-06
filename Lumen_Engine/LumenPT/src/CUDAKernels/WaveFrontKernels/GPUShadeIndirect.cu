@@ -37,7 +37,7 @@ CPU_ON_GPU void ShadeIndirect(
          * If the angle is too perpendicular to the normal, discard. It's too prone to floating point error which means it can't generate a reflection
          * some of the time.
          */
-        if (dot(surfaceData.m_Normal, surfaceData.m_IncomingRayDirection) >= -10.f * EPSILON)
+        if (fabs(dot(surfaceData.m_Normal, surfaceData.m_IncomingRayDirection)) < 3.f * EPSILON)
         {
             continue;
         }
@@ -110,13 +110,11 @@ CPU_ON_GPU void ShadeIndirect(
         assert(russianPdf >= 0.f);
         assert(surfaceData.m_TransportFactor.x >= 0 && surfaceData.m_TransportFactor.y >= 0 && surfaceData.m_TransportFactor.z >= 0);
         float3 pathContribution = surfaceData.m_TransportFactor * russianPdf;
-
-       
     	
         //Add the BSDF to the path contribution, along with the angle of incidence scaling.
         //Also scale by the BSDF PDF right away.
         pathContribution *= bsdf * fabsf(dot(surfaceData.m_Normal, bounceDirection)) * (1.f/pdf);
-
+    	
         assert(pathContribution.x >= 0 && pathContribution.y >= 0 && pathContribution.z >= 0);
     	
         //Finally add the ray to the ray buffer.
