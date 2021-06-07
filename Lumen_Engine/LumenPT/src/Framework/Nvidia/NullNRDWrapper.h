@@ -11,6 +11,7 @@ public:
 
 	void Initialize(NRDWrapperInitParams a_InitParams) override {}
 
+	void Denoise(DenoiseParams a_DenoiseParams) override {}
 
 protected:
 

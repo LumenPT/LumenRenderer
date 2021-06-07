@@ -114,6 +114,7 @@ namespace WaveFront
         NRDWrapperInitParams nrdInitParams;
         nrdInitParams.m_InputImageWidth = m_Settings.renderResolution.x;
         nrdInitParams.m_InputImageHeight = m_Settings.renderResolution.y;
+        nrdInitParams.m_pServiceLocator = &m_ServiceLocator;
         m_NRD->Initialize(nrdInitParams);
 
         m_DLSS = std::make_unique<DlssWrapper>();

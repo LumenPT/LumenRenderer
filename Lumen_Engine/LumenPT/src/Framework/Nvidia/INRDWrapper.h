@@ -9,6 +9,11 @@ struct NRDWrapperInitParams
 	PTServiceLocator* m_pServiceLocator = nullptr;
 };
 
+struct DenoiseParams
+{
+
+};
+
 class INRDWrapper
 {
 public:
@@ -18,6 +23,7 @@ public:
 
 	virtual void Initialize(NRDWrapperInitParams a_InitParams) = 0;
 
+	virtual void Denoise(DenoiseParams a_DenoiseParams) = 0;
 
 protected:
 
