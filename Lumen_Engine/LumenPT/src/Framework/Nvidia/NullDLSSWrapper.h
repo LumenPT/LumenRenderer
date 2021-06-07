@@ -9,7 +9,7 @@ public:
 	NullDLSSWrapper() {}
 	~NullDLSSWrapper() {}
 
-	bool Initialize(DLSSWrapperInitParams a_InitParams) override {}
+	bool Initialize(DLSSWrapperInitParams a_InitParams) override { return false; };
 
 
 protected:
