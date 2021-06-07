@@ -23,6 +23,7 @@ namespace WaveFront
         {
             //Add at index - 1 because the counter gives the total size, which starts at 1.
             //IMPORTANT: atomicAdd returns old value. https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#arithmetic-functions
+            
             const uint32_t index = atomicAdd(&counter, 1);
             assert(index < maxSize);
             data[index] = *a_Data;
@@ -109,7 +110,7 @@ namespace WaveFront
     }
 
     template<typename T>
-    unsigned GetAtomicCounter(const MemoryBuffer const* a_Buffer)
+    unsigned GetAtomicCounter(const MemoryBuffer *const a_Buffer)
     {
         unsigned returned = 0;
         a_Buffer->Read(&returned, sizeof(unsigned), 0);

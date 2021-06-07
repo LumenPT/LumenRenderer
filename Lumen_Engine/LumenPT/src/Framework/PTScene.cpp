@@ -102,10 +102,10 @@ void PTScene::UpdateSceneAccelerationStructure()
             auto& inst = instances.emplace_back();
             // Record the acceleration structure of the mesh into the OptixInstance
             inst.traversableHandle = ptmi.GetAccelerationStructureHandle();
-            inst.sbtOffset = 0; // Optix states that if the AS instance is an IAS, the sbt offset must be 0
+            inst.sbtOffset = 0;	// Optix states that if the AS instance is an IAS, the sbt offset must be 0
             inst.visibilityMask = WaveFront::TraceMaskType::SOLIDS;	// 1
-            // The instance ID of this struct is irrelevant, as the intersections will see the ID of the lowest level AS
-            inst.instanceId = 0; 
+			// The instance ID of this struct is irrelevant, as the intersections will see the ID of the lowest level AS
+            inst.instanceId = instanceID++;
             inst.flags = OPTIX_INSTANCE_FLAG_NONE;
 
             // Get the transformation matrix from the transform of the instance

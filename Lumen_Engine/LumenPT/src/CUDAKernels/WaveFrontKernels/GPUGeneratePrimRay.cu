@@ -1,6 +1,5 @@
 #include "GPUShadingKernels.cuh"
 #include "../../Shaders/CppCommon/SceneDataTableAccessor.h"
-
 #include <device_launch_parameters.h>
 
 

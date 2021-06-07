@@ -2,7 +2,6 @@
 
 #include "gltf.h"
 #include "glm/mat4x4.hpp"
-#include "../Renderer/LumenRenderer.h"
 
 
 #include <map>
@@ -11,7 +10,8 @@
 #include <vector>
 
 #include "Lumen/Renderer/ILumenResources.h"
-#include "VolumeManager.h"
+#include "Lumen/ModelLoading/VolumeManager.h"
+#include "Lumen/ModelLoading/Transform.h"
 
 namespace Lumen
 {
@@ -23,6 +23,7 @@ namespace Lumen
 	class ILumenMaterial;
 }
 
+class LumenRenderer;
 namespace Lumen
 {
 	//Information about a loaded image.

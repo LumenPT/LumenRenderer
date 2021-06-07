@@ -6,8 +6,12 @@
 #include "MotionVectors.h"
 #include "../Shaders/CppCommon/WaveFrontDataStructs.h"
 #include "PTServiceLocator.h"
+#include "Nvidia/INRDWrapper.h"
+#include "Nvidia/IDLSSWrapper.h"
+#include "../Tools/LumenPTModelConverter.h"
 
 #include "Renderer/LumenRenderer.h"
+
 
 #include <map>
 #include <string>
@@ -52,6 +56,9 @@ namespace WaveFront
     public:
         void StartRendering() override;
         void PerformDeferredOperations() override;
+
+        Lumen::SceneManager::GLTFResource OpenCustomFileFormat(const std::string& a_OriginalFilePath) override;
+        Lumen::SceneManager::GLTFResource CreateCustomFileFormat(const std::string& a_OriginalFilePath) override;
 
         std::unique_ptr<Lumen::ILumenPrimitive> CreatePrimitive(PrimitiveData& a_PrimitiveData) override;
         std::shared_ptr<Lumen::ILumenMesh> CreateMesh(std::vector<std::shared_ptr<Lumen::ILumenPrimitive>>& a_Primitives) override;
@@ -152,6 +159,12 @@ namespace WaveFront
         //Optix system
         std::unique_ptr<OptixWrapper> m_OptixSystem;
 
+        //NRI Wrapper
+        std::unique_ptr<INRDWrapper> m_NRD;
+
+        //DLSS Wrapper
+        std::unique_ptr<IDLSSWrapper> m_DLSS;
+
         //ReSTIR
         std::unique_ptr<ReSTIR> m_ReSTIR;
 
@@ -190,6 +203,7 @@ namespace WaveFront
         bool m_SnapshotReady;
         bool m_StartSnapshot;
 
+        LumenPTModelConverter m_ModelConverter;
     };
 }
 #endif

@@ -26,6 +26,7 @@
 **/Lumen/vendor/Glad/Glad.dir/**
 **/Lumen/vendor/imgui/ImGui.dir/**
 **/LumenPT/vendor/RayTracingDenoiser
+**/LumenPT/vendor/DLSS_Private
 
 G:\RandomCode\LumenRenderer\Lumen_Engine\Sandbox\assets\models\Sponza
 
@@ -476,3 +477,5 @@ Lumen_Engine/LumenPT/Assets/PrecompiledShaders/
 Lumen_Engine/LumenPT/Assets/PrecompiledShaders/Debug/draw_solid_color.ptx
 *.bmp
 *.ptx
+
+Lumen_Engine/Config.json

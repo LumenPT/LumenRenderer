@@ -6,6 +6,8 @@
 
 #include <thread>
 
+typedef unsigned int GLuint; 
+
 class ModelLoaderWidget
 {
 public:

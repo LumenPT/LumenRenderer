@@ -1,0 +1,9 @@
+[submodule "Lumen_Engine/Sandbox/assets/gltfExternalAssets"]
+	path = Lumen_Engine/Sandbox/assets/gltfExternalAssets
+	url = https://github.com/LumenPT/gltfExternalAssets.git
+[submodule "Lumen_Engine/LumenPT/vendor/RayTracingDenoiser"]
+	path = Lumen_Engine/LumenPT/vendor/RayTracingDenoiser
+	url = https://github.com/LumenPT/RayTracingDenoiser.git
+[submodule "Lumen_Engine/LumenPT/vendor/DLSS_Private"]
+	path = Lumen_Engine/LumenPT/vendor/DLSS_Private
+	url = https://github.com/LumenPT/DLSS_Private.git
