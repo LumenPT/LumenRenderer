@@ -1,5 +1,7 @@
 #pragma once
 #include "ModelLoading/VolumeInstance.h"
+#include "../../src/Shaders/CppCommon/VolumeStructs.h"
+#include "SceneDataTableEntry.h"
 
 #include "Optix/optix_types.h"
 
@@ -22,4 +24,7 @@ public:
     PTScene* m_SceneRef;
     PTServiceLocator& m_Services;
 
+	SceneDataTableEntry<DeviceVolume> m_SceneDataTableEntry;
+private:
+	void UpdateRaytracingData();
 };
