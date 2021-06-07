@@ -21,8 +21,8 @@
 */
 
 #pragma once
-
 #include "ggxmdf.cuh"
+#include <sutil/vec_math.h>
 
 __device__ __forceinline__ void fresnel_reflectance_dielectric( float& reflectance, const float& eta, const float cos_theta_i, const float cos_theta_t )
 {

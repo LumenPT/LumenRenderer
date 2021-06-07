@@ -641,7 +641,8 @@ namespace WaveFront
             //Reset the ray buffer so that indirect shading can fill it again.
             ResetAtomicBuffer<IntersectionRayData>(&m_Rays);
             cudaDeviceSynchronize();
-
+            CHECKLASTCUDAERROR;
+        	
             Shade(shadingLaunchParams);
             cudaDeviceSynchronize();
             CHECKLASTCUDAERROR;
@@ -920,6 +921,16 @@ namespace WaveFront
     std::shared_ptr<Lumen::ILumenMaterial> WaveFrontRenderer::CreateMaterial(
         const MaterialData& a_MaterialData)
     {
+    	//Make sure textures are not nullptr.
+        assert(a_MaterialData.m_ClearCoatRoughnessTexture);
+        assert(a_MaterialData.m_ClearCoatTexture);
+        assert(a_MaterialData.m_DiffuseTexture);
+        assert(a_MaterialData.m_EmissiveTexture);
+        assert(a_MaterialData.m_MetallicRoughnessTexture);
+        assert(a_MaterialData.m_TintTexture);
+        assert(a_MaterialData.m_TransmissionTexture);
+        assert(a_MaterialData.m_NormalMap);
+    	
         auto mat = std::make_shared<PTMaterial>();
         mat->SetDiffuseColor(a_MaterialData.m_DiffuseColor);
         mat->SetDiffuseTexture(a_MaterialData.m_DiffuseTexture);
@@ -927,6 +938,26 @@ namespace WaveFront
         mat->SetEmissiveTexture(a_MaterialData.m_EmissiveTexture);
         mat->SetMetalRoughnessTexture(a_MaterialData.m_MetallicRoughnessTexture);
         mat->SetNormalTexture(a_MaterialData.m_NormalMap);
+
+        //Disney
+        mat->SetTransmissionTexture(a_MaterialData.m_TransmissionTexture);
+        mat->SetClearCoatTexture(a_MaterialData.m_ClearCoatTexture);
+        mat->SetClearCoatRoughnessTexture(a_MaterialData.m_ClearCoatRoughnessTexture);
+        mat->SetTintTexture(a_MaterialData.m_TintTexture);
+
+        mat->SetTransmissionFactor(a_MaterialData.m_TransmissionFactor);
+        mat->SetClearCoatFactor(a_MaterialData.m_ClearCoatFactor);
+        mat->SetClearCoatRoughnessFactor(a_MaterialData.m_ClearCoatRoughnessFactor);
+        mat->SetIndexOfRefraction(a_MaterialData.m_IndexOfRefraction);
+        mat->SetSpecularFactor(a_MaterialData.m_SpecularFactor);
+        mat->SetSpecularTintFactor(a_MaterialData.m_SpecularTintFactor);
+        mat->SetSubSurfaceFactor(a_MaterialData.m_SubSurfaceFactor);
+        mat->SetLuminance(a_MaterialData.m_Luminance);
+        mat->SetAnisotropic(a_MaterialData.m_Anisotropic);
+        mat->SetSheenFactor(a_MaterialData.m_SheenFactor);
+        mat->SetSheenTintFactor(a_MaterialData.m_SheenTintFactor);
+        mat->SetTintFactor(a_MaterialData.m_TintFactor);
+        mat->SetTransmittanceFactor(a_MaterialData.m_Transmittance);
 
         CHECKLASTCUDAERROR;
 
@@ -969,6 +1000,8 @@ namespace WaveFront
 
     void WaveFrontRenderer::ResizeBuffers()
     {
+        printf("\n\nRESIZING WAVEFRONT BUFFERS!!\n\n");
+    	
         CHECKLASTCUDAERROR;
 
         ////Set up the OpenGL output buffer.
