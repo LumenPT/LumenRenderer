@@ -59,5 +59,3 @@ CPU_ON_GPU void GeneratePrimaryRay(
         a_Buffer->Set(i, &ray); //Set because primary rays are ALWAYS a ray per pixel. No need to do atomic indexing. The atomic counter is manually set later.
     }
 }
-
-

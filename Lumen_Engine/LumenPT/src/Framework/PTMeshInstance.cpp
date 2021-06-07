@@ -126,7 +126,7 @@ void PTMeshInstance::UpdateRaytracingData()
     if (!m_MeshRef || !m_SceneRef)
         return;
 
-    std::vector<OptixInstance> instances;
+    //std::vector<OptixInstance> instances;
 
     for (auto& prim : m_MeshRef->m_Primitives)
     {

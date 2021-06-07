@@ -136,8 +136,8 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
         //    a_ShadingParams.m_ReSTIR->BuildCDF(a_ShadingParams.m_TriangleLights);
         //}
 
-        CDF* cdfPtr = a_ShadingParams.m_ReSTIR->GetCdfGpuPointer();
-    	
+		CDF* cdfPtr = a_ShadingParams.m_ReSTIR->GetCdfGpuPointer();
+
         //Generate shadow rays for direct lights.
         ShadeDirect << <numBlocks, blockSize >> > (
             a_ShadingParams.m_ResolutionAndDepth,

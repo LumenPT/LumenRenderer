@@ -285,9 +285,10 @@ namespace WaveFront
 
 		volume->m_AccelerationStructure = m_OptixSystem->BuildGeometryAccelerationStructure(buildOptions, buildInput);
 
+		//This has been moved to volume instance
 		//volume->m_SceneDataTableEntry = m_Table->AddEntry<DeviceVolume>();
-		auto& entry = volume->m_SceneDataTableEntry.GetData();
-		entry.m_Grid = grid;
+		//auto& entry = volume->m_SceneDataTableEntry.GetData();
+		//entry.m_Grid = grid;
 
 		return volume;
 	}
@@ -352,6 +353,8 @@ namespace WaveFront
         const unsigned int numLightsInScene = GetAtomicCounter<WaveFront::TriangleLight>(&m_TriangleLights);
         if (numLightsInScene == 0)
         {
+            // Are you sure there are lights in the scene? Then restart the application, weird bugs man.
+            __debugbreak();
             return;
         }
 
