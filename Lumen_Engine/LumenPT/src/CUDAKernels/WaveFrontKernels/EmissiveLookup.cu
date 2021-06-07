@@ -218,19 +218,28 @@ CPU_ON_GPU void AddToLightBuffer(
                 emissive = devicePrimitiveInstance->m_EmissiveColorAndScale * devicePrimitiveInstance->m_EmissiveColorAndScale.w;
             }
 
-            light.radiance = make_float3(emissive);
-            light.normal = (vert0.m_Normal + vert1.m_Normal + vert2.m_Normal) * oneThird;
+        	//Only add actually emissive lights.
+        	if(emissive.x > 0.f || emissive.y > 0.f || emissive.z > 0.f)
+        	{
+                light.radiance = make_float3(emissive);
+                light.normal = (vert0.m_Normal + vert1.m_Normal + vert2.m_Normal) * oneThird;
 
-            const float3 vec1 = light.p0 - light.p1;
-            const float3 vec2 = light.p0 - light.p2;
+        		//Transform the normal to world space.
+                float4 tempNormal = make_float4(light.normal, 0.0f);   //No translation for normals so last components = 0.f.
+                tempNormal = devicePrimitiveInstance->m_Transform * tempNormal;
+                light.normal = normalize(make_float3(tempNormal));
 
-            light.area = sqrtf(
-                powf((vec1.y * vec2.z - vec2.y * vec1.z), 2) +
-                powf((vec1.x * vec2.z - vec2.x * vec1.z), 2) +
-                powf((vec1.x * vec2.y - vec2.x * vec1.y), 2)
-            ) / 2.0f;
+                const float3 vec1 = light.p0 - light.p1;
+                const float3 vec2 = light.p0 - light.p2;
 
-            a_Lights->Add(&light);
+                light.area = sqrtf(
+                    pow((vec1.y * vec2.z - vec2.y * vec1.z), 2) +
+                    pow((vec1.x * vec2.z - vec2.x * vec1.z), 2) +
+                    pow((vec1.x * vec2.y - vec2.x * vec1.y), 2)
+                ) / 2.0f;
+
+                a_Lights->Add(&light);
+        	}
 
             //Add light to lightbuffer, but to know where the end of the buffer is, keep track of lightIndex.
             //Dont know how many lights have already been added to buffer.

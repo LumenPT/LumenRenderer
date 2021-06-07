@@ -24,6 +24,24 @@
 //#include "Lumen/Window.h"
 #include "Lumen/LumenApp.h"
 
+//#include "LumenPTConfig.h"
+
+#ifdef USE_NVIDIA_DENOISER
+#include "Nvidia/NRDWrapper.h"
+using NrdWrapper = NRDWrapper;
+#else
+#include "Nvidia/NullNRDWrapper.h"
+using NrdWrapper = NullNRDWrapper;
+#endif
+
+#ifdef USE_NVIDIA_DLSS
+#include "Nvidia/DLSSWrapper.h"
+using DlssWrapper = DLSSWrapper;
+#else
+#include "Nvidia/NullDLSSWrapper.h"
+using DlssWrapper = NullDLSSWrapper;
+#endif
+
 #include "../../../Lumen/vendor/GLFW/include/GLFW/glfw3.h"
 #include <Optix/optix_function_table_definition.h>
 #include <filesystem>
@@ -83,6 +101,19 @@ namespace WaveFront
         //Set the service locator's pointer to the OptixWrapper.
         m_ServiceLocator.m_OptixWrapper = m_OptixSystem.get();
 
+        m_NRD = std::make_unique<NrdWrapper>();
+        NRDWrapperInitParams nrdInitParams;
+        nrdInitParams.m_InputImageWidth = m_Settings.renderResolution.x;
+        nrdInitParams.m_InputImageHeight = m_Settings.renderResolution.y;
+        m_NRD->Initialize(nrdInitParams);
+
+        m_DLSS = std::make_unique<DlssWrapper>();
+        DLSSWrapperInitParams dlssInitParams;
+        dlssInitParams.m_InputImageWidth = m_Settings.renderResolution.x;
+        dlssInitParams.m_InputImageHeight = m_Settings.renderResolution.y;
+        dlssInitParams.m_OutputImageWidth = m_Settings.outputResolution.x;
+        dlssInitParams.m_OutputImageHeight = m_Settings.outputResolution.y;
+        m_DLSS->Initialize(dlssInitParams);
 
         //Set up the OpenGL output buffer.
         m_OutputBuffer = std::make_unique<CudaGLTexture>(GL_RGBA8, m_Settings.outputResolution.x, m_Settings.outputResolution.y, 4);
@@ -129,7 +160,7 @@ namespace WaveFront
         m_ServiceLocator.m_Renderer = this;
         m_FrameSnapshot = std::make_unique<NullFrameSnapshot>();
 
-
+        m_ModelConverter.SetRendererRef(*this);
     }
 
     void WaveFrontRenderer::BeginSnapshot()
@@ -235,9 +266,10 @@ namespace WaveFront
 
 		volume->m_AccelerationStructure = m_OptixSystem->BuildGeometryAccelerationStructure(buildOptions, buildInput);
 
+		//This has been moved to volume instance
 		//volume->m_SceneDataTableEntry = m_Table->AddEntry<DeviceVolume>();
-		auto& entry = volume->m_SceneDataTableEntry.GetData();
-		entry.m_Grid = grid;
+		//auto& entry = volume->m_SceneDataTableEntry.GetData();
+		//entry.m_Grid = grid;
 
 		return volume;
 	}
@@ -302,6 +334,8 @@ namespace WaveFront
         const unsigned int numLightsInScene = GetAtomicCounter<WaveFront::TriangleLight>(&m_TriangleLights);
         if (numLightsInScene == 0)
         {
+            // Are you sure there are lights in the scene? Then restart the application, weird bugs man.
+            __debugbreak();
             return;
         }
 
@@ -584,7 +618,8 @@ namespace WaveFront
             //Reset the ray buffer so that indirect shading can fill it again.
             ResetAtomicBuffer<IntersectionRayData>(&m_Rays);
             cudaDeviceSynchronize();
-
+            CHECKLASTCUDAERROR;
+        	
             Shade(shadingLaunchParams);
             cudaDeviceSynchronize();
             CHECKLASTCUDAERROR;
@@ -733,11 +768,28 @@ namespace WaveFront
         m_OGLCallCondition.notify_all();
     }
 
+    Lumen::SceneManager::GLTFResource WaveFrontRenderer::OpenCustomFileFormat(const std::string& a_OriginalFilePath)
+    {
+        std::filesystem::path p(a_OriginalFilePath);
+        p.replace_extension(LumenPTModelConverter::ms_ExtensionName);
+
+        return m_ModelConverter.LoadFile(p.string());
+    }
+
+    Lumen::SceneManager::GLTFResource WaveFrontRenderer::CreateCustomFileFormat(const std::string& a_OriginalFilePath)
+    {
+        return m_ModelConverter.ConvertGLTF(a_OriginalFilePath);
+    }
+
     std::unique_ptr<Lumen::ILumenPrimitive> WaveFrontRenderer::CreatePrimitive(PrimitiveData& a_PrimitiveData)
     {
         //TODO let optix build the acceleration structure and return the handle.
+        std::unique_ptr<MemoryBuffer> vertexBuffer;
+        if (!a_PrimitiveData.m_Interleaved)
+            vertexBuffer = InterleaveVertexData(a_PrimitiveData);
+        else
+            vertexBuffer = std::make_unique<MemoryBuffer>(a_PrimitiveData.m_VertexBinary);
 
-        auto vertexBuffer = InterleaveVertexData(a_PrimitiveData);
         cudaDeviceSynchronize();
         auto err = cudaGetLastError();
         std::vector<uint32_t> correctedIndices;
@@ -815,7 +867,7 @@ namespace WaveFront
         buildInput.triangleArray.vertexBuffers = &**vertexBuffer;
         buildInput.triangleArray.vertexFormat = OPTIX_VERTEX_FORMAT_FLOAT3;
         buildInput.triangleArray.vertexStrideInBytes = sizeof(Vertex);
-        buildInput.triangleArray.numVertices = a_PrimitiveData.m_Positions.Size();
+        buildInput.triangleArray.numVertices = vertexBuffer->GetSize() / sizeof(Vertex);
         buildInput.triangleArray.numSbtRecords = 1;
         buildInput.triangleArray.flags = &geomFlags;
 
@@ -854,10 +906,43 @@ namespace WaveFront
     std::shared_ptr<Lumen::ILumenMaterial> WaveFrontRenderer::CreateMaterial(
         const MaterialData& a_MaterialData)
     {
+    	//Make sure textures are not nullptr.
+        assert(a_MaterialData.m_ClearCoatRoughnessTexture);
+        assert(a_MaterialData.m_ClearCoatTexture);
+        assert(a_MaterialData.m_DiffuseTexture);
+        assert(a_MaterialData.m_EmissiveTexture);
+        assert(a_MaterialData.m_MetallicRoughnessTexture);
+        assert(a_MaterialData.m_TintTexture);
+        assert(a_MaterialData.m_TransmissionTexture);
+        assert(a_MaterialData.m_NormalMap);
+    	
         auto mat = std::make_shared<PTMaterial>();
         mat->SetDiffuseColor(a_MaterialData.m_DiffuseColor);
         mat->SetDiffuseTexture(a_MaterialData.m_DiffuseTexture);
-        mat->SetEmission(a_MaterialData.m_EmssivionVal);
+        mat->SetEmission(a_MaterialData.m_EmissionVal);
+        mat->SetEmissiveTexture(a_MaterialData.m_EmissiveTexture);
+        mat->SetMetalRoughnessTexture(a_MaterialData.m_MetallicRoughnessTexture);
+        mat->SetNormalTexture(a_MaterialData.m_NormalMap);
+
+        //Disney
+        mat->SetTransmissionTexture(a_MaterialData.m_TransmissionTexture);
+        mat->SetClearCoatTexture(a_MaterialData.m_ClearCoatTexture);
+        mat->SetClearCoatRoughnessTexture(a_MaterialData.m_ClearCoatRoughnessTexture);
+        mat->SetTintTexture(a_MaterialData.m_TintTexture);
+
+        mat->SetTransmissionFactor(a_MaterialData.m_TransmissionFactor);
+        mat->SetClearCoatFactor(a_MaterialData.m_ClearCoatFactor);
+        mat->SetClearCoatRoughnessFactor(a_MaterialData.m_ClearCoatRoughnessFactor);
+        mat->SetIndexOfRefraction(a_MaterialData.m_IndexOfRefraction);
+        mat->SetSpecularFactor(a_MaterialData.m_SpecularFactor);
+        mat->SetSpecularTintFactor(a_MaterialData.m_SpecularTintFactor);
+        mat->SetSubSurfaceFactor(a_MaterialData.m_SubSurfaceFactor);
+        mat->SetLuminance(a_MaterialData.m_Luminance);
+        mat->SetAnisotropic(a_MaterialData.m_Anisotropic);
+        mat->SetSheenFactor(a_MaterialData.m_SheenFactor);
+        mat->SetSheenTintFactor(a_MaterialData.m_SheenTintFactor);
+        mat->SetTintFactor(a_MaterialData.m_TintFactor);
+        mat->SetTransmittanceFactor(a_MaterialData.m_Transmittance);
 
         CHECKLASTCUDAERROR;
 
@@ -900,6 +985,8 @@ namespace WaveFront
 
     void WaveFrontRenderer::ResizeBuffers()
     {
+        printf("\n\nRESIZING WAVEFRONT BUFFERS!!\n\n");
+    	
         CHECKLASTCUDAERROR;
 
         ////Set up the OpenGL output buffer.

@@ -4,6 +4,7 @@
 #include "MemoryBuffer.h"
 #include "AccelerationStructure.h"
 #include "ShaderBindingTableGen.h"
+#include "Lumen/Renderer/LumenRenderer.h"
 
 #include <Optix/optix_stubs.h>
 #include <algorithm>

@@ -38,6 +38,7 @@ void PTMeshInstance::SetSceneRef(PTScene* a_SceneRef)
     // This is called when the mesh is first added to the scene. Essentially immediately flags the scene for an update.
     m_SceneRef = a_SceneRef;
     m_SceneRef->MarkSceneForUpdate();
+    UpdateRaytracingData();
 }
 
 void PTMeshInstance::DependencyCallback()
@@ -51,7 +52,8 @@ void PTMeshInstance::SetMesh(std::shared_ptr<Lumen::ILumenMesh> a_Mesh)
 {
     MeshInstance::SetMesh(a_Mesh);
     // Because the mesh used by the instance was changed, the scene's structure needs to be rebuild to reflect the change.
-    m_SceneRef->MarkSceneForUpdate();    
+    m_SceneRef->MarkSceneForUpdate();
+    UpdateRaytracingData();
 }
 
 bool PTMeshInstance::VerifyAccelerationStructure()
@@ -124,7 +126,7 @@ void PTMeshInstance::UpdateRaytracingData()
     if (!m_MeshRef || !m_SceneRef)
         return;
 
-    std::vector<OptixInstance> instances;
+    //std::vector<OptixInstance> instances;
 
     for (auto& prim : m_MeshRef->m_Primitives)
     {

@@ -145,7 +145,6 @@ __device__ __forceinline__ void ShadowRaysRayGen()
     //3. If no hit, accumulate result in buffer
     if(isIntersection == 0)
     {
-
         using namespace WaveFront;
 
         float4 color{ 0.f };

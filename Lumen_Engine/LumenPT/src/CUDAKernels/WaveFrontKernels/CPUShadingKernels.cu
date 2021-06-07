@@ -66,7 +66,7 @@ CPU_ONLY void ExtractSurfaceData(
     uint2 a_Resolution,
     SceneDataTableAccessor* a_SceneDataTable)
 {
-    const int blockSize = 256;
+    const int blockSize = 512;
     const int numBlocks = (a_NumIntersections + blockSize - 1) / blockSize;
 
     ExtractSurfaceDataGpu<<<numBlocks, blockSize>>>(a_NumIntersections, a_IntersectionData, a_Rays, a_OutPut, a_Resolution, a_SceneDataTable);
@@ -155,6 +155,9 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
             a_ShadingParams.m_Output);
     }
 
+    cudaDeviceSynchronize();
+    CHECKLASTCUDAERROR;
+	
     //Update the seed.
     seed = WangHash(a_ShadingParams.m_Seed);
 

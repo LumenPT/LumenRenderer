@@ -7,9 +7,10 @@
 #include <cassert>
 #include <cmath>
 
+#include "disney.cuh"
 #include "../Framework/CudaUtilities.h"
 
-#define CUDA_BLOCK_SIZE 512
+#define CUDA_BLOCK_SIZE 256
 
 #define CUDA_BLOCK_SIZE_GRID dim3{32, 32, 1}
 
@@ -69,7 +70,10 @@ __global__ void FillCDFInternal(CDF* a_Cdf, const WaveFront::AtomicBuffer<WaveFr
 
         assert(radiance.x >= 0.f && radiance.y >= 0.f && radiance.z >= 0.f && "Radiance needs to be positive, no taking away the light in the soul");
 
-        a_Cdf->Insert((radiance.x + radiance.y + radiance.z) / 3.f);
+        const float weight = (radiance.x + radiance.y + radiance.z) / 3.f;
+        assert(weight >= 0.f);
+    	
+        a_Cdf->Insert(weight);
     }
 }
 
@@ -104,7 +108,7 @@ __global__ void FillLightBagsInternal(unsigned a_NumLightBags, unsigned a_NumLig
 }
 
 __host__ void PickPrimarySamples(const LightBagEntry* const a_LightBags, Reservoir* a_Reservoirs, const ReSTIRSettings& a_Settings, const WaveFront::SurfaceData * const a_PixelData, const std::uint32_t a_Seed)
-{
+{	
     /*
      * This functions uses a single light bag per block.
      * This means that all threads within a block operate on the same light bag data in the cache.
@@ -113,6 +117,7 @@ __host__ void PickPrimarySamples(const LightBagEntry* const a_LightBags, Reservo
     const auto numReservoirs = (a_Settings.width * a_Settings.height * a_Settings.numReservoirsPerPixel);
     const int blockSize = CUDA_BLOCK_SIZE;
     const int numBlocks = (numReservoirs + blockSize - 1) / blockSize;
+	
     PickPrimarySamplesInternal<<<numBlocks, blockSize>>>
     (
         a_LightBags,
@@ -129,7 +134,7 @@ __host__ void PickPrimarySamples(const LightBagEntry* const a_LightBags, Reservo
 
 __global__ void PickPrimarySamplesInternal(const LightBagEntry* const a_LightBags, Reservoir* a_Reservoirs, unsigned a_NumPrimarySamples, unsigned a_NumReservoirs, unsigned a_NumLightBags, unsigned a_NumLightsPerBag, const WaveFront::SurfaceData * const a_PixelData, const std::uint32_t a_Seed)
 {
-    int index = blockIdx.x * blockDim.x + threadIdx.x;
+	int index = blockIdx.x * blockDim.x + threadIdx.x;
     if (index >= a_NumReservoirs)
     {
         return;
@@ -220,6 +225,19 @@ __global__ void PickPrimarySamplesInternal(const LightBagEntry* const a_LightBag
         //The final PDF for the light in this reservoir is the solid angle divided by the original PDF of the light being chosen based on radiance.
         //Dividing scales the value up.
         const auto pdf = lightSample.solidAnglePdf / initialPdf;
+
+        assert(!isnan(lightSample.solidAnglePdf));
+        assert(!isinf(lightSample.solidAnglePdf));
+        assert(lightSample.solidAnglePdf >= 0.f);
+
+        assert(!isnan(initialPdf));
+        assert(!isinf(initialPdf));
+        assert(initialPdf > 0.f);
+    	
+        assert(!isnan(pdf));
+        assert(!isinf(pdf));
+        assert(pdf >= 0.f);
+    	
         fresh.Update(lightSample, pdf, seed);
     }
 
@@ -352,11 +370,11 @@ __global__ void GenerateShadowRayShading(WaveFront::AtomicBuffer<RestirShadowRay
             ray.distance = l - 0.05f; //Make length a little bit shorter to prevent self-shadowing.
 
             //Take the average contribution scaled after all reservoirs.
-            ray.contribution = (reservoir.sample.unshadowedPathContribution * (reservoir.weight / static_cast<float>(ReSTIRSettings::numReservoirsPerPixel)));;
-
+            ray.contribution = (reservoir.sample.unshadowedPathContribution * (reservoir.weight / static_cast<float>(ReSTIRSettings::numReservoirsPerPixel)));
+        	
             //TODO: this is a slow operation. Perhaps it's better to create multiple shadow rays per thread, store them locally, then add them at once?
             a_AtomicBuffer->Add(&ray);
-        } 
+        }
     }
 }
 
@@ -484,6 +502,11 @@ __global__ void SpatialNeighbourSamplingInternal(Reservoir* a_Reservoirs, Reserv
                 //First sample needs no resampling.
                 auto* reservoir = toCombineReservoirs[0];
                 const float weight = static_cast<float>(reservoir->sampleCount) * reservoir->weight * reservoir->sample.solidAnglePdf;
+
+                assert(!isnan(weight));
+                assert(!isinf(weight));
+                assert(weight >= 0.f);
+            	
                 output.Update(reservoir->sample, weight, a_Seed);
                 sampleCountSum += reservoir->sampleCount;
 
@@ -494,6 +517,11 @@ __global__ void SpatialNeighbourSamplingInternal(Reservoir* a_Reservoirs, Reserv
                     LightSample resampled;
                     Resample(&(reservoir->sample), toCombinePixelData[0], &resampled);
                     const float weight = static_cast<float>(reservoir->sampleCount) * reservoir->weight * resampled.solidAnglePdf;
+
+                    assert(!isnan(weight));
+                    assert(!isinf(weight));
+                    assert(weight >= 0.f);
+                	
                     output.Update(resampled, weight, a_Seed);
                     sampleCountSum += reservoir->sampleCount;
                 }
@@ -525,6 +553,11 @@ __global__ void SpatialNeighbourSamplingInternal(Reservoir* a_Reservoirs, Reserv
                 //First sample needs no resampling.
                 auto* reservoir = toCombineReservoirs[0];
                 const float weight = static_cast<float>(reservoir->sampleCount) * reservoir->weight * reservoir->sample.solidAnglePdf;
+
+                assert(!isnan(weight));
+                assert(!isinf(weight));
+                assert(weight >= 0.f);
+            	
                 output.Update(reservoir->sample, weight, a_Seed);
                 sampleCountSum += reservoir->sampleCount;
 
@@ -542,6 +575,10 @@ __global__ void SpatialNeighbourSamplingInternal(Reservoir* a_Reservoirs, Reserv
 
                     const float weight = static_cast<float>(otherReservoir->sampleCount) * otherReservoir->weight * resampled.solidAnglePdf;
 
+                    assert(!isnan(weight));
+                    assert(!isinf(weight));
+                    assert(weight >= 0.f);
+                	
                     output.Update(resampled, weight, a_Seed);
 
                     sampleCountSum += otherReservoir->sampleCount;
@@ -719,6 +756,10 @@ __device__ __inline__ void CombineUnbiased(Reservoir* a_OutputReservoir, const W
 
         const float weight = static_cast<float>(otherReservoir->sampleCount) * otherReservoir->weight * resampled.solidAnglePdf;
 
+        assert(!isnan(weight));
+        assert(!isinf(weight));
+        assert(weight >= 0.f);
+    	
         output.Update(resampled, weight, a_Seed);
 
         sampleCountSum += otherReservoir->sampleCount;
@@ -789,6 +830,10 @@ __device__ __inline__ void CombineBiased(Reservoir* a_OutputReservoir, int a_Cou
 
         const float weight = static_cast<float>(reservoir->sampleCount) * reservoir->weight * resampled.solidAnglePdf;
 
+        assert(!isnan(weight));
+        assert(!isinf(weight));
+        assert(weight >= 0.f);
+    	
         assert(resampled.solidAnglePdf >= 0.f);
 
         output.Update(resampled, weight, a_Seed);
@@ -829,7 +874,7 @@ __device__ __inline__ void Resample(LightSample* a_Input, const WaveFront::Surfa
     //Lambertian term clamped between 0 and 1. SurfaceN dot ToLight
     const float cosOut = fmax(dot(a_Input->normal, -pixelToLightDir), 0.f);
     //Light normal at sample point dotted with light direction. Invert light dir for this (light to pixel instead of pixel to light)
-
+	
     //Light is not facing towards the surface or too close to the surface.
     if(cosIn <= 0 || cosOut <= 0 || lDistance <= 0.01f)
     {
@@ -841,14 +886,29 @@ __device__ __inline__ void Resample(LightSample* a_Input, const WaveFront::Surfa
     const float solidAngle = (cosOut * a_Input->area) / (lDistance * lDistance);
 
     //BSDF is equal to material color for now.
-    const auto brdf = MicrofacetBRDF(pixelToLightDir, -a_PixelData->m_IncomingRayDirection, a_PixelData->m_Normal,
-                                     a_PixelData->m_Color, a_PixelData->m_Metallic, a_PixelData->m_Roughness);
+    //const auto brdf = MicrofacetBRDF(pixelToLightDir, -a_PixelData->m_IncomingRayDirection, a_PixelData->m_Normal,
+    //                                 a_PixelData->m_Color, a_PixelData->m_Metallic, a_PixelData->m_Roughness);
 
     //The unshadowed contribution (contributed if no obstruction is between the light and surface) takes the BRDF,
     //geometry factor and solid angle into account. Also the light radiance.
     //The only thing missing from this is the scaling with the rest of the scene based on the reservoir PDF.
     //Note: No need to multiply with transport factor because this is depth 0. It is always {1, 1, 1}.
-    const auto unshadowedPathContribution = brdf * solidAngle * cosIn * a_Output->radiance;
+    //const auto unshadowedPathContribution = brdf * solidAngle * cosIn * a_Output->radiance;
+
+    float pdf = 0.f;
+    const auto bsdf = EvaluateBSDF(a_PixelData->m_ShadingData, a_PixelData->m_Normal, a_PixelData->m_Tangent, -a_PixelData->m_IncomingRayDirection, pixelToLightDir, pdf);
+	
+    //If contribution to lobe is 0, just discard. Also goes for NAN which is sometimes sadly present with specular vertices.
+    const auto added = pdf + bsdf.x + bsdf.y + bsdf.z;
+    if(pdf <= EPSILON || isnan(added) || isinf(added))
+    {
+        a_Output->unshadowedPathContribution = make_float3(0.f, 0.f, 0.f);
+        a_Output->solidAnglePdf = 0;
+        return;
+    }
+
+    const auto unshadowedPathContribution = (bsdf / pdf) * solidAngle * cosIn * a_Output->radiance;
+	
     a_Output->unshadowedPathContribution = unshadowedPathContribution;
 
     assert(unshadowedPathContribution.x >= 0 && unshadowedPathContribution.y >= 0 && unshadowedPathContribution.z >= 0);

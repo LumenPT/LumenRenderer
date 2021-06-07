@@ -3,7 +3,7 @@
 #include <Lumen/ModelLoading/MeshInstance.h>
 #include <device_launch_parameters.h>
 #include <sutil/vec_math.h>
-
+#include "../disney.cuh"
 
 CPU_ON_GPU void ExtractSurfaceDataGpu(
     unsigned a_NumIntersections,
@@ -83,9 +83,9 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
             assert(!isnan(emissive.z));
             assert(!isnan(emissive.w));
 
-
-            const float metal = metalRoughness.z;
-            const float roughness = metalRoughness.y;
+            //Multiply metallic and roughness with their scalar factors.
+            const float metal = metalRoughness.z * material->m_MetallicFactor;
+            const float roughness = metalRoughness.y * material->m_RoughnessFactor;
             
             //Calculate the surface normal based on the texture and normal provided.
 
@@ -95,15 +95,16 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
             //Transform the normal to world space
             float4 surfaceNormalWorld = devicePrimitiveInstance.m_Transform * make_float4(surfaceNormal, 0.f);
 
+
             //TODO normal mapping
-            //float3 tangent = 
-            //    normalize(
-            //        (make_float3(A->m_Tangent) * A->m_Tangent.w) * W + 
-            //        (make_float3(B->m_Tangent) * B->m_Tangent.w) * U + 
-            //        (make_float3(C->m_Tangent) * C->m_Tangent.w) * V
-            //    );
-            //assert(!isnan(length(tangent)));
-            //assert(length(tangent) > 0);
+            float3 tangent = 
+                normalize(
+                    (make_float3(A->m_Tangent) * A->m_Tangent.w) * W + 
+                    (make_float3(B->m_Tangent) * B->m_Tangent.w) * U + 
+                    (make_float3(C->m_Tangent) * C->m_Tangent.w) * V
+                );
+            assert(!isnan(length(tangent)));
+            assert(length(tangent) > 0);
 
             ////tangent = normalize(tangent);
             ////assert(!isnan(length(tangent)));
@@ -130,25 +131,104 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
             //Can't have perfect specular surfaces. 0 is never acceptable.
             assert(roughness > 0.f && roughness <= 1.f);
 
+            //The final normal to be used by all shading.
+            float3 normal = normalize(make_float3(surfaceNormalWorld));
+
+            //ETA is air to surface.
+            float eta = 1.f / material->m_IndexOfRefraction;
+
             //The surface data to write to. Local copy for fast access.
             SurfaceData output;
             output.m_PixelIndex = currIntersection.m_PixelIndex;
             output.m_IntersectionT = currIntersection.m_IntersectionT;
-            output.m_Normal = normalize(make_float3(surfaceNormalWorld));
-            output.m_Color = finalColor;
+            output.m_Normal = normal;
             output.m_Position = currRay.m_Origin + currRay.m_Direction * currIntersection.m_IntersectionT;
             output.m_IncomingRayDirection = currRay.m_Direction;
-            output.m_Metallic = metal;
-            output.m_Roughness = roughness;
             output.m_TransportFactor = currRay.m_Contribution;
+            output.m_Tangent = tangent;
+
+            auto& shadingData = output.m_ShadingData;
+            shadingData.parameters = make_uint4(0u, 0u, 0u, 0u);    //Default init to 0 for all.
+
+            //Set output color.
+            output.m_ShadingData.color = finalColor;
+
+            //TODO enable this.
+            if(true)
+            {
+                //Multiply factors with textures.
+                const float4 clearCoat = tex2D<float4>(material->m_ClearCoatTexture, texCoords.x, texCoords.y);
+                const float4 clearCoatRoughness = tex2D<float4>(material->m_ClearCoatRoughnessTexture, texCoords.x, texCoords.y);
+                const float4 transmission = tex2D<float4>(material->m_TransmissionTexture, texCoords.x, texCoords.y);
+                const float4 tint = tex2D<float4>(material->m_TintTexture, texCoords.x, texCoords.y);
+
+                const float3 finalTintColor = make_float3(tint.x, tint.y, tint.z) * material->m_TintFactor;
+                const float finalClearCoat = material->m_ClearCoatFactor * clearCoat.x;
+                const float clearCoatGloss = 1.f - (material->m_ClearCoatRoughnessFactor * clearCoatRoughness.x);    //Invert from rough to gloss.
+                const float finalTranmission = material->m_TransmissionFactor * transmission.x;
+
+                shadingData.SetMetallic(metal);
+                shadingData.SetRoughness(roughness);
+                shadingData.SetSubSurface(material->m_SubSurfaceFactor);
+                shadingData.SetSpecular(material->m_SpecularFactor);
+                shadingData.SetSpecTint(material->m_SpecularTintFactor);
+                shadingData.SetLuminance(material->m_Luminance);
+                shadingData.SetAnisotropic(material->m_Anisotropic);
+                shadingData.SetClearCoat(finalClearCoat);
+                shadingData.SetClearCoatGloss(clearCoatGloss);
+                shadingData.SetTint(finalTintColor);
+                shadingData.SetSheen(material->m_SheenFactor);
+                shadingData.SetSheenTint(material->m_SheenTintFactor);
+                shadingData.SetTransmission(finalTranmission);
+                shadingData.SetTransmittance(material->m_TransmittanceFactor);
+                shadingData.SetETA(eta);
+
+            	
+            	//Useful debug print to show whether or not all information is correctly packed in the struct.
+            	/*
+            	if(material->m_IndexOfRefraction > 1.5f)
+            	{
+                    printf("Shading properties:\n eta: %f\n metallic: %f\n roughness: %f\n subsurface: %f\n specular: %f\n spectint: %f\n luminance: %f\n"\
+                        " anisotropic: %f\n clearcoat: %f\n clearcoat: %f\n tint: %f %f %f\n sheen: %f\n sheentint: %f\n transmission: %f\n transmittance: %f %f %f\n"
+                        , ETA, METALLIC, ROUGHNESS, SUBSURFACE, SPECULAR, SPECTINT, LUMINANCE, ANISOTROPIC, CLEARCOAT, CLEARCOATGLOSS, TINT.x, TINT.y, TINT.z, SHEEN, SHEENTINT, TRANSMISSION, shadingData.transmittance.x, shadingData.transmittance.y, shadingData.transmittance.z);
+            	}
+            	*/
+            }
+            else 
+            {
+                //TODO remove
+                shadingData.SetMetallic(0.f);
+                shadingData.SetRoughness(1.f);
+                shadingData.SetSubSurface(0.f);
+                shadingData.SetSpecular(0.f);
+                shadingData.SetSpecTint(0.f);
+                shadingData.SetLuminance(1.f);
+                shadingData.SetAnisotropic(0.f);
+                shadingData.SetClearCoat(0.f);
+                shadingData.SetClearCoatGloss(0.f);
+                shadingData.SetTint(make_float3(1.f, 1.f, 1.f));
+                shadingData.SetSheen(0.f);
+                shadingData.SetSheenTint(0.f);
+                shadingData.SetTransmission(0.f);
+                shadingData.SetTransmittance(make_float3(0.9f, 0.9f, 0.9f));
+                shadingData.SetETA(1.f);
+            }
+
             output.m_Emissive = (emissive.x > 0 || emissive.y > 0 || emissive.z > 0);
             if (output.m_Emissive)
             {
                 //Clamp between 0 and 1. TODO this is not HDR friendly so remove when we do that.
-                output.m_Color = make_float3(emissive);
-                float max = fmaxf(output.m_Color.x, fmaxf(output.m_Color.y, output.m_Color.z));
-                output.m_Color /= max;
+                output.m_ShadingData.color = make_float3(emissive);
+                float maximum = fmaxf(output.m_ShadingData.color.x, fmaxf(output.m_ShadingData.color.y, output.m_ShadingData.color.z));
+                output.m_ShadingData.color /= maximum;
             }
+
+        	//Good way to check if normals are correctly oriented (black = backside).
+        	////TODO remove
+        	////visualize normal orientation.
+         //   output.m_Emissive = true;
+         //   const float d = fmaxf(0.f, dot(output.m_Normal, -currRay.m_Direction));
+         //   output.m_ShadingData.color = make_float3(d, d, d);
 
             a_OutPut[surfaceDataIndex] = output;
         }

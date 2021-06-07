@@ -1,3 +1,4 @@
+#include "CudaUtilities.h"
 #include "Timer.h"
 #ifdef WAVEFRONT
 #include "ReSTIR.h"
@@ -45,6 +46,7 @@ CPU_ONLY void ReSTIR::Initialize(const ReSTIRSettings& a_Settings)
 		{
 			m_Reservoirs[reservoir].Resize(size);
 			ResetReservoirs(numReservoirs, static_cast<Reservoir*>(m_Reservoirs[reservoir].GetDevicePtr()));
+			CHECKLASTCUDAERROR;
 		}
 	}
 
@@ -101,8 +103,12 @@ CPU_ONLY void ReSTIR::Run(
 	//Update the CDF for the provided light sources.
 	timer.reset();
 	BuildCDF(a_Lights);
-	if(a_DebugPrint) printf("Building CDF time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
-
+	if (a_DebugPrint)
+	{
+		auto size = WaveFront::GetAtomicCounter<WaveFront::TriangleLight>(a_Lights);
+		printf("Building CDF time required: %f millis.\n NumLight: %u\n", timer.measure(TimeUnit::MILLIS), size);
+		CHECKLASTCUDAERROR;
+	}
 	//Fill light bags with values from the CDF.
 	{
 		timer.reset();
@@ -114,6 +120,7 @@ CPU_ONLY void ReSTIR::Run(
 			a_Lights->GetDevicePtr<WaveFront::AtomicBuffer<WaveFront::TriangleLight>>(), 
 			a_Seed);
 		if (a_DebugPrint) printf("Filling light bags time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
+		CHECKLASTCUDAERROR;
 	}
 
 	/*
@@ -124,6 +131,7 @@ CPU_ONLY void ReSTIR::Run(
 	timer.reset();
 	PickPrimarySamples(static_cast<LightBagEntry*>(m_LightBags.GetDevicePtr()), static_cast<Reservoir*>(m_Reservoirs[currentIndex].GetDevicePtr()), m_Settings, a_CurrentPixelData, seed);
 	if (a_DebugPrint) printf("Picking primary samples time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
+	CHECKLASTCUDAERROR;
 
 	/*
 	 * Generate shadow rays for each reservoir and resolve them.
@@ -133,6 +141,7 @@ CPU_ONLY void ReSTIR::Run(
 	timer.reset();
 	const unsigned int numRaysGenerated = GenerateReSTIRShadowRays(&m_ShadowRays, static_cast<Reservoir*>(m_Reservoirs[currentIndex].GetDevicePtr()), a_CurrentPixelData, numReservoirs);
 	if (a_DebugPrint) printf("ReSTIR Shadow Ray Generation time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
+	CHECKLASTCUDAERROR;
 
 
 	//Parameters for optix launch.
@@ -150,6 +159,7 @@ CPU_ONLY void ReSTIR::Run(
 		timer.reset();
 		a_OptixWrapper->TraceRays(numRaysGenerated, params);
 		if (a_DebugPrint) printf("Tracing ReSTIR shadow rays time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
+		CHECKLASTCUDAERROR;
 	}
 
 	/*
@@ -169,6 +179,7 @@ CPU_ONLY void ReSTIR::Run(
 			a_MotionVectorBuffer
 		);
 		if (a_DebugPrint) printf("Temporal sampling time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
+		CHECKLASTCUDAERROR;
 	}
 
 	/*
@@ -186,6 +197,7 @@ CPU_ONLY void ReSTIR::Run(
 			dimensions
 		);
 		if (a_DebugPrint) printf("Spatial sampling time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
+		CHECKLASTCUDAERROR;
 	}
 
 	{
@@ -196,6 +208,7 @@ CPU_ONLY void ReSTIR::Run(
 		timer.reset();
 		const unsigned int numRaysGenerated = GenerateReSTIRShadowRaysShading(&m_ShadowRaysShading, static_cast<Reservoir*>(m_Reservoirs[currentIndex].GetDevicePtr()), a_CurrentPixelData, dimensions);
 		if (a_DebugPrint) printf("ReSTIR Shading Ray Generation time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
+		CHECKLASTCUDAERROR;
 
 	    //Parameters for optix launch.
 		params.m_TraceType = WaveFront::RayType::RESTIR_SHADING_RAY;
@@ -208,6 +221,7 @@ CPU_ONLY void ReSTIR::Run(
 			timer.reset();
 			a_OptixWrapper->TraceRays(numRaysGenerated, params);
 			if (a_DebugPrint) printf("Tracing ReSTIR Shading Ray time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
+			CHECKLASTCUDAERROR;
 		}
 	}
 

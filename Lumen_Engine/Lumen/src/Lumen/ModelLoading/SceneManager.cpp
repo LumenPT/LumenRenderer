@@ -3,14 +3,17 @@
 #include "Node.h"
 #include "Transform.h"
 #include "../Renderer/ILumenResources.h"
-#include "stb_image.h"
-//#include "../../LumenPT/src/Framework/OptiXRenderer.h"
+#include "Lumen/Renderer/LumenRenderer.h"
 
+//#include "../../LumenPT/src/Framework/OptiXRenderer.h"
+#include "stb_image.h"
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/quaternion.hpp>
 
 //#include <string>
 #include <memory>
+#include <glm/gtx/compatibility.hpp>
+
 
 Lumen::SceneManager::~SceneManager()
 {
@@ -49,19 +52,48 @@ Lumen::SceneManager::GLTFResource* Lumen::SceneManager::LoadGLTF(std::string a_F
 
 	auto& res = m_LoadedScenes[fullPath];		// create new scene at path key
 
+	// First try to load an optimized version of the specified file, if such exists.
+	res = m_RenderPipeline->OpenCustomFileFormat(fullPath);
+
+    if (!res.m_Path.empty()) // If the path is not empty, then an optimized file was found for this model, and successfully loaded.
+		return &res;
+
+	auto begin = std::chrono::high_resolution_clock::now();
+
+	// If no optimized version of the model was found, try to create one if the renderer specifies how.
+	res = m_RenderPipeline->CreateCustomFileFormat(fullPath);
+	if (!res.m_Path.empty())
+	{
+		auto end = std::chrono::high_resolution_clock::now();
+
+		auto milli = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
+
+		printf("\n3D model conversion took %llu milliseconds.\n", milli);
+
+		return &res;
+	}
+
+	// If res.m_Path is still empty, the renderer does not use an optimized model file format, and the application is free to continue with default model loading.
+
 	//Check for glb or gltf
 	const std::string binarySuffix = ".glb";
 	bool isBinary = (a_FileName.length() >= binarySuffix.length()) && (0 == a_FileName.compare(a_FileName.length() - binarySuffix.length(), binarySuffix.length(), binarySuffix));
 
+
+	fx::gltf::ReadQuotas readQuotas{};
+	readQuotas.MaxBufferCount = 8;
+	readQuotas.MaxBufferByteLength = 128000000;	//128MB max.
+	readQuotas.MaxFileSize = 128000000;
+	
 	//NOTE: No quotas specified and no check for .gltf suffix. Might fail to load with large files and wrongly specified suffix.
 	fx::gltf::Document doc;
 	if (!isBinary)
 	{
-		doc = fx::gltf::LoadFromText(fullPath);
+		doc = fx::gltf::LoadFromText(fullPath, readQuotas);
 	}
 	else
 	{
-		doc = fx::gltf::LoadFromBinary((fullPath));
+		doc = fx::gltf::LoadFromBinary(fullPath, readQuotas);
 	}
 
 	std::cout << "[GLTF] Done loading GLTF file from disk: " << a_FileName << std::endl;
@@ -174,7 +206,7 @@ void Lumen::SceneManager::InitializeDefaultResources()
 
 void Lumen::SceneManager::LoadNodes(fx::gltf::Document& a_Doc, GLTFResource& a_Res, int a_NodeId, bool a_Root, const glm::mat4& a_TransformMat)
 {
-	std::cout << "[GLTF] Started loading node with ID: " << a_NodeId << std::endl;
+	//std::cout << "[GLTF] Started loading node with ID: " << a_NodeId << std::endl;
 
 	auto& node = a_Doc.nodes[a_NodeId];
 	glm::mat4 transform = glm::make_mat4(&node.matrix[0]);
@@ -239,7 +271,7 @@ void Lumen::SceneManager::LoadNodes(fx::gltf::Document& a_Doc, GLTFResource& a_R
 		}
 	}
 
-	std::cout << "[GLTF] Finished loading node with ID: " << a_NodeId << std::endl;
+	//std::cout << "[GLTF] Finished loading node with ID: " << a_NodeId << std::endl;
 }
 
 void Lumen::SceneManager::LoadMeshes(fx::gltf::Document& a_Doc, GLTFResource& a_Res)

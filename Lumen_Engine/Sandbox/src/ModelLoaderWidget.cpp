@@ -3,8 +3,12 @@
 #include "ImGui/imgui.h"
 
 #include "Lumen/../AssetLoading/AssetLoading.h"
+#include "Lumen/ModelLoading/ILumenScene.h"
 
 #include "Tools/ImGuiUtil.h"
+
+
+#include <glad/glad.h>
 
 #include <map>
 

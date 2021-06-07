@@ -1,0 +1,12 @@
+Package : detex
+Version : 0.1.2-master-bcd7acfe
+Maintainers : dbarkar@nvidia.com
+Description : Low-level library for decompression and manipulation of texture blocks compressed using formats such as BC1/DXT1/S3TC, BC2-BC3, BC4/RGTC1, BC5/RGTC2, BC6 (BPTC_FLOAT), BC7 (BPTC), ETC1 and the ETC2 family, loading of KTX and DDS files, and conversion between pixel formats.
+SWIPAT NvBug : 
+Repository : b'ssh://git@gitlab-master.nvidia.com:12051/dbarkar/detex.git'
+Branch : nvidia-master
+Commit : b'bcd7acfef6ed0b8473ec4f70934f2393e9d69245'
+Time : Thu Jun 11 01:21:00 2020
+Builder Name : DBARKAR-DT
+Packman Version : 6.8.1
+Packagemaker Version : 4.0.6

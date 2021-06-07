@@ -1,5 +1,7 @@
 #include "VolumeManager.h"
 
+#include "Lumen/Renderer/LumenRenderer.h"
+
 #include <filesystem>
 
 namespace Lumen

@@ -3,6 +3,7 @@
 #include "../../Shaders/CppCommon/RenderingUtility.h"
 #include <device_launch_parameters.h>
 #include <sutil/vec_math.h>
+#include "../disney.cuh"
 
 CPU_ON_GPU void ResolveDirectLightHits(
     const SurfaceData* a_SurfaceDataBuffer,
@@ -24,7 +25,7 @@ CPU_ON_GPU void ResolveDirectLightHits(
         if (pixelData.m_Emissive)
         {
             surf2DLayeredwrite<float4>(
-                make_float4(pixelData.m_Color, 1.f),
+                make_float4(pixelData.m_ShadingData.color, 1.f),
                 a_Output,
                 pixelX * sizeof(float4),
                 pixelY,
@@ -103,14 +104,25 @@ CPU_ON_GPU void ShadeDirect(
             //Geometry term G(x).
             const float solidAngle = (cosOut * light.area) / (lDistance * lDistance);
 
-            //BSDF is equal to material color for now.
-            const auto brdf = MicrofacetBRDF(pixelToLightDir, -surfaceData.m_IncomingRayDirection, surfaceData.m_Normal,
-                                             surfaceData.m_Color, surfaceData.m_Metallic, surfaceData.m_Roughness);
+            
+        	
+            float bsdfPdf = 0.f;
+            const auto bsdf = EvaluateBSDF(surfaceData.m_ShadingData, surfaceData.m_Normal, surfaceData.m_Tangent, -surfaceData.m_IncomingRayDirection, pixelToLightDir, bsdfPdf);
+        	
+            //If no contribution, don't make a shadow ray.
+            if(bsdfPdf <= EPSILON)
+            {
+                return;
+            }
+
+            ////BSDF is equal to material color for now.
+            //const auto brdf = MicrofacetBRDF(pixelToLightDir, -surfaceData.m_IncomingRayDirection, surfaceData.m_Normal,
+            //                                 surfaceData.m_ShadingData.color, surfaceData.m_Metallic, surfaceData.m_Roughness);
 
             //The unshadowed contribution (contributed if no obstruction is between the light and surface) takes the BRDF,
             //geometry factor and solid angle into account. Also the light radiance.
             //The only thing missing from this is the scaling with the rest of the scene based on the reservoir PDF.
-            auto unshadowedPathContribution = brdf * solidAngle * cosIn * light.radiance;
+            auto unshadowedPathContribution = (bsdf / bsdfPdf) * solidAngle * cosIn * light.radiance;
 
             //Scale by the PDF of this light to compensate for all other lights not being picked.
             unshadowedPathContribution *= ((1.f/pdf) * surfaceData.m_TransportFactor);
@@ -125,6 +137,8 @@ CPU_ON_GPU void ShadeDirect(
                 lDistance - 0.2f,
                 make_float4(unshadowedPathContribution, 1.f),
                 LightChannel::INDIRECT);
+
+            
 
             a_ShadowRays->Add(&shadowRay);
         }
