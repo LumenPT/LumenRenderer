@@ -6,31 +6,29 @@
 
 CPU_ON_GPU void ShadeIndirect(
     const uint3 a_ResolutionAndDepth,
-    const float3 a_CameraPosition,
     const SurfaceData* a_SurfaceDataBuffer,
-    const AtomicBuffer<IntersectionData>* a_Intersections,
     AtomicBuffer<IntersectionRayData>* a_IntersectionRays,
-    const unsigned a_NumIntersections,
-    const unsigned a_CurrentDepth,
     const unsigned a_Seed
 )
 {
-    const int index = blockIdx.x * blockDim.x + threadIdx.x;
-    const int stride = blockDim.x * gridDim.x;
+    const unsigned int pixelX = blockIdx.x * blockDim.x + threadIdx.x;
+    const unsigned int pixelY = blockIdx.y * blockDim.y + threadIdx.y;
+
+    const unsigned int pixelDataIndex = PIXEL_DATA_INDEX(pixelX, pixelY, a_ResolutionAndDepth.x);
 
     //Outside of loop because multiple items can be processed by one thread. RandomFloat modifies the seed from within the loop so no repetition occurs.
-    auto seed = WangHash(a_Seed + WangHash(index));
+    auto seed = WangHash(a_Seed + WangHash(pixelDataIndex));
 
     //Loop over the amount of intersections.
-    for (int i = index; i < a_NumIntersections; i += stride)
-    {    	
-        auto pixelIndex = a_Intersections->GetData(i)->m_PixelIndex;
-        auto surfaceData = a_SurfaceDataBuffer[pixelIndex];
+    if (pixelX < a_ResolutionAndDepth.x && pixelY < a_ResolutionAndDepth.y)
+    {
+        
+        auto& surfaceData = a_SurfaceDataBuffer[pixelDataIndex];
 
         //If the surface is emissive or not intersected, terminate.
         if(surfaceData.m_Emissive || surfaceData.m_IntersectionT <= 0.f)
         {
-            continue;
+            return;
         }
 
         /*
@@ -39,7 +37,7 @@ CPU_ON_GPU void ShadeIndirect(
          */
         if (fabs(dot(surfaceData.m_Normal, surfaceData.m_IncomingRayDirection)) < 3.f * EPSILON)
         {
-            continue;
+            return;
         }
 
         ////TODO replace with BSDF sampling (needs tangent).
@@ -66,8 +64,8 @@ CPU_ON_GPU void ShadeIndirect(
          *
          * Because half the domain is removed, the BRDF PDF can be doubled after this passes.
          */
-        //const auto bounceDotN = dot(bounceDirection, surfaceData.m_Normal);
-        //if (bounceDotN <= 0.f) continue;
+        /*const auto bounceDotN = dot(bounceDirection, surfaceData.m_Normal);
+        if (bounceDotN <= 0.f) return;*/
 
         ////Double BRDF PDF because half the domain is terminated above.
         //brdfPdf *= 2.f;
@@ -83,12 +81,24 @@ CPU_ON_GPU void ShadeIndirect(
         float3 bounceDirection;
         float pdf = 0.f;
         bool specular = false;
-        const auto bsdf = SampleBSDF(surfaceData.m_ShadingData, surfaceData.m_Normal, surfaceData.m_Normal, surfaceData.m_Tangent, -surfaceData.m_IncomingRayDirection, 1.f, RandomFloat(seed), RandomFloat(seed), RandomFloat(seed), bounceDirection, pdf, specular);
+        const auto bsdf = SampleBSDF(
+            surfaceData.m_ShadingData, 
+            surfaceData.m_Normal, 
+            surfaceData.m_Normal, 
+            surfaceData.m_Tangent, 
+            -surfaceData.m_IncomingRayDirection, 
+            1.f, 
+            RandomFloat(seed), 
+            RandomFloat(seed), 
+            RandomFloat(seed), 
+            bounceDirection, 
+            pdf, 
+            specular);
     	
         //Skip rays that have a tiny PDF.
         if (pdf <= EPSILON || isnan(pdf + bsdf.x + bsdf.y + bsdf.z))
         {
-            continue;
+            return;
         }
 
         
@@ -100,7 +110,7 @@ CPU_ON_GPU void ShadeIndirect(
         //Path termination.
         if (russianRouletteWeight < rand)
         {
-            continue;
+            return;
         }
 
         
@@ -116,13 +126,13 @@ CPU_ON_GPU void ShadeIndirect(
         pathContribution *= bsdf * fabsf(dot(surfaceData.m_Normal, bounceDirection)) * (1.f/pdf);
     	
         assert(pathContribution.x >= 0 && pathContribution.y >= 0 && pathContribution.z >= 0);
-    	
+
         //Finally add the ray to the ray buffer.
-        IntersectionRayData ray{pixelIndex, surfaceData.m_Position, bounceDirection, pathContribution};
+        IntersectionRayData ray{{pixelX, pixelY}, surfaceData.m_Position, bounceDirection, pathContribution};
 
         a_IntersectionRays->Add(&ray);
 
-        continue; //Breaky
+        return; //Breaky
     }
 
 }

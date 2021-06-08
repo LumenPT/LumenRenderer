@@ -1,5 +1,6 @@
 #pragma once
 #include <cinttypes>
+#include <cuda.h>
 
 #include "../CUDAKernels/ReSTIRKernels.cuh"
 #include "../Shaders/CppCommon/ReSTIRData.h"
@@ -30,16 +31,14 @@ public:
 	 * Run ReSTIR.
 	 */
 	CPU_ONLY void Run(
-		const WaveFront::SurfaceData * const a_CurrentPixelData,
-		const WaveFront::SurfaceData * const a_PreviousPixelData,
-		const MemoryBuffer const* a_Lights,
-	    const float3& a_CameraPosition,
-		const std::uint32_t a_Seed,
+		const WaveFront::SurfaceData* const a_CurrentPixelData,
+		const WaveFront::SurfaceData* const a_PreviousPixelData,
+		const WaveFront::MotionVectorBuffer* const a_MotionVectorBuffer,
+		const WaveFront::OptixWrapper* const a_OptixWrapper,
 		const OptixTraversableHandle a_OptixSceneHandle,
-		WaveFront::AtomicBuffer<WaveFront::ShadowRayData>* a_WaveFrontShadowRayBuffer,
-        const WaveFront::OptixWrapper* a_OptixSystem,
-		WaveFront::MotionVectorBuffer* a_MotionVectorBuffer,
-		float3* a_OutputBuffer,
+		const MemoryBuffer* const a_Lights,
+		const std::uint32_t a_Seed,
+		cudaSurfaceObject_t a_OutputBuffer,
 		bool a_DebugPrint = false
 	);
 

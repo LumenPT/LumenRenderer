@@ -10,6 +10,7 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
     AtomicBuffer<IntersectionData>* a_IntersectionData,
     AtomicBuffer<IntersectionRayData>* a_Rays,
     SurfaceData* a_OutPut,
+    uint2 a_Resolution,
     SceneDataTableAccessor* a_SceneDataTable)
 {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
@@ -18,7 +19,7 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
     {
         const IntersectionData currIntersection = *a_IntersectionData->GetData(i);
         const IntersectionRayData currRay = *a_Rays->GetData(currIntersection.m_RayArrayIndex);
-        unsigned int surfaceDataIndex = currIntersection.m_PixelIndex;
+        unsigned int surfaceDataIndex = PIXEL_DATA_INDEX(currIntersection.m_PixelIndex.m_X, currIntersection.m_PixelIndex.m_Y, a_Resolution.x);
 
         if (currIntersection.IsIntersection())
         {
@@ -138,7 +139,7 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
 
             //The surface data to write to. Local copy for fast access.
             SurfaceData output;
-            output.m_Index = currIntersection.m_PixelIndex;
+            output.m_PixelIndex = currIntersection.m_PixelIndex;
             output.m_IntersectionT = currIntersection.m_IntersectionT;
             output.m_Normal = normal;
             output.m_Position = currRay.m_Origin + currRay.m_Direction * currIntersection.m_IntersectionT;
