@@ -79,15 +79,21 @@ Lumen::SceneManager::GLTFResource* Lumen::SceneManager::LoadGLTF(std::string a_F
 	const std::string binarySuffix = ".glb";
 	bool isBinary = (a_FileName.length() >= binarySuffix.length()) && (0 == a_FileName.compare(a_FileName.length() - binarySuffix.length(), binarySuffix.length(), binarySuffix));
 
+
+	fx::gltf::ReadQuotas readQuotas{};
+	readQuotas.MaxBufferCount = 8;
+	readQuotas.MaxBufferByteLength = 128000000;	//128MB max.
+	readQuotas.MaxFileSize = 128000000;
+	
 	//NOTE: No quotas specified and no check for .gltf suffix. Might fail to load with large files and wrongly specified suffix.
 	fx::gltf::Document doc;
 	if (!isBinary)
 	{
-		doc = fx::gltf::LoadFromText(fullPath);
+		doc = fx::gltf::LoadFromText(fullPath, readQuotas);
 	}
 	else
 	{
-		doc = fx::gltf::LoadFromBinary((fullPath));
+		doc = fx::gltf::LoadFromBinary(fullPath, readQuotas);
 	}
 
 	std::cout << "[GLTF] Done loading GLTF file from disk: " << a_FileName << std::endl;

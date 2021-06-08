@@ -45,7 +45,7 @@ Lumen::VolumeInstance* PTScene::AddVolume()
     // Create the new mesh of the path tracer volume instance type
     auto ptVolInst = std::make_unique<PTVolumeInstance>(m_Services);
     // Set the scene reference for the new instance
-    ptVolInst->m_SceneRef = this;
+    ptVolInst->SetSceneRef(this);
     // Add the instance to the list of all instances and return a raw pointer to it
     m_VolumeInstances.push_back(std::move(ptVolInst));
     return m_VolumeInstances.back().get();
@@ -130,7 +130,7 @@ void PTScene::UpdateSceneAccelerationStructure()
 			// TODO: This needs to be changed to represent the index of the volumetrics shaders in the shader binding table
 			inst.sbtOffset = 1;
             inst.visibilityMask = WaveFront::TraceMaskType::VOLUMES;
-            inst.instanceId = ptVolume->m_SceneDataTableEntry.m_TableIndex;
+            inst.instanceId = ptvi.m_SceneDataTableEntry.m_TableIndex;
             inst.flags = OPTIX_INSTANCE_FLAG_NONE;
 
             // Get the transformation matrix from the transform of the instance
