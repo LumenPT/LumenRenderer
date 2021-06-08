@@ -14,13 +14,15 @@ CPU_ON_GPU void ShadeIndirect(
     const unsigned int pixelX = blockIdx.x * blockDim.x + threadIdx.x;
     const unsigned int pixelY = blockIdx.y * blockDim.y + threadIdx.y;
 
+    const unsigned int pixelDataIndex = PIXEL_DATA_INDEX(pixelX, pixelY, a_ResolutionAndDepth.x);
+
     //Outside of loop because multiple items can be processed by one thread. RandomFloat modifies the seed from within the loop so no repetition occurs.
-    auto seed = WangHash(a_Seed + WangHash(pixelX * pixelY));
+    auto seed = WangHash(a_Seed + WangHash(pixelDataIndex));
 
     //Loop over the amount of intersections.
     if (pixelX < a_ResolutionAndDepth.x && pixelY < a_ResolutionAndDepth.y)
     {
-        const unsigned int pixelDataIndex = PIXEL_DATA_INDEX(pixelX, pixelY, a_ResolutionAndDepth.x);
+        
         auto& surfaceData = a_SurfaceDataBuffer[pixelDataIndex];
 
         //If the surface is emissive or not intersected, terminate.
@@ -79,7 +81,19 @@ CPU_ON_GPU void ShadeIndirect(
         float3 bounceDirection;
         float pdf = 0.f;
         bool specular = false;
-        const auto bsdf = SampleBSDF(surfaceData.m_ShadingData, surfaceData.m_Normal, surfaceData.m_Normal, surfaceData.m_Tangent, -surfaceData.m_IncomingRayDirection, 1.f, RandomFloat(seed), RandomFloat(seed), RandomFloat(seed), bounceDirection, pdf, specular);
+        const auto bsdf = SampleBSDF(
+            surfaceData.m_ShadingData, 
+            surfaceData.m_Normal, 
+            surfaceData.m_Normal, 
+            surfaceData.m_Tangent, 
+            -surfaceData.m_IncomingRayDirection, 
+            1.f, 
+            RandomFloat(seed), 
+            RandomFloat(seed), 
+            RandomFloat(seed), 
+            bounceDirection, 
+            pdf, 
+            specular);
     	
         //Skip rays that have a tiny PDF.
         if (pdf <= EPSILON || isnan(pdf + bsdf.x + bsdf.y + bsdf.z))
@@ -115,6 +129,7 @@ CPU_ON_GPU void ShadeIndirect(
 
         //Finally add the ray to the ray buffer.
         IntersectionRayData ray{{pixelX, pixelY}, surfaceData.m_Position, bounceDirection, pathContribution};
+
         a_IntersectionRays->Add(&ray);
 
         return; //Breaky

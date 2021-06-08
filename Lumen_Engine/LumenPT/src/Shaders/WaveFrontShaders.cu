@@ -157,7 +157,7 @@ __device__ __forceinline__ void ShadowRaysRayGen()
             static_cast<unsigned int>(rayData.m_OutputChannel),
             cudaBoundaryModeTrap);
 
-        color += rayData.m_PotentialRadiance;
+        color += make_float4(rayData.m_PotentialRadiance, 0.f);
 
         surf2DLayeredwrite<float4>(
             color,
@@ -261,7 +261,7 @@ __device__ __forceinline__ void ReSTIRRayGenShading()
             static_cast<unsigned int>(LightChannel::DIRECT),
             cudaBoundaryModeTrap);
 
-        color += make_float4(rayData.contribution, 1.f);
+        color += make_float4(rayData.contribution, 0.f);
 
         surf2DLayeredwrite<float4>(
             color,

@@ -16,7 +16,7 @@ CPU_ON_GPU void MergeOutputChannels(
 
     if (pixelX < a_Resolution.x && pixelY < a_Resolution.y)
     {
-
+        
 
         float4 mergedColor = { 0.f };
 #pragma unroll 

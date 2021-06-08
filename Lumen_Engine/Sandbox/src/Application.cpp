@@ -155,13 +155,13 @@ public:
 		std::string p_string3{ p3.string() };
 		std::replace(p_string3.begin(), p_string3.end(), '\\', '/');
 
-		const std::string meshPath = p_string.append("/Sandbox/assets/models/Sponza/");
+		const std::string meshPath = p_string.append("/Sandbox/assets/models/sponza/");
 		const std::string meshPath2 = p_string2.append("/Sandbox/assets/models/EmissiveSphere/");
 		//const std::string meshPath3 = p_string3.append("/Sandbox/assets/models/knight/");
 		//Base path for meshes.
 
 		//Mesh name
-		const std::string meshName = "Sponza.gltf";
+		const std::string meshName = "sponza.glb";
 		const std::string meshName2 = "EmissiveSphere.gltf";
 		//const std::string meshName3 = "scene.gltf";
 
@@ -243,7 +243,7 @@ public:
 			xOffset += 50;
 		}
 
-		//Separate light
+		////Separate light
 		{
 			auto mesh = lumenPT->m_Scene->AddMesh();
 			mesh->SetMesh(res2->m_MeshPool[0]);
@@ -278,44 +278,44 @@ public:
 		matData.m_TintTexture = whiteTexture;
 		matData.m_TransmissionTexture = whiteTexture;
 		auto mat = lumenPT->CreateMaterial(matData);
-
+	
 		//Transparency
 		mat->SetTransmissionFactor(1.f);	//Transparency scalar.
 		mat->SetTransmittanceFactor({ 0.f, 0.f, 0.f });		//Beers law stuff.
 		mat->SetIndexOfRefraction(1.53f);	//IOR
-
+	
 		//Color settings.
 		mat->SetDiffuseColor(glm::vec4(1.f, 1.f, 1.f, 1.f));
 		mat->SetTintFactor(glm::vec3{ 1.f, 1.f, 1.f });
-
+	
 		//Scalar for diffuse light bounces.
 		mat->SetLuminance(0.f);
-
+	
 		//Sub surface scattering scalar.
 		mat->SetSubSurfaceFactor(0.f);
-
+	
 		//Sheen and how much tint to add for sheen.
 		mat->SetSheenFactor(0.f);
 		mat->SetSheenTintFactor(0.0f);
-
+	
 		//Clearcoat and roughness. Uses tint for coloring.
 		mat->SetClearCoatFactor(0.01f);
 		mat->SetClearCoatRoughnessFactor(0.f);
-
+	
 		//MetallicRoughness model.
 		mat->SetRoughnessFactor(0.0001f);
 		mat->SetMetallicFactor(0.f);
-
+	
 		//Anisotropic scalar.
 		mat->SetAnisotropic(0.f);
-
+	
 		//Apply the material and update.
 		mesh->SetOverrideMaterial(mat);
 		mesh->UpdateAccelRemoveThis();
 	}
 		
 		//for (auto& node : res3->m_NodePool)
-		//{
+		//{x
 		//	auto meshId = node->m_MeshID;
 		//	if (meshId >= 0)
 		//	{
@@ -383,8 +383,8 @@ public:
 		vndbFilePath.append("/Sandbox/assets/volume/bunny.vdb");
 		auto volumeRes = m_SceneManager->m_VolumeManager.LoadVDB(vndbFilePath);
 
-		auto volume = lumenPT->m_Scene->AddVolume();
-		volume->SetVolume(volumeRes->m_Volume);
+		//auto volume = lumenPT->m_Scene->AddVolume();
+		//volume->SetVolume(volumeRes->m_Volume);
 
 
 		contextLayer->GetPipeline()->StartRendering();

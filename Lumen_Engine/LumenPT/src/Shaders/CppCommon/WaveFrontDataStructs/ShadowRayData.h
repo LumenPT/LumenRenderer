@@ -19,7 +19,7 @@ namespace WaveFront
         m_Origin(make_float3(0.f, 0.f, 0.f)),
         m_Direction(make_float3(0.f, 0.f, 0.f)),
         m_MaxDistance(0.f),
-        m_PotentialRadiance(make_float4(0.f, 0.f, 0.f, 0.f)),
+        m_PotentialRadiance(make_float3(0.f, 0.f, 0.f)),
         m_OutputChannel(LightChannel::DIRECT)
         {}
 
@@ -28,7 +28,7 @@ namespace WaveFront
             const float3& a_Origin,
             const float3& a_Direction,
             const float& a_MaxDistance,
-            const float4& a_PotentialRadiance,
+            const float3& a_PotentialRadiance,
             LightChannel a_OutputChannel)
             :
         m_PixelIndex(a_PixelIndex),
@@ -56,7 +56,7 @@ namespace WaveFront
         float3 m_Origin;
         float3 m_Direction;
         float m_MaxDistance;
-        float4 m_PotentialRadiance;
+        float3 m_PotentialRadiance;
         LightChannel m_OutputChannel;
 
     };

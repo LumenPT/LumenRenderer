@@ -54,7 +54,9 @@ CPU_ON_GPU void ShadeDirect(
     const unsigned int pixelX = blockIdx.x * blockDim.x + threadIdx.x;
     const unsigned int pixelY = blockIdx.y * blockDim.y + threadIdx.y;
 
-    auto seed = WangHash(a_Seed + pixelX  * pixelY);
+    const unsigned int pixelDataIndex = PIXEL_DATA_INDEX(pixelX, pixelY, a_ResolutionAndDepth.x);
+
+    auto seed = WangHash(a_Seed + pixelDataIndex);
 
     if(pixelX < a_ResolutionAndDepth.x && pixelY < a_ResolutionAndDepth.y)
     {
@@ -63,7 +65,7 @@ CPU_ON_GPU void ShadeDirect(
         VolumetricShadeDirect({ pixelX, pixelY }, a_ResolutionAndDepth, a_VolumetricDataBuffer, a_VolumetricShadowRays, a_Lights, a_CDF, a_Output);
 
         // Get intersection.
-        const unsigned int pixelDataIndex = pixelY * a_ResolutionAndDepth.x + pixelX;
+        
         const SurfaceData& surfaceData = a_SurfaceDataBuffer[pixelDataIndex];
 
         if (surfaceData.m_IntersectionT > 0.f)
@@ -122,7 +124,7 @@ CPU_ON_GPU void ShadeDirect(
             //The unshadowed contribution (contributed if no obstruction is between the light and surface) takes the BRDF,
             //geometry factor and solid angle into account. Also the light radiance.
             //The only thing missing from this is the scaling with the rest of the scene based on the reservoir PDF.
-            auto unshadowedPathContribution = (bsdf / bsdfPdf) * solidAngle * cosIn * light.radiance;
+            float3 unshadowedPathContribution = (bsdf / bsdfPdf) * solidAngle * cosIn * light.radiance;
 
             //Scale by the PDF of this light to compensate for all other lights not being picked.
             unshadowedPathContribution *= ((1.f/pdf) * surfaceData.m_TransportFactor);
@@ -135,10 +137,8 @@ CPU_ON_GPU void ShadeDirect(
                 surfaceData.m_Position,
                 pixelToLightDir,
                 lDistance - 0.2f,
-                make_float4(unshadowedPathContribution, 1.f),
+                unshadowedPathContribution,
                 LightChannel::INDIRECT);
-
-            
 
             a_ShadowRays->Add(&shadowRay);
         }

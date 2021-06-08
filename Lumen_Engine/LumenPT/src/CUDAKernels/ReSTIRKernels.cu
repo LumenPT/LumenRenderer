@@ -982,7 +982,7 @@ __global__ void GenerateWaveFrontShadowRaysInternal(Reservoir* a_Reservoirs, con
                         pixel->m_PixelIndex,
                         pixel->m_Position,
                         toLightDir, l - 0.005f,
-                        make_float4(contribution, 1.f),
+                        contribution,
                         WaveFront::LightChannel::DIRECT };
                 a_AtomicBuffer->Add(&data);
             }

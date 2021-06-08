@@ -640,7 +640,7 @@ namespace WaveFront
             m_ReSTIR->SwapBuffers();
 
             //Switch up the seed.
-            seed = WangHash(frameCount);
+            seed = WangHash(seed);
         }
 
         //The amount of shadow rays to trace.
