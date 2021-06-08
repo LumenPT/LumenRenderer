@@ -50,6 +50,12 @@ public:
         return m_EntryMap;
     }
 
+    void SetOverrideMaterial(std::shared_ptr<Lumen::ILumenMaterial> a_OverrideMaterial) override
+    {
+        MeshInstance::SetOverrideMaterial(a_OverrideMaterial);
+        MarkSceneDataAsDirty();
+    };
+
     virtual void UpdateAccelRemoveThis() override
     {
         UpdateRaytracingData();

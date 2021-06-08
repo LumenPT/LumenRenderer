@@ -86,7 +86,6 @@ public:
 #ifdef WAVEFRONT
 
 		renderer = std::make_shared<WaveFront::WaveFrontRenderer>();
-
 		WaveFront::WaveFrontSettings settings{};
 
 		settings.m_ShadersFilePathSolids = config.GetFileShaderSolids();
@@ -102,6 +101,7 @@ public:
 		std::static_pointer_cast<WaveFront::WaveFrontRenderer>(renderer)->Init(settings);
 
 		CHECKLASTCUDAERROR;
+		renderer->CreateDefaultResources();
 
 #else
 
@@ -161,7 +161,7 @@ public:
 		//Base path for meshes.
 
 		//Mesh name
-		const std::string meshName = "scene.gltf";
+		const std::string meshName = "Sponza.gltf";
 		const std::string meshName2 = "EmissiveSphere.gltf";
 		//const std::string meshName3 = "scene.gltf";
 
@@ -199,6 +199,7 @@ public:
 		seed = RandomInt(seed);
 
 		lumenPT->m_Scene = res->m_Scenes[0];
+		lumenPT->m_Scene->m_MeshInstances[0]->m_Transform.SetScale(glm::vec3(1.0f));
 		for(int i = 0; i < 30; ++i)
 		{
 			for (auto& node : res2->m_NodePool)
@@ -223,7 +224,11 @@ public:
 			float p = i;
 			mesh->m_Transform.SetPosition(glm::vec3(xOffset, 100.f + (p * p), 0.f));
 			mesh->m_Transform.SetScale(glm::vec3(2.0f * (static_cast<float>((i + 1) * 2) / 4.f)));
-			mesh->SetEmissiveness(Lumen::EmissionMode::OVERRIDE, glm::vec3(1.f, 1.f, 1.f), 50.f);
+			Lumen::MeshInstance::Emissiveness emissiveness;
+			emissiveness.m_EmissionMode = Lumen::EmissionMode::OVERRIDE;
+			emissiveness.m_OverrideRadiance = glm::vec3(1.0f, 1.0f, 1.0f);
+			emissiveness.m_Scale = 50.0f;
+			mesh->SetEmissiveness(emissiveness);
 			mesh->UpdateAccelRemoveThis();
 			xOffset += 50;
 			mesh->m_Name = std::string("Light ") + std::to_string(i);
@@ -235,13 +240,18 @@ public:
 			mesh->SetMesh(res2->m_MeshPool[0]);
 			mesh->m_Transform.SetPosition(glm::vec3(200.f, 90.f, -130.f));
 			mesh->m_Transform.SetScale(glm::vec3(20.f));
-			mesh->SetEmissiveness(Lumen::EmissionMode::OVERRIDE, glm::vec3(1.f, 1.f, 1.f), 50.f);
+			Lumen::MeshInstance::Emissiveness emissiveness;
+			emissiveness.m_EmissionMode = Lumen::EmissionMode::OVERRIDE;
+			emissiveness.m_OverrideRadiance = glm::vec3(1.0f, 1.0f, 1.0f);
+			emissiveness.m_Scale = 50.0f;
+			mesh->SetEmissiveness(emissiveness);
 			mesh->UpdateAccelRemoveThis();
 		}
 
 	//Disney BSDF test
 	for(auto& lumenMesh : res2->m_MeshPool)
 	{
+		break;
 		auto mesh = lumenPT->m_Scene->AddMesh();
 		mesh->SetMesh(lumenMesh);
 		mesh->m_Transform.SetPosition(glm::vec3(000.f, 160.f, -80.f));

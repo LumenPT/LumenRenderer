@@ -78,6 +78,7 @@ private:
     bool m_ResetTransformOnMeshAdded;
     // Path that needs to be opened for the file
     std::filesystem::path m_PathToOpen;
+    std::string m_NameToGiveToInstance;
 
     // Message which serves as a way for the different states to communicate with the user.
     // Mostly used for confirmation and error messages

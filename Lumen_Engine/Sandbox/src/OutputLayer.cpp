@@ -109,6 +109,7 @@ void OutputLayer::OnAttach()
 
 	m_ModelLoaderWidget = std::make_unique<ModelLoaderWidget>(*m_LayerServices->m_SceneManager, m_Renderer->m_Scene);
 	m_SceneGraph = std::make_unique<Lumen::SceneGraph>();
+	m_SceneGraph->SetRendererRef(*m_Renderer);
 }
 
 void OutputLayer::OnUpdate()

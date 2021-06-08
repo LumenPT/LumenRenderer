@@ -226,7 +226,10 @@ void ModelLoaderWidget::ModelSelectionGLTF()
 		ImGui::ListBoxFooter();
 	}
 
+    if (m_NameToGiveToInstance.size() < 256)
+	    m_NameToGiveToInstance.resize(256);
 
+	ImGui::InputText("Instance Name", m_NameToGiveToInstance.data(), m_NameToGiveToInstance.size());
 	// Add a transform tool to determine the initial transform of the mesh that can be added to the scene
 	TransformSpecifier(m_TransformToApply, m_ResetTransformOnMeshAdded);
 
@@ -262,6 +265,7 @@ void ModelLoaderWidget::ModelSelectionGLTF()
 
 					m->SetMesh(m_LoadedResource->m_MeshPool[i]);
 					m->m_Transform = m_TransformToApply;
+					m->m_Name = m_NameToGiveToInstance;
 					if (m_ResetTransformOnMeshAdded) // Reset the transform if requested by the user
 						m_TransformToApply = Lumen::Transform();
 

@@ -85,6 +85,11 @@ namespace Lumen
             m_OverrideMaterial = a_OverrideMaterial;
         }
 
+        std::shared_ptr<Lumen::ILumenMaterial> GetOverrideMaterial()
+        {
+            return m_OverrideMaterial;
+        }
+
         auto GetMesh() const { return m_MeshRef; }
 
 

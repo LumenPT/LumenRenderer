@@ -126,7 +126,7 @@ public:
 
 	};
 
-	LumenRenderer() {};
+	LumenRenderer()	{};
 	LumenRenderer(const InitializationData& a_InitializationData) {};
 	virtual ~LumenRenderer() = default;
 
@@ -146,11 +146,14 @@ public:
 	// Create a texture from the provided texture data
 	virtual std::shared_ptr<Lumen::ILumenTexture> CreateTexture(void* a_PixelData, uint32_t a_Width, uint32_t a_Height) = 0;
 	// Create a material from the provided material data
+	std::shared_ptr<Lumen::ILumenMaterial> CreateMaterial();
 	virtual std::shared_ptr<Lumen::ILumenMaterial> CreateMaterial(const MaterialData& a_MaterialData) = 0;
 	// Create a scene from the provided scene data
 	virtual std::shared_ptr<Lumen::ILumenScene> CreateScene(SceneData a_SceneData = {});
 	// Create a volume from the provided file path
 	virtual std::shared_ptr<Lumen::ILumenVolume> CreateVolume(const std::string& a_FilePath) = 0;
+
+	void CreateDefaultResources();
 
 	virtual unsigned int GetOutputTexture() = 0;	//scene argument may be redundant... or not
 
@@ -181,7 +184,11 @@ public:
 
 	//Debug GLuint texture accessible by application
 	GLuint m_DebugTexture;
-	
+
+
 private:
+	std::shared_ptr<Lumen::ILumenTexture> m_DefaultWhiteTexture;
+	std::shared_ptr<Lumen::ILumenTexture> m_DefaultNormalTexture;
+	std::shared_ptr<Lumen::ILumenTexture> m_DefaultDiffuseTexture;
 		
 };
