@@ -161,7 +161,7 @@ public:
 		//Base path for meshes.
 
 		//Mesh name
-		const std::string meshName = "Sponza.gltf";
+		const std::string meshName = "scene.gltf";
 		const std::string meshName2 = "EmissiveSphere.gltf";
 		//const std::string meshName3 = "scene.gltf";
 
@@ -199,21 +199,6 @@ public:
 		seed = RandomInt(seed);
 
 		lumenPT->m_Scene = res->m_Scenes[0];
-
-		//Set sponza scale.
-		auto& mesh = lumenPT->m_Scene->m_MeshInstances[0];
-		mesh->m_Transform.SetScale(glm::vec3(1.f, 1.f, 1.f));
-
-		////Scale and built-in emissive triangles.
-		//auto& mesh = lumenPT->m_Scene->m_MeshInstances[0];
-		//mesh->m_Transform.SetScale(glm::vec3(140.f, 140.f, 70.f));
-		//mesh->m_Transform.Rotate(glm::vec3(0.f, 0.f, 180.f));
-		//mesh->m_Transform.Move(glm::vec3(0.f, -56.f, 50.f));
-		//mesh->SetEmissiveness(Lumen::EmissionMode::ENABLED, glm::vec3(1.f, 1.f, 1.f), 10.f);
-		//mesh->UpdateAccelRemoveThis();	//Temp till this is automatically done.
-
-		//
-
 		for(int i = 0; i < 30; ++i)
 		{
 			for (auto& node : res2->m_NodePool)

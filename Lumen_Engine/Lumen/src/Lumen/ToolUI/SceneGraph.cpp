@@ -23,7 +23,29 @@ void Lumen::SceneGraph::Display(ILumenScene& a_Scene)
     {
         auto& transform = m_SelectedMeshInstance->m_Transform;
         TransformEditor(transform);
-        m_SelectedMeshInstance;
+
+
+        auto emissiveness = m_SelectedMeshInstance->GetEmissiveness();
+        auto newEmissiveness = emissiveness;
+        ImGui::Text("Emissive Properties");
+
+        bool overrideEmissiveness = newEmissiveness.m_EmissionMode == EmissionMode::OVERRIDE;
+
+        ImGui::Checkbox("Override Emissiveness", &overrideEmissiveness);
+        if (overrideEmissiveness)
+            newEmissiveness.m_EmissionMode = EmissionMode::OVERRIDE;
+        else
+            newEmissiveness.m_EmissionMode = EmissionMode::ENABLED;
+
+        ImGui::ColorEdit3("Emission Factor", &newEmissiveness.m_OverrideRadiance[0], ImGuiColorEditFlags_Float);
+        ImGui::DragFloat("Emission Scale", &newEmissiveness.m_Scale, 1, 0.001f, std::numeric_limits<float>::max());
+
+        if (newEmissiveness.m_Scale != emissiveness.m_Scale ||
+            newEmissiveness.m_EmissionMode != emissiveness.m_EmissionMode ||
+            newEmissiveness.m_OverrideRadiance != emissiveness.m_OverrideRadiance)
+        {
+            m_SelectedMeshInstance->SetEmissiveness(newEmissiveness);            
+        }
     }
 
     ImGui::End();

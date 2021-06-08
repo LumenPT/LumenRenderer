@@ -14,9 +14,6 @@ PTMeshInstance::PTMeshInstance(PTServiceLocator& a_ServiceLocator)
     // Register the instance to the dependency callback of its transform.
     // This ensures that DependencyCallback() is called when the transform changes.
     m_Transform.AddDependent(*this);
-    m_EmissionMode = Lumen::EmissionMode::ENABLED;
-    m_EmissiveOverride = { 0.f, 0.f, 0.f };
-    m_EmissionScale = 1.f;
 }
 
 
@@ -26,11 +23,6 @@ PTMeshInstance::PTMeshInstance(const Lumen::MeshInstance& a_Instance, PTServiceL
     m_Transform = a_Instance.m_Transform;
     m_Transform.AddDependent(*this);
     m_MeshRef = a_Instance.GetMesh();
-    m_EmissionMode = Lumen::EmissionMode::ENABLED;
-    m_EmissiveOverride = { 0.f, 0.f, 0.f };
-    m_EmissionScale = 1.f;
-
-
 }
 
 void PTMeshInstance::SetSceneRef(PTScene* a_SceneRef)
@@ -115,10 +107,17 @@ OptixTraversableHandle PTMeshInstance::GetAccelerationStructureHandle() const
     return m_AccelerationStructure->m_TraversableHandle;
 }
 
+void PTMeshInstance::SetEmissiveness(const Emissiveness& a_EmissiveProperties)
+{
+    MeshInstance::SetEmissiveness(a_EmissiveProperties);
+    MarkSceneDataAsDirty();
+
+}
+
 void PTMeshInstance::SetAdditionalColor(glm::vec4 a_AdditionalColor)
 {
     m_AdditionalColor = a_AdditionalColor;
-    UpdateRaytracingData(); // I hate this so much but IDK how to do it better
+    //UpdateRaytracingData(); // I hate this so much but IDK how to do it better
 }
 
 void PTMeshInstance::UpdateRaytracingData()
@@ -149,8 +148,12 @@ void PTMeshInstance::UpdateRaytracingData()
 
         entryData.m_Primitive = ptPrim->m_DevicePrimitive;
         entryData.m_Transform = sutil::Matrix4x4(reinterpret_cast<float*>(&glmTransform[0]));
-        entryData.m_EmissionMode = m_EmissionMode;
-        entryData.m_EmissiveColorAndScale = make_float4(m_EmissiveOverride.x, m_EmissiveOverride.y, m_EmissiveOverride.z, m_EmissionScale);
+        entryData.m_EmissionMode = m_EmissiveProperties.m_EmissionMode;
+        entryData.m_EmissiveColorAndScale = make_float4(
+            m_EmissiveProperties.m_OverrideRadiance.x,
+            m_EmissiveProperties.m_OverrideRadiance.y,
+            m_EmissiveProperties.m_OverrideRadiance.z,
+            m_EmissiveProperties.m_Scale);
 
         //Check for overridden materials. If defined, overwrite the material pointer.
         if(m_OverrideMaterial != nullptr)

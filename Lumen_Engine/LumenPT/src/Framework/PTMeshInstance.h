@@ -41,6 +41,8 @@ public:
     PTScene* m_SceneRef; // Reference to the scene the instance is a part of
     PTServiceLocator& m_Services; // Reference to the path tracer service locator
 
+    void SetEmissiveness(const Emissiveness& a_EmissiveProperties) override;
+
     void SetAdditionalColor(glm::vec4 a_AdditionalColor) override;
 
     std::unordered_map<Lumen::ILumenPrimitive*, SceneDataTableEntry<DevicePrimitiveInstance>>& GetInstanceEntryMap()
