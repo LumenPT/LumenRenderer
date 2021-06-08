@@ -78,6 +78,8 @@ namespace WaveFront
          */
         unsigned GetOutputTexture() override;
 
+        std::vector<uint8_t> GetOutputTexturePixels(uint32_t& a_Width, uint32_t& a_Height) override;
+
         /*
          * Initialize the wavefront pipeline.
          * This sets up all buffers required by CUDA.

@@ -156,6 +156,7 @@ public:
 	void CreateDefaultResources();
 
 	virtual unsigned int GetOutputTexture() = 0;	//scene argument may be redundant... or not
+	virtual std::vector<uint8_t> GetOutputTexturePixels(uint32_t& a_Width, uint32_t& a_Height) = 0;
 
 	virtual void SetRenderResolution(glm::uvec2 a_NewResolution) = 0;
 	virtual void SetOutputResolution(glm::uvec2 a_NewResolution) = 0;

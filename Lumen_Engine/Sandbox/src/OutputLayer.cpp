@@ -21,6 +21,7 @@
 
 #include "Lumen/ToolUI/ModelLoaderWidget.h"
 #include "Lumen/ToolUI/SceneGraph.h"
+#include "../vendor/stb/stb_image_write.h"
 
 #include "Glad/glad.h"
 
@@ -395,6 +396,14 @@ void OutputLayer::OnImGuiRender()
 	if (newRes != m_Renderer->GetRenderResolution())
 	{
 		m_Renderer->SetRenderResolution(newRes);
+	}
+
+	if (ImGui::Button("Screenshot"))
+	{
+
+		uint32_t w, h;
+		auto pixels = m_Renderer->GetOutputTexturePixels(w, h);
+		stbi_write_png("City Screenshot.png", w, h, 4, pixels.data(), 0);
 	}
 
 	ImGui::End();

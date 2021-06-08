@@ -1005,6 +1005,23 @@ namespace WaveFront
         return m_OutputBuffer->GetTexture();
     }
 
+    std::vector<uint8_t> WaveFrontRenderer::GetOutputTexturePixels(uint32_t& a_Width, uint32_t& a_Height)
+    {
+        auto devPtr = m_OutputBuffer->GetDevicePtr<uchar4>();
+        auto size = m_OutputBuffer->GetSize();
+
+        a_Width = size.x;
+        a_Height = size.y;
+
+        std::vector<uint8_t> pixels;
+        pixels.resize(size.x * size.y * sizeof(uchar4));
+        std::lock_guard<std::mutex> lock(m_OutputBufferMutex);
+
+        cudaMemcpy(pixels.data(), devPtr, pixels.size(), cudaMemcpyKind::cudaMemcpyDeviceToHost);
+
+        return pixels;
+    }
+
     void WaveFrontRenderer::ResizeBuffers()
     {
         printf("\n\nRESIZING WAVEFRONT BUFFERS!!\n\n");
