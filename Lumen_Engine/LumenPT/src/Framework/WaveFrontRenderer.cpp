@@ -302,7 +302,6 @@ namespace WaveFront
         CHECKLASTCUDAERROR;
         auto* sceneDataTableAccessor = static_cast<PTScene*>(m_Scene.get())->GetSceneDataTableAccessor();
 
-        auto milli = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
         CHECKLASTCUDAERROR;
 
         auto accelerationStructure = std::static_pointer_cast<PTScene>(m_Scene)->GetSceneAccelerationStructure();
