@@ -680,26 +680,34 @@ namespace WaveFront
             CHECKLASTCUDAERROR;
         }
 
-        PostProcessLaunchParameters postProcessLaunchParams(
-            m_Settings.renderResolution,
-            m_Settings.outputResolution,
-            m_PixelBufferSeparate->GetSurfaceObject(),
-            m_PixelBufferCombined->GetSurfaceObject(),
-            m_IntermediateOutputBuffer.GetDevicePtr<uchar4>(),
-            m_Settings.blendOutput,
-            m_BlendCounter
-        );
+        //Post-processing
+        {
+            PostProcessLaunchParameters postProcessLaunchParams(
+                m_Settings.renderResolution,
+                m_Settings.outputResolution,
+                m_PixelBufferSeparate->GetSurfaceObject(),
+                m_PixelBufferCombined->GetSurfaceObject(),
+                m_IntermediateOutputBuffer.GetDevicePtr<uchar4>(),
+                m_Settings.blendOutput,
+                m_BlendCounter
+            );
 
-        //Post processing using CUDA kernel.
-        PostProcess(postProcessLaunchParams);
-        cudaDeviceSynchronize();
-        CHECKLASTCUDAERROR;
+            //Post processing using CUDA kernel.
+            //PostProcess(postProcessLaunchParams);
+            MergeOutput(postProcessLaunchParams);
+            cudaDeviceSynchronize();
+            CHECKLASTCUDAERROR;
 
-        OptixDenoiserDenoiseParams optixDenoiserParams = {};
-        optixDenoiserParams.m_PostProcessLaunchParams = &postProcessLaunchParams;
-        //optixDenoiserParams.m_ColorInput = m_PixelBufferCombined.GetCUDAPtr();
-        //optixDenoiserParams.m_Output = m_IntermediateOutputBuffer.GetCUDAPtr();
-        m_OptixDenoiser->Denoise(optixDenoiserParams);
+            OptixDenoiserDenoiseParams optixDenoiserParams = {};
+            optixDenoiserParams.m_PostProcessLaunchParams = &postProcessLaunchParams;
+            optixDenoiserParams.m_ColorInput = m_IntermediateOutputBuffer.GetCUDAPtr();
+            optixDenoiserParams.m_Output = m_IntermediateOutputBuffer.GetCUDAPtr();
+            m_OptixDenoiser->Denoise(optixDenoiserParams);
+
+            WriteToOutput(postProcessLaunchParams);
+            cudaDeviceSynchronize();
+            CHECKLASTCUDAERROR;
+        }
 
         // Critical scope for updating the output texture
         {

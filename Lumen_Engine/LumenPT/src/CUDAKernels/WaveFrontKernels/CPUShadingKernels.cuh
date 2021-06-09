@@ -47,3 +47,7 @@ CPU_ONLY void Shade(const WaveFront::ShadingLaunchParameters& a_ShadingParams);
  * Apply de-noising, up scaling and post-processing effects.
  */
 CPU_ONLY void PostProcess(const WaveFront::PostProcessLaunchParameters& a_PostProcessParams);
+
+CPU_ONLY void MergeOutput(const WaveFront::PostProcessLaunchParameters& a_PostProcessParams);
+
+CPU_ONLY void WriteToOutput(const WaveFront::PostProcessLaunchParameters& a_PostProcessParams);

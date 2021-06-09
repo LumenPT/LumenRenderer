@@ -60,33 +60,33 @@ void OptixDenoiserWrapper::Denoise(const OptixDenoiserDenoiseParams& a_DenoisePa
     colorTex.data = a_DenoiseParams.m_ColorInput;
     colorTex.width = m_InitParams.m_InputWidth;
     colorTex.height = m_InitParams.m_InputHeight;
-    colorTex.pixelStrideInBytes = 3 * sizeof(float);
+    colorTex.pixelStrideInBytes = 4 * sizeof(char);
     colorTex.rowStrideInBytes = colorTex.pixelStrideInBytes * colorTex.width;
-    colorTex.format = OPTIX_PIXEL_FORMAT_FLOAT3;
+    colorTex.format = OPTIX_PIXEL_FORMAT_UCHAR4;
 
     OptixImage2D outputTex;
     outputTex.data = a_DenoiseParams.m_Output;
     outputTex.width = m_InitParams.m_InputWidth;
     outputTex.height = m_InitParams.m_InputHeight;
-    outputTex.pixelStrideInBytes = sizeof(uchar4);
+    outputTex.pixelStrideInBytes = 4 * sizeof(char);
     colorTex.rowStrideInBytes = colorTex.pixelStrideInBytes * colorTex.width;
     outputTex.format = OPTIX_PIXEL_FORMAT_UCHAR4; //TODO: different format, verify this
 
 
-    auto result = optixDenoiserInvoke(
-        m_Denoiser,
-        0,
-        &optixDenoiserParams,
-        static_cast<CUdeviceptr>(m_state.GetCUDAPtr()),
-        m_state.GetSize(),
-        nullptr, //TODO
-        1, //TODO
-        0,
-        0,
-        nullptr, //TODO
-        static_cast<CUdeviceptr>(m_scratch.GetCUDAPtr()),
-        m_scratch.GetSize()
-        );
+    //auto result = optixDenoiserInvoke(
+    //    m_Denoiser,
+    //    0,
+    //    &optixDenoiserParams,
+    //    static_cast<CUdeviceptr>(m_state.GetCUDAPtr()),
+    //    m_state.GetSize(),
+    //    nullptr, //TODO
+    //    1, //TODO
+    //    0,
+    //    0,
+    //    nullptr, //TODO
+    //    static_cast<CUdeviceptr>(m_scratch.GetCUDAPtr()),
+    //    m_scratch.GetSize()
+    //    );
 
 
     //auto result = optixDenoiserInvoke(
@@ -99,13 +99,12 @@ void OptixDenoiserWrapper::Denoise(const OptixDenoiserDenoiseParams& a_DenoisePa
     //    1, //TODO
     //    0,
     //    0,
-    //    /*&outputTex*/inputLayers.data(), //TODO
+    //    &outputTex, //TODO
     //    static_cast<CUdeviceptr>(m_scratch.GetCUDAPtr()),
     //    m_scratch.GetSize()
     //    );
 
     //CHECKOPTIXRESULT(result);
-    //TODO: check result
 
 
 }

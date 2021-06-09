@@ -233,3 +233,51 @@ CPU_ONLY void PostProcess(const PostProcessLaunchParameters& a_PostProcessParams
         a_PostProcessParams.m_FinalOutput
         );
 }
+
+CPU_ONLY void MergeOutput(const PostProcessLaunchParameters& a_PostProcessParams)
+{
+    //The amount of pixels and threads/blocks needed to apply effects.
+    const dim3 blockSize{ 32, 32 ,1 };
+
+    const unsigned blockSizeWidth =
+        static_cast<unsigned>(std::ceil(static_cast<float>(a_PostProcessParams.m_RenderResolution.x) / static_cast<float>(blockSize.x)));
+    const unsigned blockSizeHeight =
+        static_cast<unsigned>(std::ceil(static_cast<float>(a_PostProcessParams.m_RenderResolution.y) / static_cast<float>(blockSize.y)));
+
+    const dim3 numBlocks{ blockSizeWidth, blockSizeHeight, 1 };
+
+    MergeOutputChannels << <numBlocks, blockSize >> > (
+        a_PostProcessParams.m_RenderResolution,
+        a_PostProcessParams.m_PixelBufferMultiChannel,
+        a_PostProcessParams.m_PixelBufferSingleChannel,
+        a_PostProcessParams.m_BlendOutput,
+        a_PostProcessParams.m_BlendCount
+        );
+}
+
+CPU_ONLY void WriteToOutput(const PostProcessLaunchParameters& a_PostProcessParams)
+{
+    //The amount of pixels and threads/blocks needed to apply effects.
+    const dim3 blockSize{ 32, 32 ,1 };
+
+    const unsigned blockSizeWidth =
+        static_cast<unsigned>(std::ceil(static_cast<float>(a_PostProcessParams.m_RenderResolution.x) / static_cast<float>(blockSize.x)));
+    const unsigned blockSizeHeight =
+        static_cast<unsigned>(std::ceil(static_cast<float>(a_PostProcessParams.m_RenderResolution.y) / static_cast<float>(blockSize.y)));
+
+    const dim3 numBlocks{ blockSizeWidth, blockSizeHeight, 1 };
+
+    const unsigned blockSizeWidthUpscaled =
+        static_cast<unsigned>(std::ceil(static_cast<float>(a_PostProcessParams.m_OutputResolution.x) / static_cast<float>(blockSize.x)));
+    const unsigned blockSizeHeightUpscaled =
+        static_cast<unsigned>(std::ceil(static_cast<float>(a_PostProcessParams.m_OutputResolution.y) / static_cast<float>(blockSize.y)));
+
+    const dim3 numBlocksUpscaled{ blockSizeWidthUpscaled, blockSizeHeightUpscaled, 1 };
+
+    //TODO This is temporary till the post-processing is  in place. Let the last stage copy it directly to the output buffer.
+    WriteToOutput << <numBlocksUpscaled, blockSize >>> (
+        a_PostProcessParams.m_OutputResolution,
+        a_PostProcessParams.m_PixelBufferSingleChannel,
+        a_PostProcessParams.m_FinalOutput
+        );
+}
