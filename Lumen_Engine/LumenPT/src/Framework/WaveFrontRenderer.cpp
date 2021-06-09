@@ -691,9 +691,9 @@ namespace WaveFront
                 m_Settings.blendOutput,
                 m_BlendCounter
             );
-
             //Post processing using CUDA kernel.
             //PostProcess(postProcessLaunchParams);
+
             MergeOutput(postProcessLaunchParams);
             cudaDeviceSynchronize();
             CHECKLASTCUDAERROR;
@@ -703,6 +703,8 @@ namespace WaveFront
             optixDenoiserParams.m_ColorInput = m_IntermediateOutputBuffer.GetCUDAPtr();
             optixDenoiserParams.m_Output = m_IntermediateOutputBuffer.GetCUDAPtr();
             m_OptixDenoiser->Denoise(optixDenoiserParams);
+            //cudaDeviceSynchronize();
+            //CHECKLASTCUDAERROR;
 
             WriteToOutput(postProcessLaunchParams);
             cudaDeviceSynchronize();

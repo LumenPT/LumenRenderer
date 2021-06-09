@@ -44,5 +44,8 @@ protected:
 	MemoryBuffer m_state;
 	MemoryBuffer m_scratch;
 
+	MemoryBuffer TestInput;
+	MemoryBuffer TestOutput;
+
 	OptixDenoiserInitParams m_InitParams;	
 };

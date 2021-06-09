@@ -45,6 +45,9 @@ void OptixDenoiserWrapper::Initialize(const OptixDenoiserInitParams& a_InitParam
         static_cast<CUdeviceptr>(m_scratch.GetCUDAPtr()),
         m_scratch.GetSize()
     ));
+
+    TestInput.Resize(m_InitParams.m_InputWidth * m_InitParams.m_InputHeight * sizeof(float) * 3);
+    TestOutput.Resize(m_InitParams.m_InputWidth * m_InitParams.m_InputHeight * sizeof(float) * 3);
 }
 
 void OptixDenoiserWrapper::Denoise(const OptixDenoiserDenoiseParams& a_DenoiseParams)
@@ -55,23 +58,39 @@ void OptixDenoiserWrapper::Denoise(const OptixDenoiserDenoiseParams& a_DenoisePa
     optixDenoiserParams.denoiseAlpha = false;
     optixDenoiserParams.blendFactor = 0.0f;
 
+    //std::vector<OptixImage2D> inputLayers;
+    //OptixImage2D& colorTex = inputLayers.emplace_back();
+    //colorTex.data = a_DenoiseParams.m_ColorInput;
+    //colorTex.width = m_InitParams.m_InputWidth;
+    //colorTex.height = m_InitParams.m_InputHeight;
+    //colorTex.pixelStrideInBytes = 4 * sizeof(char);
+    //colorTex.rowStrideInBytes = colorTex.pixelStrideInBytes * colorTex.width;
+    //colorTex.format = OPTIX_PIXEL_FORMAT_UCHAR4;
+
+    //OptixImage2D outputTex;
+    //outputTex.data = a_DenoiseParams.m_Output;
+    //outputTex.width = m_InitParams.m_InputWidth;
+    //outputTex.height = m_InitParams.m_InputHeight;
+    //outputTex.pixelStrideInBytes = 4 * sizeof(char);
+    //colorTex.rowStrideInBytes = colorTex.pixelStrideInBytes * colorTex.width;
+    //outputTex.format = OPTIX_PIXEL_FORMAT_UCHAR4; //TODO: different format, verify this
+
     std::vector<OptixImage2D> inputLayers;
     OptixImage2D& colorTex = inputLayers.emplace_back();
-    colorTex.data = a_DenoiseParams.m_ColorInput;
+    colorTex.data = static_cast<CUdeviceptr>(TestInput.GetCUDAPtr());
     colorTex.width = m_InitParams.m_InputWidth;
     colorTex.height = m_InitParams.m_InputHeight;
-    colorTex.pixelStrideInBytes = 4 * sizeof(char);
+    colorTex.pixelStrideInBytes = 3 * sizeof(float);
     colorTex.rowStrideInBytes = colorTex.pixelStrideInBytes * colorTex.width;
-    colorTex.format = OPTIX_PIXEL_FORMAT_UCHAR4;
+    colorTex.format = OPTIX_PIXEL_FORMAT_FLOAT3;
 
     OptixImage2D outputTex;
-    outputTex.data = a_DenoiseParams.m_Output;
+    outputTex.data = static_cast<CUdeviceptr>(TestOutput.GetCUDAPtr());
     outputTex.width = m_InitParams.m_InputWidth;
     outputTex.height = m_InitParams.m_InputHeight;
-    outputTex.pixelStrideInBytes = 4 * sizeof(char);
+    outputTex.pixelStrideInBytes = 3 * sizeof(float);
     colorTex.rowStrideInBytes = colorTex.pixelStrideInBytes * colorTex.width;
-    outputTex.format = OPTIX_PIXEL_FORMAT_UCHAR4; //TODO: different format, verify this
-
+    outputTex.format = OPTIX_PIXEL_FORMAT_FLOAT3; //TODO: different format, verify this
 
     //auto result = optixDenoiserInvoke(
     //    m_Denoiser,
