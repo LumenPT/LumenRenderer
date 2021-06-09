@@ -30,7 +30,7 @@ void PTVolumeInstance::SetSceneRef(PTScene* a_SceneRef)
 {
     m_SceneRef = a_SceneRef;
     m_SceneRef->MarkSceneForUpdate();
-	m_SceneDataTableEntry = m_SceneRef->m_SceneDataTable->AddEntry<DeviceVolume>();
+	m_SceneDataTableEntry = m_SceneRef->AddDataTableEntry<DeviceVolume>();
 	UpdateRaytracingData();
 }
 

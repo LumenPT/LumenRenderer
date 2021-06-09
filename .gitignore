@@ -479,3 +479,5 @@ Lumen_Engine/LumenPT/Assets/PrecompiledShaders/Debug/draw_solid_color.ptx
 *.ptx
 
 Lumen_Engine/Config.json
+
+*.ollad
