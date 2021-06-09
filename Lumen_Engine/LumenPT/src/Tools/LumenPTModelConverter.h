@@ -157,8 +157,13 @@ private:
 
     struct HeaderMeshInstance
     {
-        int32_t m_MeshId;
-        float m_Transform[16];
+        struct
+        {
+            int32_t m_MeshId;
+            float m_Transform[16];
+            uint32_t m_NameLength;
+        } m_Header;
+        std::string m_Name;
     };
 
     struct HeaderScene
@@ -166,7 +171,10 @@ private:
         struct
         {
             uint32_t m_NumMeshes;
+            uint32_t m_NameLength;
         } m_Header;
+
+        std::string m_Name;
         std::vector<HeaderMeshInstance> m_Meshes;
     };
 

@@ -154,3 +154,18 @@ void PTScene::UpdateSceneAccelerationStructure()
 
 }
 
+SceneDataTableAccessor* PTScene::GetSceneDataTableAccessor()
+{
+    UpdateSceneDataTable();
+
+    return m_SceneDataTable->GetDevicePointer();
+}
+
+void PTScene::UpdateSceneDataTable()
+{
+    for (auto& meshInstance : m_MeshInstances)
+    {
+        static_cast<PTMeshInstance*>(meshInstance.get())->UpdateRaytracingData();
+    }
+}
+

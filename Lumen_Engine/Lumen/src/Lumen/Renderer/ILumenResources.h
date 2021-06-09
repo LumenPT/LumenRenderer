@@ -54,6 +54,30 @@ namespace Lumen
         virtual void SetMetallicFactor(float a_Factor) = 0;
         virtual void SetRoughnessFactor(float a_Factor) = 0;
 
+        // ---------------------------------------------------------------------------------------------
+
+        virtual float GetClearCoatFactor() = 0;
+        virtual float GetClearCoatRoughnessFactor() = 0;
+        
+        virtual float GetLuminance() = 0;
+        virtual float GetSheenFactor() = 0;
+        virtual float GetSheenTintFactor() = 0;
+       
+        virtual float GetAnisotropic() = 0;
+       
+        virtual glm::vec3 GetTintFactor() = 0;
+       
+        virtual float GetTransmissionFactor() = 0;
+        virtual glm::vec3 GetTransmittanceFactor() = 0;
+        virtual float GetIndexOfRefraction() = 0;
+       
+        virtual float GetSpecularFactor() = 0;
+        virtual float GetSpecularTintFactor() = 0;
+        virtual float GetSubSurfaceFactor() = 0;
+       
+        virtual float GetMetallicFactor() = 0;
+        virtual float GetRoughnessFactor() = 0;
+
         //TODO add disney BSDF getter functions.
 
         virtual glm::vec4 GetDiffuseColor() const = 0;

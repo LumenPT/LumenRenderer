@@ -4,6 +4,8 @@
 #include "Transform.h"
 #include "Lumen/Renderer/ILumenResources.h"
 
+#include <string>
+
 namespace Lumen
 {
     /*
@@ -20,12 +22,24 @@ namespace Lumen
     class MeshInstance
     {
     public:
+        struct Emissiveness
+        {
+            Emissiveness(EmissionMode a_EmissionMode = EmissionMode::ENABLED, glm::vec3 a_Emission = glm::vec3(0.0f), float a_EmissionScale = 1.0f)
+                : m_EmissionMode(a_EmissionMode)
+                , m_OverrideRadiance(a_Emission)
+                , m_Scale(a_EmissionScale) {}
+            EmissionMode m_EmissionMode;
+            glm::vec3 m_OverrideRadiance;
+            float m_Scale;
+        };
+
         virtual ~MeshInstance() = default;
 
         MeshInstance()
-        : m_AdditionalColor(1.0f, 1.0f, 1.0f, 1.0f), m_EmissiveOverride(1.f), m_EmissionScale(1.f), m_EmissionMode(Lumen::EmissionMode::ENABLED)
+            : m_AdditionalColor(1.0f, 1.0f, 1.0f, 1.0f)
+            , m_EmissiveProperties()
+            , m_Name("Unnamed mesh instance")
         {
-            
         }
 
         virtual void SetMesh(std::shared_ptr<Lumen::ILumenMesh> a_Mesh)
@@ -39,12 +53,17 @@ namespace Lumen
          * The radiance is the RGB radiance value when mode is set to OVERRIDE.
          * Scale scales up the radiance value.
          */
-        virtual void SetEmissiveness(const EmissionMode a_Mode, const glm::vec3& a_OverrideRadiance, const float a_Scale)
+        virtual void SetEmissiveness(const Emissiveness& a_EmissiveProperties)
         {
-            m_EmissionMode = a_Mode;
-            m_EmissiveOverride = a_OverrideRadiance;
-            m_EmissionScale = a_Scale;
+            auto em = m_EmissiveProperties.m_EmissionMode;
+            m_EmissiveProperties = a_EmissiveProperties;
+            if (m_EmissiveProperties.m_EmissionMode != EmissionMode::OVERRIDE)
+                m_EmissiveProperties.m_EmissionMode = m_PreviousEmissionMode;
+            else if (em != m_EmissiveProperties.m_EmissionMode)
+                m_PreviousEmissionMode = em;
         }
+
+        const Emissiveness& GetEmissiveness() const { return m_EmissiveProperties; };
 
         virtual void UpdateAccelRemoveThis() {}
 
@@ -53,7 +72,7 @@ namespace Lumen
          */
         virtual EmissionMode GetEmissionMode()
         {
-            return m_EmissionMode;
+            return m_EmissiveProperties.m_EmissionMode;
         }
 
         /*
@@ -66,6 +85,11 @@ namespace Lumen
             m_OverrideMaterial = a_OverrideMaterial;
         }
 
+        std::shared_ptr<Lumen::ILumenMaterial> GetOverrideMaterial()
+        {
+            return m_OverrideMaterial;
+        }
+
         auto GetMesh() const { return m_MeshRef; }
 
 
@@ -73,11 +97,11 @@ namespace Lumen
 
 
         Transform m_Transform;
+        std::string m_Name;
     protected:
         //Emissive instance properties.
-        glm::vec3 m_EmissiveOverride;       //Emission color if overridden.
-        Lumen::EmissionMode m_EmissionMode; //Emission mode.
-        float m_EmissionScale;              //Emission scale.
+        Emissiveness m_EmissiveProperties;
+        EmissionMode m_PreviousEmissionMode;
 
         //Material to override with.
         std::shared_ptr<Lumen::ILumenMaterial> m_OverrideMaterial;

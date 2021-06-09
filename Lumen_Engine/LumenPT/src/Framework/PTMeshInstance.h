@@ -41,12 +41,20 @@ public:
     PTScene* m_SceneRef; // Reference to the scene the instance is a part of
     PTServiceLocator& m_Services; // Reference to the path tracer service locator
 
+    void SetEmissiveness(const Emissiveness& a_EmissiveProperties) override;
+
     void SetAdditionalColor(glm::vec4 a_AdditionalColor) override;
 
     std::unordered_map<Lumen::ILumenPrimitive*, SceneDataTableEntry<DevicePrimitiveInstance>>& GetInstanceEntryMap()
     {
         return m_EntryMap;
     }
+
+    void SetOverrideMaterial(std::shared_ptr<Lumen::ILumenMaterial> a_OverrideMaterial) override
+    {
+        MeshInstance::SetOverrideMaterial(a_OverrideMaterial);
+        MarkSceneDataAsDirty();
+    };
 
     virtual void UpdateAccelRemoveThis() override
     {
@@ -56,12 +64,14 @@ public:
     PTScene* GetSceneRef() { return m_SceneRef; }
 
 
-private:
     void UpdateRaytracingData();
+private:
+    void MarkSceneDataAsDirty() { m_SceneDataDirty = true; }
 private:
 
     std::unique_ptr<AccelerationStructure> m_AccelerationStructure;
     std::unordered_map<Lumen::ILumenPrimitive*, SceneDataTableEntry<DevicePrimitiveInstance>> m_EntryMap;
+    bool m_SceneDataDirty;
     std::unordered_map<Lumen::ILumenPrimitive*, uint32_t> m_LastUsedPrimitiveIDs;
 
 };
