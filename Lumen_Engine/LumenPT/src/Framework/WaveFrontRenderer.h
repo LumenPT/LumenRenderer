@@ -10,6 +10,7 @@
 #include "Nvidia/INRDWrapper.h"
 #include "Nvidia/IDLSSWrapper.h"
 #include "../Tools/LumenPTModelConverter.h"
+#include "OptixDenoiserWrapper.h" 
 
 #include "Renderer/LumenRenderer.h"
 
@@ -168,6 +169,8 @@ namespace WaveFront
 
         //DLSS Wrapper
         std::unique_ptr<IDLSSWrapper> m_DLSS;
+
+        std::unique_ptr<OptixDenoiserWrapper> m_OptixDenoiser;
 
         //ReSTIR
         std::unique_ptr<ReSTIR> m_ReSTIR;

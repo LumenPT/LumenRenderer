@@ -21,6 +21,8 @@ struct OptixDenoiserInitParams
 struct OptixDenoiserDenoiseParams
 {
 	WaveFront::PostProcessLaunchParameters* m_PostProcessLaunchParams;
+	CUdeviceptr m_ColorInput;
+	CUdeviceptr m_Output;
 };
 
 class OptixDenoiserWrapper
@@ -41,11 +43,6 @@ protected:
 
 	MemoryBuffer m_state;
 	MemoryBuffer m_scratch;
-
-	/*CUdeviceptr           m_State = 0;
-	uint32_t              m_StateSize = 0;
-	CUdeviceptr           m_Scratch = 0;
-	uint32_t              m_ScratchSize = 0;*/
 
 	OptixDenoiserInitParams m_InitParams;
 };

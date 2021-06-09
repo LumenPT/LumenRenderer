@@ -126,6 +126,13 @@ namespace WaveFront
         dlssInitParams.m_pServiceLocator = &m_ServiceLocator;
         m_DLSS->Initialize(dlssInitParams);
 
+        m_OptixDenoiser = std::make_unique<OptixDenoiserWrapper>();
+        OptixDenoiserInitParams optixDenoiserInitParams;
+        optixDenoiserInitParams.m_InputWidth = m_Settings.renderResolution.x;
+        optixDenoiserInitParams.m_InputHeight = m_Settings.renderResolution.y;
+        optixDenoiserInitParams.m_ServiceLocator = &m_ServiceLocator;
+        m_OptixDenoiser->Initialize(optixDenoiserInitParams);
+
         //Set up the OpenGL output buffer.
         m_OutputBuffer = std::make_unique<CudaGLTexture>(GL_RGBA8, m_Settings.outputResolution.x, m_Settings.outputResolution.y, 4);
         SetRenderResolution(glm::uvec2(m_Settings.outputResolution.x, m_Settings.outputResolution.y));
@@ -687,6 +694,12 @@ namespace WaveFront
         PostProcess(postProcessLaunchParams);
         cudaDeviceSynchronize();
         CHECKLASTCUDAERROR;
+
+        OptixDenoiserDenoiseParams optixDenoiserParams = {};
+        optixDenoiserParams.m_PostProcessLaunchParams = &postProcessLaunchParams;
+        //optixDenoiserParams.m_ColorInput = m_PixelBufferCombined.GetCUDAPtr();
+        //optixDenoiserParams.m_Output = m_IntermediateOutputBuffer.GetCUDAPtr();
+        m_OptixDenoiser->Denoise(optixDenoiserParams);
 
         // Critical scope for updating the output texture
         {

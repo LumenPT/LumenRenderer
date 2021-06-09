@@ -35,32 +35,6 @@ void OptixDenoiserWrapper::Initialize(const OptixDenoiserInitParams& a_InitParam
     m_state.Resize(denoiserSizes.stateSizeInBytes);
     m_scratch.Resize(denoiserSizes.withoutOverlapScratchSizeInBytes);
 
-    /*m_StateSize = denoiserSizes.stateSizeInBytes;
-    m_ScratchSize = denoiserSizes.withoutOverlapScratchSizeInBytes;
-
-    cudaMalloc(
-        reinterpret_cast<void**>(&m_State),
-        m_StateSize
-    );
-    CHECKLASTCUDAERROR;
-
-    cudaMalloc(
-        reinterpret_cast<void**>(&m_Scratch),
-        m_ScratchSize
-    );
-    CHECKLASTCUDAERROR;
-
-    CHECKOPTIXRESULT(optixDenoiserSetup(
-        m_Denoiser,
-        0,
-        m_InitParams.m_InputWidth,
-        m_InitParams.m_InputHeight,
-        m_State,
-        m_StateSize,
-        m_Scratch,
-        m_ScratchSize
-        ));*/
-
     CHECKOPTIXRESULT(optixDenoiserSetup(
         m_Denoiser,
         0,
@@ -82,8 +56,21 @@ void OptixDenoiserWrapper::Denoise(const OptixDenoiserDenoiseParams& a_DenoisePa
     optixDenoiserParams.blendFactor = 0.0f;
 
     std::vector<OptixImage2D> inputLayers;
+    OptixImage2D& colorTex = inputLayers.emplace_back();
+    colorTex.data = a_DenoiseParams.m_ColorInput;
+    colorTex.width = m_InitParams.m_InputWidth;
+    colorTex.height = m_InitParams.m_InputHeight;
+    colorTex.pixelStrideInBytes = 3 * sizeof(float);
+    colorTex.rowStrideInBytes = colorTex.pixelStrideInBytes * colorTex.width;
+    colorTex.format = OPTIX_PIXEL_FORMAT_FLOAT3;
 
-    OptixImage2D outputLayer;
+    OptixImage2D outputTex;
+    outputTex.data = a_DenoiseParams.m_Output;
+    outputTex.width = m_InitParams.m_InputWidth;
+    outputTex.height = m_InitParams.m_InputHeight;
+    outputTex.pixelStrideInBytes = sizeof(uchar4);
+    colorTex.rowStrideInBytes = colorTex.pixelStrideInBytes * colorTex.width;
+    outputTex.format = OPTIX_PIXEL_FORMAT_UCHAR4; //TODO: different format, verify this
 
 
     auto result = optixDenoiserInvoke(
@@ -101,6 +88,24 @@ void OptixDenoiserWrapper::Denoise(const OptixDenoiserDenoiseParams& a_DenoisePa
         m_scratch.GetSize()
         );
 
+
+    //auto result = optixDenoiserInvoke(
+    //    m_Denoiser,
+    //    0,
+    //    &optixDenoiserParams,
+    //    static_cast<CUdeviceptr>(m_state.GetCUDAPtr()),
+    //    m_state.GetSize(),
+    //    inputLayers.data(), //TODO
+    //    1, //TODO
+    //    0,
+    //    0,
+    //    /*&outputTex*/inputLayers.data(), //TODO
+    //    static_cast<CUdeviceptr>(m_scratch.GetCUDAPtr()),
+    //    m_scratch.GetSize()
+    //    );
+
     //CHECKOPTIXRESULT(result);
     //TODO: check result
+
+
 }
