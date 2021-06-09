@@ -10,6 +10,7 @@
 #include "Nvidia/INRDWrapper.h"
 #include "Nvidia/IDLSSWrapper.h"
 #include "../Tools/LumenPTModelConverter.h"
+#include "OptixDenoiserWrapper.h" 
 
 #include "Renderer/LumenRenderer.h"
 
@@ -162,11 +163,16 @@ namespace WaveFront
         //Optix system
         std::unique_ptr<OptixWrapper> m_OptixSystem;
 
+        //DX11System
+        std::unique_ptr<DX11Wrapper> m_DX11Wrapper;
+
         //NRI Wrapper
         std::unique_ptr<INRDWrapper> m_NRD;
 
         //DLSS Wrapper
         std::unique_ptr<IDLSSWrapper> m_DLSS;
+
+        std::unique_ptr<OptixDenoiserWrapper> m_OptixDenoiser;
 
         //ReSTIR
         std::unique_ptr<ReSTIR> m_ReSTIR;

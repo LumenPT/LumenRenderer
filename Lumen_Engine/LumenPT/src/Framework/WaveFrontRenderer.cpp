@@ -23,6 +23,7 @@
 #include "MotionVectors.h"
 //#include "Lumen/Window.h"
 #include "Lumen/LumenApp.h"
+#include "DX11Wrapper.h"
 
 //#include "LumenPTConfig.h"
 
@@ -49,6 +50,8 @@ using DlssWrapper = NullDLSSWrapper;
 #include <sutil/Matrix.h>
 #include "../Framework/PTMeshInstance.h"
 
+
+
 sutil::Matrix4x4 ConvertGLMtoSutilMat4(const glm::mat4& glmMat)
 {
     float data[16];
@@ -68,6 +71,12 @@ namespace WaveFront
 {
     void WaveFrontRenderer::Init(const WaveFrontSettings& a_Settings)
     {
+        m_DX11Wrapper = std::make_unique<DX11Wrapper>();
+        m_ServiceLocator.m_DX11Wrapper = m_DX11Wrapper.get();
+        m_DX11Wrapper->Init();
+
+        m_DX11Wrapper->GetDevice();
+
         m_BlendCounter = 0;
         m_FrameIndex = 0;
         m_Settings = a_Settings;
@@ -105,6 +114,7 @@ namespace WaveFront
         NRDWrapperInitParams nrdInitParams;
         nrdInitParams.m_InputImageWidth = m_Settings.renderResolution.x;
         nrdInitParams.m_InputImageHeight = m_Settings.renderResolution.y;
+        nrdInitParams.m_pServiceLocator = &m_ServiceLocator;
         m_NRD->Initialize(nrdInitParams);
 
         m_DLSS = std::make_unique<DlssWrapper>();
@@ -113,7 +123,15 @@ namespace WaveFront
         dlssInitParams.m_InputImageHeight = m_Settings.renderResolution.y;
         dlssInitParams.m_OutputImageWidth = m_Settings.outputResolution.x;
         dlssInitParams.m_OutputImageHeight = m_Settings.outputResolution.y;
+        dlssInitParams.m_pServiceLocator = &m_ServiceLocator;
         m_DLSS->Initialize(dlssInitParams);
+
+        m_OptixDenoiser = std::make_unique<OptixDenoiserWrapper>();
+        OptixDenoiserInitParams optixDenoiserInitParams;
+        optixDenoiserInitParams.m_InputWidth = m_Settings.renderResolution.x;
+        optixDenoiserInitParams.m_InputHeight = m_Settings.renderResolution.y;
+        optixDenoiserInitParams.m_ServiceLocator = &m_ServiceLocator;
+        m_OptixDenoiser->Initialize(optixDenoiserInitParams);
 
         //Set up the OpenGL output buffer.
         m_OutputBuffer = std::make_unique<CudaGLTexture>(GL_RGBA8, m_Settings.outputResolution.x, m_Settings.outputResolution.y, 4);
@@ -683,6 +701,12 @@ namespace WaveFront
         PostProcess(postProcessLaunchParams);
         cudaDeviceSynchronize();
         CHECKLASTCUDAERROR;
+
+        OptixDenoiserDenoiseParams optixDenoiserParams = {};
+        optixDenoiserParams.m_PostProcessLaunchParams = &postProcessLaunchParams;
+        //optixDenoiserParams.m_ColorInput = m_PixelBufferCombined.GetCUDAPtr();
+        //optixDenoiserParams.m_Output = m_IntermediateOutputBuffer.GetCUDAPtr();
+        m_OptixDenoiser->Denoise(optixDenoiserParams);
 
         // Critical scope for updating the output texture
         {
