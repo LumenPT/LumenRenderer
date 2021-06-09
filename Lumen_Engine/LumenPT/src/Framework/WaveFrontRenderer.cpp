@@ -299,8 +299,15 @@ namespace WaveFront
         //Retrieve the acceleration structure and scene data table once.
         m_OptixSystem->UpdateSBT();
         CHECKLASTCUDAERROR;
+        auto begin = std::chrono::high_resolution_clock::now();
 
-        auto* sceneDataTableAccessor = static_cast<PTScene*>(m_Scene.get())->m_SceneDataTable->GetDevicePointer();
+        auto* sceneDataTableAccessor = static_cast<PTScene*>(m_Scene.get())->GetSceneDataTableAccessor();
+
+        auto end = std::chrono::high_resolution_clock::now();
+
+        auto milli = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
+        printf("\n\nTime elapsed to build scene data table: %li milliseconds\n\n", milli);
+
         CHECKLASTCUDAERROR;
 
         auto accelerationStructure = std::static_pointer_cast<PTScene>(m_Scene)->GetSceneAccelerationStructure();
@@ -1015,6 +1022,23 @@ namespace WaveFront
     {        
         std::unique_lock<std::mutex> lock(m_OutputBufferMutex);
         return m_OutputBuffer->GetTexture();
+    }
+
+    std::vector<uint8_t> WaveFrontRenderer::GetOutputTexturePixels(uint32_t& a_Width, uint32_t& a_Height)
+    {
+        auto devPtr = m_OutputBuffer->GetDevicePtr<uchar4>();
+        auto size = m_OutputBuffer->GetSize();
+
+        a_Width = size.x;
+        a_Height = size.y;
+
+        std::vector<uint8_t> pixels;
+        pixels.resize(size.x * size.y * sizeof(uchar4));
+        std::lock_guard<std::mutex> lock(m_OutputBufferMutex);
+
+        cudaMemcpy(pixels.data(), devPtr, pixels.size(), cudaMemcpyKind::cudaMemcpyDeviceToHost);
+
+        return pixels;
     }
 
     void WaveFrontRenderer::ResizeBuffers()

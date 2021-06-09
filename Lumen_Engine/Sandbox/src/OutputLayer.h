@@ -10,6 +10,11 @@
 #include "Renderer/Camera.h"
 #include "Tools/FrameSnapshot.h"
 
+namespace Lumen
+{
+    class SceneGraph;
+}
+
 class Camera;
 
 class LumenRenderer;
@@ -59,6 +64,7 @@ private:
     float m_CameraMovementSpeed;
 
     std::unique_ptr<class ModelLoaderWidget> m_ModelLoaderWidget;
+    std::unique_ptr<Lumen::SceneGraph> m_SceneGraph;
 
     enum ContentViewMode
     {

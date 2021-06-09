@@ -60,6 +60,29 @@ public:
     void SetTransmittanceFactor(const glm::vec3& a_Factor) override;
     void SetMetallicFactor(float a_Factor) override;
     void SetRoughnessFactor(float a_Factor) override;
+
+    float GetClearCoatFactor() override { return m_ClearCoatFactor; }
+    float GetClearCoatRoughnessFactor() override { return m_ClearCoatRoughnessFactor; }
+
+    float GetLuminance() override { return m_Luminance; }
+    float GetSheenFactor() override { return m_SheenFactor; }
+    float GetSheenTintFactor() override { return m_SheenTintFactor; }
+
+    float GetAnisotropic() override { return m_Anisotropic; }
+
+    glm::vec3 GetTintFactor() override { return glm::vec3(m_TintFactor.x, m_TintFactor.y, m_TintFactor.z); }
+
+    float GetTransmissionFactor() override { return m_TransmissionFactor; }
+    glm::vec3 GetTransmittanceFactor() override { return glm::vec3(m_Transmittance.x, m_Transmittance.y, m_Transmittance.z); }
+    float GetIndexOfRefraction() override { return m_IndexOfRefraction; }
+
+    float GetSpecularFactor() override { return m_SpecularFactor; }
+    float GetSpecularTintFactor() override { return m_SpecularTintFactor; }
+    float GetSubSurfaceFactor() override { return m_SubSurfaceFactor; }
+
+    float GetMetallicFactor() override { return m_MetallicFactor; }
+    float GetRoughnessFactor() override { return m_RoughnessFactor; }
+
 private:
     // Material data is kept here instead of the base class to account for API-specific implementation details   
     float4 m_DiffuseColor;
