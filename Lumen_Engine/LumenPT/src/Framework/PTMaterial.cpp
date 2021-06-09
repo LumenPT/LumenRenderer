@@ -8,7 +8,14 @@
 #include "Cuda/vector_functions.h"
 
 PTMaterial::PTMaterial()
-    : m_DeviceMaterialDirty(true)
+    : m_DiffuseColor(), m_EmissiveColor(), m_TransmissionFactor(0), m_ClearCoatFactor(0), m_ClearCoatRoughnessFactor(0),
+      m_IndexOfRefraction(1.f),
+      m_SpecularFactor(0),
+      m_SpecularTintFactor(0),
+      m_SubSurfaceFactor(0), m_Luminance(0), m_Anisotropic(0),
+      m_SheenFactor(0.f), m_SheenTintFactor(0), m_MetallicFactor(1.f), m_RoughnessFactor(1.f),
+      m_TintFactor(make_float3(0.f)), m_Transmittance(),
+      m_DeviceMaterialDirty(true)
 {
     // Allocate the GPU memory for the GPU material representation
     m_DeviceMemoryBuffer = std::make_unique<MemoryBuffer>(sizeof(DeviceMaterial));
@@ -95,12 +102,15 @@ DeviceMaterial PTMaterial::CreateDeviceMaterial() const
     m.m_EmissionColor = m_EmissiveColor;
 
     //Should always have a default loaded.
-    m.m_MetalRoughnessTexture = **m_MetalRoughnessTexture;
+    if (m_MetalRoughnessTexture)
+        m.m_MetalRoughnessTexture = **m_MetalRoughnessTexture;
 
     //Should always be default loaded
-    m.m_NormalTexture = **m_NormalTexture;
+    if (m_NormalTexture)
+        m.m_NormalTexture = **m_NormalTexture;
 
-    m.m_EmissiveTexture = **m_EmissiveTexture;
+    if (m_EmissiveTexture)
+        m.m_EmissiveTexture = **m_EmissiveTexture;
 
 
     if (m_DiffuseTexture)
@@ -108,5 +118,159 @@ DeviceMaterial PTMaterial::CreateDeviceMaterial() const
         m.m_DiffuseTexture = **m_DiffuseTexture;
     }
 
+
+    //Disney BSDF stuff
+    m.m_TransmissionFactor = m_TransmissionFactor;
+    m.m_ClearCoatFactor = m_ClearCoatFactor;
+    m.m_IndexOfRefraction = m_IndexOfRefraction;
+    m.m_ClearCoatRoughnessFactor = m_ClearCoatRoughnessFactor;
+    m.m_SpecularFactor = m_SpecularFactor;
+    m.m_SpecularTintFactor = m_SpecularTintFactor;
+    m.m_SubSurfaceFactor = m_SubSurfaceFactor;
+
+    if(m_TransmissionTexture)
+    {
+        m.m_TransmissionTexture = **m_TransmissionTexture;
+    }
+
+    if(m_ClearCoatTexture)
+    {
+        m.m_ClearCoatTexture = **m_ClearCoatTexture;
+    }
+
+    if(m_ClearCoatRoughnessTexture)
+    {
+        m.m_ClearCoatTexture = **m_ClearCoatRoughnessTexture;
+    }
+
+    if (m_TintTexture)
+    {
+        m.m_TintTexture = **m_TintTexture;
+    }
+
+    m.m_Luminance = m_Luminance;
+    m.m_SheenFactor = m_SheenFactor;
+    m.m_SheenTintFactor = m_SheenTintFactor;
+    m.m_TintFactor = m_TintFactor;
+    m.m_Anisotropic = m_Anisotropic;
+    m.m_TransmittanceFactor = m_Transmittance;
+
+    m.m_MetallicFactor = m_MetallicFactor;
+    m.m_RoughnessFactor = m_RoughnessFactor;
+
     return m;
+}
+
+void PTMaterial::SetClearCoatTexture(std::shared_ptr<Lumen::ILumenTexture> a_Texture)
+{
+    m_ClearCoatTexture = *reinterpret_cast<std::shared_ptr<PTTexture>*>(&a_Texture);
+    m_DeviceMaterialDirty = true;
+}
+
+void PTMaterial::SetClearCoatRoughnessTexture(std::shared_ptr<Lumen::ILumenTexture> a_Texture)
+{
+    m_ClearCoatRoughnessTexture = *reinterpret_cast<std::shared_ptr<PTTexture>*>(&a_Texture);
+    m_DeviceMaterialDirty = true;
+}
+
+void PTMaterial::SetTransmissionTexture(std::shared_ptr<Lumen::ILumenTexture> a_Texture)
+{
+    m_TransmissionTexture = *reinterpret_cast<std::shared_ptr<PTTexture>*>(&a_Texture);
+    m_DeviceMaterialDirty = true;
+}
+
+void PTMaterial::SetClearCoatFactor(float a_Factor)
+{
+    m_ClearCoatFactor = a_Factor;
+    m_DeviceMaterialDirty = true;
+}
+
+void PTMaterial::SetClearCoatRoughnessFactor(float a_Factor)
+{
+    m_ClearCoatRoughnessFactor = a_Factor;
+    m_DeviceMaterialDirty = true;
+}
+
+void PTMaterial::SetIndexOfRefraction(float a_Factor)
+{
+    m_IndexOfRefraction = a_Factor;
+    m_DeviceMaterialDirty = true;
+}
+
+void PTMaterial::SetTransmissionFactor(float a_Factor)
+{
+    m_TransmissionFactor = a_Factor;
+    m_DeviceMaterialDirty = true;
+}
+
+void PTMaterial::SetSpecularFactor(float a_Factor)
+{
+    m_SpecularFactor = a_Factor;
+    m_DeviceMaterialDirty = true;
+}
+
+void PTMaterial::SetSpecularTintFactor(float a_Factor)
+{
+    m_SpecularTintFactor = a_Factor;
+    m_DeviceMaterialDirty = true;
+}
+
+void PTMaterial::SetSubSurfaceFactor(float a_Factor)
+{
+    m_SubSurfaceFactor = a_Factor;
+    m_DeviceMaterialDirty = true;
+}
+
+void PTMaterial::SetLuminance(float a_Factor)
+{
+    m_Luminance = a_Factor;
+    m_DeviceMaterialDirty = true;
+}
+
+void PTMaterial::SetTintTexture(std::shared_ptr<Lumen::ILumenTexture> a_Texture)
+{
+    m_TintTexture = *reinterpret_cast<std::shared_ptr<PTTexture>*>(&a_Texture);
+    m_DeviceMaterialDirty = true;
+}
+
+void PTMaterial::SetTintFactor(const glm::vec3& a_Factor)
+{
+    m_TintFactor = make_float3(a_Factor.x, a_Factor.y, a_Factor.z);
+    m_DeviceMaterialDirty = true;
+}
+
+void PTMaterial::SetAnisotropic(float a_Factor)
+{
+    m_Anisotropic = a_Factor;
+    m_DeviceMaterialDirty = true;
+}
+
+void PTMaterial::SetSheenFactor(float a_Factor)
+{
+    m_SheenFactor = a_Factor;
+    m_DeviceMaterialDirty = true;
+}
+
+void PTMaterial::SetSheenTintFactor(float a_Factor)
+{
+    m_SheenTintFactor = a_Factor;
+    m_DeviceMaterialDirty = true;
+}
+
+void PTMaterial::SetTransmittanceFactor(const glm::vec3& a_Factor)
+{
+    m_Transmittance = make_float3(a_Factor.x, a_Factor.y, a_Factor.z);
+    m_DeviceMaterialDirty = true;
+}
+
+void PTMaterial::SetMetallicFactor(float a_Factor)
+{
+    m_MetallicFactor = a_Factor;
+    m_DeviceMaterialDirty = true;
+}
+
+void PTMaterial::SetRoughnessFactor(float a_Factor)
+{
+    m_RoughnessFactor = a_Factor;
+    m_DeviceMaterialDirty = true;
 }

@@ -1,6 +1,6 @@
 #pragma once
 #ifdef WAVEFRONT
-#include <Lumen/Renderer/LumenRenderer.h>
+//#include "Lumen/Renderer/LumenRenderer.h"
 #include "../Shaders/CppCommon/WaveFrontDataStructs/OptixLaunchParams.h"
 #include "../Shaders/CppCommon/WaveFrontDataStructs/OptixShaderStructs.h"
 #include "ShaderBindingTableRecord.h"

@@ -27,7 +27,6 @@ public:
 	nanovdb::GridHandle<nanovdb::CudaDeviceBuffer>* GetHandle() { return &m_Handle; };
 	
 	PTServiceLocator& m_Services;
-	SceneDataTableEntry<DeviceVolume> m_SceneDataTableEntry;
 
 	std::unique_ptr<AccelerationStructure> m_AccelerationStructure = nullptr;
 	

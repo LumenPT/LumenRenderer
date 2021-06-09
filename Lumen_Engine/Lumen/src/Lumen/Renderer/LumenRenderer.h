@@ -4,6 +4,8 @@
 
 #include "Lumen/ModelLoading/ILumenScene.h"
 
+#include "Lumen/ModelLoading/SceneManager.h"
+
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
@@ -31,10 +33,15 @@ public:
 	// Structu used to initialize a primitive
 	struct PrimitiveData
 	{
+		PrimitiveData() : m_Interleaved(false) {}
+		bool m_Interleaved;
+
 		VectorView<glm::vec3, uint8_t> m_Positions;
 		VectorView<glm::vec2, uint8_t> m_TexCoords;
 		VectorView<glm::vec3, uint8_t> m_Normals;
 		VectorView<glm::vec4, uint8_t> m_Tangents;
+
+		std::vector<uint8_t> m_VertexBinary;
 
 		// Perhaps temporary solution till we decide how we'll handle the indices
 		std::vector<uint8_t> m_IndexBinary;
@@ -46,10 +53,48 @@ public:
 	// Struct used to initialize a material
 	struct MaterialData
 	{
+		MaterialData(): m_DiffuseColor(1.f, 1.f, 1.f, 1.f), m_EmissionVal(0.f, 0.f, 0.f), m_TransmissionFactor(0.f),
+                        m_ClearCoatFactor(0),
+                        m_ClearCoatRoughnessFactor(0),
+                        m_IndexOfRefraction(0),
+                        m_SpecularFactor(0),
+                        m_SpecularTintFactor(0), m_SubSurfaceFactor(0),
+                        m_Luminance(0),
+                        m_Anisotropic(0),
+                        m_SheenFactor(0), m_SheenTintFactor(0), m_MetallicFactor(1.f), m_RoughnessFactor(1.f),
+                        m_TintFactor(1.f, 1.f, 1.f),
+                        m_Transmittance(1.f, 1.f, 1.f)
+        {
+        }
+
 		glm::vec4 m_DiffuseColor;
-		glm::vec4 m_EmssivionVal;
+		glm::vec3 m_EmissionVal;
 		std::shared_ptr<Lumen::ILumenTexture> m_DiffuseTexture;
 		std::shared_ptr<Lumen::ILumenTexture> m_NormalMap;
+		std::shared_ptr<Lumen::ILumenTexture> m_MetallicRoughnessTexture;
+		std::shared_ptr<Lumen::ILumenTexture> m_EmissiveTexture;
+
+		//Disney!
+		std::shared_ptr<Lumen::ILumenTexture> m_TransmissionTexture;
+		std::shared_ptr<Lumen::ILumenTexture> m_ClearCoatTexture;
+		std::shared_ptr<Lumen::ILumenTexture> m_ClearCoatRoughnessTexture;
+		std::shared_ptr<Lumen::ILumenTexture> m_TintTexture;
+
+		float m_TransmissionFactor;
+		float m_ClearCoatFactor;
+		float m_ClearCoatRoughnessFactor;
+		float m_IndexOfRefraction;
+		float m_SpecularFactor;
+		float m_SpecularTintFactor;
+		float m_SubSurfaceFactor;
+		float m_Luminance;
+		float m_Anisotropic;
+		float m_SheenFactor;
+		float m_SheenTintFactor;
+		float m_MetallicFactor;
+		float m_RoughnessFactor;
+		glm::vec3 m_TintFactor;
+		glm::vec3 m_Transmittance;
 	};
 
 	// Struct used to initialize a scene
@@ -91,6 +136,9 @@ public:
 	// Create a primitive from the provided primitive data
 	virtual void StartRendering() = 0;
 	virtual void PerformDeferredOperations() {};
+
+	virtual Lumen::SceneManager::GLTFResource OpenCustomFileFormat(const std::string& a_OriginalFilePath);
+	virtual Lumen::SceneManager::GLTFResource CreateCustomFileFormat(const std::string& a_OriginalFilePath);
 
 	virtual std::unique_ptr<Lumen::ILumenPrimitive> CreatePrimitive(PrimitiveData& a_MeshData) = 0;
 	// Create a mesh from the provided primitives

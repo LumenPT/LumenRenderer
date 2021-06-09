@@ -5,10 +5,14 @@
 #include <cuda_runtime_api.h>
 #include <cuda/device_atomic_functions.h>
 #include <cassert>
+#include <cmath>
 
+#include "disney.cuh"
 #include "../Framework/CudaUtilities.h"
 
-#define CUDA_BLOCK_SIZE 512
+#define CUDA_BLOCK_SIZE 256
+
+#define CUDA_BLOCK_SIZE_GRID dim3{32, 32, 1}
 
 __host__ void ResetReservoirs(int a_NumReservoirs, Reservoir* a_ReservoirPointer)
 {
@@ -66,7 +70,10 @@ __global__ void FillCDFInternal(CDF* a_Cdf, const WaveFront::AtomicBuffer<WaveFr
 
         assert(radiance.x >= 0.f && radiance.y >= 0.f && radiance.z >= 0.f && "Radiance needs to be positive, no taking away the light in the soul");
 
-        a_Cdf->Insert((radiance.x + radiance.y + radiance.z) / 3.f);
+        const float weight = (radiance.x + radiance.y + radiance.z) / 3.f;
+        assert(weight >= 0.f);
+    	
+        a_Cdf->Insert(weight);
     }
 }
 
@@ -101,7 +108,7 @@ __global__ void FillLightBagsInternal(unsigned a_NumLightBags, unsigned a_NumLig
 }
 
 __host__ void PickPrimarySamples(const LightBagEntry* const a_LightBags, Reservoir* a_Reservoirs, const ReSTIRSettings& a_Settings, const WaveFront::SurfaceData * const a_PixelData, const std::uint32_t a_Seed)
-{
+{	
     /*
      * This functions uses a single light bag per block.
      * This means that all threads within a block operate on the same light bag data in the cache.
@@ -110,6 +117,7 @@ __host__ void PickPrimarySamples(const LightBagEntry* const a_LightBags, Reservo
     const auto numReservoirs = (a_Settings.width * a_Settings.height * a_Settings.numReservoirsPerPixel);
     const int blockSize = CUDA_BLOCK_SIZE;
     const int numBlocks = (numReservoirs + blockSize - 1) / blockSize;
+	
     PickPrimarySamplesInternal<<<numBlocks, blockSize>>>
     (
         a_LightBags,
@@ -126,7 +134,7 @@ __host__ void PickPrimarySamples(const LightBagEntry* const a_LightBags, Reservo
 
 __global__ void PickPrimarySamplesInternal(const LightBagEntry* const a_LightBags, Reservoir* a_Reservoirs, unsigned a_NumPrimarySamples, unsigned a_NumReservoirs, unsigned a_NumLightBags, unsigned a_NumLightsPerBag, const WaveFront::SurfaceData * const a_PixelData, const std::uint32_t a_Seed)
 {
-    int index = blockIdx.x * blockDim.x + threadIdx.x;
+	int index = blockIdx.x * blockDim.x + threadIdx.x;
     if (index >= a_NumReservoirs)
     {
         return;
@@ -217,6 +225,19 @@ __global__ void PickPrimarySamplesInternal(const LightBagEntry* const a_LightBag
         //The final PDF for the light in this reservoir is the solid angle divided by the original PDF of the light being chosen based on radiance.
         //Dividing scales the value up.
         const auto pdf = lightSample.solidAnglePdf / initialPdf;
+
+        assert(!isnan(lightSample.solidAnglePdf));
+        assert(!isinf(lightSample.solidAnglePdf));
+        assert(lightSample.solidAnglePdf >= 0.f);
+
+        assert(!isnan(initialPdf));
+        assert(!isinf(initialPdf));
+        assert(initialPdf > 0.f);
+    	
+        assert(!isnan(pdf));
+        assert(!isinf(pdf));
+        assert(pdf >= 0.f);
+    	
         fresh.Update(lightSample, pdf, seed);
     }
 
@@ -283,7 +304,7 @@ __global__ void GenerateShadowRay(WaveFront::AtomicBuffer<RestirShadowRay>* a_At
 /*
  * Generate the shadow rays used for final shading.
  */
-__host__ unsigned int GenerateReSTIRShadowRaysShading(MemoryBuffer* a_AtomicBuffer, Reservoir* a_Reservoirs, const WaveFront::SurfaceData* a_PixelData, unsigned a_NumPixels)
+__host__ unsigned int GenerateReSTIRShadowRaysShading(MemoryBuffer* a_AtomicBuffer, Reservoir* a_Reservoirs, const WaveFront::SurfaceData* a_PixelData, uint2 a_Resolution)
 {
     //Counter that is atomically incremented. Copy it to the GPU.
     WaveFront::ResetAtomicBuffer<RestirShadowRayShading>(a_AtomicBuffer);
@@ -291,12 +312,16 @@ __host__ unsigned int GenerateReSTIRShadowRaysShading(MemoryBuffer* a_AtomicBuff
     const auto devicePtr = a_AtomicBuffer->GetDevicePtr<WaveFront::AtomicBuffer<RestirShadowRayShading>>();
 
     //Call in parallel.
-    const int blockSize = CUDA_BLOCK_SIZE;
-    const int numBlocks = (a_NumPixels + blockSize - 1) / blockSize;
+    const dim3 blockSize = CUDA_BLOCK_SIZE_GRID;
+
+    const unsigned gridWidth = static_cast<unsigned>(std::ceil(static_cast<float>(a_Resolution.x) / static_cast<float>(blockSize.x)));
+    const unsigned gridHeight = static_cast<unsigned>(std::ceil(static_cast<float>(a_Resolution.y) / static_cast<float>(blockSize.y)));
+
+    const dim3 numBlocks {gridWidth, gridHeight, 1};
 
     for (int depth = 0; depth < ReSTIRSettings::numReservoirsPerPixel; ++depth)
     {
-        GenerateShadowRayShading <<<numBlocks, blockSize >>> (devicePtr, a_Reservoirs, a_PixelData, a_NumPixels, depth);
+        GenerateShadowRayShading <<<numBlocks, blockSize >>> (devicePtr, a_Reservoirs, a_PixelData, a_Resolution, depth);
     }
     cudaDeviceSynchronize();
 
@@ -306,18 +331,27 @@ __host__ unsigned int GenerateReSTIRShadowRaysShading(MemoryBuffer* a_AtomicBuff
     return WaveFront::GetAtomicCounter<RestirShadowRayShading>(a_AtomicBuffer);
 }
 
-__global__ void GenerateShadowRayShading(WaveFront::AtomicBuffer<RestirShadowRayShading>* a_AtomicBuffer, Reservoir* a_Reservoirs, const WaveFront::SurfaceData* a_PixelData, unsigned a_NumPixels, unsigned a_Depth)
+__global__ void GenerateShadowRayShading(WaveFront::AtomicBuffer<RestirShadowRayShading>* a_AtomicBuffer, Reservoir* a_Reservoirs, const WaveFront::SurfaceData* a_PixelData, uint2 a_Resolution, unsigned a_Depth)
 {
-    int index = blockIdx.x * blockDim.x + threadIdx.x;
-    if (index >= a_NumPixels) return;
 
-    const WaveFront::SurfaceData pixelData = a_PixelData[index];
+    const unsigned int pixelX = blockIdx.x * blockDim.x + threadIdx.x;
+    const unsigned int pixelY = blockIdx.y * blockDim.y + threadIdx.y;
+
+    //Make sure to not go out of bounds.
+    if(pixelX >= a_Resolution.x || pixelY >= a_Resolution.y)
+    {
+        return;
+    }
+
+    const unsigned int pixelDataIndex = PIXEL_DATA_INDEX(pixelX, pixelY, a_Resolution.x);
+
+    const WaveFront::SurfaceData pixelData = a_PixelData[pixelDataIndex];
 
     //Only run for valid intersections.
     if (pixelData.m_IntersectionT > 0.f && !pixelData.m_Emissive)
     {
         //If the reservoir has a weight, add a shadow ray.
-        const auto reservoirIndex = RESERVOIR_INDEX(index, a_Depth, ReSTIRSettings::numReservoirsPerPixel);
+        const auto reservoirIndex = RESERVOIR_INDEX(pixelDataIndex, a_Depth, ReSTIRSettings::numReservoirsPerPixel);
         const Reservoir reservoir = a_Reservoirs[reservoirIndex];
 
         if (reservoir.weight > 0.f)
@@ -330,16 +364,17 @@ __global__ void GenerateShadowRayShading(WaveFront::AtomicBuffer<RestirShadowRay
 
             RestirShadowRayShading ray;
             ray.index = reservoirIndex;
+            ray.pixelIndex = { pixelX, pixelY };
             ray.direction = pixelToLight;
             ray.origin = pixelData.m_Position;
             ray.distance = l - 0.05f; //Make length a little bit shorter to prevent self-shadowing.
-            
-            //Take the average contribution scaled after all reservoirs.
-            ray.contribution = (reservoir.sample.unshadowedPathContribution * (reservoir.weight / static_cast<float>(ReSTIRSettings::numReservoirsPerPixel)));;
 
+            //Take the average contribution scaled after all reservoirs.
+            ray.contribution = (reservoir.sample.unshadowedPathContribution * (reservoir.weight / static_cast<float>(ReSTIRSettings::numReservoirsPerPixel)));
+        	
             //TODO: this is a slow operation. Perhaps it's better to create multiple shadow rays per thread, store them locally, then add them at once?
             a_AtomicBuffer->Add(&ray);
-        } 
+        }
     }
 }
 
@@ -467,6 +502,11 @@ __global__ void SpatialNeighbourSamplingInternal(Reservoir* a_Reservoirs, Reserv
                 //First sample needs no resampling.
                 auto* reservoir = toCombineReservoirs[0];
                 const float weight = static_cast<float>(reservoir->sampleCount) * reservoir->weight * reservoir->sample.solidAnglePdf;
+
+                assert(!isnan(weight));
+                assert(!isinf(weight));
+                assert(weight >= 0.f);
+            	
                 output.Update(reservoir->sample, weight, a_Seed);
                 sampleCountSum += reservoir->sampleCount;
 
@@ -477,6 +517,11 @@ __global__ void SpatialNeighbourSamplingInternal(Reservoir* a_Reservoirs, Reserv
                     LightSample resampled;
                     Resample(&(reservoir->sample), toCombinePixelData[0], &resampled);
                     const float weight = static_cast<float>(reservoir->sampleCount) * reservoir->weight * resampled.solidAnglePdf;
+
+                    assert(!isnan(weight));
+                    assert(!isinf(weight));
+                    assert(weight >= 0.f);
+                	
                     output.Update(resampled, weight, a_Seed);
                     sampleCountSum += reservoir->sampleCount;
                 }
@@ -508,6 +553,11 @@ __global__ void SpatialNeighbourSamplingInternal(Reservoir* a_Reservoirs, Reserv
                 //First sample needs no resampling.
                 auto* reservoir = toCombineReservoirs[0];
                 const float weight = static_cast<float>(reservoir->sampleCount) * reservoir->weight * reservoir->sample.solidAnglePdf;
+
+                assert(!isnan(weight));
+                assert(!isinf(weight));
+                assert(weight >= 0.f);
+            	
                 output.Update(reservoir->sample, weight, a_Seed);
                 sampleCountSum += reservoir->sampleCount;
 
@@ -525,6 +575,10 @@ __global__ void SpatialNeighbourSamplingInternal(Reservoir* a_Reservoirs, Reserv
 
                     const float weight = static_cast<float>(otherReservoir->sampleCount) * otherReservoir->weight * resampled.solidAnglePdf;
 
+                    assert(!isnan(weight));
+                    assert(!isinf(weight));
+                    assert(weight >= 0.f);
+                	
                     output.Update(resampled, weight, a_Seed);
 
                     sampleCountSum += otherReservoir->sampleCount;
@@ -586,15 +640,23 @@ __host__ void TemporalNeighbourSampling(
     const WaveFront::SurfaceData* a_PreviousPixelData,
     const std::uint32_t a_Seed,
     uint2 a_Dimensions,
-    WaveFront::MotionVectorBuffer* a_MotionVectorBuffer
+    const WaveFront::MotionVectorBuffer* const a_MotionVectorBuffer
 )
 {
     const unsigned numReservoirs = a_Dimensions.x * a_Dimensions.y * ReSTIRSettings::numReservoirsPerPixel;
     const int blockSize = CUDA_BLOCK_SIZE;
     const int numBlocks = (numReservoirs + blockSize - 1) / blockSize;
 
-    CombineTemporalSamplesInternal << <numBlocks, blockSize >> > (a_CurrentReservoirs, a_PreviousReservoirs,
-                                                                  a_CurrentPixelData, a_PreviousPixelData, a_Seed, numReservoirs, a_Dimensions, a_MotionVectorBuffer);
+    CombineTemporalSamplesInternal << <numBlocks, blockSize >> > (
+        a_CurrentReservoirs, 
+        a_PreviousReservoirs,
+        a_CurrentPixelData, 
+        a_PreviousPixelData, 
+        a_Seed, 
+        numReservoirs, 
+        a_Dimensions, 
+        a_MotionVectorBuffer);
+
     cudaDeviceSynchronize();
     CHECKLASTCUDAERROR;
 }
@@ -608,7 +670,7 @@ __global__ void CombineTemporalSamplesInternal(
     const std::uint32_t a_Seed,
     unsigned a_NumReservoirs,
     uint2 a_Dimensions,
-    WaveFront::MotionVectorBuffer* a_MotionVectorBuffer
+    const WaveFront::MotionVectorBuffer* const a_MotionVectorBuffer
 )
 {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
@@ -694,6 +756,10 @@ __device__ __inline__ void CombineUnbiased(Reservoir* a_OutputReservoir, const W
 
         const float weight = static_cast<float>(otherReservoir->sampleCount) * otherReservoir->weight * resampled.solidAnglePdf;
 
+        assert(!isnan(weight));
+        assert(!isinf(weight));
+        assert(weight >= 0.f);
+    	
         output.Update(resampled, weight, a_Seed);
 
         sampleCountSum += otherReservoir->sampleCount;
@@ -764,6 +830,10 @@ __device__ __inline__ void CombineBiased(Reservoir* a_OutputReservoir, int a_Cou
 
         const float weight = static_cast<float>(reservoir->sampleCount) * reservoir->weight * resampled.solidAnglePdf;
 
+        assert(!isnan(weight));
+        assert(!isinf(weight));
+        assert(weight >= 0.f);
+    	
         assert(resampled.solidAnglePdf >= 0.f);
 
         output.Update(resampled, weight, a_Seed);
@@ -804,7 +874,7 @@ __device__ __inline__ void Resample(LightSample* a_Input, const WaveFront::Surfa
     //Lambertian term clamped between 0 and 1. SurfaceN dot ToLight
     const float cosOut = fmax(dot(a_Input->normal, -pixelToLightDir), 0.f);
     //Light normal at sample point dotted with light direction. Invert light dir for this (light to pixel instead of pixel to light)
-
+	
     //Light is not facing towards the surface or too close to the surface.
     if(cosIn <= 0 || cosOut <= 0 || lDistance <= 0.01f)
     {
@@ -816,14 +886,29 @@ __device__ __inline__ void Resample(LightSample* a_Input, const WaveFront::Surfa
     const float solidAngle = (cosOut * a_Input->area) / (lDistance * lDistance);
 
     //BSDF is equal to material color for now.
-    const auto brdf = MicrofacetBRDF(pixelToLightDir, -a_PixelData->m_IncomingRayDirection, a_PixelData->m_Normal,
-                                     a_PixelData->m_Color, a_PixelData->m_Metallic, a_PixelData->m_Roughness);
+    //const auto brdf = MicrofacetBRDF(pixelToLightDir, -a_PixelData->m_IncomingRayDirection, a_PixelData->m_Normal,
+    //                                 a_PixelData->m_Color, a_PixelData->m_Metallic, a_PixelData->m_Roughness);
 
     //The unshadowed contribution (contributed if no obstruction is between the light and surface) takes the BRDF,
     //geometry factor and solid angle into account. Also the light radiance.
     //The only thing missing from this is the scaling with the rest of the scene based on the reservoir PDF.
     //Note: No need to multiply with transport factor because this is depth 0. It is always {1, 1, 1}.
-    const auto unshadowedPathContribution = brdf * solidAngle * cosIn * a_Output->radiance;
+    //const auto unshadowedPathContribution = brdf * solidAngle * cosIn * a_Output->radiance;
+
+    float pdf = 0.f;
+    const auto bsdf = EvaluateBSDF(a_PixelData->m_ShadingData, a_PixelData->m_Normal, a_PixelData->m_Tangent, -a_PixelData->m_IncomingRayDirection, pixelToLightDir, pdf);
+	
+    //If contribution to lobe is 0, just discard. Also goes for NAN which is sometimes sadly present with specular vertices.
+    const auto added = pdf + bsdf.x + bsdf.y + bsdf.z;
+    if(pdf <= EPSILON || isnan(added) || isinf(added))
+    {
+        a_Output->unshadowedPathContribution = make_float3(0.f, 0.f, 0.f);
+        a_Output->solidAnglePdf = 0;
+        return;
+    }
+
+    const auto unshadowedPathContribution = (bsdf / pdf) * solidAngle * cosIn * a_Output->radiance;
+	
     a_Output->unshadowedPathContribution = unshadowedPathContribution;
 
     assert(unshadowedPathContribution.x >= 0 && unshadowedPathContribution.y >= 0 && unshadowedPathContribution.z >= 0);
@@ -892,7 +977,13 @@ __global__ void GenerateWaveFrontShadowRaysInternal(Reservoir* a_Reservoirs, con
 
                 //TODO ensure no shadow acne.
                 //TODO: Pass pixel index to shadow ray data.
-                auto data = WaveFront::ShadowRayData{ pixel->m_Index, pixel->m_Position, toLightDir, l - 0.005f, contribution, WaveFront::LightChannel::DIRECT };
+                auto data =
+                    WaveFront::ShadowRayData{
+                        pixel->m_PixelIndex,
+                        pixel->m_Position,
+                        toLightDir, l - 0.005f,
+                        contribution,
+                        WaveFront::LightChannel::DIRECT };
                 a_AtomicBuffer->Add(&data);
             }
         }

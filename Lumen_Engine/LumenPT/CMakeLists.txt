@@ -60,9 +60,13 @@ message("----------------------------------------------")
 
 add_custom_command(
 	OUTPUT ${CUDA_FILES_OUTPUT}
+	COMMAND if exist "${CUDA_FILES_OUTPUT_DIR}\\" 
+			${CMAKE_COMMAND} -E rm -rf "${CUDA_FILES_OUTPUT_DIR}\\" &&
+			${CMAKE_COMMAND} -E echo "[INFO]: Cleaned up shader directory: ${CUDA_FILES_OUTPUT_DIR}"
 	COMMAND ${CMAKE_COMMAND} -E make_directory ${CUDA_FILES_OUTPUT_DIR}
-	COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_OBJECTS:CUDAShaders> ${CUDA_FILES_OUTPUT_DIR}
-	#COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_OBJECTS:CudaPTX> ${CUDA_FILES_OUTPUT_DIR}
+	#COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_OBJECTS:CUDAShaders> ${CUDA_FILES_OUTPUT_DIR}
+	COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_OBJECTS:CUDAShaders> ${CUDA_FILES_OUTPUT_DIR} &&
+			${CMAKE_COMMAND} -E echo "[INFO]: Copied $<TARGET_OBJECTS:CUDAShaders> to ${CUDA_FILES_OUTPUT_DIR}"
 	DEPENDS CUDAShaders
 	VERBATIM
 	COMMAND_EXPAND_LISTS)
@@ -177,6 +181,9 @@ set(LUMENPT_INCLUDES
 	"${CMAKE_CURRENT_SOURCE_DIR}/../Lumen/vendor/glm"
 	"${CMAKE_CURRENT_SOURCE_DIR}/src/"
 	#"${CMAKE_CURRENT_BINARY_DIR}/config"
+	"${CMAKE_CURRENT_SOURCE_DIR}/../Lumen/vendor/fx"
+	"${CMAKE_CURRENT_SOURCE_DIR}/../Lumen/vendor/nlohmann/include"
+	"${CMAKE_CURRENT_BINARY_DIR}/config"
 	${NANOVDB_HEADERS}
 )
 

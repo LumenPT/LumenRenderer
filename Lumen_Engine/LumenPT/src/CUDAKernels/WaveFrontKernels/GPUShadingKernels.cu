@@ -1,5 +1,6 @@
 #include "GPUShadingKernels.cuh"
 #include <device_launch_parameters.h>
+#include "../../../vendor/Include/Cuda/cuda/helpers.h"
 
 //Just temporary CUDA kernels.
 
@@ -18,34 +19,46 @@ CPU_ON_GPU void DEBUGShadePrimIntersections(
     {
         //Copy the diffuse color over for now for unshaded.
         auto* output = &a_Output[i * static_cast<unsigned>(LightChannel::NUM_CHANNELS)];
-        output[static_cast<unsigned>(LightChannel::DIRECT)] = a_CurrentSurfaceData[i].m_Color;
+        output[static_cast<unsigned>(LightChannel::DIRECT)] = a_CurrentSurfaceData[i].m_ShadingData.color;
     }
 }
 
 
 CPU_ON_GPU void WriteToOutput(
     const uint2 a_Resolution,
-    const float3 * const a_Input,
+    const cudaSurfaceObject_t a_Input,
     uchar4* a_Output
 )
 {
-    const unsigned int numPixels = a_Resolution.x * a_Resolution.y;
-    const unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
-    const unsigned int stride = blockDim.x * gridDim.x;
+    const unsigned int pixelX = blockIdx.x * blockDim.x + threadIdx.x;
+    const unsigned int pixelY = blockIdx.y * blockDim.y + threadIdx.y;
+
+    const unsigned int pixelDataIndex = PIXEL_DATA_INDEX(pixelX, pixelY, a_Resolution.x);
 
     //This literally copies 1-to-1 so it doesn't need to know about pixel indices or anything.
     //TODO: Maybe skip this step entirely and just directly output to this buffer when merging light channels? Then apply effects in this buffer?
     //TODO: It would save one copy.
-    for (unsigned int i = index; i < numPixels; i += stride)
+    if(pixelX < a_Resolution.x && pixelY < a_Resolution.y)
     {
-        a_Output[i] = make_color(a_Input[i]);
+        float4 color{ 0.f };
+
+        surf2Dread<float4>(
+            &color,
+            a_Input,
+            pixelX * sizeof(float4),
+            pixelY,
+            cudaBoundaryModeTrap);
+
+        a_Output[pixelDataIndex] = make_color(color);
+            
     }
 }
 
-CPU_ON_GPU void GenerateMotionVector(MotionVectorBuffer* a_Buffer, 
-const SurfaceData* a_CurrentSurfaceData, 
-uint2 a_Resolution, 
-sutil::Matrix4x4 a_PrevViewProjMatrix
+CPU_ON_GPU void GenerateMotionVector(
+    MotionVectorBuffer* a_Buffer, 
+    const SurfaceData* a_CurrentSurfaceData, 
+    uint2 a_Resolution, 
+    sutil::Matrix4x4 a_PrevViewProjMatrix
 )
 {
     int size = a_Resolution.x * a_Resolution.y;
@@ -73,12 +86,5 @@ sutil::Matrix4x4 a_PrevViewProjMatrix
         motionVectorData.m_Velocity = (currScreenPos - prevScreenPos);
         
         a_Buffer->SetMotionVectorData(motionVectorData, i);
-    	
-        //if(i == 800 * 300 + 400)
-        {
-	        //printf("x: %.6f y: %.6f \n", a_Buffer->m_MotionVectorBuffer[i].m_Velocity.x, a_Buffer->m_MotionVectorBuffer[i].m_Velocity.y);
-            //printf("x: %.6f y: %.6f \n", currScreenPos.x, currScreenPos.y);
-            //printf("x: %.6f y: %.6f \n", prevScreenPos.x, prevScreenPos.y);
-        }
     }
 }

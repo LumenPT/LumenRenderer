@@ -31,14 +31,56 @@ struct DeviceMaterial
 {
 
     DeviceMaterial()
-        :
-    m_DiffuseColor({0.f, 0.f, 0.f, 0.f}),
-    m_EmissionColor({0.f, 0.f, 0.f, 0.f}),
-    m_DiffuseTexture(0),
-    m_EmissiveTexture(0),
-    m_MetalRoughnessTexture(0),
-    m_NormalTexture(0)
-    {}
+        : m_TransmissionTexture(0), m_TransmissionFactor(0), m_ClearCoatTexture(0), m_ClearCoatRoughnessTexture(0),
+          m_ClearCoatFactor(0),
+          m_ClearCoatRoughnessFactor(0),
+          m_IndexOfRefraction(0),
+          m_SpecularFactor(0),
+          m_SpecularTintFactor(0),
+          m_SubSurfaceFactor(0), m_Luminance(0), m_Anisotropic(0), m_SheenFactor(0.f),
+          m_TintFactor(make_float3(0.f, 0.f, 0.f)), m_TransmittanceFactor(make_float3(0.f, 0.f, 0.f)),
+          m_DiffuseColor({0.f, 0.f, 0.f, 0.f}),
+          m_EmissionColor({0.f, 0.f, 0.f, 0.f}),
+          m_DiffuseTexture(0),
+          m_EmissiveTexture(0),
+          m_MetalRoughnessTexture(0),
+          m_NormalTexture(0), m_SheenTintFactor(0), m_TintTexture(0)
+    {
+    }
+
+    //TODO: pack these together.
+
+    //Transmission
+    cudaTextureObject_t m_TransmissionTexture;
+    float m_TransmissionFactor;
+
+    //Clearcoat
+    cudaTextureObject_t m_ClearCoatTexture;
+    cudaTextureObject_t m_ClearCoatRoughnessTexture;
+    float m_ClearCoatFactor;
+    float m_ClearCoatRoughnessFactor;
+
+    //Refraction
+    float m_IndexOfRefraction;
+
+    //Specular
+    float m_SpecularFactor;
+    float m_SpecularTintFactor;
+
+    //Subsurface scattering. //NOTE: This is not provided by GLTF at the moment. 
+    float m_SubSurfaceFactor;
+
+    float m_Luminance;
+    float m_Anisotropic;
+
+    float m_MetallicFactor;
+    float m_RoughnessFactor;
+
+    float m_SheenTintFactor;
+    float m_SheenFactor;
+    float3 m_TintFactor;
+    float3 m_TransmittanceFactor;
+
 
     NONAMESPACE::float4 m_DiffuseColor;
     NONAMESPACE::float4 m_EmissionColor;
@@ -46,6 +88,7 @@ struct DeviceMaterial
     cudaTextureObject_t m_EmissiveTexture;
     cudaTextureObject_t m_MetalRoughnessTexture;
     cudaTextureObject_t m_NormalTexture;
+    cudaTextureObject_t m_TintTexture;
 };
 
 //TODO: change this naming because it is confusing, it could be name DevicePrimitiveArray or DeviceMesh

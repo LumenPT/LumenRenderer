@@ -1,8 +1,10 @@
 #include "SnapShotProcessing.cuh"
+#include "../Shaders/CppCommon/WaveFrontDataStructs.h"
 
 #include <device_launch_parameters.h>
 
 CPU_ON_GPU void SeparateIntersectionRayBuffer(WaveFront::AtomicBuffer<WaveFront::IntersectionRayData>* a_IntersectionBuffer,
+                                              uint2 a_Resolution,
                                               float3* a_OriginBuffer, float3* a_DirectionBuffer, float3* a_ContributionBuffer)
 {
     const uint32_t bufferSize = a_IntersectionBuffer->GetSize();
@@ -13,9 +15,12 @@ CPU_ON_GPU void SeparateIntersectionRayBuffer(WaveFront::AtomicBuffer<WaveFront:
     {
         WaveFront::IntersectionRayData* intersectionData = &a_IntersectionBuffer->data[index];
 
-        a_OriginBuffer[intersectionData->m_PixelIndex] = intersectionData->m_Origin;
-        a_DirectionBuffer[intersectionData->m_PixelIndex] = intersectionData->m_Direction;
-        a_ContributionBuffer[intersectionData->m_PixelIndex] = intersectionData->m_Contribution;
+        const WaveFront::PixelIndex& pixelIndex = intersectionData->m_PixelIndex;
+        const unsigned int pixelDataIndex = PIXEL_DATA_INDEX(pixelIndex.m_X, pixelIndex.m_Y, a_Resolution.x);
+
+        a_OriginBuffer[pixelDataIndex] = intersectionData->m_Origin;
+        a_DirectionBuffer[pixelDataIndex] = intersectionData->m_Direction;
+        a_ContributionBuffer[pixelDataIndex] = intersectionData->m_Contribution;
     }
 }
 
@@ -38,11 +43,12 @@ CPU_ON_GPU void SeparateMotionVectorBuffer(uint64_t a_BufferSize, WaveFront::Mot
 }
 
 CPU_ONLY void SeparateIntersectionRayBufferCPU(uint64_t a_BufferSize, WaveFront::AtomicBuffer<WaveFront::IntersectionRayData>* a_IntersectionBuffer,
+    uint2 a_Resolution,
     float3* a_OriginBuffer, float3* a_DirectionBuffer, float3* a_ContributionBuffer)
 {
     const int blockSize = 256;
     const int numBlocks = (a_BufferSize + blockSize - 1) / blockSize;
-    SeparateIntersectionRayBuffer<<<numBlocks, blockSize>>>(a_IntersectionBuffer, a_OriginBuffer, a_DirectionBuffer, a_ContributionBuffer);
+    SeparateIntersectionRayBuffer<<<numBlocks, blockSize>>>(a_IntersectionBuffer, a_Resolution, a_OriginBuffer, a_DirectionBuffer, a_ContributionBuffer);
 
 	cudaDeviceSynchronize();
 };
