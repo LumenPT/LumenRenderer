@@ -1,4 +1,8 @@
 #include "DX11Wrapper.h"
+
+#include <cuda_d3d11_interop.h>
+#include <cuda_runtime_api.h>
+
 namespace WaveFront 
 {
     void DX11Wrapper::Init()
@@ -30,7 +34,7 @@ namespace WaveFront
 
     }
 
-    Microsoft::WRL::ComPtr<ID3D11Texture2D> DX11Wrapper::CreateTexture2D(const uint3 a_ResDepth)
+    Microsoft::WRL::ComPtr<ID3D11Texture2D> DX11Wrapper::CreateTexture2D(const uint3& a_ResDepth)
     {
         D3D11_TEXTURE2D_DESC desc;
         desc.BindFlags = 0;
@@ -48,7 +52,7 @@ namespace WaveFront
 
     }
 
-    Microsoft::WRL::ComPtr<ID3D11Texture2D> DX11Wrapper::ResizeTexture2D(Microsoft::WRL::ComPtr<ID3D11Texture2D> a_Tex, const uint2 a_NewSize)
+    Microsoft::WRL::ComPtr<ID3D11Texture2D> DX11Wrapper::ResizeTexture2D(Microsoft::WRL::ComPtr<ID3D11Texture2D> a_Tex, const uint2& a_NewSize)
     {
         D3D11_TEXTURE2D_DESC desc;
         a_Tex->GetDesc(&desc);
