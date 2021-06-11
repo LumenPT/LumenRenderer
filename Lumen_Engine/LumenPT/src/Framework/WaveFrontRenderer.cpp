@@ -1007,6 +1007,7 @@ namespace WaveFront
 
     std::vector<uint8_t> WaveFrontRenderer::GetOutputTexturePixels(uint32_t& a_Width, uint32_t& a_Height)
     {
+        std::lock_guard<std::mutex> lock(m_OutputBufferMutex);
         auto devPtr = m_OutputBuffer->GetDevicePtr<uchar4>();
         auto size = m_OutputBuffer->GetSize();
 

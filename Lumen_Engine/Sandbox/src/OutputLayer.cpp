@@ -736,6 +736,6 @@ std::string OutputLayer::DefaultScreenshotName()
 	time_t now = time(0);
 	tm* time = gmtime(&now);
 	std::string name = "Screenshot" + std::to_string(time->tm_mday) + std::to_string(time->tm_mon) + '-'
-		+ std::to_string(time->tm_hour) + std::to_string(time->tm_min) + ".png";
+		+ std::to_string(time->tm_hour) + std::to_string(time->tm_min) + std::to_string(time->tm_sec) + ".png";
 	return name;
 }
