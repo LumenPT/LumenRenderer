@@ -53,6 +53,9 @@ private:
     void InitContentViewNameTable();
     void ContentViewDropDown();
 
+    void MakeScreenshot(std::string a_ScreenshotFileName);
+    std::string DefaultScreenshotName();
+
     std::shared_ptr<LumenRenderer> m_Renderer;
     //std::unique_ptr<LumenPT> m_LumenPT;
 
