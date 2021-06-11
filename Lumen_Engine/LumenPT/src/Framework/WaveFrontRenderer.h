@@ -69,6 +69,8 @@ namespace WaveFront
         std::shared_ptr<Lumen::ILumenVolume> CreateVolume(const std::string& a_FilePath) override;
         std::shared_ptr<Lumen::ILumenScene> CreateScene(SceneData a_SceneData) override;
 
+        void DoGameworks() override;
+
         //Public functionality
     public:
         WaveFrontRenderer();

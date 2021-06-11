@@ -103,6 +103,8 @@ public:
 		CHECKLASTCUDAERROR;
 		renderer->CreateDefaultResources();
 
+		renderer->DoGameworks();
+
 #else
 
 		OptiXRenderer::InitializationData initData;

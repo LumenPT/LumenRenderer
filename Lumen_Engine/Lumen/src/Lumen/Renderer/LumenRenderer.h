@@ -153,6 +153,9 @@ public:
 	// Create a volume from the provided file path
 	virtual std::shared_ptr<Lumen::ILumenVolume> CreateVolume(const std::string& a_FilePath) = 0;
 
+	//NGX test
+	virtual void DoGameworks() = 0;
+
 	void CreateDefaultResources();
 
 	virtual unsigned int GetOutputTexture() = 0;	//scene argument may be redundant... or not
