@@ -728,7 +728,8 @@ void OutputLayer::MakeScreenshot(std::string a_ScreenshotFileName)
 	auto pixels = m_Renderer->GetOutputTexturePixels(w, h);
 	std::filesystem::path p = a_ScreenshotFileName;
 	std::filesystem::create_directories(p.parent_path());
-	assert(stbi_write_png(a_ScreenshotFileName.c_str(), w, h, 4, pixels.data(), 0));
+	auto err = stbi_write_png(a_ScreenshotFileName.c_str(), w, h, 4, pixels.data(), 0);
+	assert(err);
 }
 
 std::string OutputLayer::DefaultScreenshotName()
