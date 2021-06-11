@@ -1016,7 +1016,6 @@ namespace WaveFront
 
         std::vector<uint8_t> pixels;
         pixels.resize(size.x * size.y * sizeof(uchar4));
-        std::lock_guard<std::mutex> lock(m_OutputBufferMutex);
 
         cudaMemcpy(pixels.data(), devPtr, pixels.size(), cudaMemcpyKind::cudaMemcpyDeviceToHost);
 
