@@ -928,10 +928,10 @@ namespace WaveFront
     }
 
     std::shared_ptr<Lumen::ILumenTexture> WaveFrontRenderer::CreateTexture(void* a_PixelData,
-        uint32_t a_Width, uint32_t a_Height)
+        uint32_t a_Width, uint32_t a_Height, bool a_Normalize)
     {
         static cudaChannelFormatDesc formatDesc = cudaCreateChannelDesc<uchar4>();
-        return std::make_shared<PTTexture>(a_PixelData, formatDesc, a_Width, a_Height);
+        return std::make_shared<PTTexture>(a_PixelData, formatDesc, a_Width, a_Height, a_Normalize);
     }
 
     std::shared_ptr<Lumen::ILumenMaterial> WaveFrontRenderer::CreateMaterial(
@@ -1057,7 +1057,7 @@ namespace WaveFront
 
         //Initialize the ray buffers. Note: These are not initialized but Reset() is called when the waves start.
         const auto numPrimaryRays = numPixels;
-        const auto numShadowRays = numPixels * m_Settings.depth + (numPixels * ReSTIRSettings::numReservoirsPerPixel); //TODO: change to 2x num pixels and add safety check to resolve when full.
+        const auto numShadowRays = numPixels * m_Settings.depth;// +(numPixels * ReSTIRSettings::numReservoirsPerPixel); //TODO: change to 2x num pixels and add safety check to resolve when full.
 
         //Create atomic buffers. This automatically sets the counter to 0 and size to max.
         CreateAtomicBuffer<IntersectionRayData>(&m_Rays, numPrimaryRays);
