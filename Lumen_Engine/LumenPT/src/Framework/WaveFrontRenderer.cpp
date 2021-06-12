@@ -576,29 +576,39 @@ namespace WaveFront
             //1 and 2 are used for the first intersection and remembered for temporal use.
             const auto surfaceDataBufferIndex = (depth == 0 ? currentIndex : 2);   
 
-            ExtractSurfaceData(
-                numIntersections,
-                m_IntersectionData.GetDevicePtr<AtomicBuffer<IntersectionData>>(),
-                m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>(),
-                m_SurfaceData[surfaceDataBufferIndex].GetDevicePtr<SurfaceData>(),
-                m_Settings.renderResolution,
-                sceneDataTableAccessor);
+        	if(numIntersections > 0)
+        	{
+                ExtractSurfaceData(
+                    numIntersections,
+                    m_IntersectionData.GetDevicePtr<AtomicBuffer<IntersectionData>>(),
+                    m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>(),
+                    m_SurfaceData[surfaceDataBufferIndex].GetDevicePtr<SurfaceData>(),
+                    m_Settings.renderResolution,
+                    sceneDataTableAccessor);
+
+                cudaDeviceSynchronize();
+                CHECKLASTCUDAERROR;
+        	}
 
             unsigned numVolumeIntersections = 0;
             m_VolumetricIntersectionData.Read(&numVolumeIntersections, sizeof(numVolumeIntersections), 0);
 
             const auto volumetricDataBufferIndex = 0;
 
-            ExtractVolumetricData(
-                numVolumeIntersections,
-                m_VolumetricIntersectionData.GetDevicePtr<AtomicBuffer<VolumetricIntersectionData>>(),
-                m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>(),
-                m_VolumetricData[volumetricDataBufferIndex].GetDevicePtr<VolumetricData>(),
-                m_Settings.renderResolution,
-                sceneDataTableAccessor);
+        	//Ensure that there is actually volumes to extract data from.
+        	if(numVolumeIntersections > 0)
+        	{
+                ExtractVolumetricData(
+                    numVolumeIntersections,
+                    m_VolumetricIntersectionData.GetDevicePtr<AtomicBuffer<VolumetricIntersectionData>>(),
+                    m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>(),
+                    m_VolumetricData[volumetricDataBufferIndex].GetDevicePtr<VolumetricData>(),
+                    m_Settings.renderResolution,
+                    sceneDataTableAccessor);
 
-            cudaDeviceSynchronize();
-            CHECKLASTCUDAERROR;
+                cudaDeviceSynchronize();
+                CHECKLASTCUDAERROR;
+        	}
 
             //motion vector generation
             if (depth == 0)

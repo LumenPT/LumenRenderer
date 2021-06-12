@@ -167,17 +167,12 @@ __global__ void PickPrimarySamplesInternal(const LightBagEntry* const a_LightBag
     //The current pixel index.
     const WaveFront::SurfaceData pixel = a_PixelData[pixelIndex];
 
-    //If the surface is emissive, don't apply ReSTIR.
-    if(pixel.m_Emissive)
+    //If the surface is emissive, alpha discarded or non-intersected continue.
+    if(pixel.m_SurfaceFlags)
     {
         return;
     }
 
-    //If no intersection exists at this pixel, do nothing.
-    if(pixel.m_IntersectionT <= 0.f)
-    {
-        return;
-    }
 
     //Base Seed depending on pixel index.
     auto seed = WangHash(a_Seed + WangHash(index));
@@ -276,7 +271,7 @@ __global__ void GenerateShadowRay(WaveFront::AtomicBuffer<RestirShadowRay>* a_At
     const WaveFront::SurfaceData pixelData = a_PixelData[pixelIndex];
 
     //Only run for valid intersections.
-    if(pixelData.m_IntersectionT > 0.f && !pixelData.m_Emissive)
+    if(!pixelData.m_SurfaceFlags)
     {
         //If the reservoir has a weight, add a shadow ray.
         const Reservoir reservoir = a_Reservoirs[index];
@@ -348,7 +343,7 @@ __global__ void GenerateShadowRayShading(WaveFront::AtomicBuffer<RestirShadowRay
     const WaveFront::SurfaceData pixelData = a_PixelData[pixelDataIndex];
 
     //Only run for valid intersections.
-    if (pixelData.m_IntersectionT > 0.f && !pixelData.m_Emissive)
+    if (!pixelData.m_SurfaceFlags)
     {
         //If the reservoir has a weight, add a shadow ray.
         const auto reservoirIndex = RESERVOIR_INDEX(pixelDataIndex, a_Depth, ReSTIRSettings::numReservoirsPerPixel);
@@ -438,7 +433,7 @@ __global__ void SpatialNeighbourSamplingInternal(Reservoir* a_Reservoirs, Reserv
     toCombinePixelData[0] = &a_PixelData[pixelIndex];
 
     //Only run when there's an intersection for this pixel.
-    if (toCombinePixelData[0]->m_IntersectionT > 0.f && !toCombinePixelData[0]->m_Emissive)
+    if (!toCombinePixelData[0]->m_SurfaceFlags)
     {
         const int y = pixelIndex / a_Dimensions.x;
         const int x = pixelIndex - (y * a_Dimensions.x);
@@ -466,7 +461,7 @@ __global__ void SpatialNeighbourSamplingInternal(Reservoir* a_Reservoirs, Reserv
                 toCombinePixelData[count] = &a_PixelData[neighbourIndex];
 
                 //Only run for valid depths and non-emissive surfaces.
-                if (toCombinePixelData[count]->m_IntersectionT > 0.f && !toCombinePixelData[count]->m_Emissive)
+                if (!toCombinePixelData[count]->m_SurfaceFlags)
                 {
                     toCombineReservoirs[count] = &a_Reservoirs[RESERVOIR_INDEX(neighbourIndex, currentDepth, ReSTIRSettings::numReservoirsPerPixel)];
                     //Gotta stay positive.
@@ -702,7 +697,7 @@ __global__ void CombineTemporalSamplesInternal(
     pixelPointers[1] = a_CurrentPixelData[pixelIndex];
 
     //Ensure that the depth of both samples is valid, and then combine them at each depth.
-    if (pixelPointers[0].m_IntersectionT > 0.f && pixelPointers[1].m_IntersectionT > 0.f && !pixelPointers[0].m_Emissive && !pixelPointers[1].m_Emissive)
+    if (!pixelPointers[0].m_SurfaceFlags && !pixelPointers[1].m_SurfaceFlags)
     {
         toCombine[0] = a_PreviousReservoirs[RESERVOIR_INDEX(temporalIndex, currentDepth, ReSTIRSettings::numReservoirsPerPixel)];
         toCombine[1] = a_CurrentReservoirs[index];
@@ -950,7 +945,7 @@ __global__ void GenerateWaveFrontShadowRaysInternal(Reservoir* a_Reservoirs, con
         const WaveFront::SurfaceData* pixel = &a_PixelData[i];
 
         //Only generate shadow rays for pixels that hit a surface that is not emissive.
-        if(pixel->m_IntersectionT > 0.f && !pixel->m_Emissive)
+        if(!(pixel->m_SurfaceFlags))
         {
             /*
              * TODO

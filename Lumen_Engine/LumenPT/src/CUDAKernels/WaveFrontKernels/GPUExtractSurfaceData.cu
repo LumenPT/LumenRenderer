@@ -86,6 +86,40 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
             assert(!isnan(emissive.z));
             assert(!isnan(emissive.w));
 
+            //The surface data to write to. Local copy for fast access.
+            SurfaceData output;
+            output.m_SurfaceFlags = SURFACE_FLAG_NONE;  //Default to no flags.
+
+
+            //If emissive, set flag and 
+            if ((emissive.x > 0 || emissive.y > 0 || emissive.z > 0))
+            {
+                //Clamp between 0 and 1. TODO this is not HDR friendly so remove when we do that.
+                output.m_ShadingData.color = make_float3(emissive);
+                float maximum = fmaxf(output.m_ShadingData.color.x, fmaxf(output.m_ShadingData.color.y, output.m_ShadingData.color.z));
+                output.m_ShadingData.color /= maximum;
+
+                //Set the output flag. Because this surface is emissive, it will never be shaded and paths are always terminated.
+                //NOTE: Surface data position is not set, neither is normal. This means that it is not safe to do anything on an emissive surface that is randomly hit.
+                output.m_SurfaceFlags |= SURFACE_FLAG_EMISSIVE;
+                output.m_PixelIndex = currIntersection.m_PixelIndex;
+                a_OutPut[surfaceDataIndex] = output;
+                continue;
+            }
+
+            //Check for alpha discard (discard anything that is somewhat transparent).
+            if (textureColor.w < 0.51f)
+            {
+                //The position of intersection is set so that the ray can continue onward.
+                output.m_SurfaceFlags |= SURFACE_FLAG_ALPHA_TRANSPARENT;
+                output.m_Position = currRay.m_Origin + currRay.m_Direction * currIntersection.m_IntersectionT;
+                output.m_IncomingRayDirection = currRay.m_Direction;
+                output.m_TransportFactor = currRay.m_Contribution;
+                output.m_PixelIndex = currIntersection.m_PixelIndex;
+                a_OutPut[surfaceDataIndex] = output;
+                continue;
+            }
+
             //Multiply metallic and roughness with their scalar factors.
             const float metal = metalRoughness.z * material->m_MetallicFactor;
             const float roughness = metalRoughness.y * material->m_RoughnessFactor;
@@ -124,8 +158,6 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
             //ETA is air to surface.
             float eta = 1.f / material->m_IndexOfRefraction;
 
-            //The surface data to write to. Local copy for fast access.
-            SurfaceData output;
             output.m_PixelIndex = currIntersection.m_PixelIndex;
             output.m_IntersectionT = currIntersection.m_IntersectionT;
             output.m_Normal = normalMapNormal;
@@ -168,29 +200,13 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
             shadingData.SetTransmission(finalTranmission);
             shadingData.SetTransmittance(material->m_TransmittanceFactor);
             shadingData.SetETA(eta);
-
-            
-            //Useful debug print to show whether or not all information is correctly packed in the struct.
-            /*
-            if(material->m_IndexOfRefraction > 1.5f)
-            {
-                printf("Shading properties:\n eta: %f\n metallic: %f\n roughness: %f\n subsurface: %f\n specular: %f\n spectint: %f\n luminance: %f\n"\
-                    " anisotropic: %f\n clearcoat: %f\n clearcoat: %f\n tint: %f %f %f\n sheen: %f\n sheentint: %f\n transmission: %f\n transmittance: %f %f %f\n"
-                    , ETA, METALLIC, ROUGHNESS, SUBSURFACE, SPECULAR, SPECTINT, LUMINANCE, ANISOTROPIC, CLEARCOAT, CLEARCOATGLOSS, TINT.x, TINT.y, TINT.z, SHEEN, SHEENTINT, TRANSMISSION, shadingData.transmittance.x, shadingData.transmittance.y, shadingData.transmittance.z);
-            }
-            */
-            
-
-            output.m_Emissive = (emissive.x > 0 || emissive.y > 0 || emissive.z > 0);
-            if (output.m_Emissive)
-            {
-                //Clamp between 0 and 1. TODO this is not HDR friendly so remove when we do that.
-                output.m_ShadingData.color = make_float3(emissive);
-                float maximum = fmaxf(output.m_ShadingData.color.x, fmaxf(output.m_ShadingData.color.y, output.m_ShadingData.color.z));
-                output.m_ShadingData.color /= maximum;
-            }
-
+        	
             a_OutPut[surfaceDataIndex] = output;
+        }
+        else
+        {
+        	//No intersection, so mark with the non-intersection bit.
+			a_OutPut[surfaceDataIndex].m_SurfaceFlags = SURFACE_FLAG_NON_INTERSECT;
         }
     }
 }
