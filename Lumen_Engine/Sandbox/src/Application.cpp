@@ -103,7 +103,6 @@ public:
 		CHECKLASTCUDAERROR;
 		renderer->CreateDefaultResources();
 
-		renderer->DoGameworks();
 
 #else
 
@@ -386,6 +385,7 @@ public:
 		//auto volume = lumenPT->m_Scene->AddVolume();
 		//volume->SetVolume(volumeRes->m_Volume);
 
+		renderer->DoGameworks();
 
 		contextLayer->GetPipeline()->StartRendering();
 
