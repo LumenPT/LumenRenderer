@@ -6,25 +6,25 @@
 
 #include <cassert>
 
-PTTexture::PTTexture(std::string a_Path)
+PTTexture::PTTexture(std::string a_Path, bool a_Normalize)
 {
     // Load the data using stb_image
     int x, y, c;
     auto data = stbi_load(a_Path.c_str(), &x, &y, &c, 4);
 
     // Create a texture from the loaded data
-    CreateTextureObject(data, cudaCreateChannelDesc<uchar4>(), x, y);
+    CreateTextureObject(data, cudaCreateChannelDesc<uchar4>(), x, y, a_Normalize);
 
     // Free the loaded data to avoid cramming up the CPU memory
     stbi_image_free(data);
 
 }
 
-PTTexture::PTTexture(void* a_PixelData, cudaChannelFormatDesc& a_FormatDesc, uint32_t a_Width, uint32_t a_Height)
+PTTexture::PTTexture(void* a_PixelData, cudaChannelFormatDesc& a_FormatDesc, uint32_t a_Width, uint32_t a_Height, bool a_Normalize)
     : m_Width(a_Width)
     , m_Height(a_Height)
 {
-    CreateTextureObject(a_PixelData, a_FormatDesc, a_Width, a_Height);
+    CreateTextureObject(a_PixelData, a_FormatDesc, a_Width, a_Height, a_Normalize);
 }
 
 PTTexture::~PTTexture()
@@ -32,7 +32,7 @@ PTTexture::~PTTexture()
     cudaFreeArray(m_MemoryArray);
 }
 
-void PTTexture::CreateTextureObject(void* a_PixelData, cudaChannelFormatDesc& a_FormatDesc, uint32_t a_Width, uint32_t a_Height)
+void PTTexture::CreateTextureObject(void* a_PixelData, cudaChannelFormatDesc& a_FormatDesc, uint32_t a_Width, uint32_t a_Height, bool a_Normalize)
 {
     m_Width = a_Width;
     m_Height = a_Height;
@@ -66,8 +66,8 @@ void PTTexture::CreateTextureObject(void* a_PixelData, cudaChannelFormatDesc& a_
     texDesc.normalizedCoords = 1;
     texDesc.maxAnisotropy = 1;
     texDesc.disableTrilinearOptimization = 1;
-    texDesc.readMode = cudaReadModeNormalizedFloat;
-    texDesc.sRGB = 1;
+    texDesc.readMode = cudaReadModeNormalizedFloat;// a_Normalize ? cudaReadModeNormalizedFloat : cudaReadModeElementType;
+    texDesc.sRGB = a_Normalize ? 1 : 0;
 
     // Finally, create the texture object itself
     cudaCreateTextureObject(&m_TextureObject, &resDesc, &texDesc, nullptr);

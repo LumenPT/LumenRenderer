@@ -198,10 +198,10 @@ void Lumen::SceneManager::InitializeDefaultResources()
 	uchar4 whitePixel = { 255,255,255,255 };
 	uchar4 diffusePixel{ 0, 255, 255, 0};
 	uchar4 normal = { 128, 128, 255, 0 };
-	m_DefaultDiffuseTexture = m_RenderPipeline->CreateTexture(&whitePixel, 1, 1);
-	m_DefaultMetalRoughnessTexture = m_RenderPipeline->CreateTexture(&diffusePixel, 1, 1);
-	m_DefaultNormalTexture = m_RenderPipeline->CreateTexture(&normal, 1, 1);
-	m_DefaultEmissiveTexture = m_RenderPipeline->CreateTexture(&whitePixel, 1, 1);
+	m_DefaultDiffuseTexture = m_RenderPipeline->CreateTexture(&whitePixel, 1, 1, true);
+	m_DefaultMetalRoughnessTexture = m_RenderPipeline->CreateTexture(&diffusePixel, 1, 1, true);
+	m_DefaultNormalTexture = m_RenderPipeline->CreateTexture(&normal, 1, 1, false);
+	m_DefaultEmissiveTexture = m_RenderPipeline->CreateTexture(&whitePixel, 1, 1, true);
 }
 
 void Lumen::SceneManager::LoadNodes(fx::gltf::Document& a_Doc, GLTFResource& a_Res, int a_NodeId, bool a_Root, const glm::mat4& a_TransformMat)
@@ -736,7 +736,7 @@ void Lumen::SceneManager::LoadMaterials(fx::gltf::Document& a_Doc, GLTFResource&
 			//Load the texture either from file or binary. Then create the engine texture object.
 			auto info = LoadTexture(a_Doc, fxMat.pbrMetallicRoughness.baseColorTexture.index, a_Path, 4);
 
-			const auto tex = m_RenderPipeline->CreateTexture(info.data, info.w, info.h);
+			const auto tex = m_RenderPipeline->CreateTexture(info.data, info.w, info.h, true);
 			mat->SetDiffuseTexture(tex);
 
 			//Free the memory after it's uploaded.
@@ -761,7 +761,7 @@ void Lumen::SceneManager::LoadMaterials(fx::gltf::Document& a_Doc, GLTFResource&
 				data->y = std::max(data->y, static_cast<unsigned char>(1));
 			}
 
-			const auto tex = m_RenderPipeline->CreateTexture(info.data, info.w, info.h);
+			const auto tex = m_RenderPipeline->CreateTexture(info.data, info.w, info.h, false);
 			mat->SetMetalRoughnessTexture(tex);
 
 			//Free the memory after it's uploaded.
@@ -777,7 +777,7 @@ void Lumen::SceneManager::LoadMaterials(fx::gltf::Document& a_Doc, GLTFResource&
 		{
 			//Load the texture either from file or binary. Then create the engine texture object.
 			auto info = LoadTexture(a_Doc, fxMat.normalTexture.index, a_Path, 4);
-			const auto tex = m_RenderPipeline->CreateTexture(info.data, info.w, info.h);
+			const auto tex = m_RenderPipeline->CreateTexture(info.data, info.w, info.h, false);
 			mat->SetNormalTexture(tex);
 
 			//Free the memory after it's uploaded.
@@ -804,7 +804,7 @@ void Lumen::SceneManager::LoadMaterials(fx::gltf::Document& a_Doc, GLTFResource&
 		if (fxMat.emissiveTexture.index != -1)
 		{
 			auto info = LoadTexture(a_Doc, fxMat.emissiveTexture.index, a_Path, 4);
-			const auto tex = m_RenderPipeline->CreateTexture(info.data, info.w, info.h);
+			const auto tex = m_RenderPipeline->CreateTexture(info.data, info.w, info.h, true);
 
 			mat->SetEmissiveTexture(tex);
 

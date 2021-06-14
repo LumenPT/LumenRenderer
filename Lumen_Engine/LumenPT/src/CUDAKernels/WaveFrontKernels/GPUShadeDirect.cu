@@ -22,7 +22,7 @@ CPU_ON_GPU void ResolveDirectLightHits(
 
         auto& pixelData = a_SurfaceDataBuffer[pixelDataIndex];
         //If the surface is emissive, store its light directly in the output buffer.
-        if (pixelData.m_Emissive)
+        if (pixelData.m_SurfaceFlags & SURFACE_FLAG_EMISSIVE)
         {
             surf2DLayeredwrite<float4>(
                 make_float4(pixelData.m_ShadingData.color, 1.f),
@@ -68,7 +68,7 @@ CPU_ON_GPU void ShadeDirect(
         
         const SurfaceData& surfaceData = a_SurfaceDataBuffer[pixelDataIndex];
 
-        if (surfaceData.m_IntersectionT > 0.f)
+        if (!surfaceData.m_SurfaceFlags)
         {
             //Pick a light from the CDF.
             unsigned index;
