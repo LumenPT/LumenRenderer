@@ -78,6 +78,7 @@ private:
 	bool m_SwapDirtyFlag;	//Dirty flag to assert if someone forgets to swap the buffers.
 
 	//Memory buffers only used in the current frame.
+	MemoryBuffer m_CdfTree;		//Buffer for tree building for the CDF. 
 	MemoryBuffer m_Cdf;			//The CDF which is the size of a CDF entry times the amount of lights.
 	MemoryBuffer m_LightBags;	//All light bags as a single array. Size of num light bags * size of light bag * light index or something.
 	MemoryBuffer m_ShadowRays;	//Buffer for each shadow ray in a frame. Size of screen dimensions * ray size * reservoirsPerPixel.

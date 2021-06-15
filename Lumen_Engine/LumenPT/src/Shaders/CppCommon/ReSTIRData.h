@@ -31,7 +31,7 @@ struct ReSTIRSettings
     std::uint32_t height = 0;
 
     //The amount of reservoirs used per pixel.
-    static constexpr std::uint32_t numReservoirsPerPixel = 5; //Default 5
+    static constexpr std::uint32_t numReservoirsPerPixel = 1; //Default 5
 
     //The amount of lights per light bag.
     static constexpr std::uint32_t numLightsPerBag = 1000;  //Default 1000
@@ -200,6 +200,25 @@ struct CDF
         data[size] = sum;     
     	
         ++size;
+    }
+
+	/*
+	 * Set the CDF size and total sum.
+	 * This is meant to be used with a parallel scan algorithm.
+	 */
+	GPU_ONLY void SetCDFSize(float a_Sum, unsigned a_Size)
+    {
+        sum = a_Sum;
+        size = a_Size;
+    }
+
+	/*
+	 * Insert an element into the CDF at the given index with the given accumulated weight.
+	 * This is meant  to be used with a parallel scan algorithm.
+	 */
+	GPU_ONLY void Insert(unsigned a_Index, float a_Weight)
+    {
+        data[a_Index] = a_Weight;
     }
 
     /*

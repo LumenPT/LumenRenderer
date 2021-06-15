@@ -249,11 +249,16 @@ void ReSTIR::BuildCDF(const MemoryBuffer const* a_Lights)
 		if (m_Cdf.GetSize() < cdfNeededSize)
 		{
 			m_Cdf.Resize(cdfNeededSize);
-		}
 
+			//The CDF tree requires a base 2 size. First power of 2 bigger than or equal to the number of lights.
+			const unsigned power = std::ceilf(std::log2f(static_cast<float>(numLights))) + 1;	//Take the lowest base of 2, and add 1 for the first copy.
+			m_CdfTree.Resize(static_cast<size_t>(std::pow(2u, power)));
+		}
+		
 		//Insert the light data in the CDF.
-		FillCDF(static_cast<CDF*>(
-			m_Cdf.GetDevicePtr()), 
+		FillCDF(
+			static_cast<CDF*>(m_Cdf.GetDevicePtr()),
+			m_Cdf.GetDevicePtr<float>(),
 			a_Lights->GetDevicePtr<WaveFront::AtomicBuffer<WaveFront::TriangleLight>>(), 
 			numLights);
 	}
