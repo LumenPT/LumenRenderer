@@ -151,4 +151,28 @@ namespace WaveFront
         const unsigned m_BlendCount;
     };
 
+
+    struct OptixDenoiserLaunchParameters
+    {
+
+        CPU_ONLY OptixDenoiserLaunchParameters(
+            const uint2& a_RenderResolution,
+            const cudaSurfaceObject_t a_PixelBufferSingleChannel,
+            float3* a_IntermediaryInput,
+            float3* a_IntermediaryOutput
+        )
+            :
+            m_RenderResolution(a_RenderResolution),
+            m_PixelBufferSingleChannel(a_PixelBufferSingleChannel),
+            m_IntermediaryInput(a_IntermediaryInput),
+            m_IntermediaryOutput(a_IntermediaryOutput)
+        {}
+
+        CPU_ONLY ~OptixDenoiserLaunchParameters() = default;
+
+        const uint2& m_RenderResolution;
+        const cudaSurfaceObject_t m_PixelBufferSingleChannel;
+        float3* m_IntermediaryInput;
+        float3* m_IntermediaryOutput;
+    };
 }

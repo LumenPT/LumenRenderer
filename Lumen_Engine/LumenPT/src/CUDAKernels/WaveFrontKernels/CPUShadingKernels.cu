@@ -281,3 +281,37 @@ CPU_ONLY void WriteToOutput(const PostProcessLaunchParameters& a_PostProcessPara
         a_PostProcessParams.m_FinalOutput
         );
 }
+
+CPU_ONLY void PrepareOptixDenoising(const WaveFront::OptixDenoiserLaunchParameters& a_LaunchParams)
+{
+    //The amount of pixels and threads/blocks needed to apply effects.
+    const dim3 blockSize{ 32, 32 ,1 };
+
+    const unsigned blockSizeWidth =
+        static_cast<unsigned>(std::ceil(static_cast<float>(a_LaunchParams.m_RenderResolution.x) / static_cast<float>(blockSize.x)));
+    const unsigned blockSizeHeight =
+        static_cast<unsigned>(std::ceil(static_cast<float>(a_LaunchParams.m_RenderResolution.y) / static_cast<float>(blockSize.y)));
+
+    const dim3 numBlocks{ blockSizeWidth, blockSizeHeight, 1 };
+
+    PrepareOptixDenoisingGPU << <numBlocks, blockSize >> > (
+        a_LaunchParams
+        );
+}
+
+CPU_ONLY void FinishOptixDenoising(const WaveFront::OptixDenoiserLaunchParameters& a_LaunchParams)
+{
+    //The amount of pixels and threads/blocks needed to apply effects.
+    const dim3 blockSize{ 32, 32 ,1 };
+
+    const unsigned blockSizeWidth =
+        static_cast<unsigned>(std::ceil(static_cast<float>(a_LaunchParams.m_RenderResolution.x) / static_cast<float>(blockSize.x)));
+    const unsigned blockSizeHeight =
+        static_cast<unsigned>(std::ceil(static_cast<float>(a_LaunchParams.m_RenderResolution.y) / static_cast<float>(blockSize.y)));
+
+    const dim3 numBlocks{ blockSizeWidth, blockSizeHeight, 1 };
+
+    FinishOptixDenoisingGPU << <numBlocks, blockSize >> > (
+        a_LaunchParams
+        );
+}

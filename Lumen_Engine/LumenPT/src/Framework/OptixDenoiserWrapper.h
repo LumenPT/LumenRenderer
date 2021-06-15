@@ -36,6 +36,9 @@ public:
 
 	void Denoise(const OptixDenoiserDenoiseParams& a_DenoiseParams);
 
+	MemoryBuffer TestInput;
+	MemoryBuffer TestOutput;
+
 protected:
 
 	OptixDenoiser         m_Denoiser = nullptr;
@@ -43,9 +46,6 @@ protected:
 
 	MemoryBuffer m_state;
 	MemoryBuffer m_scratch;
-
-	MemoryBuffer TestInput;
-	MemoryBuffer TestOutput;
 
 	OptixDenoiserInitParams m_InitParams;	
 };

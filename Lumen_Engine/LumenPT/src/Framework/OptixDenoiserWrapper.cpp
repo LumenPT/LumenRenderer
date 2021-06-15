@@ -77,7 +77,7 @@ void OptixDenoiserWrapper::Denoise(const OptixDenoiserDenoiseParams& a_DenoisePa
 
     std::vector<OptixImage2D> inputLayers;
     OptixImage2D& colorTex = inputLayers.emplace_back();
-    colorTex.data = static_cast<CUdeviceptr>(TestInput.GetCUDAPtr());
+    colorTex.data = /*static_cast<CUdeviceptr>(TestInput.GetCUDAPtr())*/a_DenoiseParams.m_ColorInput;
     colorTex.width = m_InitParams.m_InputWidth;
     colorTex.height = m_InitParams.m_InputHeight;
     colorTex.pixelStrideInBytes = 3 * sizeof(float);
@@ -85,7 +85,7 @@ void OptixDenoiserWrapper::Denoise(const OptixDenoiserDenoiseParams& a_DenoisePa
     colorTex.format = OPTIX_PIXEL_FORMAT_FLOAT3;
 
     OptixImage2D outputTex;
-    outputTex.data = static_cast<CUdeviceptr>(TestOutput.GetCUDAPtr());
+    outputTex.data = /*static_cast<CUdeviceptr>(TestOutput.GetCUDAPtr())*/a_DenoiseParams.m_Output;
     outputTex.width = m_InitParams.m_InputWidth;
     outputTex.height = m_InitParams.m_InputHeight;
     outputTex.pixelStrideInBytes = 3 * sizeof(float);
@@ -108,22 +108,22 @@ void OptixDenoiserWrapper::Denoise(const OptixDenoiserDenoiseParams& a_DenoisePa
     //    );
 
 
-    //auto result = optixDenoiserInvoke(
-    //    m_Denoiser,
-    //    0,
-    //    &optixDenoiserParams,
-    //    static_cast<CUdeviceptr>(m_state.GetCUDAPtr()),
-    //    m_state.GetSize(),
-    //    inputLayers.data(), //TODO
-    //    1, //TODO
-    //    0,
-    //    0,
-    //    &outputTex, //TODO
-    //    static_cast<CUdeviceptr>(m_scratch.GetCUDAPtr()),
-    //    m_scratch.GetSize()
-    //    );
+    /*auto result = optixDenoiserInvoke(
+        m_Denoiser,
+        0,
+        &optixDenoiserParams,
+        static_cast<CUdeviceptr>(m_state.GetCUDAPtr()),
+        m_state.GetSize(),
+        inputLayers.data(),
+        1,
+        0,
+        0,
+        &outputTex,
+        static_cast<CUdeviceptr>(m_scratch.GetCUDAPtr()),
+        m_scratch.GetSize()
+        );
 
-    //CHECKOPTIXRESULT(result);
+    CHECKOPTIXRESULT(result);*/
 
 
 }

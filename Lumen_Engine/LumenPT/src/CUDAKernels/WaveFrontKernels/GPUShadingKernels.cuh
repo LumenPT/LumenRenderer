@@ -123,3 +123,7 @@ CPU_ON_GPU void GenerateMotionVector(
     const SurfaceData* a_CurrentSurfaceData,
     uint2 a_Resolution,
     sutil::Matrix4x4 a_PrevViewProjMatrix);
+
+CPU_ON_GPU void PrepareOptixDenoisingGPU(const WaveFront::OptixDenoiserLaunchParameters& a_LaunchParams);
+
+CPU_ON_GPU void FinishOptixDenoisingGPU(const WaveFront::OptixDenoiserLaunchParameters& a_LaunchParams);
