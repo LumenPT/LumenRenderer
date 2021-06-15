@@ -5,9 +5,9 @@
 #include <d3dcompiler.h>
 #include <DirectXMath.h>
 #include <wrl.h>
-#include <cuda_d3d11_interop.h>
-#include <cuda_runtime_api.h>
 
+struct uint3;
+struct uint2;
 
 namespace WaveFront
 {
@@ -18,8 +18,8 @@ namespace WaveFront
 		inline ID3D11Device* GetDevice() { return m_D3dDevice; };
 		inline ID3D11DeviceContext* GetContext() { return m_D3dDeviceContext; };
 
-		Microsoft::WRL::ComPtr<ID3D11Texture2D> CreateTexture2D(const uint3 a_ResDepth);
-		Microsoft::WRL::ComPtr<ID3D11Texture2D> ResizeTexture2D(Microsoft::WRL::ComPtr<ID3D11Texture2D> a_Tex, const uint2 a_NewSize);
+		Microsoft::WRL::ComPtr<ID3D11Texture2D> CreateTexture2D(const uint3& a_ResDepth);
+		Microsoft::WRL::ComPtr<ID3D11Texture2D> ResizeTexture2D(Microsoft::WRL::ComPtr<ID3D11Texture2D> a_Tex, const uint2& a_NewSize);
 
 	private:
 		ID3D11Device* m_D3dDevice = nullptr;

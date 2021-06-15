@@ -75,7 +75,10 @@ namespace WaveFront
         m_ServiceLocator.m_DX11Wrapper = m_DX11Wrapper.get();
         m_DX11Wrapper->Init();
 
-        m_DX11Wrapper->GetDevice();
+        
+
+
+        //m_DX11Wrapper->GetDevice();
 
         m_BlendCounter = 0;
         m_FrameIndex = 0;
@@ -105,26 +108,26 @@ namespace WaveFront
         optixInitData.m_PipelineMaxNumHitResultAttributes = 2;
         optixInitData.m_PipelineMaxNumPayloads = 5;
 
+        
+
         m_OptixSystem = std::make_unique<OptixWrapper>(optixInitData);
 
         //Set the service locator's pointer to the OptixWrapper.
         m_ServiceLocator.m_OptixWrapper = m_OptixSystem.get();
 
-        m_NRD = std::make_unique<NrdWrapper>();
-        NRDWrapperInitParams nrdInitParams;
-        nrdInitParams.m_InputImageWidth = m_Settings.renderResolution.x;
-        nrdInitParams.m_InputImageHeight = m_Settings.renderResolution.y;
-        nrdInitParams.m_pServiceLocator = &m_ServiceLocator;
-        m_NRD->Initialize(nrdInitParams);
+        //m_NRD = std::make_unique<NrdWrapper>();
+        //NRDWrapperInitParams nrdInitParams;
+        //nrdInitParams.m_InputImageWidth = m_Settings.renderResolution.x;
+        //nrdInitParams.m_InputImageHeight = m_Settings.renderResolution.y;
+        //nrdInitParams.m_pServiceLocator = &m_ServiceLocator;
+        //m_NRD->Initialize(nrdInitParams);
 
-        m_DLSS = std::make_unique<DlssWrapper>();
-        DLSSWrapperInitParams dlssInitParams;
-        dlssInitParams.m_InputImageWidth = m_Settings.renderResolution.x;
-        dlssInitParams.m_InputImageHeight = m_Settings.renderResolution.y;
-        dlssInitParams.m_OutputImageWidth = m_Settings.outputResolution.x;
-        dlssInitParams.m_OutputImageHeight = m_Settings.outputResolution.y;
-        dlssInitParams.m_pServiceLocator = &m_ServiceLocator;
-        m_DLSS->Initialize(dlssInitParams);
+        //m_OptixDenoiser = std::make_unique<OptixDenoiserWrapper>();
+        //OptixDenoiserInitParams optixDenoiserInitParams;
+        //optixDenoiserInitParams.m_InputWidth = m_Settings.renderResolution.x;
+        //optixDenoiserInitParams.m_InputHeight = m_Settings.renderResolution.y;
+        //optixDenoiserInitParams.m_ServiceLocator = &m_ServiceLocator;
+        //m_OptixDenoiser->Initialize(optixDenoiserInitParams);
 
         m_OptixDenoiser = std::make_unique<OptixDenoiserWrapper>();
         OptixDenoiserInitParams optixDenoiserInitParams;
@@ -179,6 +182,16 @@ namespace WaveFront
         m_FrameSnapshot = std::make_unique<NullFrameSnapshot>();
 
         m_ModelConverter.SetRendererRef(*this);
+
+        /*m_DLSS = std::make_unique<DlssWrapper>();
+        DLSSWrapperInitParams dlssInitParams;
+        dlssInitParams.m_InputImageWidth = m_Settings.renderResolution.x;
+        dlssInitParams.m_InputImageHeight = m_Settings.renderResolution.y;
+        dlssInitParams.m_OutputImageWidth = m_Settings.outputResolution.x;
+        dlssInitParams.m_OutputImageHeight = m_Settings.outputResolution.y;
+        dlssInitParams.m_pServiceLocator = &m_ServiceLocator;
+        m_DLSS->Initialize(dlssInitParams);*/
+
     }
 
     void WaveFrontRenderer::BeginSnapshot()
@@ -993,6 +1006,20 @@ namespace WaveFront
     std::shared_ptr<Lumen::ILumenScene> WaveFrontRenderer::CreateScene(SceneData a_SceneData)
     {
         return std::make_shared<PTScene>(a_SceneData, m_ServiceLocator);
+    }
+
+    void WaveFrontRenderer::DoGameworks()
+    {
+
+        m_DLSS = std::make_unique<DlssWrapper>();
+        DLSSWrapperInitParams dlssInitParams;
+        dlssInitParams.m_InputImageWidth = m_Settings.renderResolution.x;
+        dlssInitParams.m_InputImageHeight = m_Settings.renderResolution.y;
+        dlssInitParams.m_OutputImageWidth = m_Settings.outputResolution.x;
+        dlssInitParams.m_OutputImageHeight = m_Settings.outputResolution.y;
+        dlssInitParams.m_pServiceLocator = &m_ServiceLocator;
+        m_DLSS->Initialize(dlssInitParams);
+
     }
 
     WaveFrontRenderer::WaveFrontRenderer() : m_BlendCounter(0)

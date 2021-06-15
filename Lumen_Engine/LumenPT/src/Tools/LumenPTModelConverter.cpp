@@ -35,8 +35,8 @@ Lumen::SceneManager::GLTFResource LumenPTModelConverter::ConvertGLTF(std::string
 
 	fx::gltf::ReadQuotas readQuotas{};
 	readQuotas.MaxBufferCount = 8;
-	readQuotas.MaxBufferByteLength = 128000000;	//128MB max.
-	readQuotas.MaxFileSize = 128000000;
+	readQuotas.MaxBufferByteLength = 5120000000;	//128MB max.
+	readQuotas.MaxFileSize = 5120000000;
 
 	if (sp.extension() == ".gltf")
 		fxDoc = LoadFromText(p, readQuotas);

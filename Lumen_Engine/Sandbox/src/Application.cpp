@@ -103,6 +103,7 @@ public:
 		CHECKLASTCUDAERROR;
 		renderer->CreateDefaultResources();
 
+
 #else
 
 		OptiXRenderer::InitializationData initData;
@@ -253,7 +254,7 @@ public:
 		for(auto& lumenMesh : res2->m_MeshPool)
 		{
 			auto mesh = lumenPT->m_Scene->AddMesh();
-      Feature-DX11Wrapper
+      //Feature-DX11Wrapper
 			mesh->SetMesh(lumenMesh);
 			mesh->m_Transform.SetPosition(glm::vec3(000.f, 160.f, -80.f));
 			mesh->m_Transform.SetRotation(glm::vec3(-90.f, 90.f, 0.f));
@@ -384,6 +385,7 @@ public:
 		//auto volume = lumenPT->m_Scene->AddVolume();
 		//volume->SetVolume(volumeRes->m_Volume);
 
+		renderer->DoGameworks();
 
 		contextLayer->GetPipeline()->StartRendering();
 
