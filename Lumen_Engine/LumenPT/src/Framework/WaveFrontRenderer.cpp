@@ -568,6 +568,31 @@ namespace WaveFront
                 return resBuffers;
             });
 
+        m_FrameSnapshot->AddBuffer([&]()
+            {
+                auto optixDenoiserInput = &(m_OptixDenoiser->TestInput);
+                auto optixDenoiszerOutput = &(m_OptixDenoiser->TestOutput);
+
+                std::map<std::string, FrameSnapshot::ImageBuffer> resBuffers;
+                m_DeferredOpenGLCalls.push([&]() {
+                    resBuffers["Optix denoiser input"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
+                        m_Settings.renderResolution.y, 3 * sizeof(float));
+
+                    resBuffers["Optix denoiser output"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
+                        m_Settings.renderResolution.y, 3 * sizeof(float));
+                    });
+                WaitForDeferredCalls();
+
+                SeparateOptixDenoiserBufferCPU(m_Settings.renderResolution.x * m_Settings.renderResolution.y,
+                    optixDenoiserInput->GetDevicePtr<float3>(),
+                    optixDenoiszerOutput->GetDevicePtr<float3>(),
+                    resBuffers.at("Optix denoiser input").m_Memory->GetDevicePtr<float3>(),
+                    resBuffers.at("Optix denoiser output").m_Memory->GetDevicePtr<float3>()
+                );
+
+                return resBuffers;
+            });
+
         //Clear the surface data that contains information from the second last frame so that it can be reused by this frame.
         cudaMemset(m_SurfaceData[currentIndex].GetDevicePtr(), 0, sizeof(SurfaceData) * numPixels);
         cudaDeviceSynchronize();
@@ -820,10 +845,13 @@ namespace WaveFront
 
 
         // TODO: Weird debug code. Yeet?
-        //m_DebugTexture = m_OutputTexture;
+        m_DebugTexture = m_OutputTexture;
         //#if defined(_DEBUG)
-        m_MotionVectors.GenerateDebugTextures();
-        //m_DebugTexture = m_MotionVectors.GetMotionVectorMagnitudeTex();
+        /*m_MotionVectors.GenerateDebugTextures();
+        m_DebugTexture = m_MotionVectors.GetMotionVectorMagnitudeTex();*/
+
+        /*m_OptixDenoiser->UpdateDebugTextures();
+        m_DebugTexture = m_OptixDenoiser->m_OptixDenoiserInputTex.m_Memory->GetTexture();*/
 
         m_SnapshotReady = recordingSnapshot;
         CHECKLASTCUDAERROR;

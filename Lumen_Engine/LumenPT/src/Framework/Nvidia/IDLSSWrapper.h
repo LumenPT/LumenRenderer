@@ -21,7 +21,7 @@ public:
 	virtual ~IDLSSWrapper() = default;
 
 	virtual bool Initialize(DLSSWrapperInitParams a_InitParams) = 0;
-
+	virtual bool EvaluateDLSS() = 0;
 
 protected:
 

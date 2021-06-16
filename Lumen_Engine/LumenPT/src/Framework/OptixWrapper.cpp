@@ -90,8 +90,6 @@ std::unique_ptr<AccelerationStructure> OptixWrapper::BuildInstanceAccelerationSt
     buildInput.type = OPTIX_BUILD_INPUT_TYPE_INSTANCES;
     buildInput.instanceArray.instances = *instanceBuffer;
     buildInput.instanceArray.numInstances = static_cast<uint32_t>(a_Instances.size());
-    buildInput.instanceArray.aabbs = 0;
-    buildInput.instanceArray.numAabbs = 0;
 
     OptixAccelBuildOptions buildOptions = {};
     // Based on research, it is more efficient to continuously be rebuilding most instance acceleration structures rather than to update them

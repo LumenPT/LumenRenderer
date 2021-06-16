@@ -10,7 +10,7 @@ public:
 	~NullDLSSWrapper() {}
 
 	bool Initialize(DLSSWrapperInitParams a_InitParams) override { return false; };
-
+	bool EvaluateDLSS() override { return false; };
 
 protected:
 

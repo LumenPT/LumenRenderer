@@ -6,6 +6,8 @@
 
 #include "MemoryBuffer.h"
 #include "Shaders/CppCommon/WaveFrontDataStructs/CudaKernelParamStructs.h"
+#include "../Tools/FrameSnapshot.h"
+#include "CudaGLTexture.h"
 
 #include <cstdint>
 
@@ -36,8 +38,13 @@ public:
 
 	void Denoise(const OptixDenoiserDenoiseParams& a_DenoiseParams);
 
+	void UpdateDebugTextures();
+
 	MemoryBuffer TestInput;
 	MemoryBuffer TestOutput;
+
+	FrameSnapshot::ImageBuffer m_OptixDenoiserInputTex;
+	FrameSnapshot::ImageBuffer m_OptixDenoiserOutputTex;
 
 protected:
 
@@ -48,4 +55,5 @@ protected:
 	MemoryBuffer m_scratch;
 
 	OptixDenoiserInitParams m_InitParams;	
+
 };

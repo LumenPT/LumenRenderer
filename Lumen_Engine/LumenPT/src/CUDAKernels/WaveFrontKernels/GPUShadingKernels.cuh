@@ -125,6 +125,14 @@ CPU_ON_GPU void GenerateMotionVector(
     uint2 a_Resolution,
     sutil::Matrix4x4 a_PrevViewProjMatrix);
 
-CPU_ON_GPU void PrepareOptixDenoisingGPU(const WaveFront::OptixDenoiserLaunchParameters& a_LaunchParams);
+CPU_ON_GPU void PrepareOptixDenoisingGPU(
+    const uint2 a_RenderResolution,
+    const cudaSurfaceObject_t a_PixelBufferSingleChannel,
+    float3* a_IntermediaryInput,
+    float3* a_IntermediaryOutput);
 
-CPU_ON_GPU void FinishOptixDenoisingGPU(const WaveFront::OptixDenoiserLaunchParameters& a_LaunchParams);
+CPU_ON_GPU void FinishOptixDenoisingGPU(
+    const uint2 a_RenderResolution,
+    const cudaSurfaceObject_t a_PixelBufferSingleChannel,
+    float3* a_IntermediaryInput,
+    float3* a_IntermediaryOutput);
