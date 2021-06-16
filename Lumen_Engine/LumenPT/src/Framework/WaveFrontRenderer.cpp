@@ -718,15 +718,15 @@ namespace WaveFront
             cudaDeviceSynchronize();
             CHECKLASTCUDAERROR;
 
-            /*OptixDenoiserLaunchParameters optixDenoiserLaunchParams(
+            OptixDenoiserLaunchParameters optixDenoiserLaunchParams(
                 m_Settings.renderResolution,
                 m_PixelBufferCombined->GetSurfaceObject(),
                 m_OptixDenoiser->TestInput.GetDevicePtr<float3>(),
                 m_OptixDenoiser->TestOutput.GetDevicePtr<float3>()
             );
 
-            PrepareOptixDenoising(optixDenoiserLaunchParams);
-            CHECKLASTCUDAERROR;*/
+            //PrepareOptixDenoising(optixDenoiserLaunchParams);
+            CHECKLASTCUDAERROR;
 
             OptixDenoiserDenoiseParams optixDenoiserParams = {};
             optixDenoiserParams.m_PostProcessLaunchParams = &postProcessLaunchParams;
@@ -738,8 +738,8 @@ namespace WaveFront
             //cudaDeviceSynchronize();
             CHECKLASTCUDAERROR;
 
-            /*FinishOptixDenoising(optixDenoiserLaunchParams);
-            CHECKLASTCUDAERROR;*/
+            //FinishOptixDenoising(optixDenoiserLaunchParams);
+            CHECKLASTCUDAERROR;
 
             WriteToOutput(postProcessLaunchParams);
             cudaDeviceSynchronize();

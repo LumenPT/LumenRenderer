@@ -282,7 +282,7 @@ CPU_ONLY void WriteToOutput(const PostProcessLaunchParameters& a_PostProcessPara
         );
 }
 
-CPU_ONLY void PrepareOptixDenoising(const WaveFront::OptixDenoiserLaunchParameters& a_LaunchParams)
+CPU_ONLY void PrepareOptixDenoising(WaveFront::OptixDenoiserLaunchParameters& a_LaunchParams)
 {
     //The amount of pixels and threads/blocks needed to apply effects.
     const dim3 blockSize{ 32, 32 ,1 };
@@ -294,12 +294,17 @@ CPU_ONLY void PrepareOptixDenoising(const WaveFront::OptixDenoiserLaunchParamete
 
     const dim3 numBlocks{ blockSizeWidth, blockSizeHeight, 1 };
 
+    printf("hey\n");
+
     PrepareOptixDenoisingGPU << <numBlocks, blockSize >> > (
-        a_LaunchParams
+        a_LaunchParams.m_RenderResolution,
+        a_LaunchParams.m_PixelBufferSingleChannel,
+        a_LaunchParams.m_IntermediaryInput,
+        a_LaunchParams.m_IntermediaryOutput
         );
 }
 
-CPU_ONLY void FinishOptixDenoising(const WaveFront::OptixDenoiserLaunchParameters& a_LaunchParams)
+CPU_ONLY void FinishOptixDenoising(WaveFront::OptixDenoiserLaunchParameters& a_LaunchParams)
 {
     //The amount of pixels and threads/blocks needed to apply effects.
     const dim3 blockSize{ 32, 32 ,1 };
@@ -312,6 +317,9 @@ CPU_ONLY void FinishOptixDenoising(const WaveFront::OptixDenoiserLaunchParameter
     const dim3 numBlocks{ blockSizeWidth, blockSizeHeight, 1 };
 
     FinishOptixDenoisingGPU << <numBlocks, blockSize >> > (
-        a_LaunchParams
+        a_LaunchParams.m_RenderResolution,
+        a_LaunchParams.m_PixelBufferSingleChannel,
+        a_LaunchParams.m_IntermediaryInput,
+        a_LaunchParams.m_IntermediaryOutput
         );
 }
