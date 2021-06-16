@@ -11,6 +11,40 @@ namespace Lumen
     class ILumenScene
     {
     public:
+        struct Node
+        {
+            Node()
+                : m_MeshInstancePtr(nullptr)
+                , m_VolumeInstancePtr(nullptr)
+                , m_Parent(nullptr)
+                , m_Name("Unnamed Node")
+            {}
+
+            /*Node(Node&& a_Other)
+            {
+                m_MeshInstancePtr = a_Other.m_MeshInstancePtr;
+                m_VolumeInstancePtr = a_Other.m_VolumeInstancePtr;
+                m_Parent = a_Other.m_Parent;
+                m_Parent->m_ChildNodes.erase(std::find(m_Parent->m_ChildNodes.begin(), m_Parent->m_ChildNodes.end(),
+                    [&](std::unique_ptr<Node>& a_Child) {return a_Child.get() == &a_Other; }));
+            }*/
+
+            Node* AddChild()
+            {
+                m_ChildNodes.push_back(std::make_unique<Node>());
+                m_Transform.AddChild(m_ChildNodes.back()->m_Transform);
+                m_ChildNodes.back()->m_Parent = this;
+                return m_ChildNodes.back().get();
+            }
+
+            Transform m_Transform; 
+            std::string m_Name;
+            Node* m_Parent;
+            std::vector<std::unique_ptr<Node>> m_ChildNodes;
+            Lumen::MeshInstance* m_MeshInstancePtr;
+            Lumen::VolumeInstance* m_VolumeInstancePtr;
+        };
+
         /// <summary>
         /// Takes in camera data on initialization
         /// </summary>
@@ -35,6 +69,7 @@ namespace Lumen
         std::vector<unsigned int> m_MeshLightIndices;
         std::vector<std::unique_ptr<Lumen::VolumeInstance>> m_VolumeInstances;
         const std::unique_ptr<Camera> m_Camera;
+        std::vector<std::unique_ptr<Node>> m_RootNodes; // GLTF allows for multiple root nodes in the same scene, so support that
     	//accelleration structure
 
     private:

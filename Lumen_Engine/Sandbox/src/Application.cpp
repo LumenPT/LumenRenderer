@@ -200,6 +200,11 @@ public:
 
 		lumenPT->m_Scene = res->m_Scenes[0];
 		lumenPT->m_Scene->m_MeshInstances[0]->m_Transform.SetScale(glm::vec3(1.0f));
+
+		Lumen::ILumenScene::Node* lightsNode = lumenPT->m_Scene->m_RootNodes[0]->AddChild();
+		lightsNode->m_Name = "Lights";
+
+		//lumenPT->m_Scene->m_RootNodes[0].m_Transform.AddChild(lightsNode.m_Transform);
 		for(int i = 0; i < 30; ++i)
 		{
 			for (auto& node : res2->m_NodePool)
@@ -218,12 +223,17 @@ public:
 					//mesh->UpdateAccelRemoveThis();
 				}
 			}
+
+			Lumen::ILumenScene::Node* node = lightsNode->AddChild();
+
 			auto mesh = lumenPT->m_Scene->AddMesh();
+			node->m_MeshInstancePtr = mesh;
 			mesh->SetMesh(res2->m_MeshPool[0]);
 			//mesh->m_Transform.CopyTransform(*node->m_LocalTransform);
 			float p = i;
 			mesh->m_Transform.SetPosition(glm::vec3(xOffset, 100.f + (p * p), 0.f));
 			mesh->m_Transform.SetScale(glm::vec3(2.0f * (static_cast<float>((i + 1) * 2) / 4.f)));
+			mesh->m_Transform.SetParent(&node->m_Transform);
 			Lumen::MeshInstance::Emissiveness emissiveness;
 			emissiveness.m_EmissionMode = Lumen::EmissionMode::OVERRIDE;
 			emissiveness.m_OverrideRadiance = glm::vec3(1.0f, 1.0f, 1.0f);

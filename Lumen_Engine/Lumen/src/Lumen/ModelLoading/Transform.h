@@ -38,6 +38,7 @@ namespace Lumen // BYOUTIFUL KARTOSHKA
 
     class Transform
     {
+        friend Transform;
     public:
         Transform();
         ~Transform();
@@ -69,7 +70,8 @@ namespace Lumen // BYOUTIFUL KARTOSHKA
         glm::vec3 GetRotationEuler() const;
         const glm::vec3& GetScale() const;
 
-        glm::mat4 GetTransformationMatrix() const;
+        glm::mat4 GetWorldTransformationMatrix() const;
+        glm::mat4 GetLocalTransformationMatrix() const;
 
         operator glm::mat4() const;
 
@@ -99,22 +101,44 @@ namespace Lumen // BYOUTIFUL KARTOSHKA
             }
         }
 
+        Transform* GetParent() const { return m_Parent; }
+        const std::vector<Transform*>& GetChildren() const { return m_Children; }
+
+        void SetParent(Transform* a_ParentTransform);
+        void AddChild(Transform& a_ChildTransform);
+        void RemoveChild(Transform& a_ChildTransform);
+
+        static uint64_t m_IdCount;
+        const uint64_t m_ID = m_IdCount++;
     private:
-        void MakeDirty();
-        void UpdateMatrix() const;
+
+        void AddChildInternal(Transform& a_ChildTransform);
+        void SetParentInternal(Transform* a_ParentTransform);
+
+        void MakeWorldDirty();
+        void MakeLocalDirty();
+        void UpdateLocalMatrix() const;
+        void UpdateWorldMatrix() const;
 
         void Decompose();
 
         void UpdateDependents();
 
+
         glm::vec3 m_Position;
         glm::quat m_Rotation;
         glm::vec3 m_Scale;
 
-        mutable glm::mat4 m_TransformationMatrix;
-        mutable bool m_MatrixDirty;
+        mutable glm::mat4 m_WorldMatrix;
+        mutable bool m_WorldMatrixDirty;
+        mutable glm::mat4 m_LocalMatrix;
+        mutable bool m_LocalMatrixDirty;
+
+        Transform* m_Parent;
+        std::vector<Transform*> m_Children;
 
         std::vector<std::unique_ptr<DependentBase>> m_Dependents;
+
     };
 
     Transform operator*(const Lumen::Transform& a_Left, const Lumen::Transform& a_Right);
