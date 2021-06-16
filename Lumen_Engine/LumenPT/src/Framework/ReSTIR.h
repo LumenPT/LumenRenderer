@@ -38,7 +38,7 @@ public:
 		const OptixTraversableHandle a_OptixSceneHandle,
 		const MemoryBuffer* const a_Lights,
 		const std::uint32_t a_Seed,
-		cudaSurfaceObject_t a_OutputBuffer,
+		std::array<cudaSurfaceObject_t, static_cast<unsigned>(WaveFront::LightChannel::NUM_CHANNELS)> a_OutputBuffer,
 		bool a_DebugPrint = false
 	);
 

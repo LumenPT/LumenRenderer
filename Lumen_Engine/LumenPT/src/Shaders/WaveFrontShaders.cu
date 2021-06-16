@@ -149,22 +149,20 @@ __device__ __forceinline__ void ShadowRaysRayGen()
 
         float4 color{ 0.f };
 
-        surf2DLayeredread<float4>(
+        surf2Dread<float4>(
             &color,
-            launchParams.m_ResultBuffer,
+            launchParams.m_OutputChannels[static_cast<unsigned int>(rayData.m_OutputChannel)],
             rayData.m_PixelIndex.m_X * sizeof(float4),
             rayData.m_PixelIndex.m_Y,
-            static_cast<unsigned int>(rayData.m_OutputChannel),
             cudaBoundaryModeTrap);
 
         color += make_float4(rayData.m_PotentialRadiance, 0.f);
 
-        surf2DLayeredwrite<float4>(
+        surf2Dwrite<float4>(
             color,
-            launchParams.m_ResultBuffer,
+            launchParams.m_OutputChannels[static_cast<unsigned int>(rayData.m_OutputChannel)],
             rayData.m_PixelIndex.m_X * sizeof(float4),
             rayData.m_PixelIndex.m_Y,
-            static_cast<unsigned int>(rayData.m_OutputChannel),
             cudaBoundaryModeTrap);
 
     }
@@ -253,22 +251,20 @@ __device__ __forceinline__ void ReSTIRRayGenShading()
 
         float4 color{ 0.f };
 
-        surf2DLayeredread<float4>(
+        surf2Dread<float4>(
             &color,
-            launchParams.m_ResultBuffer,
+            launchParams.m_OutputChannels[static_cast<unsigned int>(LightChannel::DIRECT)],
             rayData.pixelIndex.m_X * sizeof(float4),
             rayData.pixelIndex.m_Y,
-            static_cast<unsigned int>(LightChannel::DIRECT),
             cudaBoundaryModeTrap);
 
         color += make_float4(rayData.contribution, 0.f);
 
-        surf2DLayeredwrite<float4>(
+        surf2Dwrite<float4>(
             color,
-            launchParams.m_ResultBuffer,
+            launchParams.m_OutputChannels[static_cast<unsigned int>(LightChannel::DIRECT)],
             rayData.pixelIndex.m_X * sizeof(float4),
             rayData.pixelIndex.m_Y,
-            static_cast<unsigned int>(LightChannel::DIRECT),
             cudaBoundaryModeTrap);
     }
 }

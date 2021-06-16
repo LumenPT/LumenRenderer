@@ -4,6 +4,7 @@
 #include "SurfaceData.h"
 #include "VolumetricData.h"
 #include "MotionVectorsGenerationData.h"
+#include <array>
 
 class ReSTIR;
 
@@ -78,7 +79,7 @@ namespace WaveFront
             AtomicBuffer<ShadowRayData>* a_SolidShadowRayBuffer,
             AtomicBuffer<ShadowRayData>* a_VolumetricShadowRayBuffer,
             ReSTIR* a_ReSTIR,
-            cudaSurfaceObject_t a_Output
+            std::array<cudaSurfaceObject_t, static_cast<unsigned>(LightChannel::NUM_CHANNELS)> a_OutputChannels
         )
             :
         m_ResolutionAndDepth(a_ResolutionAndDepth),
@@ -95,7 +96,7 @@ namespace WaveFront
         m_SolidShadowRayBuffer(a_SolidShadowRayBuffer),
         m_VolumetricShadowRayBuffer(a_VolumetricShadowRayBuffer),
         m_ReSTIR(a_ReSTIR),
-        m_Output(a_Output)
+        m_OutputChannels(a_OutputChannels)
         {}
 
 
@@ -115,7 +116,7 @@ namespace WaveFront
         AtomicBuffer<ShadowRayData>* m_SolidShadowRayBuffer;
         AtomicBuffer<ShadowRayData>* m_VolumetricShadowRayBuffer;
         ReSTIR* m_ReSTIR;
-        cudaSurfaceObject_t m_Output;
+        std::array<cudaSurfaceObject_t, static_cast<unsigned>(LightChannel::NUM_CHANNELS)> m_OutputChannels;
     };
 
     struct PostProcessLaunchParameters
@@ -124,7 +125,7 @@ namespace WaveFront
         CPU_ONLY PostProcessLaunchParameters(
             const uint2& a_RenderResolution,
             const uint2& a_OutputResolution,
-            const cudaSurfaceObject_t a_PixelBufferMultiChannel,
+            const std::array<cudaSurfaceObject_t, static_cast<unsigned>(LightChannel::NUM_CHANNELS)> a_PixelBufferMultiChannel,
             const cudaSurfaceObject_t a_PixelBufferSingleChannel,
             uchar4* const a_FinalOutput,
             const bool a_BlendOutput,
@@ -144,7 +145,7 @@ namespace WaveFront
 
         const uint2& m_RenderResolution;
         const uint2& m_OutputResolution;
-        const cudaSurfaceObject_t m_PixelBufferMultiChannel;
+        const std::array<cudaSurfaceObject_t, static_cast<unsigned>(LightChannel::NUM_CHANNELS)> m_PixelBufferMultiChannel;
         const cudaSurfaceObject_t m_PixelBufferSingleChannel;
         uchar4* const m_FinalOutput;
         const bool m_BlendOutput;

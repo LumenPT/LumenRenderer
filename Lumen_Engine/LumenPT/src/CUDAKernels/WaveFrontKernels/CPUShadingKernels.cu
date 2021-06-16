@@ -114,7 +114,7 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
         ResolveDirectLightHits<<<numBlocks, blockSize>>>(
             a_ShadingParams.m_CurrentSurfaceData,
             uint2{a_ShadingParams.m_ResolutionAndDepth.x, a_ShadingParams.m_ResolutionAndDepth.y},
-            a_ShadingParams.m_Output
+            a_ShadingParams.m_OutputChannels[static_cast<unsigned>(LightChannel::DIRECT)]
         );
 
         /*
@@ -128,7 +128,7 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
             a_ShadingParams.m_OptixSceneHandle,
             a_ShadingParams.m_TriangleLights,
             a_ShadingParams.m_Seed,
-            a_ShadingParams.m_Output);
+            a_ShadingParams.m_OutputChannels);
     }
     else
     {
@@ -152,7 +152,7 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
             CDFPtr,
             a_ShadingParams.m_SolidShadowRayBuffer,
             a_ShadingParams.m_VolumetricShadowRayBuffer,
-            a_ShadingParams.m_Output);
+            a_ShadingParams.m_OutputChannels[static_cast<unsigned>(LightChannel::VOLUMETRIC)]);
     }
 
     cudaDeviceSynchronize();

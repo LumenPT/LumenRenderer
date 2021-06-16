@@ -3,7 +3,7 @@
 
 CPU_ON_GPU void MergeOutputChannels(
     const uint2 a_Resolution,
-    const cudaSurfaceObject_t a_Input,
+    ArrayParameter<cudaSurfaceObject_t, static_cast<unsigned>(LightChannel::NUM_CHANNELS)> a_Input,
     const cudaSurfaceObject_t a_Output,
     const bool a_BlendOutput,
     const unsigned a_BlendCount
@@ -24,12 +24,12 @@ CPU_ON_GPU void MergeOutputChannels(
         {
 
             float4 channelColor{ 0.f };
-            surf2DLayeredread<float4>(
+
+            surf2Dread<float4>(
                 &channelColor,
-                a_Input,
+                a_Input[channelIndex],
                 pixelX * sizeof(float4),
                 pixelY,
-                channelIndex,
                 cudaBoundaryModeTrap);
 
             mergedColor += channelColor;

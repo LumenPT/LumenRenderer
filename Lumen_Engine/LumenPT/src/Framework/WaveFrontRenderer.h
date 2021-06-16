@@ -3,7 +3,7 @@
 #include "OptixWrapper.h"
 #include "CudaGLTexture.h"
 #include "MemoryBuffer.h"
-#include "GpuTexture.h"
+#include "InteropGPUTexture.h"
 #include "MotionVectors.h"
 #include "../Shaders/CppCommon/WaveFrontDataStructs.h"
 #include "PTServiceLocator.h"
@@ -150,11 +150,16 @@ namespace WaveFront
         //Buffer containing volumetric shadow rays.
         MemoryBuffer m_VolumetricShadowRays;
 
+        static const unsigned s_numLightChannels = static_cast<unsigned>(LightChannel::NUM_CHANNELS);
         //Buffer used for output of separate channels of light.
-        std::unique_ptr<GpuTexture<float4>> m_PixelBufferSeparate;
+        std::unique_ptr<InteropGPUTexture> m_PixelBufferSeparate[s_numLightChannels];
 
         //Buffer used to combine light channels after denoising.
-        std::unique_ptr<GpuTexture<float4>> m_PixelBufferCombined;
+        std::unique_ptr<InteropGPUTexture> m_PixelBufferCombined;
+
+        Microsoft::WRL::ComPtr<ID3D11Texture2D> m_D3D11PixelBufferSeparate;
+
+        Microsoft::WRL::ComPtr<ID3D11Texture2D> m_D3D11PixelBufferCombined;
 
         //Triangle lights.
         MemoryBuffer m_TriangleLights;

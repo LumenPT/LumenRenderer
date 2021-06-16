@@ -15,15 +15,15 @@ namespace WaveFront
 	{
 	public:
 		void Init();
-		inline ID3D11Device* GetDevice() { return m_D3dDevice; };
-		inline ID3D11DeviceContext* GetContext() { return m_D3dDeviceContext; };
+		inline Microsoft::WRL::ComPtr<ID3D11Device> GetDevice() { return m_D3dDevice; };
+		inline Microsoft::WRL::ComPtr<ID3D11DeviceContext> GetContext() { return m_D3dDeviceContext; };
 
 		Microsoft::WRL::ComPtr<ID3D11Texture2D> CreateTexture2D(const uint3& a_ResDepth);
-		Microsoft::WRL::ComPtr<ID3D11Texture2D> ResizeTexture2D(Microsoft::WRL::ComPtr<ID3D11Texture2D> a_Tex, const uint2& a_NewSize);
+		Microsoft::WRL::ComPtr<ID3D11Texture2D> ResizeTexture2D(Microsoft::WRL::ComPtr<ID3D11Texture2D>& a_Tex, const uint2& a_NewSize);
 
 	private:
-		ID3D11Device* m_D3dDevice = nullptr;
-		ID3D11DeviceContext* m_D3dDeviceContext = nullptr;
+		Microsoft::WRL::ComPtr<ID3D11Device> m_D3dDevice = nullptr;
+		Microsoft::WRL::ComPtr<ID3D11DeviceContext> m_D3dDeviceContext = nullptr;
 
 	};
 }

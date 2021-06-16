@@ -71,7 +71,7 @@ CPU_ONLY void ReSTIR::Run(
 	const OptixTraversableHandle a_OptixSceneHandle,
 	const MemoryBuffer* const a_Lights,
 	const std::uint32_t a_Seed,
-	cudaSurfaceObject_t a_OutputBuffer,
+	std::array<cudaSurfaceObject_t, static_cast<unsigned>(WaveFront::LightChannel::NUM_CHANNELS)> a_OutputBuffer,
 	bool a_DebugPrint
 )
 {
@@ -212,7 +212,10 @@ CPU_ONLY void ReSTIR::Run(
 
 	    //Parameters for optix launch.
 		params.m_TraceType = WaveFront::RayType::RESTIR_SHADING_RAY;
-		params.m_ResultBuffer = a_OutputBuffer;
+		for (unsigned int channelIndex = 0; channelIndex < static_cast<unsigned>(WaveFront::LightChannel::NUM_CHANNELS); ++channelIndex)
+		{
+			params.m_OutputChannels[channelIndex] = a_OutputBuffer[channelIndex];
+		}
 		params.m_ReSTIRShadowRayShadingBatch = m_ShadowRaysShading.GetDevicePtr<WaveFront::AtomicBuffer<RestirShadowRayShading>>();
 
 		//Tell Optix to resolve all shadow rays, which sets reservoir weight to 0 when occluded.

@@ -24,12 +24,11 @@ CPU_ON_GPU void ResolveDirectLightHits(
         //If the surface is emissive, store its light directly in the output buffer.
         if (pixelData.m_Emissive)
         {
-            surf2DLayeredwrite<float4>(
+            surf2Dwrite<float4>(
                 make_float4(pixelData.m_ShadingData.color, 1.f),
                 a_Output,
                 pixelX * sizeof(float4),
                 pixelY,
-                static_cast<unsigned int>(LightChannel::DIRECT),
                 cudaBoundaryModeTrap);
         }
 
@@ -47,7 +46,7 @@ CPU_ON_GPU void ShadeDirect(
     const CDF* const a_CDF,
     AtomicBuffer<ShadowRayData>* const a_ShadowRays,
     AtomicBuffer<ShadowRayData>* const a_VolumetricShadowRays,
-	cudaSurfaceObject_t a_Output
+	cudaSurfaceObject_t a_VolumetricOutput
 )
 {
 
@@ -62,7 +61,7 @@ CPU_ON_GPU void ShadeDirect(
     {
 
         //TODO: return some form of light transform factor after resolving the distances in the volume.
-        VolumetricShadeDirect({ pixelX, pixelY }, a_ResolutionAndDepth, a_VolumetricDataBuffer, a_VolumetricShadowRays, a_Lights, a_CDF, a_Output);
+        VolumetricShadeDirect({ pixelX, pixelY }, a_ResolutionAndDepth, a_VolumetricDataBuffer, a_VolumetricShadowRays, a_Lights, a_CDF, a_VolumetricOutput);
 
         // Get intersection.
         

@@ -1,6 +1,7 @@
 #pragma once
 #include "../../Shaders/CppCommon/CudaDefines.h"
 #include "../../Shaders/CppCommon/WaveFrontDataStructs.h"
+#include "../../Shaders/CppCommon/ArrayParameter.h"
 
 using namespace WaveFront;
 
@@ -47,7 +48,7 @@ CPU_ON_GPU void ShadeDirect(
     const CDF* const a_CDF,
     AtomicBuffer<ShadowRayData>* const a_ShadowRays,
     AtomicBuffer<ShadowRayData>* const a_VolumetricShadowRays,
-    cudaSurfaceObject_t a_Output		//TODO: remove a_Output
+    cudaSurfaceObject_t a_VolumetricOutput		//TODO: remove a_Output
     );
 
 /*
@@ -95,7 +96,7 @@ CPU_ON_GPU void Denoise();
  */
 CPU_ON_GPU void MergeOutputChannels(
     const uint2 a_Resolution,
-    const cudaSurfaceObject_t a_Input,
+    const ArrayParameter<cudaSurfaceObject_t, static_cast<unsigned>(LightChannel::NUM_CHANNELS)> a_Input,
     const cudaSurfaceObject_t a_Output,
     const bool a_BlendOutput,
     const unsigned a_BlendCount

@@ -140,12 +140,13 @@ namespace WaveFront
         m_OutputBuffer = std::make_unique<CudaGLTexture>(GL_RGBA8, m_Settings.outputResolution.x, m_Settings.outputResolution.y, 4);
         SetRenderResolution(glm::uvec2(m_Settings.outputResolution.x, m_Settings.outputResolution.y));
 
-        //Set up bufferS.
+        //Set up buffers.
 
-        const auto numOutputChannels = static_cast<unsigned>(LightChannel::NUM_CHANNELS);
+        //Set up pixel output buffers.
 
-        const cudaExtent pixelBufferSizeSeparate = cudaExtent{ m_Settings.renderResolution.x, m_Settings.renderResolution.y, numOutputChannels };
-        const cudaExtent pixelBufferSizeCombined = cudaExtent{ m_Settings.renderResolution.x, m_Settings.renderResolution.y, 0 };
+        m_D3D11PixelBufferSeparate = m_DX11Wrapper->CreateTexture2D({ m_Settings.renderResolution.x, m_Settings.renderResolution.y, s_numLightChannels});
+
+        m_D3D11PixelBufferCombined = m_DX11Wrapper->CreateTexture2D({ m_Settings.renderResolution.x, m_Settings.renderResolution.y, 1 });
 
         cudaTextureDesc pixelBufferDesc {};
         memset(&pixelBufferDesc, 0, sizeof(pixelBufferDesc));
@@ -155,19 +156,28 @@ namespace WaveFront
         pixelBufferDesc.filterMode = cudaFilterModePoint;
         pixelBufferDesc.readMode = cudaReadModeElementType;
 
-        m_PixelBufferSeparate = std::make_unique<GpuTexture<float4>>(
-            pixelBufferSizeSeparate,
-            cudaArrayLayered | cudaArraySurfaceLoadStore,
-            pixelBufferDesc);
+        for(unsigned int channelIndex = 0; channelIndex < s_numLightChannels; ++channelIndex)
+        {
+            m_PixelBufferSeparate[channelIndex] = 
+                std::make_unique<InteropGPUTexture>(
+                    m_D3D11PixelBufferSeparate, 
+                    pixelBufferDesc, 
+                    cudaGraphicsRegisterFlagsSurfaceLoadStore);
 
-        m_PixelBufferSeparate->Clear();
+            m_PixelBufferSeparate[channelIndex]->Map(channelIndex);
+            m_PixelBufferSeparate[channelIndex]->Clear();
+            m_PixelBufferSeparate[channelIndex]->Unmap();
+        }
 
-        m_PixelBufferCombined = std::make_unique<GpuTexture<float4>>(
-            pixelBufferSizeCombined,
-            cudaArraySurfaceLoadStore,
-            pixelBufferDesc);
+        m_PixelBufferCombined =
+            std::make_unique<InteropGPUTexture>(
+                m_D3D11PixelBufferCombined,
+                pixelBufferDesc,
+                cudaGraphicsRegisterFlagsSurfaceLoadStore);
 
+        m_PixelBufferCombined->Map();
         m_PixelBufferCombined->Clear();
+        m_PixelBufferCombined->Unmap();
 
         ResizeBuffers();
 
@@ -438,9 +448,25 @@ namespace WaveFront
         CHECKLASTCUDAERROR;
 
 
+
+        //Prepare separate pixel buffer(s) for CUDA operations.
+        //Get the surface objects to use for the different light channels into a single variable.
+        std::array<cudaSurfaceObject_t, s_numLightChannels> pixelBuffers{};
+        for (unsigned int lightChannelIndex = 0; lightChannelIndex < s_numLightChannels; ++lightChannelIndex)
+        {
+            m_PixelBufferSeparate[lightChannelIndex]->Map(lightChannelIndex);
+            pixelBuffers[lightChannelIndex] = m_PixelBufferSeparate[lightChannelIndex]->GetSurfaceObject();
+        }
+
+        //Prepare combined pixel buffer for CUDA operations.
+        m_PixelBufferCombined->Map();
+
         //Start by clearing the data from the previous frame.
-        //ResetLightChannels(m_PixelBufferSeparate.GetDevicePtr<float3>(), numPixels, static_cast<unsigned>(LightChannel::NUM_CHANNELS));
-        m_PixelBufferSeparate->Clear();
+
+        for(auto& buffer : m_PixelBufferSeparate)
+        {
+            buffer->Clear();   
+        }
 
         //Only clean the merged buffer if no blending is enabled.
         if (!m_Settings.blendOutput)
@@ -651,7 +677,7 @@ namespace WaveFront
                 m_ShadowRays.GetDevicePtr<AtomicBuffer<ShadowRayData>>(),
                 m_VolumetricShadowRays.GetDevicePtr<AtomicBuffer<ShadowRayData>>(),
                 m_ReSTIR.get(),
-                m_PixelBufferSeparate->GetSurfaceObject());
+                pixelBuffers);
 
             //Reset the ray buffer so that indirect shading can fill it again.
             ResetAtomicBuffer<IntersectionRayData>(&m_Rays);
@@ -687,11 +713,13 @@ namespace WaveFront
         if (numShadowRays > 0)
         {
 
+            
+
             //The settings for shadow ray resolving.
             OptixLaunchParameters shadowRayLaunchParameters;
             shadowRayLaunchParameters = rayLaunchParameters; //Copy settings from the intersection rays.
             shadowRayLaunchParameters.m_TraceType = RayType::SHADOW_RAY;
-            shadowRayLaunchParameters.m_ResultBuffer = m_PixelBufferSeparate->GetSurfaceObject();
+            shadowRayLaunchParameters.m_OutputChannels = pixelBuffers;
             shadowRayLaunchParameters.m_ShadowRayBatch = m_ShadowRays.GetDevicePtr<AtomicBuffer<ShadowRayData>>();
 
             //Tell optix to resolve the shadow rays.
@@ -705,7 +733,7 @@ namespace WaveFront
             PostProcessLaunchParameters postProcessLaunchParams(
                 m_Settings.renderResolution,
                 m_Settings.outputResolution,
-                m_PixelBufferSeparate->GetSurfaceObject(),
+                pixelBuffers,
                 m_PixelBufferCombined->GetSurfaceObject(),
                 m_IntermediateOutputBuffer.GetDevicePtr<uchar4>(),
                 m_Settings.blendOutput,
@@ -725,38 +753,46 @@ namespace WaveFront
                 m_OptixDenoiser->TestOutput.GetDevicePtr<float3>()
             );
 
-            PrepareOptixDenoising(optixDenoiserLaunchParams);
-            CHECKLASTCUDAERROR;
+            //PrepareOptixDenoising(optixDenoiserLaunchParams);
+            //CHECKLASTCUDAERROR;
 
-            OptixDenoiserDenoiseParams optixDenoiserParams = {};
-            optixDenoiserParams.m_PostProcessLaunchParams = &postProcessLaunchParams;
-            /*optixDenoiserParams.m_ColorInput = m_IntermediateOutputBuffer.GetCUDAPtr();
-            optixDenoiserParams.m_Output = m_IntermediateOutputBuffer.GetCUDAPtr();*/
-            optixDenoiserParams.m_ColorInput = m_OptixDenoiser->TestInput.GetCUDAPtr();
-            optixDenoiserParams.m_Output = m_OptixDenoiser->TestOutput.GetCUDAPtr();
-            m_OptixDenoiser->Denoise(optixDenoiserParams);
-            //cudaDeviceSynchronize();
-            CHECKLASTCUDAERROR;
+            //OptixDenoiserDenoiseParams optixDenoiserParams = {};
+            //optixDenoiserParams.m_PostProcessLaunchParams = &postProcessLaunchParams;
+            ///*optixDenoiserParams.m_ColorInput = m_IntermediateOutputBuffer.GetCUDAPtr();
+            //optixDenoiserParams.m_Output = m_IntermediateOutputBuffer.GetCUDAPtr();*/
+            //optixDenoiserParams.m_ColorInput = m_OptixDenoiser->TestInput.GetCUDAPtr();
+            //optixDenoiserParams.m_Output = m_OptixDenoiser->TestOutput.GetCUDAPtr();
+            //m_OptixDenoiser->Denoise(optixDenoiserParams);
+            ////cudaDeviceSynchronize();
+            //CHECKLASTCUDAERROR;
 
-            FinishOptixDenoising(optixDenoiserLaunchParams);
-            CHECKLASTCUDAERROR;
+            //FinishOptixDenoising(optixDenoiserLaunchParams);
+            //CHECKLASTCUDAERROR;
 
             WriteToOutput(postProcessLaunchParams);
             cudaDeviceSynchronize();
             CHECKLASTCUDAERROR;
         }
 
+        //Cuda should no longer be operating on the pixelbuffers.
+        for(auto& buffer : m_PixelBufferSeparate)
+        {
+            buffer->Unmap();
+        }
+
+        m_PixelBufferCombined->Unmap();
+
         // Critical scope for updating the output texture
         {
             std::unique_lock guard(m_OutputBufferMutex); // Take ownership of the mutex, locking it
 
-            auto err = cudaGetLastError();
+            CHECKLASTCUDAERROR;
 
             // Perform a GPU to GPU copy, from the intermediate output buffer to the real output buffer
-            auto err1 = cudaMemcpy(m_OutputBuffer->GetDevicePtr<void>(), m_IntermediateOutputBuffer.GetDevicePtr(),
-                m_IntermediateOutputBuffer.GetSize(), cudaMemcpyKind::cudaMemcpyDeviceToDevice);
+            CHECKCUDAERROR(cudaMemcpy(m_OutputBuffer->GetDevicePtr<void>(), m_IntermediateOutputBuffer.GetDevicePtr(),
+                m_IntermediateOutputBuffer.GetSize(), cudaMemcpyKind::cudaMemcpyDeviceToDevice));
 
-            cudaDeviceSynchronize();
+            CHECKCUDAERROR(cudaDeviceSynchronize());
 
             // Once the memcpy is complete, the lock guard releases the mutex
         }
@@ -1102,10 +1138,10 @@ namespace WaveFront
         
 
         //Allocate pixel buffer.
-        m_PixelBufferSeparate->Resize({ m_Settings.renderResolution.x, m_Settings.renderResolution.y, numOutputChannels });
+        //TODO: m_PixelBufferSeparate->Resize({ m_Settings.renderResolution.x, m_Settings.renderResolution.y, numOutputChannels });
 
         //Single channel pixel buffer.
-        m_PixelBufferCombined->Resize({m_Settings.renderResolution.x, m_Settings.renderResolution.y, 0});
+        //TODO: m_PixelBufferCombined->Resize({m_Settings.renderResolution.x, m_Settings.renderResolution.y, 0});
 
         //Initialize the ray buffers. Note: These are not initialized but Reset() is called when the waves start.
         const auto numPrimaryRays = numPixels;
