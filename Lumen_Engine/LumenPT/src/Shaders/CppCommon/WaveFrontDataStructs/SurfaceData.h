@@ -53,16 +53,15 @@ namespace WaveFront
             float3 a_Normal,
             float3 a_GeometricNormal,
             float a_IntersectionT,
-            ShadingData a_ShadingData,
+            MaterialData a_MaterialData,
             SurfaceFlags a_Surface_flags,
-            bool a_Emissive,
             float3 a_IncomingRayDirection,
             float3 a_TransportFactor)
 	        : m_Position(a_Position),
 	          m_Normal(a_Normal),
 	          m_GeometricNormal(a_GeometricNormal), m_Tangent(),
 	          m_IntersectionT(a_IntersectionT),
-	          m_ShadingData(a_ShadingData),
+	          m_MaterialData(a_MaterialData),
 	          m_SurfaceFlags(a_Surface_flags),
 	          m_IncomingRayDirection(a_IncomingRayDirection),
 	          m_TransportFactor(a_TransportFactor)
@@ -94,7 +93,7 @@ namespace WaveFront
         float3 m_IncomingRayDirection;
 
     	//Shading related data such as color, roughness, metallicness and transmission. etc.
-        ShadingData m_ShadingData;  
+        MaterialData m_MaterialData;  
     	
         //Flags telling whether or not this surface is emissive, intersected or alpha transparent.
         SurfaceFlags m_SurfaceFlags;

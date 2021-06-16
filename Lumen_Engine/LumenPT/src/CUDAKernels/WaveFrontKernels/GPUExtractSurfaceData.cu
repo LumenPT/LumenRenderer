@@ -58,8 +58,6 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
             //TODO extract different textures (emissive, diffuse, metallic, roughness).
             const float4 normalMap = tex2D<float4>(material->m_NormalTexture, texCoords.x, texCoords.y);
             const float4 textureColor = tex2D<float4>(material->m_DiffuseTexture, texCoords.x, texCoords.y);
-            const float3 finalColor = make_float3(textureColor * material->m_DiffuseColor);
-            const float4 metalRoughness = tex2D<float4>(material->m_MetalRoughnessTexture, texCoords.x, texCoords.y);
 
             //Emissive mode
             float4 emissive = make_float4(0.f);
@@ -68,7 +66,7 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
             if (devicePrimitiveInstance.m_EmissionMode == Lumen::EmissionMode::ENABLED)
             {
                 emissive = tex2D<float4>(material->m_EmissiveTexture, texCoords.x, texCoords.y);
-                emissive *= material->m_EmissionColor * devicePrimitiveInstance.m_EmissiveColorAndScale.w;
+                emissive *= material->m_MaterialData.m_Emissive * devicePrimitiveInstance.m_EmissiveColorAndScale.w;
             }
 
             //When override, take the ovverride emissive color and scale it up.
@@ -95,9 +93,9 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
             if ((emissive.x > 0 || emissive.y > 0 || emissive.z > 0))
             {
                 //Clamp between 0 and 1. TODO this is not HDR friendly so remove when we do that.
-                output.m_ShadingData.color = make_float3(emissive);
-                float maximum = fmaxf(output.m_ShadingData.color.x, fmaxf(output.m_ShadingData.color.y, output.m_ShadingData.color.z));
-                output.m_ShadingData.color /= maximum;
+                output.m_MaterialData.m_Color = emissive;
+                float maximum = fmaxf(output.m_MaterialData.m_Color.x, fmaxf(output.m_MaterialData.m_Color.y, output.m_MaterialData.m_Color.z));
+                output.m_MaterialData.m_Color /= maximum;
 
                 //Set the output flag. Because this surface is emissive, it will never be shaded and paths are always terminated.
                 //NOTE: Surface data position is not set, neither is normal. This means that it is not safe to do anything on an emissive surface that is randomly hit.
@@ -120,10 +118,6 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
                 continue;
             }
 
-            //Multiply metallic and roughness with their scalar factors.
-            const float metal = metalRoughness.z * material->m_MetallicFactor;
-            const float roughness = metalRoughness.y * material->m_RoughnessFactor;
-
             //Take the local normal and tangent, then calculate the bitangent.
             float4 localNormal = make_float4(normalize(A->m_Normal * W + B->m_Normal * U + C->m_Normal * V), 0.f);
             float4 localTangent =
@@ -137,9 +131,9 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
             auto& mat = devicePrimitiveInstance.m_Transform;
 
             //Transform to world space.
-            float3 normalWorld = normalize(make_float3(mat * localNormal));
-            float3 tangentWorld = normalize(make_float3(mat * localTangent));
-            float3 bitangentWorld = cross(normalWorld, tangentWorld) * flip;
+            const float3 normalWorld = normalize(make_float3(mat * localNormal));
+            const float3 tangentWorld = normalize(make_float3(mat * localTangent));
+            const float3 bitangentWorld = cross(normalWorld, tangentWorld) * flip;
 
             //Extract the normal map normal, and then convert it to world space using the TBN matrix.
             float3 normalMapNormal = make_float3(normalMap.x, normalMap.y, normalMap.z);
@@ -152,11 +146,8 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
                 normalMapNormal.x * tangentWorld.z + normalMapNormal.y * bitangentWorld.z + normalMapNormal.z * normalWorld.z
             ));//Matrix multiply except manually because I don't like sutil.
 
-            //Can't have perfect specular surfaces. 0 is never acceptable.
-            assert(roughness > 0.f && roughness <= 1.f);
-
             //ETA is air to surface.
-            float eta = 1.f / material->m_IndexOfRefraction;
+            float eta = 1.f / material->m_MaterialData.GetRefractiveIndex();
 
             output.m_PixelIndex = currIntersection.m_PixelIndex;
             output.m_IntersectionT = currIntersection.m_IntersectionT;
@@ -167,12 +158,17 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
             output.m_TransportFactor = currRay.m_Contribution;
             output.m_Tangent = tangentWorld;
 
-            auto& shadingData = output.m_ShadingData;
-            shadingData.parameters = make_uint4(0u, 0u, 0u, 0u);    //Default init to 0 for all.
+        	//Copy the material properties over.
+            output.m_MaterialData = material->m_MaterialData;
 
+            //Multiply metallic and roughness with their scalar factors. Write to output.
+            const float4 metalRoughness = tex2D<float4>(material->m_MetalRoughnessTexture, texCoords.x, texCoords.y);
+            output.m_MaterialData.SetMetallic(metalRoughness.z * material->m_MaterialData.GetMetallic());
+            output.m_MaterialData.SetRoughness(metalRoughness.y * material->m_MaterialData.GetRoughness());
+        	
             //Set output color.
-            output.m_ShadingData.color = finalColor;
-
+            const float4 finalColor = textureColor * material->m_MaterialData.m_Color;
+            output.m_MaterialData.m_Color = finalColor;
 
             //Multiply factors with textures.
             const float4 clearCoat = tex2D<float4>(material->m_ClearCoatTexture, texCoords.x, texCoords.y);
@@ -180,26 +176,42 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
             const float4 transmission = tex2D<float4>(material->m_TransmissionTexture, texCoords.x, texCoords.y);
             const float4 tint = tex2D<float4>(material->m_TintTexture, texCoords.x, texCoords.y);
 
-            const float3 finalTintColor = make_float3(tint.x, tint.y, tint.z) * material->m_TintFactor;
-            const float finalClearCoat = material->m_ClearCoatFactor * clearCoat.x;
-            const float clearCoatGloss = 1.f - (material->m_ClearCoatRoughnessFactor * clearCoatRoughness.x);    //Invert from rough to gloss.
-            const float finalTranmission = material->m_TransmissionFactor * transmission.x;
+            const float3 finalTintColor = make_float3(tint.x, tint.y, tint.z) * material->m_MaterialData.GetTint();
+            const float finalClearCoat = material->m_MaterialData.GetClearCoat() * clearCoat.x;
+            const float clearCoatGloss = material->m_MaterialData.GetClearCoatGloss() * (1.f - clearCoatRoughness.x); //Invert the texture because it's roughness and not gloss.
+            const float finalTranmission = material->m_MaterialData.GetTransmission() * transmission.x;
 
-            shadingData.SetMetallic(metal);
-            shadingData.SetRoughness(roughness);
-            shadingData.SetSubSurface(material->m_SubSurfaceFactor);
-            shadingData.SetSpecular(material->m_SpecularFactor);
-            shadingData.SetSpecTint(material->m_SpecularTintFactor);
-            shadingData.SetLuminance(material->m_Luminance);
-            shadingData.SetAnisotropic(material->m_Anisotropic);
-            shadingData.SetClearCoat(finalClearCoat);
-            shadingData.SetClearCoatGloss(clearCoatGloss);
-            shadingData.SetTint(finalTintColor);
-            shadingData.SetSheen(material->m_SheenFactor);
-            shadingData.SetSheenTint(material->m_SheenTintFactor);
-            shadingData.SetTransmission(finalTranmission);
-            shadingData.SetTransmittance(material->m_TransmittanceFactor);
-            shadingData.SetETA(eta);
+            //Can't have perfect specular surfaces. 0 is never acceptable.
+            assert(output.m_MaterialData.GetRoughness() > 0.f && output.m_MaterialData.GetRoughness() <= 1.f);
+        	
+            output.m_MaterialData.SetClearCoat(finalClearCoat);
+            output.m_MaterialData.SetClearCoatGloss(clearCoatGloss);
+            output.m_MaterialData.SetTint(finalTintColor);
+            output.m_MaterialData.SetTransmission(finalTranmission);
+            output.m_MaterialData.SetRefractiveIndex(eta);
+
+
+        	////TODO Comment this out. Debugging only.
+         //   if(i == 220200)
+         //   {
+         //       printf("Surface data material values:\n");
+         //       printf("- Color: %f %f %f %f\n", output.m_MaterialData.m_Color.x, output.m_MaterialData.m_Color.y, output.m_MaterialData.m_Color.z, output.m_MaterialData.m_Color.w);
+         //       printf("- Emissive: %f %f %f %f\n", output.m_MaterialData.m_Emissive.x, output.m_MaterialData.m_Emissive.y, output.m_MaterialData.m_Emissive.z, output.m_MaterialData.m_Emissive.w);
+         //       printf("- Tint: %f %f %f\n", output.m_MaterialData.m_Tint.x, output.m_MaterialData.m_Tint.y, output.m_MaterialData.m_Tint.z);
+         //       printf("- Transmittance: %f %f %f\n", output.m_MaterialData.m_Transmittance.x, output.m_MaterialData.m_Transmittance.y, output.m_MaterialData.m_Transmittance.z);
+         //       printf("- IOR: %f\n", output.m_MaterialData.GetRefractiveIndex());
+         //       printf("- Spec: %f\n", output.m_MaterialData.GetSpecular());
+         //       printf("- SpecTint: %f\n", output.m_MaterialData.GetSpecTint());
+         //       printf("- Luminance: %f\n", output.m_MaterialData.GetLuminance());
+         //       printf("- Metallic: %f\n", output.m_MaterialData.GetMetallic());
+         //       printf("- Roughness: %f\n", output.m_MaterialData.GetRoughness());
+         //       printf("- SubSurface: %f\n", output.m_MaterialData.GetSubSurface());
+         //       printf("- Anisotropic: %f\n", output.m_MaterialData.GetAnisotropic());
+         //       printf("- Sheen: %f\n", output.m_MaterialData.GetSheen());
+         //       printf("- SheenTint: %f\n", output.m_MaterialData.GetSheenTint());
+         //       printf("- ClearCoat: %f\n", output.m_MaterialData.GetClearCoat());
+         //       printf("- Transmission: %f\n", output.m_MaterialData.GetTransmission());
+         //   }
         	
             a_OutPut[surfaceDataIndex] = output;
         }

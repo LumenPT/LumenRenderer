@@ -129,7 +129,7 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
             a_ShadingParams.m_TriangleLights,
             a_ShadingParams.m_Seed,
             a_ShadingParams.m_Output,
-            true);
+            false);
     }
     else
     {

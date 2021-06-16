@@ -9,6 +9,8 @@
 
 #include <memory>
 
+#include "../Shaders/CppCommon/MaterialStructs.h"
+
 struct DeviceMaterial;
 
 // Pathtracer-specific implementation of the material class.
@@ -61,32 +63,38 @@ public:
     void SetMetallicFactor(float a_Factor) override;
     void SetRoughnessFactor(float a_Factor) override;
 
-    float GetClearCoatFactor() override { return m_ClearCoatFactor; }
-    float GetClearCoatRoughnessFactor() override { return m_ClearCoatRoughnessFactor; }
+    float GetClearCoatFactor() override { return m_MaterialData.GetClearCoat(); }
+    float GetClearCoatRoughnessFactor() override { return 1.f - m_MaterialData.GetClearCoatGloss(); }
 
-    float GetLuminance() override { return m_Luminance; }
-    float GetSheenFactor() override { return m_SheenFactor; }
-    float GetSheenTintFactor() override { return m_SheenTintFactor; }
+    float GetLuminance() override { return m_MaterialData.GetLuminance(); }
+    float GetSheenFactor() override { return m_MaterialData.GetSheen(); }
+    float GetSheenTintFactor() override { return m_MaterialData.GetSheenTint(); }
 
-    float GetAnisotropic() override { return m_Anisotropic; }
+    float GetAnisotropic() override { return m_MaterialData.GetAnisotropic(); }
 
-    glm::vec3 GetTintFactor() override { return glm::vec3(m_TintFactor.x, m_TintFactor.y, m_TintFactor.z); }
+    glm::vec3 GetTintFactor() override
+    {
+        const float3 data = m_MaterialData.GetTint();
+	    return glm::vec3(data.x, data.y, data.z);
+    }
 
-    float GetTransmissionFactor() override { return m_TransmissionFactor; }
-    glm::vec3 GetTransmittanceFactor() override { return glm::vec3(m_Transmittance.x, m_Transmittance.y, m_Transmittance.z); }
-    float GetIndexOfRefraction() override { return m_IndexOfRefraction; }
+    float GetTransmissionFactor() override { return m_MaterialData.GetTransmission(); }
+    glm::vec3 GetTransmittanceFactor() override
+    {
+        const auto data = m_MaterialData.GetTransmittance();
+	    return glm::vec3(data.x, data.y, data.z);
+    }
+    float GetIndexOfRefraction() override { return m_MaterialData.GetRefractiveIndex(); }
 
-    float GetSpecularFactor() override { return m_SpecularFactor; }
-    float GetSpecularTintFactor() override { return m_SpecularTintFactor; }
-    float GetSubSurfaceFactor() override { return m_SubSurfaceFactor; }
+    float GetSpecularFactor() override { return m_MaterialData.GetSpecular(); }
+    float GetSpecularTintFactor() override { return m_MaterialData.GetSpecTint(); }
+    float GetSubSurfaceFactor() override { return m_MaterialData.GetSubSurface(); }
 
-    float GetMetallicFactor() override { return m_MetallicFactor; }
-    float GetRoughnessFactor() override { return m_RoughnessFactor; }
+    float GetMetallicFactor() override { return m_MaterialData.GetMetallic(); }
+    float GetRoughnessFactor() override { return m_MaterialData.GetRoughness(); }
 
 private:
     // Material data is kept here instead of the base class to account for API-specific implementation details   
-    float4 m_DiffuseColor;
-    float4 m_EmissiveColor;
     std::shared_ptr<class PTTexture> m_DiffuseTexture;
     std::shared_ptr<class PTTexture> m_EmissiveTexture;
     std::shared_ptr<class PTTexture> m_MetalRoughnessTexture;
@@ -97,21 +105,8 @@ private:
     std::shared_ptr<class PTTexture> m_ClearCoatRoughnessTexture;
     std::shared_ptr<class PTTexture> m_TintTexture;
 
-    float m_TransmissionFactor;
-    float m_ClearCoatFactor;
-    float m_ClearCoatRoughnessFactor;
-    float m_IndexOfRefraction;
-    float m_SpecularFactor;
-    float m_SpecularTintFactor;
-    float m_SubSurfaceFactor;
-    float m_Luminance;
-    float m_Anisotropic;
-    float m_SheenFactor;
-    float m_SheenTintFactor;
-    float m_MetallicFactor;
-    float m_RoughnessFactor;
-    float3 m_TintFactor;
-    float3 m_Transmittance;
+	//Tightly packed material data.
+    MaterialData m_MaterialData;
 
     // A flag to keep track if the GPU representation of the material needs to be updated after something was changed
     mutable bool m_DeviceMaterialDirty;

@@ -1005,7 +1005,7 @@ __device__ __inline__ void Resample(LightSample* a_Input, const WaveFront::Surfa
     //const auto unshadowedPathContribution = brdf * solidAngle * cosIn * a_Output->radiance;
 
     float pdf = 0.f;
-    const auto bsdf = EvaluateBSDF(a_PixelData->m_ShadingData, a_PixelData->m_Normal, a_PixelData->m_Tangent, -a_PixelData->m_IncomingRayDirection, pixelToLightDir, pdf);
+    const auto bsdf = EvaluateBSDF(a_PixelData->m_MaterialData, a_PixelData->m_Normal, a_PixelData->m_Tangent, -a_PixelData->m_IncomingRayDirection, pixelToLightDir, pdf);
 	
     //If contribution to lobe is 0, just discard. Also goes for NAN which is sometimes sadly present with specular vertices.
     const auto added = pdf + bsdf.x + bsdf.y + bsdf.z;

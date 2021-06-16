@@ -25,7 +25,7 @@ CPU_ON_GPU void ResolveDirectLightHits(
         if (pixelData.m_SurfaceFlags & SURFACE_FLAG_EMISSIVE)
         {
             surf2DLayeredwrite<float4>(
-                make_float4(pixelData.m_ShadingData.color, 1.f),
+                pixelData.m_MaterialData.m_Color,
                 a_Output,
                 pixelX * sizeof(float4),
                 pixelY,
@@ -109,7 +109,7 @@ CPU_ON_GPU void ShadeDirect(
             
         	
             float bsdfPdf = 0.f;
-            const auto bsdf = EvaluateBSDF(surfaceData.m_ShadingData, surfaceData.m_Normal, surfaceData.m_Tangent, -surfaceData.m_IncomingRayDirection, pixelToLightDir, bsdfPdf);
+            const auto bsdf = EvaluateBSDF(surfaceData.m_MaterialData, surfaceData.m_Normal, surfaceData.m_Tangent, -surfaceData.m_IncomingRayDirection, pixelToLightDir, bsdfPdf);
         	
             //If no contribution, don't make a shadow ray.
             if(bsdfPdf <= EPSILON)

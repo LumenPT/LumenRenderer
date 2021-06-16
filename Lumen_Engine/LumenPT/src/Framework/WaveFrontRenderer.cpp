@@ -294,6 +294,9 @@ namespace WaveFront
 
     void WaveFrontRenderer::TraceFrame()
     {
+    	//Track frame time.
+        Timer timer;
+    	
         CHECKLASTCUDAERROR;
 
         //Retrieve the acceleration structure and scene data table once.
@@ -315,7 +318,6 @@ namespace WaveFront
         CHECKLASTCUDAERROR;
 
         //Timer to measure how long each frame takes.
-        Timer timer;
         ResetAtomicBuffer<WaveFront::TriangleLight>(&m_TriangleLights);
         auto lightBuffer = m_TriangleLights.GetDevicePtr<AtomicBuffer<WaveFront::TriangleLight>>();
 
@@ -763,6 +765,8 @@ namespace WaveFront
 
         m_SnapshotReady = recordingSnapshot;
         CHECKLASTCUDAERROR;
+
+        printf("Total frame time: %f milliseconds.\n", timer.measure(TimeUnit::MILLIS));
     }
 
     std::unique_ptr<MemoryBuffer> WaveFrontRenderer::InterleaveVertexData(const PrimitiveData& a_MeshData) const
@@ -956,6 +960,9 @@ namespace WaveFront
         assert(a_MaterialData.m_TintTexture);
         assert(a_MaterialData.m_TransmissionTexture);
         assert(a_MaterialData.m_NormalMap);
+
+    	//Roughness may never be 0.
+        assert(a_MaterialData.m_RoughnessFactor > 0.f);
     	
         auto mat = std::make_shared<PTMaterial>();
         mat->SetDiffuseColor(a_MaterialData.m_DiffuseColor);
@@ -984,6 +991,9 @@ namespace WaveFront
         mat->SetSheenTintFactor(a_MaterialData.m_SheenTintFactor);
         mat->SetTintFactor(a_MaterialData.m_TintFactor);
         mat->SetTransmittanceFactor(a_MaterialData.m_Transmittance);
+
+        mat->SetRoughnessFactor(a_MaterialData.m_RoughnessFactor);
+        mat->SetMetallicFactor(a_MaterialData.m_MetallicFactor);
 
         CHECKLASTCUDAERROR;
 

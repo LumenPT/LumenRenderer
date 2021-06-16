@@ -90,7 +90,7 @@ CPU_ON_GPU void ShadeIndirect(
         float pdf = 0.f;
         bool specular = false;
         const auto bsdf = SampleBSDF(
-            surfaceData.m_ShadingData, 
+            surfaceData.m_MaterialData, 
             surfaceData.m_Normal, 
             surfaceData.m_Normal, 
             surfaceData.m_Tangent, 
