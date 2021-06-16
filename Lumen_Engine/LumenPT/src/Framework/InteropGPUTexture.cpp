@@ -27,6 +27,12 @@ InteropGPUTexture::InteropGPUTexture(
 
 }
 
+InteropGPUTexture::~InteropGPUTexture()
+{
+
+    
+
+}
 
 void InteropGPUTexture::Map(
     unsigned a_ArrayIndex, 
@@ -116,6 +122,8 @@ void InteropGPUTexture::Clear() const
         extent.width * formatByteSize, 
         extent.height, 
         cudaMemcpyDeviceToDevice));
+
+    CHECKCUDAERROR(cudaFree(devPtr));
 
 }
 

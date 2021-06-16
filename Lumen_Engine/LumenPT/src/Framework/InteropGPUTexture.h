@@ -27,6 +27,8 @@ public:
         const cudaTextureDesc& a_TextureDesc,
         unsigned int a_RegisterFlags = cudaGraphicsRegisterFlagsNone);
 
+    ~InteropGPUTexture();
+
     void Map(
         unsigned int a_ArrayIndex = 0,
         unsigned int a_MipLevel = 0,
