@@ -7,6 +7,3 @@
 [submodule "Lumen_Engine/LumenPT/vendor/DLSS_Private"]
 	path = Lumen_Engine/LumenPT/vendor/DLSS_Private
 	url = https://github.com/LumenPT/DLSS_Private.git
-[submodule "Lumen_Engine/TestProject"]
-	path = Lumen_Engine/TestProject
-	url = https://github.com/LumenPT/TestProject
