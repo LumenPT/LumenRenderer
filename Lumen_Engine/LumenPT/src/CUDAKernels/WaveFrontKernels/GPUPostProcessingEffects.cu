@@ -34,6 +34,7 @@ CPU_ON_GPU void PrepareOptixDenoisingGPU(
             cudaBoundaryModeTrap);
 
         a_IntermediaryInput[pixelDataIndex] = make_float3(color.x, color.y, color.z);
+        //a_IntermediaryOutput[pixelDataIndex] = make_float3(color.x, color.y, color.z); //TODO: for testing, remove
 
         //printf("%f %f %f\n", color.x, color.y, color.z);
     }
