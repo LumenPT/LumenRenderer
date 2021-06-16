@@ -21,8 +21,7 @@ void SceneDataTable::UpdateTable()
     else
     {
         // Otherwise, the cheaper, partial rebuild can be performed which only touches writes into entries which have been modified
-        // TODO: Partial update is broken, needs to be reimplemented correctly
-        FullRebuild();
+        PartialUpdate();
     }
 }
 
@@ -57,18 +56,38 @@ bool SceneDataTable::UpdateStride()
 void SceneDataTable::PartialUpdate()
 {
     // TODO: This is low-key scuffed, needs rewriting 
-    uint32_t indexCounter = 0;
     for (auto& entryPair : m_Entries)
-    {
+    { 
         auto& entry = entryPair.second;
         if (entry->m_Dirty)
         {
             entry->m_Dirty = false;
 
-            auto offset = indexCounter * m_EntryStride;
+            uint64_t index = entry->m_TableIndex;
+            if (!entry->m_TableIndexValid) // Is the index the entry has actually valid?
+            {
+                if (!m_UnusedIndices.empty()) // Are there any indices which are no longer in use in the middle of the table?
+                {
+                    // If there are, fetch the first one from the set, and remove it from the set
+                    index = *m_UnusedIndices.begin(); 
+                    m_UnusedIndices.erase(index);
+                }
+                else
+                {
+                    // If there aren't any, place the entry in the back of the table
+                    // m_MaxIndex holds the index of the last element in the table,
+                    // so incrementing it will give us a free index we can use
+                    // Prior to this a check is made if the current GPU buffer has sufficient memory to contain all the data
+                    // So it should be safe to do this without accessing illegal GPU memory
+                    index = ++m_MaxIndex; 
+                }
+            }
+
+            auto offset = index * m_EntryStride;
 
             cudaMemcpy(reinterpret_cast<void*>(*m_GpuBuffer + offset), entry->m_RawData, entry->m_Size, cudaMemcpyHostToDevice);
-            entry->m_TableIndex = indexCounter++;
+            entry->m_TableIndex = index;
+            entry->m_TableIndexValid = true;
         }
     }
 }
@@ -94,6 +113,8 @@ void SceneDataTable::FullRebuild()
         cudaMemcpy(reinterpret_cast<void*>(*m_GpuBuffer + offset), entry->m_RawData, entry->m_Size, cudaMemcpyHostToDevice);
         CHECKLASTCUDAERROR;
         entry->m_TableIndex = indexCounter++;
+        entry->m_TableIndexValid = true;
     }
+    m_MaxIndex = m_Entries.size() - 1; // We want MaxIndex to be the index of the last element in the table, hence why we decrement by 1
     CHECKLASTCUDAERROR;
 };
