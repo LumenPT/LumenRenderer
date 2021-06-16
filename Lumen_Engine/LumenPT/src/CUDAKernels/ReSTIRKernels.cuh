@@ -28,11 +28,37 @@ __host__ void ResetReservoirs(int a_NumReservoirs, Reservoir* a_ReservoirPointer
 
 __global__ void ResetReservoirInternal(int a_NumReservoirs, Reservoir* a_ReservoirPointer);
 
-__host__ void FillCDF(CDF* a_Cdf, const WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights, unsigned a_LightCount);
+__host__ void FillCDF(CDF* a_Cdf, float* a_CdfTreeBuffer, const WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights, unsigned a_LightCount);
 
 __global__ void ResetCDF(CDF* a_Cdf);
 
-__global__ void FillCDFInternal(CDF* a_Cdf, const WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights, unsigned a_LightCount);
+/*
+ * Set the CDF sum and size based on the tree.
+ */
+__global__ void SetCDFSize(CDF* a_Cdf, float* a_CdfTreeBuffer, unsigned a_NumLights);
+
+/*
+ * Build a balanced binary tree of all lights bottom up.
+ * NumParentNodes contains the amount of nodes at the depth above this depth as a base of 2.
+ * It is equal to half the amount of nodes at the current depth.
+ */
+__global__ void BuildCDFTree(float* a_CdfTreeBuffer, unsigned a_NumParentNodes, unsigned a_ArrayOffset);
+
+/*
+ * Calculate the weights for each light and output to the CDF tree.
+ */
+__global__ void CalculateLightWeights(float* a_CdfTreeBuffer, const WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights, unsigned a_LightCount, unsigned a_NumLeafNodes);
+
+/*
+ * Traverse the binary tree to fill the CDF with the sums of the light buffer.
+ */
+__global__ void FillCDFParallel(CDF* a_Cdf, float* a_CdfTreeBuffer, const WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights, unsigned a_LightCount, unsigned a_TreeDepth, unsigned a_LeafNodes);
+
+/*
+ * Use a single thread to fill the CDF. Very inefficient.
+ */
+__global__ void FillCDFInternalSingleThread(CDF* a_Cdf, const WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights, unsigned a_LightCount);
+
 
 __host__ void FillLightBags(unsigned a_NumLightBags, unsigned a_NumLightsPerBag, CDF* a_Cdf, LightBagEntry* a_LightBagPtr, const WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights, const std::uint32_t a_Seed);
 

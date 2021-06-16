@@ -128,7 +128,8 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
             a_ShadingParams.m_OptixSceneHandle,
             a_ShadingParams.m_TriangleLights,
             a_ShadingParams.m_Seed,
-            a_ShadingParams.m_Output);
+            a_ShadingParams.m_Output,
+            false);
     }
     else
     {

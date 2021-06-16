@@ -6,7 +6,7 @@
 #include <cuda/device_atomic_functions.h>
 #include <cassert>
 #include <cmath>
-
+#include "../Framework/Timer.h"
 #include "disney.cuh"
 #include "../Framework/CudaUtilities.h"
 
@@ -38,18 +38,47 @@ __global__ void ResetReservoirInternal(int a_NumReservoirs, Reservoir* a_Reservo
     }
 }
 
-__host__ void FillCDF(CDF* a_Cdf, const WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights, unsigned a_LightCount)
+__host__ void FillCDF(CDF* a_Cdf, float* a_CdfTreeBuffer, const WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights, unsigned a_LightCount)
 {
-    //TODO: This is not efficient single threaded.
-    //TODO: Use this: https://developer.nvidia.com/gpugems/gpugems3/part-vi-gpu-computing/chapter-39-parallel-prefix-sum-scan-cuda
-
+	//Note: No need to manually reset as the CDF rebuilding manually sets the sum and size.
     //First reset the CDF on the GPU.
-    ResetCDF<<<1,1>>>(a_Cdf);
-    cudaDeviceSynchronize();
-    CHECKLASTCUDAERROR;
+    //ResetCDF<<<1,1>>>(a_Cdf);
+    //cudaDeviceSynchronize();
+    //CHECKLASTCUDAERROR;
 
+	//Note: Disabled because horribly slow.
     //Run from one thread because it's not thread safe to append the sum of each element.
-    FillCDFInternal <<<1, 1>>> (a_Cdf, a_Lights, a_LightCount);
+    //FillCDFInternalSingleThread <<<1, 1>>> (a_Cdf, a_Lights, a_LightCount);
+
+	//Use 512 threads per block, since these are relatively tiny operations.
+    const unsigned blockSize = 512;
+    const unsigned treeDepth = std::ceil(std::log2f(a_LightCount)); //The total depth of the tree, in terms of operations to be performed.
+    const unsigned numLeafNodes = std::pow(2u, treeDepth);
+    const unsigned blockCount = (numLeafNodes + blockSize - 1) / blockSize;
+	
+    //Calculate the light weights and output to the tree buffer. Threads for lights that are no present will deposit 0 weight to keep the tree valid.
+    CalculateLightWeights<<<blockCount, blockSize>>>(a_CdfTreeBuffer, a_Lights, a_LightCount, numLeafNodes);
+    CHECKLASTCUDAERROR;
+    cudaDeviceSynchronize();
+	
+	//Offset into the array to start writing the tree.
+    unsigned arrayOffset = numLeafNodes;
+	
+	//Loop over each depth and build the tree.
+	for(auto depth = 0u; depth < treeDepth; ++depth)
+	{
+        const unsigned numThreads = std::pow(2, treeDepth - (depth + 1));   //Half the amount of threads as there are lights at a depth.
+        const int numBlocks = (numThreads + blockSize - 1) / blockSize;
+        BuildCDFTree <<<numBlocks, blockSize >>> (a_CdfTreeBuffer, numThreads, arrayOffset - 1);  //numThreads is the amount of nodes to be written.
+        arrayOffset /= 2;   //Half the offset, as half the amount of root nodes exist at the parent.
+		CHECKLASTCUDAERROR;
+        cudaDeviceSynchronize();
+	}
+
+	//Spawn a thread per element in the CDF. Fill by traversing down tree on the left.
+    FillCDFParallel <<<((a_LightCount + blockSize - 1) / blockSize), blockSize >>> (a_Cdf, a_CdfTreeBuffer, a_Lights, a_LightCount, treeDepth, numLeafNodes);
+    SetCDFSize<<<1, 1>>>(a_Cdf, a_CdfTreeBuffer, a_LightCount);
+	
     cudaDeviceSynchronize();
     CHECKLASTCUDAERROR;
 }
@@ -59,7 +88,92 @@ __global__ void ResetCDF(CDF* a_Cdf)
     a_Cdf->Reset();
 }
 
-__global__ void FillCDFInternal(CDF* a_Cdf, const WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights, unsigned a_LightCount)
+__global__ void CalculateLightWeights(float* a_CdfTreeBuffer, const WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights, unsigned a_LightCount, unsigned a_NumLeafNodes)
+{
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    int stride = blockDim.x * gridDim.x;
+
+    //Loop over all the light indices assigned to this thread.
+    for (int i = index; i < a_NumLeafNodes; i += stride)
+    {
+        float weight = 0.f;
+
+    	//If there is a light with this index, calculate the weight.
+        if(i < a_LightCount)
+        {
+            //Light weight is just the average radiance for now.
+            const float3 radiance = a_Lights->GetData(i)->radiance;
+            assert(radiance.x >= 0.f && radiance.y >= 0.f && radiance.z >= 0.f && "Radiance needs to be positive, no taking away the light in the soul.");
+            weight = (radiance.x + radiance.y + radiance.z) / 3.f;
+        }
+
+    	//Output to the END of the buffer so that the tree can be built on top with root = 0.
+        a_CdfTreeBuffer[i + a_NumLeafNodes - 1] = weight;
+    }
+}
+
+__global__ void SetCDFSize(CDF* a_Cdf, float* a_CdfTreeBuffer, unsigned a_NumLights)
+{
+    a_Cdf->SetCDFSize(a_CdfTreeBuffer[0], a_NumLights);
+}
+
+__global__ void BuildCDFTree(float* a_CdfTreeBuffer, unsigned a_NumParentNodes, unsigned a_ArrayOffset)
+{
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    int stride = blockDim.x * gridDim.x;
+	
+	//Loop over all the light indices assigned to this thread.
+    for (int i = index; i < a_NumParentNodes; i += stride)
+    {
+        //Combine the previous two elements into a single new element, and output it in the right position.
+        const int childRoot = a_ArrayOffset + (2 * i);
+        const int parentRoot = (childRoot - 1) / 2;
+        const float sum = a_CdfTreeBuffer[childRoot] + a_CdfTreeBuffer[childRoot + 1];
+        a_CdfTreeBuffer[parentRoot] = sum;
+	}
+}
+
+__global__ void FillCDFParallel(CDF* a_Cdf, float* a_CdfTreeBuffer, const WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights, unsigned a_LightCount, unsigned a_TreeDepth, unsigned a_LeafNodes)
+{
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    int stride = blockDim.x * gridDim.x;
+
+	//For every light, traverse the tree and find the sum.
+    for (int lightIndex = index; lightIndex < a_LightCount; lightIndex += stride)
+    {
+        unsigned split = a_LeafNodes / 2;
+        unsigned splitStep = split / 2;
+        unsigned rootIndex = 0;
+        float sum = a_CdfTreeBuffer[a_LeafNodes - 1];   //Because the bottom level of the tree can't reach the left-most node, I add it manually here.
+    	//
+    	//Traverse down the tree starting at element 0 (root node).
+    	for(int depth = 0; depth < a_TreeDepth; ++depth)
+    	{
+    		//Light index lies to the left of the node split, which means that the right side does not affect it at all. Go down the left node.
+            if(lightIndex < split)
+            {            	
+                rootIndex = (2 * rootIndex) + 1;
+                split -= splitStep;
+            }
+    		//Right of the node split, so left node affects it fully. Go down the right node.
+            else
+            {
+                const auto leftIndex = (2 * rootIndex) + 1;
+                sum += a_CdfTreeBuffer[leftIndex];
+                rootIndex = leftIndex + 1;  //Right node index
+                split += splitStep;
+            }
+
+    		//Half the amount of step per split.
+            splitStep /= 2;
+    	}
+
+    	//Set the prefix sum for this light index in the CDF.
+        a_Cdf->Insert(lightIndex, sum);
+    }
+}
+
+__global__ void FillCDFInternalSingleThread(CDF* a_Cdf, const WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights, unsigned a_LightCount)
 {
     for (int i = 0; i < a_LightCount; ++i)
     {
@@ -68,7 +182,7 @@ __global__ void FillCDFInternal(CDF* a_Cdf, const WaveFront::AtomicBuffer<WaveFr
 
         //printf("Radiance: %f, %f, %f LightCount: %i \n", radiance.x, radiance.y, radiance.z, a_LightCount);
 
-        assert(radiance.x >= 0.f && radiance.y >= 0.f && radiance.z >= 0.f && "Radiance needs to be positive, no taking away the light in the soul");
+        assert(radiance.x >= 0.f && radiance.y >= 0.f && radiance.z >= 0.f && "Radiance needs to be positive, no taking away the light in the soul.");
 
         const float weight = (radiance.x + radiance.y + radiance.z) / 3.f;
         assert(weight >= 0.f);
@@ -891,7 +1005,7 @@ __device__ __inline__ void Resample(LightSample* a_Input, const WaveFront::Surfa
     //const auto unshadowedPathContribution = brdf * solidAngle * cosIn * a_Output->radiance;
 
     float pdf = 0.f;
-    const auto bsdf = EvaluateBSDF(a_PixelData->m_ShadingData, a_PixelData->m_Normal, a_PixelData->m_Tangent, -a_PixelData->m_IncomingRayDirection, pixelToLightDir, pdf);
+    const auto bsdf = EvaluateBSDF(a_PixelData->m_MaterialData, a_PixelData->m_Normal, a_PixelData->m_Tangent, -a_PixelData->m_IncomingRayDirection, pixelToLightDir, pdf);
 	
     //If contribution to lobe is 0, just discard. Also goes for NAN which is sometimes sadly present with specular vertices.
     const auto added = pdf + bsdf.x + bsdf.y + bsdf.z;

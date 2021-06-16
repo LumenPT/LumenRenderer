@@ -85,7 +85,7 @@ CPU_ON_GPU void FindEmissives(
         //    diffuseColor *= tex2D<float4>(diffuseTexture, UVCentroid.x, UVCentroid.y);
         //}
 
-        float4 emissiveColor = a_Mat->m_EmissionColor;
+        float4 emissiveColor = a_Mat->m_MaterialData.m_Emissive;
 
         if(emissiveTexture)
         {
@@ -210,7 +210,7 @@ CPU_ON_GPU void AddToLightBuffer(
             if (devicePrimitiveInstance->m_EmissionMode == Lumen::EmissionMode::ENABLED)
             {
                 emissive = tex2D<float4>(mat->m_EmissiveTexture, UVCentroid.x, UVCentroid.y);
-                emissive *= mat->m_EmissionColor * devicePrimitiveInstance->m_EmissiveColorAndScale.w;
+                emissive *= mat->m_MaterialData.m_Emissive * devicePrimitiveInstance->m_EmissiveColorAndScale.w;
             }
             //When override, take the ovverride emissive color and scale it up.
             else if (devicePrimitiveInstance->m_EmissionMode == Lumen::EmissionMode::OVERRIDE)
