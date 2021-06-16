@@ -855,6 +855,25 @@ namespace WaveFront
 
         m_SnapshotReady = recordingSnapshot;
         CHECKLASTCUDAERROR;
+
+        //tonemapping should be done before DLSS
+        //DLSS performs better on LDR data as opposed to HDR
+
+        //kinda gross to reinitialize dlssInitParams here again but ohwell
+        DLSSWrapperInitParams dlssInitParams;
+        dlssInitParams.m_InputImageWidth = m_Settings.renderResolution.x;
+        dlssInitParams.m_InputImageHeight = m_Settings.renderResolution.y;
+        dlssInitParams.m_OutputImageWidth = m_Settings.outputResolution.x;
+        dlssInitParams.m_OutputImageHeight = m_Settings.outputResolution.y;
+        dlssInitParams.m_pServiceLocator = &m_ServiceLocator;
+
+        unsigned int mv = m_MotionVectors.GetMotionVectorDirectionsTex();
+        //Get pixelbuffer to pass in
+        //
+        //m_DLSS->EvaluateDLSS(dlssInitParams, mv);
+
+        // Gamma correction
+        // Cuda kernel? Shader? whu?
     }
 
     std::unique_ptr<MemoryBuffer> WaveFrontRenderer::InterleaveVertexData(const PrimitiveData& a_MeshData) const
@@ -1087,7 +1106,7 @@ namespace WaveFront
         return std::make_shared<PTScene>(a_SceneData, m_ServiceLocator);
     }
 
-    void WaveFrontRenderer::DoGameworks()
+    void WaveFrontRenderer::InitNGX()
     {
 
         m_DLSS = std::make_unique<DlssWrapper>();
@@ -1181,7 +1200,6 @@ namespace WaveFront
 		CreateAtomicBuffer<ShadowRayData>(&m_VolumetricShadowRays, numShadowRays);
 		CreateAtomicBuffer<IntersectionData>(&m_IntersectionData, numPixels);
 		CreateAtomicBuffer<VolumetricIntersectionData>(&m_VolumetricIntersectionData, numPixels);
-
 
 		//Initialize each surface data buffer.
 		for (auto& surfaceDataBuffer : m_SurfaceData)

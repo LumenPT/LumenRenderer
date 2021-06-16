@@ -385,7 +385,7 @@ public:
 		//auto volume = lumenPT->m_Scene->AddVolume();
 		//volume->SetVolume(volumeRes->m_Volume);
 
-		renderer->DoGameworks();
+		renderer->InitNGX();
 
 		contextLayer->GetPipeline()->StartRendering();
 

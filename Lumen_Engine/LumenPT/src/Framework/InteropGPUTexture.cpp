@@ -4,6 +4,7 @@
 #include <memory>
 #include <cassert>
 #include <cuda_d3d11_interop.h>
+#include <algorithm>
 
 using namespace Microsoft::WRL;
 

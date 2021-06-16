@@ -154,7 +154,7 @@ public:
 	virtual std::shared_ptr<Lumen::ILumenVolume> CreateVolume(const std::string& a_FilePath) = 0;
 
 	//NGX test
-	virtual void DoGameworks() = 0;
+	virtual void InitNGX() = 0;
 
 	void CreateDefaultResources();
 
