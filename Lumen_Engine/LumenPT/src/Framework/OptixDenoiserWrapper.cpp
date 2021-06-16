@@ -13,21 +13,20 @@ OptixDenoiserWrapper::~OptixDenoiserWrapper()
 
 void OptixDenoiserWrapper::Initialize(const OptixDenoiserInitParams& a_InitParams)
 {
-    //assert(a_InitParams.m_ServiceLocator != nullptr);
-    //assert(a_InitParams.m_ServiceLocator->m_OptixWrapper != nullptr);
+    assert(a_InitParams.m_ServiceLocator != nullptr);
+    assert(a_InitParams.m_ServiceLocator->m_OptixWrapper != nullptr);
 
-    //m_InitParams = a_InitParams;
-    //WaveFront::OptixWrapper& optixWrapper = *(m_InitParams.m_ServiceLocator->m_OptixWrapper);
+    m_InitParams = a_InitParams;
+    WaveFront::OptixWrapper& optixWrapper = *(m_InitParams.m_ServiceLocator->m_OptixWrapper);
 
-    //OptixDenoiserOptions options = {}; //this struct is missing some options?
-    //options.inputKind = OPTIX_DENOISER_INPUT_RGB; //TODO: add albedo and normal at later date
+    //OptixDenoiserOptions options = {};
+    //options.guideAlbedo = 0;
+    //options.guideNormal = 0;
     //
-    //CHECKOPTIXRESULT(optixDenoiserCreate(optixWrapper.GetDeviceContext(), &options, &m_Denoiser));
-
     //OptixDenoiserModelKind denoiserModelKind = {};
     //denoiserModelKind = OPTIX_DENOISER_MODEL_KIND_LDR;
 
-    //CHECKOPTIXRESULT(optixDenoiserSetModel(m_Denoiser, denoiserModelKind, nullptr, 0));
+    //CHECKOPTIXRESULT(optixDenoiserCreate(optixWrapper.GetDeviceContext(), denoiserModelKind, &options, &m_Denoiser));
 
     //OptixDenoiserSizes denoiserSizes = {};
     //CHECKOPTIXRESULT(optixDenoiserComputeMemoryResources(m_Denoiser, m_InitParams.m_InputWidth, m_InitParams.m_InputHeight, &denoiserSizes)); //TODO: might have to set max input to 4K resolution
@@ -61,8 +60,11 @@ void OptixDenoiserWrapper::Denoise(const OptixDenoiserDenoiseParams& a_DenoisePa
     ////MemoryBuffer test1(m_InitParams.m_InputWidth * m_InitParams.m_InputHeight * sizeof(float3));
     ////MemoryBuffer test2(m_InitParams.m_InputWidth * m_InitParams.m_InputHeight * sizeof(float3));
 
-    //std::vector<OptixImage2D> inputLayers;
-    //OptixImage2D& colorTex = inputLayers.emplace_back();
+    //OptixDenoiserGuideLayer guideLayer;
+
+    //OptixDenoiserLayer inputOutputLayer;
+
+    //OptixImage2D& colorTex = inputOutputLayer.input;
     //colorTex.data = /*static_cast<CUdeviceptr>(test1.GetCUDAPtr())*/a_DenoiseParams.m_ColorInput;
     //colorTex.width = m_InitParams.m_InputWidth;
     //colorTex.height = m_InitParams.m_InputHeight;
@@ -70,7 +72,7 @@ void OptixDenoiserWrapper::Denoise(const OptixDenoiserDenoiseParams& a_DenoisePa
     //colorTex.rowStrideInBytes = colorTex.pixelStrideInBytes * colorTex.width;
     //colorTex.format = OPTIX_PIXEL_FORMAT_FLOAT3;
 
-    //OptixImage2D outputTex;
+    //OptixImage2D& outputTex = inputOutputLayer.output;
     //outputTex.data = /*static_cast<CUdeviceptr>(test2.GetCUDAPtr())*/a_DenoiseParams.m_Output;
     //outputTex.width = m_InitParams.m_InputWidth;
     //outputTex.height = m_InitParams.m_InputHeight;
@@ -78,23 +80,125 @@ void OptixDenoiserWrapper::Denoise(const OptixDenoiserDenoiseParams& a_DenoisePa
     //colorTex.rowStrideInBytes = colorTex.pixelStrideInBytes * colorTex.width;
     //outputTex.format = OPTIX_PIXEL_FORMAT_FLOAT3;
 
-    /*CHECKLASTCUDAERROR;
+    //CHECKLASTCUDAERROR;
+    //auto result = optixDenoiserInvoke(
+    //    m_Denoiser,
+    //    0,
+    //    &optixDenoiserParams,
+    //    m_state.GetCUDAPtr(),
+    //    m_state.GetSize(),
+    //    &guideLayer,
+    //    &inputOutputLayer,
+    //    1,
+    //    0,
+    //    0,
+    //    m_scratch.GetCUDAPtr(),
+    //    m_scratch.GetSize()
+    //    );
+
+    //CHECKOPTIXRESULT(result);
+    //CHECKLASTCUDAERROR;
+
+    OptixDenoiser m_Denoiser;
+
+    CUdeviceptr m_state;
+    size_t m_state_size;
+    CUdeviceptr m_scratch;
+    size_t m_scratch_size;
+
+    size_t textureSize = sizeof(float) * 3 * 800 * 600;
+
+    CUdeviceptr TestInput;
+    CHECKCUDAERROR(cudaMalloc(
+        reinterpret_cast<void**>(&TestInput),
+        textureSize
+    ));
+
+    CUdeviceptr TestOutput;
+    CHECKCUDAERROR(cudaMalloc(
+        reinterpret_cast<void**>(&TestOutput),
+        textureSize
+    ));
+
+    OptixDenoiserOptions denoiserOptions = {};
+    denoiserOptions.guideAlbedo = 0;
+    denoiserOptions.guideNormal = 0;
+
+    OptixDenoiserModelKind denoiserModelKind = {};
+    denoiserModelKind = OPTIX_DENOISER_MODEL_KIND_LDR;
+
+    WaveFront::OptixWrapper& optixWrapper = *(m_InitParams.m_ServiceLocator->m_OptixWrapper);
+
+    CHECKOPTIXRESULT(optixDenoiserCreate(optixWrapper.GetDeviceContext(), denoiserModelKind, &denoiserOptions, &m_Denoiser));
+
+    OptixDenoiserSizes denoiserSizes = {};
+    CHECKOPTIXRESULT(optixDenoiserComputeMemoryResources(m_Denoiser, 800, 600, &denoiserSizes)); //TODO: might have to set max input to 4K resolution
+
+    m_state_size = denoiserSizes.stateSizeInBytes;
+    m_scratch_size = denoiserSizes.withoutOverlapScratchSizeInBytes;
+
+    CHECKCUDAERROR(cudaMalloc(
+        reinterpret_cast<void**>(&m_state),
+        m_state_size
+    ));
+
+    CHECKCUDAERROR(cudaMalloc(
+        reinterpret_cast<void**>(&m_scratch),
+        m_scratch_size
+    ));
+
+    CHECKOPTIXRESULT(optixDenoiserSetup(
+        m_Denoiser,
+        0,
+        800,
+        600,
+        m_state,
+        m_state_size,
+        m_scratch,
+        m_scratch_size
+    ));
+
+    OptixDenoiserParams optixDenoiserParams = {};
+    optixDenoiserParams.denoiseAlpha = false;
+    optixDenoiserParams.blendFactor = 0.0f;
+
+    OptixDenoiserGuideLayer guideLayer;
+
+    OptixDenoiserLayer inputOutputLayer;
+
+    OptixImage2D& colorTex = inputOutputLayer.input;
+    colorTex.data = TestInput;
+    colorTex.width = 800;
+    colorTex.height = 600;
+    colorTex.pixelStrideInBytes = sizeof(float3);
+    colorTex.rowStrideInBytes = colorTex.pixelStrideInBytes * colorTex.width;
+    colorTex.format = OPTIX_PIXEL_FORMAT_FLOAT3;
+
+    OptixImage2D& outputTex = inputOutputLayer.output;
+    outputTex.data = TestOutput;
+    outputTex.width = 800;
+    outputTex.height = 600;
+    outputTex.pixelStrideInBytes = sizeof(float3);
+    colorTex.rowStrideInBytes = colorTex.pixelStrideInBytes * colorTex.width;
+    outputTex.format = OPTIX_PIXEL_FORMAT_FLOAT3;
+
+    CHECKLASTCUDAERROR;
     auto result = optixDenoiserInvoke(
         m_Denoiser,
         0,
         &optixDenoiserParams,
-        m_state.GetCUDAPtr(),
-        m_state.GetSize(),
-        inputLayers.data(),
+        m_state,
+        m_state_size,
+        &guideLayer,
+        &inputOutputLayer,
         1,
         0,
         0,
-        &outputTex,
-        m_scratch.GetCUDAPtr(),
-        m_scratch.GetSize()
-        );
+        m_scratch,
+        m_scratch_size
+    );
 
     CHECKOPTIXRESULT(result);
-    CHECKLASTCUDAERROR;*/
+    CHECKLASTCUDAERROR;
 
 }

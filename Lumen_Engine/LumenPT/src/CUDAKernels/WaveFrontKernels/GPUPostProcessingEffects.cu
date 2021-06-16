@@ -13,9 +13,6 @@ CPU_ON_GPU void PrepareOptixDenoisingGPU(const WaveFront::OptixDenoiserLaunchPar
 
     const unsigned int pixelDataIndex = PIXEL_DATA_INDEX(pixelX, pixelY, a_LaunchParams.m_RenderResolution.x);
 
-    //This literally copies 1-to-1 so it doesn't need to know about pixel indices or anything.
-    //TODO: Maybe skip this step entirely and just directly output to this buffer when merging light channels? Then apply effects in this buffer?
-    //TODO: It would save one copy.
     if (pixelX < a_LaunchParams.m_RenderResolution.x && pixelY < a_LaunchParams.m_RenderResolution.y)
     {
         float4 color{ 0.f };
