@@ -48,7 +48,7 @@ std::shared_ptr<Lumen::ILumenScene> LumenRenderer::CreateScene(SceneData a_Scene
 void LumenRenderer::CreateDefaultResources()
 {
     uchar4 whitePixel = { 255,255,255,255 };
-    uchar4 diffusePixel{ 255, 255, 255, 0 };
+    uchar4 diffusePixel{ 255, 255, 255, 255 };
     uchar4 normal = { 128, 128, 255, 0 };
     m_DefaultWhiteTexture = CreateTexture(&whitePixel, 1, 1, false);
     m_DefaultDiffuseTexture = CreateTexture(&diffusePixel, 1, 1, false);

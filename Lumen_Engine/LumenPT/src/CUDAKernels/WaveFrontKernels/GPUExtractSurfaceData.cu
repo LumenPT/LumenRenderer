@@ -20,7 +20,7 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
         const IntersectionData currIntersection = *a_IntersectionData->GetData(i);
         const IntersectionRayData currRay = *a_Rays->GetData(currIntersection.m_RayArrayIndex);
         unsigned int surfaceDataIndex = PIXEL_DATA_INDEX(currIntersection.m_PixelIndex.m_X, currIntersection.m_PixelIndex.m_Y, a_Resolution.x);
-
+    	
         if (currIntersection.IsIntersection())
         {
             // Get ray used to calculate intersection.
@@ -102,6 +102,7 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
                 output.m_SurfaceFlags |= SURFACE_FLAG_EMISSIVE;
                 output.m_PixelIndex = currIntersection.m_PixelIndex;
                 a_OutPut[surfaceDataIndex] = output;
+            	
                 continue;
             }
 
@@ -115,6 +116,7 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
                 output.m_TransportFactor = currRay.m_Contribution;
                 output.m_PixelIndex = currIntersection.m_PixelIndex;
                 a_OutPut[surfaceDataIndex] = output;
+            	
                 continue;
             }
 
