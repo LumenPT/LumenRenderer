@@ -227,7 +227,7 @@ public:
 			Lumen::MeshInstance::Emissiveness emissiveness;
 			emissiveness.m_EmissionMode = Lumen::EmissionMode::OVERRIDE;
 			emissiveness.m_OverrideRadiance = glm::vec3(1.0f, 1.0f, 1.0f);
-			emissiveness.m_Scale = 50.0f;
+			emissiveness.m_Scale = 25.0f;
 			mesh->SetEmissiveness(emissiveness);
 			mesh->UpdateAccelRemoveThis();
 			xOffset += 50;
