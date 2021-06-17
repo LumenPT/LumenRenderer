@@ -813,21 +813,19 @@ namespace WaveFront
             CHECKLASTCUDAERROR;
 
             // TODO: Render and output resolutions used in DLSS init params
-            //kinda gross to reinitialize dlssInitParams here again but ohwell
-            DLSSWrapperInitParams dlssInitParams;
-            dlssInitParams.m_InputImageWidth = m_Settings.renderResolution.x;
-            dlssInitParams.m_InputImageHeight = m_Settings.renderResolution.y;
-            dlssInitParams.m_OutputImageWidth = m_Settings.renderResolution.x * 2;
-            dlssInitParams.m_OutputImageHeight = m_Settings.renderResolution.y * 2;
-            //dlssInitParams.m_OutputImageWidth = m_Settings.outputResolution.x;
-            //dlssInitParams.m_OutputImageHeight = m_Settings.outputResolution.y;
-            dlssInitParams.m_pServiceLocator = &m_ServiceLocator;
+            std::shared_ptr<DLSSWrapperInitParams> params = m_DLSS->GetDLSSParams();
+            params->m_InputImageWidth = m_Settings.renderResolution.x;
+            params->m_InputImageHeight = m_Settings.renderResolution.y;
+            params->m_OutputImageWidth = m_Settings.outputResolution.x;
+            params->m_OutputImageHeight = m_Settings.outputResolution.y;
+            params->m_DLSSMode = static_cast<DLSSWrapperInitParams::DLSSMode>(m_DlssMode);
 
             m_PixelBufferCombined->Unmap();
 
             //m_DX11Wrapper->GetContext()->CopyResource(m_DX11Wrapper->m_D3D11PixelBufferCombined, m_D3D11PixelBufferCombined.Get());
 
-            m_DLSS->EvaluateDLSS(dlssInitParams, m_D3D11PixelBufferCombined, m_MotionVectors.GetMotionVectorDirectionsTex());
+            m_DLSS->EvaluateDLSS(m_D3D11PixelBufferCombined);
+            //m_DLSS->EvaluateDLSS(dlssInitParams, m_D3D11PixelBufferCombined, m_MotionVectors.GetMotionVectorDirectionsTex());
 
             //construct motion vector tex 
             //std::shared_ptr<InteropGPUTexture>();

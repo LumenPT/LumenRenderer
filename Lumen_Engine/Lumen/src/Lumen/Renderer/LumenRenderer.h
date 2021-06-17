@@ -126,16 +126,6 @@ public:
 
 	};
 
-	enum class DLSSMode
-	{
-		OFF = 0,
-		MAXPERF,
-		BALANCED,
-		MAXQUALITY,
-		ULTRAPERF,
-		ULTRAQUALITY,
-	};
-
 	LumenRenderer()	{};
 	LumenRenderer(const InitializationData& a_InitializationData) {};
 	virtual ~LumenRenderer() = default;
@@ -199,7 +189,7 @@ public:
 	//Debug GLuint texture accessible by application
 	GLuint m_DebugTexture;
 
-	DLSSMode m_DlssMode = DLSSMode::OFF;
+	unsigned int m_DlssMode = 0; //corresponds to dlssmodes enum in DLSS init params
 
 private:
 	std::shared_ptr<Lumen::ILumenTexture> m_DefaultWhiteTexture;

@@ -83,7 +83,7 @@ private:
         CONTENTVIEWMODE_COUNT
     };
 
-    int m_Dlss_Mode;
+    int m_Dlss_SelectedMode;
     bool m_BlendMode = false;
 
     std::vector<std::unique_ptr<FrameSnapshot>> m_FrameSnapshots;

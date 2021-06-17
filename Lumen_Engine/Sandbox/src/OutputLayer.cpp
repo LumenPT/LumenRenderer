@@ -649,15 +649,9 @@ void OutputLayer::ImGuiCameraSettings()
 
 	ImGui::DragFloat("Camera Movement Speed", &m_CameraMovementSpeed, 0.1f, 0.0f);
 
-	ImGui::Combo("DLSS setting", &m_Dlss_Mode, "Off\0Max performance\0Balanced\0Max quality\0Ultra performance\0Ultra quality\0");
+	ImGui::Combo("DLSS setting", &m_Dlss_SelectedMode, "Off\0Max performance\0Balanced\0Max quality\0Ultra performance\0Ultra quality\0");
+	m_Renderer->m_DlssMode = m_Dlss_SelectedMode;
 
-	if (m_Dlss_Mode == 0) m_Renderer->m_DlssMode = LumenRenderer::DLSSMode::OFF;
-	if (m_Dlss_Mode == 1) m_Renderer->m_DlssMode = LumenRenderer::DLSSMode::MAXPERF;
-	if (m_Dlss_Mode == 2) m_Renderer->m_DlssMode = LumenRenderer::DLSSMode::BALANCED;
-	if (m_Dlss_Mode == 3) m_Renderer->m_DlssMode = LumenRenderer::DLSSMode::MAXQUALITY;
-	if (m_Dlss_Mode == 4) m_Renderer->m_DlssMode = LumenRenderer::DLSSMode::ULTRAPERF;
-	if (m_Dlss_Mode == 5) m_Renderer->m_DlssMode = LumenRenderer::DLSSMode::ULTRAQUALITY;
-	
 	ImGui::End();
 }
 
