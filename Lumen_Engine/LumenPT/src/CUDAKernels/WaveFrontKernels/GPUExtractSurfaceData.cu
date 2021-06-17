@@ -193,7 +193,7 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
             output.m_MaterialData.SetRefractiveIndex(eta);
 
 
-        	//////TODO Comment this out. Debugging only.
+        	////////TODO Comment this out. Debugging only.
          //   if(i == 220200)
          //   {
          //       printf("Surface data material values:\n");
@@ -214,7 +214,7 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
          //       printf("- ClearCoat: %f\n", output.m_MaterialData.GetClearCoat());
          //       printf("- Transmission: %f\n", output.m_MaterialData.GetTransmission());
          //   }
-        	//
+        	
             a_OutPut[surfaceDataIndex] = output;
         }
         else
