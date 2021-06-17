@@ -10,6 +10,8 @@
 #include "Renderer/Camera.h"
 #include "Tools/FrameSnapshot.h"
 
+#include <deque>
+
 namespace Lumen
 {
     class SceneGraph;
@@ -97,6 +99,7 @@ private:
         bool m_PixelDebugger = false;
         bool m_CameraSettings = false;
         bool m_DebugViewport = false;
+        bool m_Profiler = true;
     } m_EnabledTools;
 
     struct CmpNoChange
@@ -131,7 +134,9 @@ private:
     ContentViewMode m_CurrContentView;
     std::function<void(glm::vec2)> m_ContentViewFunc;
     std::map<ContentViewMode, std::string> m_ContentViewNames;
-    
+
+    std::deque<FrameStats> m_PreviousFramesStats;
+    const uint32_t m_MaxStoredFrames = 5 * 60 * 60; // 5 minutes of running at 60FPS
 
     uint32_t m_LastFrameTex;
     uint32_t m_SmallViewportFrameTex;

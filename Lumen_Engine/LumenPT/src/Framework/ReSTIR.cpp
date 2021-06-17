@@ -3,6 +3,8 @@
 #ifdef WAVEFRONT
 #include "ReSTIR.h"
 
+#include "Lumen/Renderer/LumenRenderer.h"
+
 #include <cassert>
 #include <cuda_runtime.h>
 
@@ -64,17 +66,17 @@ CPU_ONLY void ReSTIR::Initialize(const ReSTIRSettings& a_Settings)
 }
 
 CPU_ONLY void ReSTIR::Run(
-	const WaveFront::SurfaceData* const a_CurrentPixelData,
-	const WaveFront::SurfaceData* const a_PreviousPixelData,
-	const MemoryBuffer const* a_Lights,
-	const float3& a_CameraPosition,
-	const std::uint32_t a_Seed,
-	const OptixTraversableHandle a_OptixSceneHandle,
-	WaveFront::AtomicBuffer<WaveFront::ShadowRayData>* a_WaveFrontShadowRayBuffer,
-	const WaveFront::OptixWrapper* a_OptixSystem,
-	WaveFront::MotionVectorBuffer* a_MotionVectorBuffer,
-	float3* a_OutputBuffer,
-	bool a_DebugPrint
+    const WaveFront::SurfaceData* const a_CurrentPixelData,
+    const WaveFront::SurfaceData* const a_PreviousPixelData,
+    const MemoryBuffer const* a_Lights,
+    const float3& a_CameraPosition,
+    const std::uint32_t a_Seed,
+    const OptixTraversableHandle a_OptixSceneHandle,
+    WaveFront::AtomicBuffer<WaveFront::ShadowRayData>* a_WaveFrontShadowRayBuffer,
+    const WaveFront::OptixWrapper* a_OptixSystem,
+    WaveFront::MotionVectorBuffer* a_MotionVectorBuffer,
+    float3* a_OutputBuffer,
+    FrameStats& a_FrameStats, bool a_DebugPrint
 )
 {
 	assert(m_SwapDirtyFlag && "SwapBuffers has to be called once per frame for ReSTIR to properly work.");
@@ -240,6 +242,7 @@ CPU_ONLY void ReSTIR::Run(
 
 	printf("Total ReSTIR runtime: %f millis.\n", totalTimer.measure(TimeUnit::MILLIS));
 
+	a_FrameStats.m_Times["ReSTIR"] = totalTimer.measure(TimeUnit::MICROS);
 
 	//Ensure that swap buffers is called.
 	m_SwapDirtyFlag = false;

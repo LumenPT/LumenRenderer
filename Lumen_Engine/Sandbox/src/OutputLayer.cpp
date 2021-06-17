@@ -207,6 +207,8 @@ void OutputLayer::OnImGuiRender()
 				m_EnabledTools.m_DebugViewport = !m_EnabledTools.m_DebugViewport;
 			tooltip("Enable a viewport used for debugging off-screen resources");
 
+			if (ImGui::Selectable("Profiler", m_EnabledTools.m_Profiler))
+				m_EnabledTools.m_Profiler = !m_EnabledTools.m_Profiler;
 
 			ImGui::EndMenu();
 	    }
@@ -316,21 +318,67 @@ void OutputLayer::OnImGuiRender()
 
     }
 
-	float data1[3] = { 0.4f, 0.5f, 0.6f };
-	float data2[3] = { 0.7f, 0.8f, 0.3f };
+    if (m_EnabledTools.m_Profiler)
+    {
+		auto lastFrame = m_Renderer->GetLastFrameStats();
+        if (lastFrame.m_Id && (m_PreviousFramesStats.empty() || m_PreviousFramesStats.back().m_Id != lastFrame.m_Id))
+        {
+			m_PreviousFramesStats.push_back(lastFrame);
 
-	ImGui::Begin("I elementary school maths because of these");
+            if (m_PreviousFramesStats.size() > m_MaxStoredFrames)
+            {
+				m_PreviousFramesStats.pop_front();
+            }            
+        }
 
-	ImPlot::SetNextPlotLimits(0.0f, 4.0f, 0.0f, 1.0f);
+		if (!m_PreviousFramesStats.empty())
+		{
 
-	if (ImPlot::BeginPlot("My sadness", "X", "Y", ImVec2(-1, 0), ImPlotFlags_None))
-	{
-		ImPlot::PlotBars("This shit", data1, 3, 0.1f);
-		ImPlot::PlotBars("This shit, but worse", data2, 3, 0.1f);
-		ImPlot::EndPlot();
-		//ImPlot::sca
-	}
-	ImGui::End();
+
+			ImGui::Begin("Profiler");
+
+			std::map<std::string, std::vector<uint64_t>> processedData;
+
+			for (auto& time : m_PreviousFramesStats[0].m_Times)
+			{
+				processedData[time.first] = std::vector<uint64_t>();
+				processedData[time.first].reserve(m_PreviousFramesStats.size());
+			}
+
+			std::vector<uint64_t> previous(m_PreviousFramesStats.size(), 0);
+
+			uint64_t maxTime = 0;
+
+			for (auto& data : processedData)
+			{
+				for (int i = 0; i < m_PreviousFramesStats.size(); i++)
+				{
+					auto n = previous[i] + m_PreviousFramesStats[i].m_Times[data.first];
+					data.second.push_back(n);
+					previous[i] = n;
+                    if (i > static_cast<int>(m_PreviousFramesStats.size()) - 400)
+                    {
+					    maxTime = std::max(maxTime, n);                        
+                    }
+				}
+			}
+
+			ImPlot::SetNextPlotLimitsY(0.0, static_cast<double>(maxTime) * 1.1, ImGuiCond_Always);
+			ImPlot::SetNextPlotLimitsX(static_cast<double>(m_PreviousFramesStats.size()) - 300.0, static_cast<double>(m_PreviousFramesStats.size()), ImGuiCond_Always);
+
+			if (ImPlot::BeginPlot("Frame Times"))
+			{
+				for (auto iter = processedData.crbegin(); iter != processedData.crend(); ++iter)
+				{
+					auto pair = *iter;
+					ImPlot::PlotBars(pair.first.c_str(), pair.second.data(), pair.second.size(), 1.0f);
+				}
+				ImPlot::EndPlot();
+			}
+
+			ImGui::End();
+		}
+    }
 
 
 	/////////////////////////////////////////////////

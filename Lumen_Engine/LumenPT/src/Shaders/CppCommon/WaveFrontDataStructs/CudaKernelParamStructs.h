@@ -6,7 +6,7 @@
 #include "MotionVectorsGenerationData.h"
 
 class ReSTIR;
-
+struct FrameStats;
 namespace WaveFront
 {
     class OptixWrapper;
@@ -72,7 +72,7 @@ namespace WaveFront
             AtomicBuffer<IntersectionRayData>* a_RayBuffer,
             AtomicBuffer<ShadowRayData>* a_ShadowRays,
             AtomicBuffer<ShadowRayData>* a_VolumetricShadowRays,
-			MemoryBuffer* a_TriangleLights,
+            MemoryBuffer* a_TriangleLights,
             const float3& a_CameraPosition,
             const float3& a_CameraDirection,
             const OptixTraversableHandle a_OptixSceneHandle,
@@ -129,6 +129,7 @@ namespace WaveFront
         AtomicBuffer<ShadowRayData>* m_ShadowRays;
         AtomicBuffer<ShadowRayData>* m_VolumetricShadowRays;
         WaveFront::MotionVectorBuffer* m_MotionVectorBuffer;
+        FrameStats* m_FrameStats;
     };
 
     struct PostProcessLaunchParameters
