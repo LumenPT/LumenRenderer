@@ -25,8 +25,16 @@ CPU_ON_GPU void ShadeIndirect(
         
         auto& surfaceData = a_SurfaceDataBuffer[pixelDataIndex];
 
+    	//Check for alpha discarded surfaces. If alpha discarded, just continue in the same direction.
+    	if(surfaceData.m_SurfaceFlags & SURFACE_FLAG_ALPHA_TRANSPARENT)
+    	{
+            IntersectionRayData ray{ {pixelX, pixelY}, surfaceData.m_Position, surfaceData.m_IncomingRayDirection, surfaceData.m_TransportFactor};
+            a_IntersectionRays->Add(&ray);
+            return;
+    	}
+
         //If the surface is emissive or not intersected, terminate.
-        if(surfaceData.m_Emissive || surfaceData.m_IntersectionT <= 0.f)
+        if(surfaceData.m_SurfaceFlags)
         {
             return;
         }
@@ -82,7 +90,7 @@ CPU_ON_GPU void ShadeIndirect(
         float pdf = 0.f;
         bool specular = false;
         const auto bsdf = SampleBSDF(
-            surfaceData.m_ShadingData, 
+            surfaceData.m_MaterialData, 
             surfaceData.m_Normal, 
             surfaceData.m_Normal, 
             surfaceData.m_Tangent, 

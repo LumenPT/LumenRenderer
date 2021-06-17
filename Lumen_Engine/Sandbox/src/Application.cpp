@@ -255,18 +255,17 @@ public:
 		for(auto& lumenMesh : res2->m_MeshPool)
 		{
 			auto mesh = lumenPT->m_Scene->AddMesh();
-      //Feature-DX11Wrapper
 			mesh->SetMesh(lumenMesh);
 			mesh->m_Transform.SetPosition(glm::vec3(000.f, 160.f, -80.f));
 			mesh->m_Transform.SetRotation(glm::vec3(-90.f, 90.f, 0.f));
-			constexpr auto scale = 14.f;
+			constexpr auto scale = 60.f;
 			mesh->m_Transform.SetScale(glm::vec3(scale, scale, scale));
 			uchar4 whitePixel = { 255,255,255,255 };
 			uchar4 diffusePixel{ 255, 255, 255, 0 };
 			uchar4 normal = { 128, 128, 255, 0 };
-			auto whiteTexture = lumenPT->CreateTexture(&whitePixel, 1, 1);
-			auto diffuseTexture = lumenPT->CreateTexture(&diffusePixel, 1, 1);
-			auto normalTexture = lumenPT->CreateTexture(&normal, 1, 1);
+			auto whiteTexture = lumenPT->CreateTexture(&whitePixel, 1, 1, false);
+			auto diffuseTexture = lumenPT->CreateTexture(&diffusePixel, 1, 1, true);
+			auto normalTexture = lumenPT->CreateTexture(&normal, 1, 1, false);
 			LumenRenderer::MaterialData matData;
 			matData.m_ClearCoatRoughnessTexture = whiteTexture;
 			matData.m_ClearCoatTexture = whiteTexture;
@@ -280,9 +279,9 @@ public:
 
 	
 			//Transparency
-			mat->SetTransmissionFactor(1.f);	//Transparency scalar.
+			mat->SetTransmissionFactor(0.f);	//Transparency scalar.
 			mat->SetTransmittanceFactor({ 0.f, 0.f, 0.f });		//Beers law stuff.
-			mat->SetIndexOfRefraction(1.53f);	//IOR
+			mat->SetIndexOfRefraction(1.0f);	//IOR
 	
 			//Color settings.
 			mat->SetDiffuseColor(glm::vec4(1.f, 1.f, 1.f, 1.f));
@@ -303,8 +302,8 @@ public:
 			mat->SetClearCoatRoughnessFactor(0.f);
 	
 			//MetallicRoughness model.
-			mat->SetRoughnessFactor(0.0001f);
-			mat->SetMetallicFactor(0.f);
+			mat->SetRoughnessFactor(1.f);
+			mat->SetMetallicFactor(1.f);
 	
 			//Anisotropic scalar.
 			mat->SetAnisotropic(0.f);

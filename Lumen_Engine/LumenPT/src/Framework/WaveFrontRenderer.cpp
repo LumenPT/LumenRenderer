@@ -319,6 +319,9 @@ namespace WaveFront
 
     void WaveFrontRenderer::TraceFrame()
     {
+    	//Track frame time.
+        Timer timer;
+    	
         CHECKLASTCUDAERROR;
 
         //Retrieve the acceleration structure and scene data table once.
@@ -340,7 +343,6 @@ namespace WaveFront
         CHECKLASTCUDAERROR;
 
         //Timer to measure how long each frame takes.
-        Timer timer;
         ResetAtomicBuffer<WaveFront::TriangleLight>(&m_TriangleLights);
         auto lightBuffer = m_TriangleLights.GetDevicePtr<AtomicBuffer<WaveFront::TriangleLight>>();
 
@@ -651,29 +653,39 @@ namespace WaveFront
             //1 and 2 are used for the first intersection and remembered for temporal use.
             const auto surfaceDataBufferIndex = (depth == 0 ? currentIndex : 2);   
 
-            ExtractSurfaceData(
-                numIntersections,
-                m_IntersectionData.GetDevicePtr<AtomicBuffer<IntersectionData>>(),
-                m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>(),
-                m_SurfaceData[surfaceDataBufferIndex].GetDevicePtr<SurfaceData>(),
-                m_Settings.renderResolution,        // TODO: render resolution used to extract surface data
-                sceneDataTableAccessor);
+        	if(numIntersections > 0)
+        	{
+                ExtractSurfaceData(
+                    numIntersections,
+                    m_IntersectionData.GetDevicePtr<AtomicBuffer<IntersectionData>>(),
+                    m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>(),
+                    m_SurfaceData[surfaceDataBufferIndex].GetDevicePtr<SurfaceData>(),
+                    m_Settings.renderResolution,
+                    sceneDataTableAccessor);
+
+                cudaDeviceSynchronize();
+                CHECKLASTCUDAERROR;
+        	}
 
             unsigned numVolumeIntersections = 0;
             m_VolumetricIntersectionData.Read(&numVolumeIntersections, sizeof(numVolumeIntersections), 0);
 
             const auto volumetricDataBufferIndex = 0;
 
-            ExtractVolumetricData(
-                numVolumeIntersections,
-                m_VolumetricIntersectionData.GetDevicePtr<AtomicBuffer<VolumetricIntersectionData>>(),
-                m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>(),
-                m_VolumetricData[volumetricDataBufferIndex].GetDevicePtr<VolumetricData>(),
-                m_Settings.renderResolution,        // TODO: render resolution used to extract volumetric data
-                sceneDataTableAccessor);
+        	//Ensure that there is actually volumes to extract data from.
+        	if(numVolumeIntersections > 0)
+        	{
+                ExtractVolumetricData(
+                    numVolumeIntersections,
+                    m_VolumetricIntersectionData.GetDevicePtr<AtomicBuffer<VolumetricIntersectionData>>(),
+                    m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>(),
+                    m_VolumetricData[volumetricDataBufferIndex].GetDevicePtr<VolumetricData>(),
+                    m_Settings.renderResolution,
+                    sceneDataTableAccessor);
 
-            cudaDeviceSynchronize();
-            CHECKLASTCUDAERROR;
+                cudaDeviceSynchronize();
+                CHECKLASTCUDAERROR;
+        	}
 
             //motion vector generation
             if (depth == 0)
@@ -888,6 +900,8 @@ namespace WaveFront
         m_SnapshotReady = recordingSnapshot;
         CHECKLASTCUDAERROR;
 
+        printf("Total frame time: %f milliseconds.\n", timer.measure(TimeUnit::MILLIS));
+
         //tonemapping should be done before DLSS
         //DLSS performs better on LDR data as opposed to HDR
 
@@ -1067,10 +1081,10 @@ namespace WaveFront
     }
 
     std::shared_ptr<Lumen::ILumenTexture> WaveFrontRenderer::CreateTexture(void* a_PixelData,
-        uint32_t a_Width, uint32_t a_Height)
+        uint32_t a_Width, uint32_t a_Height, bool a_Normalize)
     {
         static cudaChannelFormatDesc formatDesc = cudaCreateChannelDesc<uchar4>();
-        return std::make_shared<PTTexture>(a_PixelData, formatDesc, a_Width, a_Height);
+        return std::make_shared<PTTexture>(a_PixelData, formatDesc, a_Width, a_Height, a_Normalize);
     }
 
     std::shared_ptr<Lumen::ILumenMaterial> WaveFrontRenderer::CreateMaterial(
@@ -1085,6 +1099,9 @@ namespace WaveFront
         assert(a_MaterialData.m_TintTexture);
         assert(a_MaterialData.m_TransmissionTexture);
         assert(a_MaterialData.m_NormalMap);
+
+    	//Roughness may never be 0.
+        assert(a_MaterialData.m_RoughnessFactor > 0.f);
     	
         auto mat = std::make_shared<PTMaterial>();
         mat->SetDiffuseColor(a_MaterialData.m_DiffuseColor);
@@ -1113,6 +1130,9 @@ namespace WaveFront
         mat->SetSheenTintFactor(a_MaterialData.m_SheenTintFactor);
         mat->SetTintFactor(a_MaterialData.m_TintFactor);
         mat->SetTransmittanceFactor(a_MaterialData.m_Transmittance);
+
+        mat->SetRoughnessFactor(a_MaterialData.m_RoughnessFactor);
+        mat->SetMetallicFactor(a_MaterialData.m_MetallicFactor);
 
         CHECKLASTCUDAERROR;
 
@@ -1169,6 +1189,7 @@ namespace WaveFront
 
     std::vector<uint8_t> WaveFrontRenderer::GetOutputTexturePixels(uint32_t& a_Width, uint32_t& a_Height)
     {
+        std::lock_guard<std::mutex> lock(m_OutputBufferMutex);
         auto devPtr = m_OutputBuffer->GetDevicePtr<uchar4>();
         auto size = m_OutputBuffer->GetSize();
 
@@ -1177,7 +1198,6 @@ namespace WaveFront
 
         std::vector<uint8_t> pixels;
         pixels.resize(size.x * size.y * sizeof(uchar4));
-        std::lock_guard<std::mutex> lock(m_OutputBufferMutex);
 
         cudaMemcpy(pixels.data(), devPtr, pixels.size(), cudaMemcpyKind::cudaMemcpyDeviceToHost);
 
@@ -1211,7 +1231,7 @@ namespace WaveFront
 
         //Initialize the ray buffers. Note: These are not initialized but Reset() is called when the waves start.
         const auto numPrimaryRays = numPixels;
-        const auto numShadowRays = numPixels * m_Settings.depth + (numPixels * ReSTIRSettings::numReservoirsPerPixel); //TODO: change to 2x num pixels and add safety check to resolve when full.
+        const auto numShadowRays = numPixels * m_Settings.depth;// +(numPixels * ReSTIRSettings::numReservoirsPerPixel); //TODO: change to 2x num pixels and add safety check to resolve when full.
 
         //Create atomic buffers. This automatically sets the counter to 0 and size to max.
         CreateAtomicBuffer<IntersectionRayData>(&m_Rays, numPrimaryRays);

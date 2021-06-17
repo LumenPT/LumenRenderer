@@ -152,7 +152,7 @@ __global__ void __closesthit__HitShader()
     }
 
     float4 smpCol = tex2D<float4>(prim->m_Material->m_DiffuseTexture, texCoords.x, texCoords.y);
-    float4 finalCol = smpCol * prim->m_Material->m_DiffuseColor;
+    float4 finalCol = smpCol * prim->m_Material->m_MaterialData.m_Color;
 
     optixSetPayload_0(float_as_int(finalCol.x));
     optixSetPayload_1(float_as_int(finalCol.y));

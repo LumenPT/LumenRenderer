@@ -23,7 +23,7 @@ CPU_ON_GPU void ResolveDirectLightHits(
 
         auto& pixelData = a_SurfaceDataBuffer[pixelDataIndex];
         //If the surface is emissive, store its light directly in the output buffer.
-        if (pixelData.m_Emissive)
+        if (pixelData.m_SurfaceFlags & SURFACE_FLAG_EMISSIVE)
         {
 
             half4Ushort4 color{ (pixelData.m_ShadingData.color, 1.f) };
@@ -70,7 +70,7 @@ CPU_ON_GPU void ShadeDirect(
         
         const SurfaceData& surfaceData = a_SurfaceDataBuffer[pixelDataIndex];
 
-        if (surfaceData.m_IntersectionT > 0.f)
+        if (!surfaceData.m_SurfaceFlags)
         {
             //Pick a light from the CDF.
             unsigned index;
@@ -111,7 +111,7 @@ CPU_ON_GPU void ShadeDirect(
             
         	
             float bsdfPdf = 0.f;
-            const auto bsdf = EvaluateBSDF(surfaceData.m_ShadingData, surfaceData.m_Normal, surfaceData.m_Tangent, -surfaceData.m_IncomingRayDirection, pixelToLightDir, bsdfPdf);
+            const auto bsdf = EvaluateBSDF(surfaceData.m_MaterialData, surfaceData.m_Normal, surfaceData.m_Tangent, -surfaceData.m_IncomingRayDirection, pixelToLightDir, bsdfPdf);
         	
             //If no contribution, don't make a shadow ray.
             if(bsdfPdf <= EPSILON)

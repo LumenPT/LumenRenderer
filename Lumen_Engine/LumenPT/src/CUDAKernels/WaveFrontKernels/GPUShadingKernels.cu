@@ -20,7 +20,7 @@ CPU_ON_GPU void DEBUGShadePrimIntersections(
     {
         //Copy the diffuse color over for now for unshaded.
         auto* output = &a_Output[i * static_cast<unsigned>(LightChannel::NUM_CHANNELS)];
-        output[static_cast<unsigned>(LightChannel::DIRECT)] = a_CurrentSurfaceData[i].m_ShadingData.color;
+        output[static_cast<unsigned>(LightChannel::DIRECT)] = make_float3(a_CurrentSurfaceData[i].m_MaterialData.m_Color);
     }
 }
 

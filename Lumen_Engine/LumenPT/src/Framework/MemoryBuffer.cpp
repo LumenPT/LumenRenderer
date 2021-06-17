@@ -11,7 +11,7 @@
 // This is because it makes extensive use of the CUDA toolkit.
 void CudaCheck(cudaError_t err)
 {
-#ifdef _DEBUG
+#if defined(_DEBUG) || !defined(_NDEBUG)
     if (err != 0)
     {
         printf("Cuda error %u", err);

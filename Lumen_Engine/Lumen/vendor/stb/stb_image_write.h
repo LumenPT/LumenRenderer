@@ -1,3 +1,4 @@
+
 /* stb_image_write - v1.15 - public domain - http://nothings.org/stb
    writes out PNG/BMP/TGA/JPEG/HDR images to C stdio - Sean Barrett 2010-2015
                                      no warranty implied; use at your own risk
@@ -320,8 +321,13 @@ static FILE *stbiw__fopen(char const *filename, char const *mode)
 #endif
 
 #elif defined(_MSC_VER) && _MSC_VER >= 1400
-   if (0 != fopen_s(&f, filename, mode))
-      f=0;
+   int u = 0;
+   u = fopen_s(&f, filename, mode);
+   if (0 != u)
+   {
+		f = 0;
+   }
+      
 #else
    f = fopen(filename, mode);
 #endif

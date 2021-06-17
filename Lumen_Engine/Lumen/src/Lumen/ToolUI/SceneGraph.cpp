@@ -9,25 +9,58 @@
 #include <map>
 #include <string>
 
+Lumen::SceneGraph::SceneGraph()
+	: m_SelectedMeshInstance(nullptr)
+	, m_SelectedVolumeInstance(nullptr)
+{
+    m_SearchString.resize(128, 0);
+}
+
 void Lumen::SceneGraph::Display(ILumenScene& a_Scene)
 {
 
     ImGui::Begin("Scene Graph");
+    ImGui::InputText("Search", m_SearchString.data(), m_SearchString.size());
+
+    auto trimmed = std::string(m_SearchString.begin(), m_SearchString.begin() + m_SearchString.find(char(0)));
+	
     if (ImGui::ListBoxHeader(""))
     {
-
         std::map<std::string, uint32_t> names;
+    	
         for (auto& meshInstance : a_Scene.m_MeshInstances)
         {
-            auto instanceName = meshInstance->m_Name;
+            auto instanceName = "[M] " + meshInstance->m_Name;
             if (names[meshInstance->m_Name] == 0)
                 names[meshInstance->m_Name]++;
             else
                 instanceName += std::to_string(names[meshInstance->m_Name]);
 
-            if (ImGui::Selectable(instanceName.c_str(), m_SelectedMeshInstance == meshInstance.get()))
-                m_SelectedMeshInstance = meshInstance.get();
+            if (trimmed.empty() || instanceName.find(trimmed) != std::string::npos)
+                if (ImGui::Selectable(instanceName.c_str(), m_SelectedMeshInstance == meshInstance.get()))
+                {
+                    m_SelectedMeshInstance = meshInstance.get();
+                    m_SelectedVolumeInstance = nullptr;
+                }
         }
+
+        for (auto& volumeInstance : a_Scene.m_VolumeInstances)
+        {
+            auto instanceName = "[V] " + volumeInstance->m_Name;
+            if (names[volumeInstance->m_Name] = 0)
+                names[volumeInstance->m_Name]++;
+            else
+                instanceName += std::to_string(names[volumeInstance->m_Name]);
+
+            if (trimmed.empty() || instanceName.find(trimmed) != std::string::npos)
+                if (ImGui::Selectable(instanceName.c_str(), m_SelectedVolumeInstance == volumeInstance.get()))
+                {
+                    m_SelectedVolumeInstance = volumeInstance.get();
+                    m_SelectedMeshInstance = nullptr;
+
+                }
+        }
+    	
         ImGui::ListBoxFooter();
     }
 
@@ -222,7 +255,14 @@ void Lumen::SceneGraph::Display(ILumenScene& a_Scene)
 
 
     }
-
+    else if (m_SelectedVolumeInstance != nullptr)
+    {
+	    if (ImGui::CollapsingHeader("Transformation"))
+        {
+            auto& transform = m_SelectedVolumeInstance->m_Transform;
+            TransformEditor(transform);            
+        }
+    }
     ImGui::End();
 }
 
