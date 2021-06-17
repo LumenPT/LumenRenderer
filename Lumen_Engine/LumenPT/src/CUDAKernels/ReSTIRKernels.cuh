@@ -105,18 +105,21 @@ __device__ __forceinline__ void ShadeReservoirs(Reservoir* a_Reservoirs, unsigne
 /*
  * Resample spatial neighbours with an intermediate output buffer.
  * Combine reservoirs.
+ *
+ * Returns a pointer to the swap buffer containing the final combined reservoirs.
  */
-__host__ void SpatialNeighbourSampling(
-    Reservoir* a_Reservoirs,
-    Reservoir* a_SwapBuffer,
+__host__ Reservoir* SpatialNeighbourSampling(
+    Reservoir* a_InputReservoirs,
+    Reservoir* a_SwapBuffer1,
+    Reservoir* a_SwapBuffer2,
     const WaveFront::SurfaceData* a_PixelData,
     const std::uint32_t a_Seed,
     uint2 a_Dimensions
 );
 
 __global__ void SpatialNeighbourSamplingInternal(
-    Reservoir* a_Reservoirs,
-    Reservoir* a_SwapBuffer,
+    Reservoir* a_ReservoirsIn,
+    Reservoir* a_ReservoirsOut,
     const WaveFront::SurfaceData* a_PixelData,
     const std::uint32_t a_Seed,
     uint2 a_Dimensions,
@@ -173,12 +176,20 @@ __device__ __inline__ void CombineBiased(Reservoir* a_OutputReservoir, int a_Cou
  */
 __device__ __inline__ void Resample(LightSample* a_Input, const WaveFront::SurfaceData* a_PixelData, LightSample* a_Output);
 
-/*
- * Generate shadow rays from the reservoirs after ReSTIR runs.
- * Add the shadow rays with scaled-by-weight payload to the wavefront buffer.
- */
-__host__ void GenerateWaveFrontShadowRays(Reservoir* a_Reservoirs, const WaveFront::SurfaceData* a_PixelData, WaveFront::AtomicBuffer<WaveFront::ShadowRayData>* a_AtomicBuffer, unsigned a_NumPixels);
+///*
+// * Generate shadow rays from the reservoirs after ReSTIR runs.
+// * Add the shadow rays with scaled-by-weight payload to the wavefront buffer.
+// */
+//__host__ void GenerateWaveFrontShadowRays(Reservoir* a_Reservoirs, const WaveFront::SurfaceData* a_PixelData, WaveFront::AtomicBuffer<WaveFront::ShadowRayData>* a_AtomicBuffer, unsigned a_NumPixels);
+//
+//__global__ void GenerateWaveFrontShadowRaysInternal(Reservoir* a_Reservoirs, const WaveFront::SurfaceData* a_PixelData, WaveFront::AtomicBuffer<WaveFront::ShadowRayData>* a_AtomicBuffer, unsigned a_NumPixels, unsigned a_Depth);
 
-__global__ void GenerateWaveFrontShadowRaysInternal(Reservoir* a_Reservoirs, const WaveFront::SurfaceData* a_PixelData, WaveFront::AtomicBuffer<WaveFront::ShadowRayData>* a_AtomicBuffer, unsigned a_NumPixels, unsigned a_Depth);
+/*
+ * Combine reservoirs of two buffers.
+ * Stores the combined results into the first reservoir buffer.
+ */
+__host__ void CombineReservoirBuffers(Reservoir* a_Reservoirs1, Reservoir* a_Reservoirs2, const WaveFront::SurfaceData* a_SurfaceData, unsigned a_NumReservoirs, unsigned a_Seed);
+
+__global__ void CombineReservoirBuffersInternal(Reservoir* a_Reservoirs1, Reservoir* a_Reservoirs2, const WaveFront::SurfaceData* a_SurfaceData, unsigned a_NumReservoirs, unsigned a_Seed);
 
 __device__ __inline__ uint32_t __mysmid();

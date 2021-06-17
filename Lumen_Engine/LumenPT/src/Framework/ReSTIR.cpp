@@ -191,10 +191,10 @@ CPU_ONLY void ReSTIR::Run(
 	{
 		seed = WangHash(seed);
 		timer.reset();
-		//TODO change to swap between 2 and 3. Then shade the one that has the final output.
-		SpatialNeighbourSampling(
+		Reservoir* neighbourBuffer = SpatialNeighbourSampling(
 			reservoirPointers[currentIndex],
 			reservoirPointers[2],
+			reservoirPointers[3],
 			a_CurrentPixelData,
 			seed,
 			dimensions
@@ -214,7 +214,9 @@ CPU_ONLY void ReSTIR::Run(
 		/*
 		 * Finally, combine the neighbour reservoirs with the current reservoirs to be used in the next frame.
 		 */
-		//TODO combine neighbour reservoirs with current buffer as source for next frame samples.
+		timer.reset();
+		CombineReservoirBuffers(reservoirPointers[currentIndex], neighbourBuffer, a_CurrentPixelData, numPixels * ReSTIRSettings::numReservoirsPerPixel, WangHash(seed));
+		if (a_DebugPrint) printf("Spatial reservoir combination time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
 	}
 
 	//Ensure CUDA is done executing now.

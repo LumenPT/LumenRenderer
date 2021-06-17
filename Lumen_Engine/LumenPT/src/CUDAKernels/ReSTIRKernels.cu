@@ -560,30 +560,22 @@ __device__ __forceinline__ void ShadeReservoirs(Reservoir* a_Reservoirs, unsigne
 //}
 
 
-__host__ void SpatialNeighbourSampling(Reservoir* a_Reservoirs, Reservoir* a_SwapBuffer, const WaveFront::SurfaceData* a_PixelData, const std::uint32_t a_Seed, uint2 a_Dimensions)
+__host__ Reservoir* SpatialNeighbourSampling(
+    Reservoir* a_InputReservoirs,
+    Reservoir* a_SwapBuffer1,
+    Reservoir* a_SwapBuffer2,
+    const WaveFront::SurfaceData* a_PixelData,
+    const std::uint32_t a_Seed,
+    uint2 a_Dimensions
+)
 {
-    /*
-     * TODO:
-     * This is tricky because it's a matter of balancing local data and random access.
-     * Right now it's very slow because the amount of data locally required per neigbour is too much.
-     * This stalls the pipeline and threads in a block.
-     * Less threads per block makes this somewhat better up to a certain extent.
-     *
-     * Having everything as pointers is not ideal because now it does random access and trashes the cache.
-     *
-     * The ideal solution:
-     * - All data as pointers.
-     * - All data is located in the same place in memory.
-     * - One thread per reservoir (so also per depth).
-     * - Maybe limit the amount of threads per block for optimal cache hits.
-     * - Blocks in the same SM need to operate on the same region of pixel data.
-     */
     const unsigned numReservoirs = a_Dimensions.x * a_Dimensions.y * ReSTIRSettings::numReservoirsPerPixel;
     const int blockSize = CUDA_BLOCK_SIZE;
     const int numBlocks = (numReservoirs + blockSize - 1) / blockSize;
 
-    Reservoir* fromBuffer = a_Reservoirs;
-    Reservoir* toBuffer = a_SwapBuffer;
+	//Initially, copy from the current reservoirs. After depth 0 the two swap buffers are used.
+    Reservoir* fromBuffer = a_InputReservoirs;
+    Reservoir* toBuffer = a_SwapBuffer1;
 
     //Synchronize between each swap, and then swap the buffers.
     for (int iteration = 0; iteration < ReSTIRSettings::numSpatialIterations; ++iteration)
@@ -593,42 +585,56 @@ __host__ void SpatialNeighbourSampling(Reservoir* a_Reservoirs, Reservoir* a_Swa
         CHECKLASTCUDAERROR;
 
         //Swap the pointers for in and output.
-        Reservoir* temp = fromBuffer;
-        fromBuffer = toBuffer;
-        toBuffer = temp;
+    	if(iteration == 0)
+    	{
+            fromBuffer = a_SwapBuffer1;
+            toBuffer = a_SwapBuffer2;
+    	}
+        else
+        {
+            Reservoir* temp = fromBuffer;
+            fromBuffer = toBuffer;
+            toBuffer = temp;
+        }
     }
 
+	//Buffer currently containing the combined reservoirs.
+    return fromBuffer;
 }
 
-__global__ void SpatialNeighbourSamplingInternal(Reservoir* a_Reservoirs, Reservoir* a_SwapBuffer,
-    const WaveFront::SurfaceData* a_PixelData, const std::uint32_t a_Seed, uint2 a_Dimensions,
-    unsigned a_NumReservoirs)
+__global__ void SpatialNeighbourSamplingInternal(
+    Reservoir* a_ReservoirsIn,
+    Reservoir* a_ReservoirsOut,
+    const WaveFront::SurfaceData* a_PixelData,
+    const std::uint32_t a_Seed,
+    uint2 a_Dimensions,
+    unsigned a_NumReservoirs
+)
 {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     if (index >= a_NumReservoirs) return;
 
     //Storage for reservoirs and pixels to be combined.
-    const WaveFront::SurfaceData* toCombinePixelData[ReSTIRSettings::numSpatialSamples + 1];
-    Reservoir* toCombineReservoirs[ReSTIRSettings::numSpatialSamples + 1];
+    const WaveFront::SurfaceData* toCombinePixelData[ReSTIRSettings::numSpatialSamples];
+    Reservoir* toCombineReservoirs[ReSTIRSettings::numSpatialSamples];
 
     //The seed unique to this pixel.
     auto seed =  WangHash(a_Seed + index);
 
     const auto pixelIndex = index / ReSTIRSettings::numReservoirsPerPixel;
     const auto currentDepth = index - (pixelIndex * ReSTIRSettings::numReservoirsPerPixel);
-    toCombinePixelData[0] = &a_PixelData[pixelIndex];
+
+	//Current surface data.
+    auto& currentSurfaceData = a_PixelData[pixelIndex];
 
     //Only run when there's an intersection for this pixel.
-    if (!toCombinePixelData[0]->m_SurfaceFlags)
+    if (!currentSurfaceData.m_SurfaceFlags)
     {
         const int y = pixelIndex / a_Dimensions.x;
         const int x = pixelIndex - (y * a_Dimensions.x);
+        int count = 0;
 
-        toCombineReservoirs[0] = &a_Reservoirs[index];
-
-        int count = 1;
-
-        for (int neighbour = 1; neighbour <= ReSTIRSettings::numSpatialSamples; ++neighbour)
+        for (int neighbour = 0; neighbour < ReSTIRSettings::numSpatialSamples; ++neighbour)
         {
             //TODO This generates a square rn. Make it within a circle.
             const int neighbourY = round((RandomFloat(seed) * 2.f - 1.f) * static_cast<float>(ReSTIRSettings::spatialSampleRadius)) + y;
@@ -649,16 +655,16 @@ __global__ void SpatialNeighbourSamplingInternal(Reservoir* a_Reservoirs, Reserv
                 //Only run for valid depths and non-emissive surfaces.
                 if (!toCombinePixelData[count]->m_SurfaceFlags)
                 {
-                    toCombineReservoirs[count] = &a_Reservoirs[RESERVOIR_INDEX(neighbourIndex, currentDepth, ReSTIRSettings::numReservoirsPerPixel)];
+                    toCombineReservoirs[count] = &a_ReservoirsIn[RESERVOIR_INDEX(neighbourIndex, currentDepth, ReSTIRSettings::numReservoirsPerPixel)];
                     //Gotta stay positive.
                     assert(toCombineReservoirs[count]->weight >= 0.f);
 
                     //Discard samples that are too different.
                     const float depth1 = toCombinePixelData[count]->m_IntersectionT;
-                    const float depth2 = toCombinePixelData[0]->m_IntersectionT;
+                    const float depth2 = currentSurfaceData.m_IntersectionT;
                     const float depthDifPct = fabs(depth1 - depth2) / ((depth1 + depth2) / 2.f);
 
-                    const float angleDif = dot(toCombinePixelData[count]->m_Normal, toCombinePixelData[0]->m_Normal);	//Between 0 and 1 (0 to 90 degrees). 
+                    const float angleDif = dot(toCombinePixelData[count]->m_Normal, currentSurfaceData.m_Normal);	//Between 0 and 1 (0 to 90 degrees). 
                     static constexpr float MAX_ANGLE_COS = 0.72222222223f;	//Dot product is cos of the angle. If higher than this value, it's within 25 degrees.
 
                     //If the samples are similar enough, up the counter. This will means the samples are not overwritten and will be merged.
@@ -680,19 +686,8 @@ __global__ void SpatialNeighbourSamplingInternal(Reservoir* a_Reservoirs, Reserv
                 //Output reservoir.
                 Reservoir output;
 
-                //First sample needs no resampling.
-                auto* reservoir = toCombineReservoirs[0];
-                const float weight = static_cast<float>(reservoir->sampleCount) * reservoir->weight * reservoir->sample.solidAnglePdf;
-
-                assert(!isnan(weight));
-                assert(!isinf(weight));
-                assert(weight >= 0.f);
-            	
-                output.Update(reservoir->sample, weight, a_Seed);
-                sampleCountSum += reservoir->sampleCount;
-
                 //Iterate over the intersection data to combine.
-                for (int i = 1; i < count; ++i)
+                for (int i = 0; i < count; ++i)
                 {
                     auto* reservoir = toCombineReservoirs[i];
                     LightSample resampled;
@@ -723,7 +718,7 @@ __global__ void SpatialNeighbourSamplingInternal(Reservoir* a_Reservoirs, Reserv
                 assert(!isinf(output.weightSum));
 
                 //Override the reservoir for the output at this depth.
-                a_SwapBuffer[index] = output;
+                a_ReservoirsOut[index] = output;
             }
             else
             {
@@ -731,19 +726,8 @@ __global__ void SpatialNeighbourSamplingInternal(Reservoir* a_Reservoirs, Reserv
                 Reservoir output;
                 int sampleCountSum = 0;
 
-                //First sample needs no resampling.
-                auto* reservoir = toCombineReservoirs[0];
-                const float weight = static_cast<float>(reservoir->sampleCount) * reservoir->weight * reservoir->sample.solidAnglePdf;
-
-                assert(!isnan(weight));
-                assert(!isinf(weight));
-                assert(weight >= 0.f);
-            	
-                output.Update(reservoir->sample, weight, a_Seed);
-                sampleCountSum += reservoir->sampleCount;
-
                 //Merge the other reservoirs in.
-                for (int i = 1; i < count; ++i)
+                for (int i = 0; i < count; ++i)
                 {
                     auto* otherReservoir = toCombineReservoirs[i];
                     LightSample resampled;
@@ -778,7 +762,7 @@ __global__ void SpatialNeighbourSamplingInternal(Reservoir* a_Reservoirs, Reserv
 
                     if (resampled.solidAnglePdf > 0)
                     {
-                        correction += a_Reservoirs[index].sampleCount;
+                        correction += a_ReservoirsOut[index].sampleCount;
                     }
                 }
 
@@ -800,14 +784,14 @@ __global__ void SpatialNeighbourSamplingInternal(Reservoir* a_Reservoirs, Reserv
                 assert(!isinf(output.weightSum));
 
                 //Store the output reservoir for the pixel.
-                a_SwapBuffer[index] = output;
+                a_ReservoirsOut[index] = output;
             }
         }
         //Not enough reservoirs to combine, but still data needs to be passed on.
         else
         {
-            //Copy the reservoir over directly without any combining.
-            a_SwapBuffer[index] = *toCombineReservoirs[0];
+            //Set the output reservoir to 0 if there was no valid candidates. Will be auto discarded when combined for next frame.
+            a_ReservoirsOut[index].Reset();
         }
     }
     
@@ -1136,67 +1120,103 @@ __device__ __inline__ void Resample(LightSample* a_Input, const WaveFront::Surfa
         z) / 3.f;
 }
 
-__host__ void GenerateWaveFrontShadowRays(Reservoir* a_Reservoirs, const WaveFront::SurfaceData* a_PixelData, WaveFront::AtomicBuffer<WaveFront::ShadowRayData>* a_AtomicBuffer, unsigned a_NumPixels)
-{
-    //Call in parallel.
-    const int blockSize = CUDA_BLOCK_SIZE;
-    const int numBlocks = (a_NumPixels + blockSize - 1) / blockSize;
+//__host__ void GenerateWaveFrontShadowRays(Reservoir* a_Reservoirs, const WaveFront::SurfaceData* a_PixelData, WaveFront::AtomicBuffer<WaveFront::ShadowRayData>* a_AtomicBuffer, unsigned a_NumPixels)
+//{
+//    //Call in parallel.
+//    const int blockSize = CUDA_BLOCK_SIZE;
+//    const int numBlocks = (a_NumPixels + blockSize - 1) / blockSize;
+//
+//    //Separate invocations for each depth to add a stride.
+//    for (int depth = 0; depth < ReSTIRSettings::numReservoirsPerPixel; ++depth)
+//    {
+//        GenerateWaveFrontShadowRaysInternal << <numBlocks, blockSize >> > (a_Reservoirs, a_PixelData, a_AtomicBuffer, a_NumPixels, depth);
+//    }
+//    cudaDeviceSynchronize();
+//    CHECKLASTCUDAERROR;
+//}
+//
+//__global__ void GenerateWaveFrontShadowRaysInternal(Reservoir* a_Reservoirs, const WaveFront::SurfaceData* a_PixelData, WaveFront::AtomicBuffer<WaveFront::ShadowRayData>* a_AtomicBuffer, unsigned a_NumPixels, unsigned a_Depth)
+//{
+//    int index = blockIdx.x * blockDim.x + threadIdx.x;
+//    int stride = blockDim.x * gridDim.x;
+//
+//    for (int i = index; i < a_NumPixels; i += stride)
+//    {
+//        const WaveFront::SurfaceData* pixel = &a_PixelData[i];
+//
+//        //Only generate shadow rays for pixels that hit a surface that is not emissive.
+//        if(!(pixel->m_SurfaceFlags))
+//        {
+//            /*
+//             * TODO
+//             * Note: This currently divides the expected contribution per reservoir by the amount of reservoirs.
+//             * It's essentially like scaling down so that the total adds up to 100% if all shadow rays pass.
+//             * This does shoot one shadow ray per reservoir, but I think that's needed for accurate results.
+//             * If we are really desperate we could average the reservoir results and then send a single shadow ray.
+//             */
+//
+//            //Get the contribution and scale it down based on the number of reservoirs.
+//            Reservoir* reservoir = &a_Reservoirs[RESERVOIR_INDEX(i, a_Depth, ReSTIRSettings::numReservoirsPerPixel)];
+//
+//            //Only send shadow rays for reservoirs that have a valid sample.
+//            if(reservoir->weight > 0)
+//            {
+//                float3 contribution = (reservoir->sample.unshadowedPathContribution * (reservoir->weight / static_cast<float>(ReSTIRSettings::numReservoirsPerPixel)));
+//
+//                //Generate a ray for this particular reservoir.
+//                float3 toLightDir = reservoir->sample.position - pixel->m_Position;
+//                const float l = length(toLightDir);
+//                toLightDir /= l;
+//
+//                //TODO: add stride between these.
+//
+//                //TODO ensure no shadow acne.
+//                //TODO: Pass pixel index to shadow ray data.
+//                auto data =
+//                    WaveFront::ShadowRayData{
+//                        pixel->m_PixelIndex,
+//                        pixel->m_Position,
+//                        toLightDir, l - 0.005f,
+//                        contribution,
+//                        WaveFront::LightChannel::DIRECT };
+//                a_AtomicBuffer->Add(&data);
+//            }
+//        }
+//    }
+//}
 
-    //Separate invocations for each depth to add a stride.
-    for (int depth = 0; depth < ReSTIRSettings::numReservoirsPerPixel; ++depth)
-    {
-        GenerateWaveFrontShadowRaysInternal << <numBlocks, blockSize >> > (a_Reservoirs, a_PixelData, a_AtomicBuffer, a_NumPixels, depth);
-    }
+__host__ void CombineReservoirBuffers(Reservoir* a_Reservoirs1, Reservoir* a_Reservoirs2, const WaveFront::SurfaceData* a_SurfaceData, unsigned a_NumReservoirs, unsigned a_Seed)
+{
+    const int blockSize = CUDA_BLOCK_SIZE;
+    const int numBlocks = (a_NumReservoirs + blockSize - 1) / blockSize;
+    CombineReservoirBuffersInternal<< <numBlocks, blockSize >> > (a_Reservoirs1, a_Reservoirs2, a_SurfaceData, a_NumReservoirs, a_Seed);
     cudaDeviceSynchronize();
     CHECKLASTCUDAERROR;
+
 }
 
-__global__ void GenerateWaveFrontShadowRaysInternal(Reservoir* a_Reservoirs, const WaveFront::SurfaceData* a_PixelData, WaveFront::AtomicBuffer<WaveFront::ShadowRayData>* a_AtomicBuffer, unsigned a_NumPixels, unsigned a_Depth)
+__global__ void CombineReservoirBuffersInternal(Reservoir* a_Reservoirs1, Reservoir* a_Reservoirs2, const WaveFront::SurfaceData* a_SurfaceData, unsigned a_NumReservoirs, unsigned a_Seed)
 {
-    int index = blockIdx.x * blockDim.x + threadIdx.x;
-    int stride = blockDim.x * gridDim.x;
-
-    for (int i = index; i < a_NumPixels; i += stride)
+    const int index = blockIdx.x * blockDim.x + threadIdx.x;
+    const int stride = blockDim.x * gridDim.x;
+	
+    for (int i = index; i < a_NumReservoirs; i += stride)
     {
-        const WaveFront::SurfaceData* pixel = &a_PixelData[i];
-
-        //Only generate shadow rays for pixels that hit a surface that is not emissive.
-        if(!(pixel->m_SurfaceFlags))
+        const auto pixelIndex = i / ReSTIRSettings::numReservoirsPerPixel;
+	    const WaveFront::SurfaceData* surface = &a_SurfaceData[pixelIndex];
+ 
+    	//Only shade surfaces that can be shaded.
+        if(!surface->m_SurfaceFlags)
         {
-            /*
-             * TODO
-             * Note: This currently divides the expected contribution per reservoir by the amount of reservoirs.
-             * It's essentially like scaling down so that the total adds up to 100% if all shadow rays pass.
-             * This does shoot one shadow ray per reservoir, but I think that's needed for accurate results.
-             * If we are really desperate we could average the reservoir results and then send a single shadow ray.
-             */
+            Reservoir toCombine[2];
+            toCombine[0] = a_Reservoirs1[i];
+            toCombine[1] = a_Reservoirs2[i];
 
-            //Get the contribution and scale it down based on the number of reservoirs.
-            Reservoir* reservoir = &a_Reservoirs[RESERVOIR_INDEX(i, a_Depth, ReSTIRSettings::numReservoirsPerPixel)];
-
-            //Only send shadow rays for reservoirs that have a valid sample.
-            if(reservoir->weight > 0)
-            {
-                float3 contribution = (reservoir->sample.unshadowedPathContribution * (reservoir->weight / static_cast<float>(ReSTIRSettings::numReservoirsPerPixel)));
-
-                //Generate a ray for this particular reservoir.
-                float3 toLightDir = reservoir->sample.position - pixel->m_Position;
-                const float l = length(toLightDir);
-                toLightDir /= l;
-
-                //TODO: add stride between these.
-
-                //TODO ensure no shadow acne.
-                //TODO: Pass pixel index to shadow ray data.
-                auto data =
-                    WaveFront::ShadowRayData{
-                        pixel->m_PixelIndex,
-                        pixel->m_Position,
-                        toLightDir, l - 0.005f,
-                        contribution,
-                        WaveFront::LightChannel::DIRECT };
-                a_AtomicBuffer->Add(&data);
-            }
+        	//This function only calls combineBiased because at this point there's no information about the second reservoirs original surface.
+        	//Assume it is the same surface.
+        	//This is fine when combining neighbour samples, as those have already been re-weighed for the target pixel when unbiased mode is enabled.
+        	//Outputs to the input buffer.
+            CombineBiased(&a_Reservoirs1[i], 2, &toCombine[0], surface, WangHash(a_Seed + i));
         }
     }
 }
