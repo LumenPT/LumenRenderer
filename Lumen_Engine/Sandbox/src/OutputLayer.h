@@ -19,6 +19,8 @@ class Camera;
 
 class LumenRenderer;
 
+
+
 class OutputLayer : public Lumen::Layer
 {
     struct ScenePreset
@@ -49,6 +51,7 @@ private:
     void HandleCameraInput(Camera& a_Camera);
     void HandleSceneInput();
     void ImGuiCameraSettings();
+    void ImGuiPixelDebugger();
 
     void InitContentViewNameTable();
     void ContentViewDropDown();
@@ -84,6 +87,38 @@ private:
         INT4,
         FLOAT4,
         CONTENTVIEWMODE_COUNT
+    };
+
+    struct
+    {
+        bool m_SceneGraph = true;
+        bool m_FileLoader = false;
+        bool m_ImageResizer = false;
+        bool m_PixelDebugger = false;
+        bool m_CameraSettings = false;
+        bool m_DebugViewport = false;
+    } m_EnabledTools;
+
+    struct CmpNoChange
+    {
+        bool operator()(const std::string& a_A, const std::string& a_B) const
+        {
+            auto as = a_A.substr(0, a_A.find('p'));
+            auto bs = a_B.substr(0, a_B.find('p'));
+
+            auto a = std::stoi(as);
+            auto b = std::stoi(bs);
+
+            return a < b;
+        }
+    };
+
+    inline static std::map<std::string, glm::uvec2, CmpNoChange> ms_PresetSizes = {
+        {"480p", glm::uvec2(854, 480)},
+        {"720p", glm::uvec2(1280, 720)},
+        {"1080p", glm::uvec2(1920, 1080)},
+        {"1440p", glm::uvec2(2560, 1440)},
+        {"2160p", glm::uvec2(3840, 2160)}
     };
 
     std::vector<std::unique_ptr<FrameSnapshot>> m_FrameSnapshots;

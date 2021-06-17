@@ -2,11 +2,13 @@
 #include "ImGuiLayer.h"
 
 #include "imgui.h"
+#include "implot.h"
 #include "examples/imgui_impl_glfw.h"
 #include "examples/imgui_impl_opengl3.h"
 #include "Lumen/GLTaskSystem.h"
 
 #include "Lumen/LumenApp.h"
+
 
 #include <GLFW/glfw3.h>
 #include <glad/glad.h>
@@ -28,6 +30,7 @@ namespace Lumen
 		// Setup Dear ImGui context
 		IMGUI_CHECKVERSION();
 		ImGui::CreateContext();
+		ImPlot::CreateContext();
 		ImGuiIO& io = ImGui::GetIO(); (void)io;
 		io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;       // Enable Keyboard Controls
 		//io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
@@ -59,6 +62,7 @@ namespace Lumen
 
 	void ImGuiLayer::OnDetach()
 	{
+		ImPlot::DestroyContext();
 		ImGui_ImplOpenGL3_Shutdown();
 		ImGui_ImplGlfw_Shutdown();
 		ImGui::DestroyContext();
@@ -100,5 +104,6 @@ namespace Lumen
 	{
 		static bool show = true;
 		ImGui::ShowDemoWindow(&show);
+		ImPlot::ShowDemoWindow();
 	}
 }
