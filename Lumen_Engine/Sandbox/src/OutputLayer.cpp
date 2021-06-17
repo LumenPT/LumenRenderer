@@ -531,10 +531,12 @@ void OutputLayer::HandleCameraInput(Camera& a_Camera)
     if (!ImGui::IsAnyItemActive() && Lumen::Input::IsMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT))
 	{
 		auto delta = Lumen::Input::GetMouseDelta();
-
-		a_Camera.IncrementYaw(-glm::radians(delta.first * m_CameraMouseSensitivity));
-		a_Camera.IncrementPitch(glm::radians(delta.second * m_CameraMouseSensitivity));
-		m_Renderer->SetBlendMode(false);
+		if (delta.first != 0 || delta.second != 0)
+		{
+			a_Camera.IncrementYaw(-glm::radians(delta.first * m_CameraMouseSensitivity));
+			a_Camera.IncrementPitch(glm::radians(delta.second * m_CameraMouseSensitivity));
+			m_Renderer->SetBlendMode(false);
+		}
 	}
 
 	float movementSpeed = m_CameraMovementSpeed / 60.f;
