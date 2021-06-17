@@ -1,5 +1,6 @@
 #include "CppCommon/WaveFrontDataStructs.h"
 #include "CppCommon/RenderingUtility.h"
+#include "CppCommon/Half4.h"
 
 #include "../../vendor/Include/Cuda/cuda/helpers.h"
 #include "../../vendor/Include/sutil/vec_math.h"
@@ -147,21 +148,29 @@ __device__ __forceinline__ void ShadowRaysRayGen()
     {
         using namespace WaveFront;
 
-        float4 color{ 0.f };
+        
+        half4Ushort4 color{ make_ushort4(0, 0 , 0, 0) };
 
-        surf2Dread<float4>(
-            &color,
+        surf2Dread<ushort4>(
+            &color.m_Ushort4,
             launchParams.m_OutputChannels[static_cast<unsigned int>(rayData.m_OutputChannel)],
-            rayData.m_PixelIndex.m_X * sizeof(float4),
+            rayData.m_PixelIndex.m_X * sizeof(ushort4),
             rayData.m_PixelIndex.m_Y,
             cudaBoundaryModeTrap);
 
-        color += make_float4(rayData.m_PotentialRadiance, 0.f);
+        //color += half4(rayData.m_PotentialRadiance, 0.f);
 
-        surf2Dwrite<float4>(
-            color,
+        half4 radiance{ rayData.m_PotentialRadiance, 0.f };
+
+        color.m_Half4.m_Elements[0].x = color.m_Half4.m_Elements[0].x + radiance.m_Elements[0].x;
+        color.m_Half4.m_Elements[0].y = color.m_Half4.m_Elements[0].y + radiance.m_Elements[0].y;
+        color.m_Half4.m_Elements[1].x = color.m_Half4.m_Elements[1].x + radiance.m_Elements[1].x;
+        color.m_Half4.m_Elements[1].y = color.m_Half4.m_Elements[1].y + radiance.m_Elements[1].y;
+
+        surf2Dwrite<ushort4>(
+            color.m_Ushort4,
             launchParams.m_OutputChannels[static_cast<unsigned int>(rayData.m_OutputChannel)],
-            rayData.m_PixelIndex.m_X * sizeof(float4),
+            rayData.m_PixelIndex.m_X * sizeof(ushort4),
             rayData.m_PixelIndex.m_Y,
             cudaBoundaryModeTrap);
 
@@ -249,21 +258,28 @@ __device__ __forceinline__ void ReSTIRRayGenShading()
     {
         using namespace WaveFront;
 
-        float4 color{ 0.f };
 
-        surf2Dread<float4>(
-            &color,
+        half4Ushort4 color{ make_ushort4(0, 0, 0, 0) };
+
+        surf2Dread<ushort4>(
+            &color.m_Ushort4,
             launchParams.m_OutputChannels[static_cast<unsigned int>(LightChannel::DIRECT)],
-            rayData.pixelIndex.m_X * sizeof(float4),
+            rayData.pixelIndex.m_X * sizeof(ushort4),
             rayData.pixelIndex.m_Y,
             cudaBoundaryModeTrap);
 
-        color += make_float4(rayData.contribution, 0.f);
+        //color += half4(rayData.contribution, 0.f);
+        half4 radiance{ rayData.contribution, 0.f };
 
-        surf2Dwrite<float4>(
-            color,
+        color.m_Half4.m_Elements[0].x = color.m_Half4.m_Elements[0].x + radiance.m_Elements[0].x;
+        color.m_Half4.m_Elements[0].y = color.m_Half4.m_Elements[0].y + radiance.m_Elements[0].y;
+        color.m_Half4.m_Elements[1].x = color.m_Half4.m_Elements[1].x + radiance.m_Elements[1].x;
+        color.m_Half4.m_Elements[1].y = color.m_Half4.m_Elements[1].y + radiance.m_Elements[1].y;
+
+        surf2Dwrite<ushort4>(
+            color.m_Ushort4,
             launchParams.m_OutputChannels[static_cast<unsigned int>(LightChannel::DIRECT)],
-            rayData.pixelIndex.m_X * sizeof(float4),
+            rayData.pixelIndex.m_X * sizeof(ushort4),
             rayData.pixelIndex.m_Y,
             cudaBoundaryModeTrap);
     }

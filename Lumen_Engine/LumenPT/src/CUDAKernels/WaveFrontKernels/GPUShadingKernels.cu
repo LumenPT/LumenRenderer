@@ -1,5 +1,6 @@
 #include "GPUShadingKernels.cuh"
 #include <device_launch_parameters.h>
+#include "../../Shaders/CppCommon/Half4.h"
 #include "../../../vendor/Include/Cuda/cuda/helpers.h"
 
 //Just temporary CUDA kernels.
@@ -40,16 +41,16 @@ CPU_ON_GPU void WriteToOutput(
     //TODO: It would save one copy.
     if(pixelX < a_Resolution.x && pixelY < a_Resolution.y)
     {
-        float4 color{ 0.f };
+        half4Ushort4 color{ 0.f };
 
-        surf2Dread<float4>(
-            &color,
+        surf2Dread<ushort4>(
+            &color.m_Ushort4,
             a_Input,
-            pixelX * sizeof(float4),
+            pixelX * sizeof(ushort4),
             pixelY,
             cudaBoundaryModeTrap);
 
-        a_Output[pixelDataIndex] = make_color(color);
+        a_Output[pixelDataIndex] = make_color(color.m_Half4.AsFloat4());
             
     }
 }

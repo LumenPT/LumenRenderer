@@ -1,6 +1,7 @@
 #include "GPUShadingKernels.cuh"
 #include "../VolumetricKernels/GPUVolumetricShadingKernels.cuh"
 #include "../../Shaders/CppCommon/RenderingUtility.h"
+#include "../../Shaders/CppCommon/Half4.h"
 #include <device_launch_parameters.h>
 #include <sutil/vec_math.h>
 #include "../disney.cuh"
@@ -24,10 +25,12 @@ CPU_ON_GPU void ResolveDirectLightHits(
         //If the surface is emissive, store its light directly in the output buffer.
         if (pixelData.m_Emissive)
         {
-            surf2Dwrite<float4>(
-                make_float4(pixelData.m_ShadingData.color, 1.f),
+
+            half4Ushort4 color{ (pixelData.m_ShadingData.color, 1.f) };
+            surf2Dwrite<ushort4>(
+                color.m_Ushort4,
                 a_Output,
-                pixelX * sizeof(float4),
+                pixelX * sizeof(ushort4),
                 pixelY,
                 cudaBoundaryModeTrap);
         }

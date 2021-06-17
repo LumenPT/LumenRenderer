@@ -46,7 +46,7 @@ namespace WaveFront
         desc.Width = a_ResDepth.x;
         desc.Height = a_ResDepth.y;
         desc.ArraySize = a_ResDepth.z;
-        desc.Format = DXGI_FORMAT_R32G32B32A32_FLOAT; //TODO: find out how to use 16 bit float format with CUDA (DLSS & NRD requirement). Provide as param?
+        desc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT; //TODO: find out how to use 16 bit float format with CUDA (DLSS & NRD requirement). Provide as param?
         desc.SampleDesc = textureSampleDesc;
         desc.Usage = D3D11_USAGE_DEFAULT;
         desc.BindFlags = 0;

@@ -29,7 +29,7 @@ InteropGPUTexture::InteropGPUTexture(
 }
 
 InteropGPUTexture::~InteropGPUTexture()
-{
+{ 
 
     
 
@@ -125,6 +125,8 @@ void InteropGPUTexture::Clear() const
         cudaMemcpyDeviceToDevice));
 
     CHECKCUDAERROR(cudaFree(devPtr));
+
+    
 
 }
 

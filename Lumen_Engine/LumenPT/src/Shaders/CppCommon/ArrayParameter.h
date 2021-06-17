@@ -12,15 +12,15 @@ struct ArrayParameter
     __host__
     ArrayParameter(const std::array<T,N>& a_Copied)
         :
-    array()
+    m_Elements()
     {
-        std::copy(a_Copied.begin(), a_Copied.end(), array);
+        std::copy(a_Copied.begin(), a_Copied.end(), m_Elements);
     }
 
     __host__
     ArrayParameter& operator=(const std::array<T, N>& a_Copied)
     {
-        std::copy(a_Copied.begin(), a_Copied.end(), array);
+        std::copy(a_Copied.begin(), a_Copied.end(), m_Elements);
         return *this;
     }
 
@@ -29,7 +29,7 @@ struct ArrayParameter
     {
         assert(a_Index < N && "Index out of range!");
 
-        return array[a_Index];
+        return m_Elements[a_Index];
 
     }
 
@@ -38,10 +38,10 @@ struct ArrayParameter
     {
         assert(a_Index < N && "Index out of range!");
 
-        return array[a_Index];
+        return m_Elements[a_Index];
 
     }
 
-    T array[N];
+    T m_Elements[N];
 
 };
