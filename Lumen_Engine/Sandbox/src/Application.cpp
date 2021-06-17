@@ -91,7 +91,7 @@ public:
 		settings.m_ShadersFilePathSolids = config.GetFileShaderSolids();
 		settings.m_ShadersFilePathVolumetrics = config.GetFileShaderVolumetrics();
 
-		settings.depth = 5;
+		settings.depth = 1;
 		settings.minIntersectionT = 0.1f;
 		settings.maxIntersectionT = 5000.f;
 		settings.renderResolution = { 800, 600 };

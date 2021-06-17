@@ -30,24 +30,21 @@ CPU_ONLY void ReSTIR::Initialize(const ReSTIRSettings& a_Settings)
 	//Shadow rays.
 	{
 		//At most one shadow ray per reservoir. Always resize even when big enough already, because this is initialization so it should not happen often.
-		const size_t size = static_cast<size_t>(m_Settings.width) * static_cast<size_t>(m_Settings.height) * m_Settings.numReservoirsPerPixel;
+		//Multiply by two because it will contain primary sample and neighbour sample rays.
+		const unsigned size = static_cast<unsigned>(m_Settings.width) * static_cast<unsigned>(m_Settings.height) * ReSTIRSettings::numReservoirsPerPixel * 2u;
 		WaveFront::CreateAtomicBuffer<RestirShadowRay>(&m_ShadowRays, size);
-		WaveFront::CreateAtomicBuffer<RestirShadowRayShading>(&m_ShadowRaysShading, size);
 	}
 
 	//Reservoirs
 	{
 		//Reserve enough memory for both the front and back buffer to contain all reservoirs.
-		const size_t numReservoirs = static_cast<size_t>(m_Settings.width) * static_cast<size_t>(m_Settings.height) * m_Settings.numReservoirsPerPixel;
+		//The 4 represents one buffer for primary samples, temporal samples, and two for neighbours.
+		const size_t numReservoirs = static_cast<size_t>(m_Settings.width) * static_cast<size_t>(m_Settings.height) * m_Settings.numReservoirsPerPixel * 4;  
 		const size_t size = numReservoirs * sizeof(Reservoir);
-
-		//Initialize all three reservoir buffers.
-		for(int reservoir = 0; reservoir < 3; ++reservoir)
-		{
-			m_Reservoirs[reservoir].Resize(size);
-			ResetReservoirs(numReservoirs, static_cast<Reservoir*>(m_Reservoirs[reservoir].GetDevicePtr()));
-			CHECKLASTCUDAERROR;
-		}
+		m_Reservoirs.Resize(size);
+		ResetReservoirs(numReservoirs, static_cast<Reservoir*>(m_Reservoirs.GetDevicePtr()));
+		CHECKLASTCUDAERROR;
+		
 	}
 
 	//Light bag generation
@@ -75,8 +72,30 @@ CPU_ONLY void ReSTIR::Run(
 	bool a_DebugPrint
 )
 {
+	//TODO:
+	/*
+	 * - Combine neighbour samples, but not with current one. Use buffer 2 and 3.
+	 * - Generate shadow rays for neighbour reservoirs and then shade.
+	 * - Generate shadow rays for primary reservoirs and then shade.
+	 * - Shade temporal reservoirs always.
+	 *
+	 * - Now combine current, temporal and neighbour reservoirs.
+	 */
+	
 	assert(m_SwapDirtyFlag && "SwapBuffers has to be called once per frame for ReSTIR to properly work.");
 	assert(a_OptixWrapper && "Optix System cannot be nullptr!");
+
+	//The stride in the reservoir buffer between the different buffers in terms of elements.
+	const size_t bufferStride = static_cast<size_t>(m_Settings.width) * static_cast<size_t>(m_Settings.height) * m_Settings.numReservoirsPerPixel;
+
+	//The offsets into the buffer for each reservoir set.
+	Reservoir* reservoirPointers[4]
+	{
+		&m_Reservoirs.GetDevicePtr<Reservoir>()[bufferStride * 0],
+		&m_Reservoirs.GetDevicePtr<Reservoir>()[bufferStride * 1],
+		&m_Reservoirs.GetDevicePtr<Reservoir>()[bufferStride * 2],
+		&m_Reservoirs.GetDevicePtr<Reservoir>()[bufferStride * 3],
+	};
 
 	//Index of the reservoir buffers (current and temporal).
 	const auto currentIndex = m_SwapChainIndex;
@@ -89,7 +108,6 @@ CPU_ONLY void ReSTIR::Run(
 	const uint2 dimensions = uint2{ m_Settings.width, m_Settings.height };
 
 	//TODO: take camera position and direction into account when doing RIS.
-	//TODO: Also use light area.
 
 	//Timer for measuring performance.
 	Timer timer;
@@ -129,56 +147,37 @@ CPU_ONLY void ReSTIR::Run(
 	 */
 	seed = WangHash(seed);
 	timer.reset();
-	PickPrimarySamples(static_cast<LightBagEntry*>(m_LightBags.GetDevicePtr()), static_cast<Reservoir*>(m_Reservoirs[currentIndex].GetDevicePtr()), m_Settings, a_CurrentPixelData, seed);
+	PickPrimarySamples(static_cast<LightBagEntry*>(m_LightBags.GetDevicePtr()), reservoirPointers[currentIndex], m_Settings, a_CurrentPixelData, seed);
 	CHECKLASTCUDAERROR;
     if (a_DebugPrint) printf("Picking primary samples time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
 
 	/*
-	 * Generate shadow rays for each reservoir and resolve them.
-	 * If a shadow ray is occluded, the reservoirs weight is set to 0.
+	 * Do a visibility check to eliminate bad primary samples.
+	 * Then shade all the surviving samples.
 	 */
-	const auto numReservoirs = numPixels * m_Settings.numReservoirsPerPixel;
 	timer.reset();
-	const unsigned int numRaysGenerated = GenerateReSTIRShadowRays(&m_ShadowRays, static_cast<Reservoir*>(m_Reservoirs[currentIndex].GetDevicePtr()), a_CurrentPixelData, numReservoirs);
+	VisibilityCheck(&m_ShadowRays, reservoirPointers[currentIndex], a_CurrentPixelData, a_OptixWrapper, numPixels, a_OptixSceneHandle);
+	Shade(reservoirPointers[currentIndex], dimensions.x, dimensions.y, a_OutputBuffer);
+	if (a_DebugPrint) printf("Primary visibility check and shading time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
 	CHECKLASTCUDAERROR;
-    if (a_DebugPrint) printf("ReSTIR Shadow Ray Generation time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
-
-
-
-	//Parameters for optix launch.
-	WaveFront::OptixLaunchParameters params {};
-	params.m_TraversableHandle = a_OptixSceneHandle;
-	params.m_Reservoirs = static_cast<Reservoir*>(m_Reservoirs[currentIndex].GetDevicePtr());
-	params.m_ReSTIRShadowRayBatch = m_ShadowRays.GetDevicePtr<WaveFront::AtomicBuffer<RestirShadowRay>>();
-	params.m_MinMaxDistance = { 0.1f, 10000.f };	//TODO use actual numbers but idk which ones are okay ish?
-	params.m_ResolutionAndDepth = make_uint3(m_Settings.width, m_Settings.height, 1);
-	params.m_TraceType = WaveFront::RayType::RESTIR_RAY;
-
-	//Tell Optix to resolve all shadow rays, which sets reservoir weight to 0 when occluded.
-	if(numRaysGenerated > 0)
-	{
-		printf("Now tracing shadow rays: %i\n", numRaysGenerated);
-		timer.reset();
-		a_OptixWrapper->TraceRays(numRaysGenerated, params);
-		CHECKLASTCUDAERROR;
-		if (a_DebugPrint) printf("Tracing ReSTIR shadow rays time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
-	}
-
+	
 	/*
      * Temporal sampling where reservoirs are combined with those of the previous frame.
+     * Temporal samples are always used to shade. This happens internally with no visibility check.
      */
 	if (m_Settings.enableTemporal)
 	{
 		seed = WangHash(seed);
 		timer.reset();
 		TemporalNeighbourSampling(
-			m_Reservoirs[currentIndex].GetDevicePtr<Reservoir>(),
-			m_Reservoirs[temporalIndex].GetDevicePtr<Reservoir>(),
+			reservoirPointers[currentIndex],
+			reservoirPointers[temporalIndex],
 			a_CurrentPixelData,
 			a_PreviousPixelData,
 			seed,
 			dimensions,
-			a_MotionVectorBuffer
+			a_MotionVectorBuffer,
+			a_OutputBuffer
 		);
 		if (a_DebugPrint) printf("Temporal sampling time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
 		CHECKLASTCUDAERROR;
@@ -186,45 +185,36 @@ CPU_ONLY void ReSTIR::Run(
 
 	/*
 	 * Spatial sampling where neighbouring reservoirs are combined.
+	 * Spatial neighbours are then visibility checked and shaded.
 	 */
 	if(m_Settings.enableSpatial)
 	{
 		seed = WangHash(seed);
 		timer.reset();
+		//TODO change to swap between 2 and 3. Then shade the one that has the final output.
 		SpatialNeighbourSampling(
-			static_cast<Reservoir*>(m_Reservoirs[currentIndex].GetDevicePtr()),
-			static_cast<Reservoir*>(m_Reservoirs[2].GetDevicePtr()), 
+			reservoirPointers[currentIndex],
+			reservoirPointers[2],
 			a_CurrentPixelData,
 			seed,
 			dimensions
 		);
 		if (a_DebugPrint) printf("Spatial sampling time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
 		CHECKLASTCUDAERROR;
-	}
 
-	{
 		/*
-		 * Instead of regular shadow rays, make more ReSTIRShadowRays.
-		 * Then do another optix launch to resolve them.
+		 * Do the second visibility check for spatial samples (greatly reduces shadow bleed).
 		 */
 		timer.reset();
-		const unsigned int numRaysGenerated = GenerateReSTIRShadowRaysShading(&m_ShadowRaysShading, static_cast<Reservoir*>(m_Reservoirs[currentIndex].GetDevicePtr()), a_CurrentPixelData, dimensions);
-		if (a_DebugPrint) printf("ReSTIR Shading Ray Generation time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
+		VisibilityCheck(&m_ShadowRays, reservoirPointers[currentIndex], a_CurrentPixelData, a_OptixWrapper, numPixels, a_OptixSceneHandle);
+		Shade(reservoirPointers[currentIndex], dimensions.x, dimensions.y, a_OutputBuffer);
+		if (a_DebugPrint) printf("Spatial visibility check and shading time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
 		CHECKLASTCUDAERROR;
-
-	    //Parameters for optix launch.
-		params.m_TraceType = WaveFront::RayType::RESTIR_SHADING_RAY;
-		params.m_ResultBuffer = a_OutputBuffer;
-		params.m_ReSTIRShadowRayShadingBatch = m_ShadowRaysShading.GetDevicePtr<WaveFront::AtomicBuffer<RestirShadowRayShading>>();
-
-		//Tell Optix to resolve all shadow rays, which sets reservoir weight to 0 when occluded.
-		if (numRaysGenerated > 0)
-		{
-			timer.reset();
-			a_OptixWrapper->TraceRays(numRaysGenerated, params);
-			if (a_DebugPrint) printf("Tracing ReSTIR Shading Ray time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
-			CHECKLASTCUDAERROR;
-		}
+		
+		/*
+		 * Finally, combine the neighbour reservoirs with the current reservoirs to be used in the next frame.
+		 */
+		//TODO combine neighbour reservoirs with current buffer as source for next frame samples.
 	}
 
 	//Ensure CUDA is done executing now.
@@ -237,7 +227,7 @@ CPU_ONLY void ReSTIR::Run(
 	m_SwapDirtyFlag = false;
 }
 
-void ReSTIR::BuildCDF(const MemoryBuffer const* a_Lights)
+void ReSTIR::BuildCDF(const MemoryBuffer* a_Lights)
 {
 	/*
      * Resize buffers based on the amount of lights and update data.
@@ -285,7 +275,7 @@ CDF* ReSTIR::GetCdfGpuPointer() const
 
 size_t ReSTIR::GetExpectedGpuRamUsage(const ReSTIRSettings& a_Settings, size_t a_NumLights) const
 {
-	const size_t reservoirSize = static_cast<size_t>(a_Settings.width) * static_cast<size_t>(a_Settings.height) * a_Settings.numReservoirsPerPixel * sizeof(Reservoir) * 3;
+	const size_t reservoirSize = static_cast<size_t>(a_Settings.width) * static_cast<size_t>(a_Settings.height) * a_Settings.numReservoirsPerPixel * sizeof(Reservoir) * 4;
 	const size_t cdfSize = a_NumLights * sizeof(float);
 	const size_t lightBagSize = sizeof(LightBagEntry) * a_Settings.numLightsPerBag * a_Settings.numLightBags;
 	const size_t shadowRaySize = sizeof(WaveFront::AtomicBuffer<RestirShadowRay>) + (static_cast<size_t>(a_Settings.width) * static_cast<size_t>(a_Settings.height) * a_Settings.numReservoirsPerPixel * sizeof(RestirShadowRay));
@@ -293,12 +283,38 @@ size_t ReSTIR::GetExpectedGpuRamUsage(const ReSTIRSettings& a_Settings, size_t a
 	return reservoirSize + cdfSize + lightBagSize + shadowRaySize;
 }
 
+void ReSTIR::VisibilityCheck(MemoryBuffer* a_ShadowRayAtomicBuffer, Reservoir* a_Reservoirs,
+	const WaveFront::SurfaceData* a_SurfaceData, const WaveFront::OptixWrapper* a_OptixWrapper, unsigned a_NumPixels, OptixTraversableHandle a_OptixSceneHandle)
+{
+	/*
+	 * Generate shadow rays for each reservoir and resolve them.
+	 * If a shadow ray is occluded, the reservoirs weight is set to 0.
+	 */
+	const auto numReservoirs = a_NumPixels * ReSTIRSettings::numReservoirsPerPixel;
+	const unsigned int numRaysGenerated = GenerateReSTIRShadowRays(a_ShadowRayAtomicBuffer, a_Reservoirs, a_SurfaceData, numReservoirs);
+	CHECKLASTCUDAERROR;
+
+	//Tell Optix to resolve all shadow rays, which sets reservoir weight to 0 when occluded.
+	if (numRaysGenerated > 0)
+	{
+		//Parameters for optix launch.
+		WaveFront::OptixLaunchParameters params{};
+		params.m_TraversableHandle = a_OptixSceneHandle;
+		params.m_Reservoirs = a_Reservoirs;
+		params.m_ReSTIRShadowRayBatch = a_ShadowRayAtomicBuffer->GetDevicePtr<WaveFront::AtomicBuffer<RestirShadowRay>>();
+		params.m_MinMaxDistance = { 0.1f, 10000.f };	//TODO use actual numbers but idk which ones are okay ish?
+		params.m_ResolutionAndDepth = make_uint3(m_Settings.width, m_Settings.height, 1);
+		params.m_TraceType = WaveFront::RayType::RESTIR_RAY;
+		
+		a_OptixWrapper->TraceRays(numRaysGenerated, params);
+		CHECKLASTCUDAERROR;
+	}
+}
+
 size_t ReSTIR::GetAllocatedGpuMemory() const
 {
 	return
-		m_Reservoirs[0].GetSize()
-		+ m_Reservoirs[1].GetSize()
-		+ m_Reservoirs[2].GetSize()
+		m_Reservoirs.GetSize()
 		+ m_Cdf.GetSize()
 		+ m_ShadowRays.GetSize()
 		+ m_LightBags.GetSize()

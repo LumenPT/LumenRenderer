@@ -74,20 +74,33 @@ __global__ void PickPrimarySamplesInternal(const LightBagEntry* const a_LightBag
 /*
  * Generate shadow rays for the given reservoirs.
  * These shadow rays are then resolved with Optix, and reservoirs weights are updated to reflect mutual visibility.
+ * BufferOffset provides the offset into the reservoir buffer at which to write.
+ *
  *
  * The amount of shadow rays that was generated will be returned as an int.
  */
 __host__ unsigned int GenerateReSTIRShadowRays(MemoryBuffer* a_AtomicBuffer, Reservoir* a_Reservoirs, const WaveFront::SurfaceData* a_PixelData, unsigned a_NumReservoirs);
 
-/*
- * Generate the shadow rays used for shading.
- */
-__host__ unsigned int GenerateReSTIRShadowRaysShading(MemoryBuffer* a_AtomicBuffer, Reservoir* a_Reservoirs, const WaveFront::SurfaceData* a_PixelData, uint2 a_Resolution);
-
 //Generate a shadow ray based on the thread ID.
 __global__ void GenerateShadowRay(WaveFront::AtomicBuffer<RestirShadowRay>* a_AtomicBuffer, Reservoir* a_Reservoirs, const  WaveFront::SurfaceData* a_PixelData, unsigned a_NumReservoirs);
 
-__global__ void GenerateShadowRayShading(WaveFront::AtomicBuffer<RestirShadowRayShading>* a_AtomicBuffer, Reservoir* a_Reservoirs, const  WaveFront::SurfaceData* a_PixelData, uint2 a_Resolution, unsigned a_Depth);
+
+/*
+ * Use reservoirs to write to output buffers.
+ * Width and height use the amount of reservoirs per pixel to determine which reservoir contributes to each pixel.
+ */
+__host__ void Shade(Reservoir* a_Reservoirs, unsigned a_Width, unsigned a_Height, cudaSurfaceObject_t a_OutputBuffer);
+__global__ void ShadeInternal(Reservoir* a_Reservoirs, unsigned a_Width, unsigned a_Height, cudaSurfaceObject_t a_OutputBuffer);
+
+//Shade all reservoirs for a specific pixel.
+__device__ __forceinline__ void ShadeReservoirs(Reservoir* a_Reservoirs, unsigned a_Width, unsigned a_InputX, unsigned a_InputY, unsigned a_OutputX, unsigned a_OutputY, cudaSurfaceObject_t a_OutputBuffer);
+
+/*
+ * Generate the shadow rays used for shading.
+ */
+//__host__ unsigned int GenerateReSTIRShadowRaysShading(MemoryBuffer* a_AtomicBuffer, Reservoir* a_Reservoirs, const WaveFront::SurfaceData* a_PixelData, uint2 a_Resolution);
+
+//__global__ void GenerateShadowRayShading(WaveFront::AtomicBuffer<RestirShadowRayShading>* a_AtomicBuffer, Reservoir* a_Reservoirs, const  WaveFront::SurfaceData* a_PixelData, uint2 a_Resolution, unsigned a_Depth);
 
 /*
  * Resample spatial neighbours with an intermediate output buffer.
@@ -120,7 +133,8 @@ __host__ void TemporalNeighbourSampling(
     const WaveFront::SurfaceData* a_PreviousPixelData,
     const std::uint32_t a_Seed,
     uint2 a_Dimensions,
-    const WaveFront::MotionVectorBuffer* const a_MotionVectorBuffer
+    const WaveFront::MotionVectorBuffer* const a_MotionVectorBuffer,
+    cudaSurfaceObject_t a_OutputBuffer
 );
 
 __global__ void CombineTemporalSamplesInternal(
@@ -129,9 +143,10 @@ __global__ void CombineTemporalSamplesInternal(
     const WaveFront::SurfaceData* a_CurrentPixelData,
     const WaveFront::SurfaceData* a_PreviousPixelData,
     const std::uint32_t a_Seed,
-    unsigned a_NumReservoirs,
+    unsigned a_NumPixels,
     uint2 a_Dimensions,
-    const WaveFront::MotionVectorBuffer* const a_MotionVectorBuffer
+    const WaveFront::MotionVectorBuffer* const a_MotionVectorBuffer,
+    cudaSurfaceObject_t a_OutputBuffer
 );
 
 /*
