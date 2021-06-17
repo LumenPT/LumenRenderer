@@ -21,9 +21,13 @@ namespace WaveFront
 		Microsoft::WRL::ComPtr<ID3D11Texture2D> CreateTexture2D(const uint3& a_ResDepth);
 		Microsoft::WRL::ComPtr<ID3D11Texture2D> ResizeTexture2D(Microsoft::WRL::ComPtr<ID3D11Texture2D>& a_Tex, const uint2& a_NewSize);
 
+		ID3D11Texture2D* m_D3D11PixelBufferCombined;
+
+
 	private:
 		Microsoft::WRL::ComPtr<ID3D11Device> m_D3dDevice = nullptr;
 		Microsoft::WRL::ComPtr<ID3D11DeviceContext> m_D3dDeviceContext = nullptr;
+
 
 	};
 }

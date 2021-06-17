@@ -83,6 +83,9 @@ private:
         CONTENTVIEWMODE_COUNT
     };
 
+    int m_Dlss_Mode;
+    bool m_BlendMode = false;
+
     std::vector<std::unique_ptr<FrameSnapshot>> m_FrameSnapshots;
     int m_CurrentSnapShotIndex;
     const std::pair<const std::string, FrameSnapshot::ImageBuffer>* m_CurrentImageBuffer;
