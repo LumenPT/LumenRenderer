@@ -189,6 +189,7 @@ public:
 	//Debug GLuint texture accessible by application
 	GLuint m_DebugTexture;
 
+	unsigned int m_DlssMode = 0; //corresponds to dlssmodes enum in DLSS init params
 
 private:
 	std::shared_ptr<Lumen::ILumenTexture> m_DefaultWhiteTexture;
