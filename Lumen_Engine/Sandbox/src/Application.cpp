@@ -155,13 +155,13 @@ public:
 		std::string p_string3{ p3.string() };
 		std::replace(p_string3.begin(), p_string3.end(), '\\', '/');
 
-		const std::string meshPath = p_string.append("/Sandbox/assets/models/Sponza/");
+		const std::string meshPath = p_string.append("/Sandbox/assets/models/");
 		const std::string meshPath2 = p_string2.append("/Sandbox/assets/models/EmissiveSphere/");
 		//const std::string meshPath3 = p_string3.append("/Sandbox/assets/models/knight/");
 		//Base path for meshes.
 
 		//Mesh name
-		const std::string meshName = "Sponza.gltf";
+		const std::string meshName = "SanMiguel.glb";
 		const std::string meshName2 = "EmissiveSphere.gltf";
 		//const std::string meshName3 = "scene.gltf";
 
@@ -200,7 +200,7 @@ public:
 
 		lumenPT->m_Scene = res->m_Scenes[0];
 		lumenPT->m_Scene->m_MeshInstances[0]->m_Transform.SetScale(glm::vec3(1.0f));
-		for(int i = 0; i < 30; ++i)
+		for(int i = 0; i < 5; ++i)
 		{
 			for (auto& node : res2->m_NodePool)
 			{
@@ -223,7 +223,8 @@ public:
 			//mesh->m_Transform.CopyTransform(*node->m_LocalTransform);
 			float p = i;
 			mesh->m_Transform.SetPosition(glm::vec3(xOffset, 100.f + (p * p), 0.f));
-			mesh->m_Transform.SetScale(glm::vec3(2.0f * (static_cast<float>((i + 1) * 2) / 4.f)));
+			const auto scale = glm::vec3(2.0f * (static_cast<float>((i + 1) * 2) / 4.f)) + 1.f;
+			mesh->m_Transform.SetScale(scale);
 			Lumen::MeshInstance::Emissiveness emissiveness;
 			emissiveness.m_EmissionMode = Lumen::EmissionMode::OVERRIDE;
 			emissiveness.m_OverrideRadiance = glm::vec3(1.0f, 1.0f, 1.0f);
@@ -249,67 +250,67 @@ public:
 		//	}
 		//}
 
-		//Disney BSDF test
-		for(auto& lumenMesh : res2->m_MeshPool)
-		{
-			auto mesh = lumenPT->m_Scene->AddMesh();
-			mesh->SetMesh(lumenMesh);
-			mesh->m_Transform.SetPosition(glm::vec3(000.f, 160.f, -80.f));
-			mesh->m_Transform.SetRotation(glm::vec3(-90.f, 90.f, 0.f));
-			constexpr auto scale = 60.f;
-			mesh->m_Transform.SetScale(glm::vec3(scale, scale, scale));
-			uchar4 whitePixel = { 255,255,255,255 };
-			uchar4 diffusePixel{ 255, 255, 255, 0 };
-			uchar4 normal = { 128, 128, 255, 0 };
-			auto whiteTexture = lumenPT->CreateTexture(&whitePixel, 1, 1, false);
-			auto diffuseTexture = lumenPT->CreateTexture(&diffusePixel, 1, 1, true);
-			auto normalTexture = lumenPT->CreateTexture(&normal, 1, 1, false);
-			LumenRenderer::MaterialData matData;
-			matData.m_ClearCoatRoughnessTexture = whiteTexture;
-			matData.m_ClearCoatTexture = whiteTexture;
-			matData.m_DiffuseTexture = whiteTexture;
-			matData.m_EmissiveTexture = whiteTexture;
-			matData.m_MetallicRoughnessTexture = whiteTexture;
-			matData.m_NormalMap = normalTexture;
-			matData.m_TintTexture = whiteTexture;
-			matData.m_TransmissionTexture = whiteTexture;
-			auto mat = lumenPT->CreateMaterial(matData);
+		////Disney BSDF test
+		//for(auto& lumenMesh : res2->m_MeshPool)
+		//{
+		//	auto mesh = lumenPT->m_Scene->AddMesh();
+		//	mesh->SetMesh(lumenMesh);
+		//	mesh->m_Transform.SetPosition(glm::vec3(000.f, 160.f, -80.f));
+		//	mesh->m_Transform.SetRotation(glm::vec3(-90.f, 90.f, 0.f));
+		//	constexpr auto scale = 60.f;
+		//	mesh->m_Transform.SetScale(glm::vec3(scale, scale, scale));
+		//	uchar4 whitePixel = { 255,255,255,255 };
+		//	uchar4 diffusePixel{ 255, 255, 255, 0 };
+		//	uchar4 normal = { 128, 128, 255, 0 };
+		//	auto whiteTexture = lumenPT->CreateTexture(&whitePixel, 1, 1, false);
+		//	auto diffuseTexture = lumenPT->CreateTexture(&diffusePixel, 1, 1, true);
+		//	auto normalTexture = lumenPT->CreateTexture(&normal, 1, 1, false);
+		//	LumenRenderer::MaterialData matData;
+		//	matData.m_ClearCoatRoughnessTexture = whiteTexture;
+		//	matData.m_ClearCoatTexture = whiteTexture;
+		//	matData.m_DiffuseTexture = whiteTexture;
+		//	matData.m_EmissiveTexture = whiteTexture;
+		//	matData.m_MetallicRoughnessTexture = whiteTexture;
+		//	matData.m_NormalMap = normalTexture;
+		//	matData.m_TintTexture = whiteTexture;
+		//	matData.m_TransmissionTexture = whiteTexture;
+		//	auto mat = lumenPT->CreateMaterial(matData);
 
 	
-			//Transparency
-			mat->SetTransmissionFactor(0.f);	//Transparency scalar.
-			mat->SetTransmittanceFactor({ 0.f, 0.f, 0.f });		//Beers law stuff.
-			mat->SetIndexOfRefraction(1.0f);	//IOR
+		//	//Transparency
+		//	mat->SetTransmissionFactor(0.f);	//Transparency scalar.
+		//	mat->SetTransmittanceFactor({ 0.f, 0.f, 0.f });		//Beers law stuff.
+		//	mat->SetIndexOfRefraction(1.0f);	//IOR
 	
-			//Color settings.
-			mat->SetDiffuseColor(glm::vec4(1.f, 1.f, 1.f, 1.f));
-			mat->SetTintFactor(glm::vec3{ 1.f, 1.f, 1.f });
+		//	//Color settings.
+		//	mat->SetDiffuseColor(glm::vec4(1.f, 1.f, 1.f, 1.f));
+		//	mat->SetTintFactor(glm::vec3{ 1.f, 1.f, 1.f });
 	
-			//Scalar for diffuse light bounces.
-			mat->SetLuminance(0.f);
+		//	//Scalar for diffuse light bounces.
+		//	mat->SetLuminance(0.f);
 	
-			//Sub surface scattering scalar.
-			mat->SetSubSurfaceFactor(0.f);
+		//	//Sub surface scattering scalar.
+		//	mat->SetSubSurfaceFactor(0.f);
 	
-			//Sheen and how much tint to add for sheen.
-			mat->SetSheenFactor(0.f);
-			mat->SetSheenTintFactor(0.0f);
+		//	//Sheen and how much tint to add for sheen.
+		//	mat->SetSheenFactor(0.f);
+		//	mat->SetSheenTintFactor(0.0f);
 	
-			//Clearcoat and roughness. Uses tint for coloring.
-			mat->SetClearCoatFactor(0.01f);
-			mat->SetClearCoatRoughnessFactor(0.f);
+		//	//Clearcoat and roughness. Uses tint for coloring.
+		//	mat->SetClearCoatFactor(0.01f);
+		//	mat->SetClearCoatRoughnessFactor(0.f);
 	
-			//MetallicRoughness model.
-			mat->SetRoughnessFactor(1.f);
-			mat->SetMetallicFactor(1.f);
+		//	//MetallicRoughness model.
+		//	mat->SetRoughnessFactor(1.f);
+		//	mat->SetMetallicFactor(1.f);
 	
-			//Anisotropic scalar.
-			mat->SetAnisotropic(0.f);
+		//	//Anisotropic scalar.
+		//	mat->SetAnisotropic(0.f);
 	
-			//Apply the material and update.
-			mesh->SetOverrideMaterial(mat);
-			mesh->UpdateAccelRemoveThis();
-		}
+		//	//Apply the material and update.
+		//	mesh->SetOverrideMaterial(mat);
+		//	mesh->UpdateAccelRemoveThis();
+		//}
 		
 		//for (auto& node : res3->m_NodePool)
 		//{x

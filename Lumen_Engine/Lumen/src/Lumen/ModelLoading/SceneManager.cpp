@@ -81,9 +81,9 @@ Lumen::SceneManager::GLTFResource* Lumen::SceneManager::LoadGLTF(std::string a_F
 
 
 	fx::gltf::ReadQuotas readQuotas{};
-	readQuotas.MaxBufferCount = 8;
-	readQuotas.MaxBufferByteLength = 128000000;	//128MB max.
-	readQuotas.MaxFileSize = 128000000;
+	readQuotas.MaxBufferCount = 99;
+	readQuotas.MaxBufferByteLength = 999999000000;
+	readQuotas.MaxFileSize = 999999000000;
 	
 	//NOTE: No quotas specified and no check for .gltf suffix. Might fail to load with large files and wrongly specified suffix.
 	fx::gltf::Document doc;
