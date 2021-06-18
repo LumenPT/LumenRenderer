@@ -334,20 +334,23 @@ namespace WaveFront
 
                 for (auto& prim : meshInstance->GetMesh()->m_Primitives)
                 {
-                    auto ptPrim = static_cast<PTPrimitive*>(prim.get());
+                    if(prim->m_ContainEmissive)
+                    {
+                        auto ptPrim = static_cast<PTPrimitive*>(prim.get());
 
-                    //Find the primitive instance in the data table.
-                    auto& entryMap = asPTInstance->GetInstanceEntryMap();
-                    auto entry = &entryMap.at(prim.get());
-
-                    AddToLightBufferWrap(
-                        ptPrim->m_VertBuffer->GetDevicePtr<Vertex>(),
-                        ptPrim->m_IndexBuffer->GetDevicePtr<uint32_t>(),
-                        ptPrim->m_BoolBuffer->GetDevicePtr<bool>(),
-                        ptPrim->m_IndexBuffer->GetSize() / sizeof(uint32_t),
-                        lightBuffer,
-                        sceneDataTableAccessor,
-                        entry->m_TableIndex);
+                        //Find the primitive instance in the data table.
+                        auto& entryMap = asPTInstance->GetInstanceEntryMap();
+                        auto entry = &entryMap.at(prim.get());
+                    	
+                        AddToLightBufferWrap(
+                            ptPrim->m_VertBuffer->GetDevicePtr<Vertex>(),
+                            ptPrim->m_IndexBuffer->GetDevicePtr<uint32_t>(),
+                            ptPrim->m_BoolBuffer->GetDevicePtr<bool>(),
+                            ptPrim->m_IndexBuffer->GetSize() / sizeof(uint32_t),
+                            lightBuffer,
+                            sceneDataTableAccessor,
+                            entry->m_TableIndex);
+                    }
                 }
                 
             }
@@ -876,7 +879,7 @@ namespace WaveFront
 
             cudaDeviceSynchronize();
             CHECKLASTCUDAERROR;
-
+        	
             FindEmissivesWrap(
                 vertexBuffer->GetDevicePtr<Vertex>(),
                 indexBuffer->GetDevicePtr<uint32_t>(),
