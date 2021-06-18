@@ -25,12 +25,12 @@ public:
 	/*
 	 * Initialize the ReSTIR required buffers for the given screen dimensions.
 	 */
-	CPU_ONLY void Initialize(const ReSTIRSettings& a_Settings);
+	void Initialize(const ReSTIRSettings& a_Settings);
 
 	/*
 	 * Run ReSTIR.
 	 */
-	CPU_ONLY void Run(
+	void Run(
 		const WaveFront::SurfaceData* const a_CurrentPixelData,
 		const WaveFront::SurfaceData* const a_PreviousPixelData,
 		const WaveFront::MotionVectorBuffer* const a_MotionVectorBuffer,
@@ -45,7 +45,7 @@ public:
 	/*
 	 * Update the CDF for the given light sources.
 	 */
-	CPU_ONLY void BuildCDF(const MemoryBuffer* a_Lights);
+	void BuildCDF(const MemoryBuffer* a_Lights);
 
 	/*
 	 * Swap the front and back buffer. This has to be called once per frame.

@@ -35,7 +35,12 @@ __global__ void ResetCDF(CDF* a_Cdf);
 /*
  * Set the CDF sum and size based on the tree.
  */
-__global__ void SetCDFSize(CDF* a_Cdf, float* a_CdfTreeBuffer, unsigned a_NumLights);
+__global__ void SetCDFSize(CDF* a_Cdf, unsigned a_NumLights);
+
+/*
+ * Function used to visualize a CDF and tree to ensure that the values are as expected.
+ */
+__global__ void DebugPrintCdf(CDF* a_Cdf, float* a_CDFTree);
 
 /*
  * Build a balanced binary tree of all lights bottom up.

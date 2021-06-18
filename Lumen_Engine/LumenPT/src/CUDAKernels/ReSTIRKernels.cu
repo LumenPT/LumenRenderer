@@ -21,7 +21,7 @@ __host__ void ResetReservoirs(int a_NumReservoirs, Reservoir* a_ReservoirPointer
     const int blockSize = CUDA_BLOCK_SIZE;
     const int numBlocks = (a_NumReservoirs + blockSize - 1) / blockSize;
     ResetReservoirInternal<<<numBlocks, blockSize>>>(a_NumReservoirs, a_ReservoirPointer);
-
+	
     //TODO: Wait after every task may not be needed.Check if it is required between kernel calls.
     cudaDeviceSynchronize();
     CHECKLASTCUDAERROR;
@@ -49,7 +49,7 @@ __host__ void FillCDF(CDF* a_Cdf, float* a_CdfTreeBuffer, const WaveFront::Atomi
 	//Note: Disabled because horribly slow.
     //Run from one thread because it's not thread safe to append the sum of each element.
     //FillCDFInternalSingleThread <<<1, 1>>> (a_Cdf, a_Lights, a_LightCount);
-
+	
 	//Use 512 threads per block, since these are relatively tiny operations.
     const unsigned blockSize = 512;
     const unsigned treeDepth = std::ceil(std::log2f(a_LightCount)); //The total depth of the tree, in terms of operations to be performed.
@@ -77,10 +77,18 @@ __host__ void FillCDF(CDF* a_Cdf, float* a_CdfTreeBuffer, const WaveFront::Atomi
 
 	//Spawn a thread per element in the CDF. Fill by traversing down tree on the left.
     FillCDFParallel <<<((a_LightCount + blockSize - 1) / blockSize), blockSize >>> (a_Cdf, a_CdfTreeBuffer, a_Lights, a_LightCount, treeDepth, numLeafNodes);
-    SetCDFSize<<<1, 1>>>(a_Cdf, a_CdfTreeBuffer, a_LightCount);
+    cudaDeviceSynchronize();
+    CHECKLASTCUDAERROR;
+
+	//Set the CDF to the right size.
+    SetCDFSize<<<1, 1>>>(a_Cdf, a_LightCount);
 	
     cudaDeviceSynchronize();
     CHECKLASTCUDAERROR;
+
+	//TODO remove
+    //DebugPrintCdf<<<1,1>>>(a_Cdf, a_CdfTreeBuffer);
+
 }
 
 __global__ void ResetCDF(CDF* a_Cdf)
@@ -112,10 +120,32 @@ __global__ void CalculateLightWeights(float* a_CdfTreeBuffer, const WaveFront::A
     }
 }
 
-__global__ void SetCDFSize(CDF* a_Cdf, float* a_CdfTreeBuffer, unsigned a_NumLights)
+__global__ void SetCDFSize(CDF* a_Cdf, unsigned a_NumLights)
 {
-    a_Cdf->SetCDFSize(a_CdfTreeBuffer[0], a_NumLights);
+    a_Cdf->SetCDFSize(a_NumLights);
 }
+
+__global__ void DebugPrintCdf(CDF* a_Cdf, float* a_CDFTree)
+{
+    int start = a_Cdf->size - 30;
+    if (start < 0) start = 0;
+
+    const unsigned treeSize = powf(2.f, ceilf(log2f(a_Cdf->size)));
+
+    printf("CDF Entry 0: %f\n", a_Cdf->data[0]);
+    printf("CDF Tree Entry 0: %f\n", a_CDFTree[treeSize - 1]);
+	
+    for (int i = start; i < a_Cdf->size; ++i)
+    {
+        printf("CDF Entry %i: %f\n", i, a_Cdf->data[i]);
+    }
+
+    for (int i = 0; i < min(30u, a_Cdf->size - 1); ++i)
+    {
+        printf("CDF tree node %i: %f\n", i, a_CDFTree[i]);
+    }
+}
+
 
 __global__ void BuildCDFTree(float* a_CdfTreeBuffer, unsigned a_NumParentNodes, unsigned a_ArrayOffset)
 {
@@ -141,35 +171,80 @@ __global__ void FillCDFParallel(CDF* a_Cdf, float* a_CdfTreeBuffer, const WaveFr
 	//For every light, traverse the tree and find the sum.
     for (int lightIndex = index; lightIndex < a_LightCount; lightIndex += stride)
     {
-        unsigned split = a_LeafNodes / 2;
-        unsigned splitStep = split / 2;
-        unsigned rootIndex = 0;
-        float sum = a_CdfTreeBuffer[a_LeafNodes - 1];   //Because the bottom level of the tree can't reach the left-most node, I add it manually here.
-    	//
-    	//Traverse down the tree starting at element 0 (root node).
-    	for(int depth = 0; depth < a_TreeDepth; ++depth)
-    	{
-    		//Light index lies to the left of the node split, which means that the right side does not affect it at all. Go down the left node.
-            if(lightIndex < split)
-            {            	
-                rootIndex = (2 * rootIndex) + 1;
-                split -= splitStep;
-            }
-    		//Right of the node split, so left node affects it fully. Go down the right node.
+        unsigned start = 0;
+        unsigned end = a_LeafNodes - 1;
+        unsigned branchIndex = 0;
+    	
+        /*
+         * The appended value found by traversing the tree.
+         * When the tree reaches the bottom level, it terminates, and so the element at light index
+         * is not actually added.
+         * to solve this, start by reading the bottom element derived from the light index.
+         */
+        float sum = a_CdfTreeBuffer[(a_LeafNodes - 1) + lightIndex];    
+    	
+        for(int depth = 0; depth < a_TreeDepth; ++depth)
+        {
+        	//Center of the nodes remaining.
+            const int split = (start + end) / 2;
+
+        	//Light index lies left of the split, so the right nodes are fully discarded.
+        	if(lightIndex <= split)
+        	{        		
+        		//Go down the tree on the left.
+                branchIndex = (2 * branchIndex) + 1;
+        		
+        		//Adjust the search range to the left.
+                end = split;
+        	}
+        	//Light index lies in right nodes. Append left and traverse down the right side.
             else
             {
-                const auto leftIndex = (2 * rootIndex) + 1;
+                //Go down the tree on the right. Append the found 
+                const auto leftIndex = (2 * branchIndex) + 1;
                 sum += a_CdfTreeBuffer[leftIndex];
-                rootIndex = leftIndex + 1;  //Right node index
-                split += splitStep;
+                branchIndex = leftIndex + 1;  //Right node index
+            	
+            	//Adjust the search region to the right.
+                start = split + 1;
             }
+        }
 
-    		//Half the amount of step per split.
-            splitStep /= 2;
-    	}
-
-    	//Set the prefix sum for this light index in the CDF.
+        //Finally add to the CDF when all branches relevant for the index have been appended.
         a_Cdf->Insert(lightIndex, sum);
+
+    	/*
+    	 * TODO: below code doesn't properly add in all cases (bottom leaves don't get added).
+    	 */
+     //   unsigned split = a_LeafNodes / 2;
+     //   unsigned splitStep = split / 2;
+     //   unsigned rootIndex = 0;
+     //   float sum = a_CdfTreeBuffer[a_LeafNodes - 1];   //Because the bottom level of the tree can't reach the left-most node, I add it manually here.
+    	////
+    	////Traverse down the tree starting at element 0 (root node).
+    	//for(int depth = 0; depth < a_TreeDepth; ++depth)
+    	//{
+    	//	//Light index lies to the left of the node split, which means that the right side does not affect it at all. Go down the left node.
+     //       if(lightIndex < split)
+     //       {            	
+     //           rootIndex = (2 * rootIndex) + 1;
+     //           split -= splitStep;
+     //       }
+    	//	//Right of the node split, so left node affects it fully. Go down the right node.
+     //       else
+     //       {
+     //           const auto leftIndex = (2 * rootIndex) + 1;
+     //           sum += a_CdfTreeBuffer[leftIndex];
+     //           rootIndex = leftIndex + 1;  //Right node index
+     //           split += splitStep;
+     //       }
+
+    	//	//Half the amount of step per split.
+     //       splitStep /= 2;
+    	//}
+
+    	////Set the prefix sum for this light index in the CDF.
+     //   a_Cdf->Insert(lightIndex, sum);
     }
 }
 
@@ -208,7 +283,7 @@ __global__ void FillLightBagsInternal(unsigned a_NumLightBags, unsigned a_NumLig
     int stride = blockDim.x * gridDim.x;
 
     for (int i = index; i < numLightsTotal; i += stride)
-    {
+    {    	
         //Generate a random float between 0 and 1.
         auto seed = WangHash(a_Seed + WangHash(i));
         const float random = RandomFloat(seed);

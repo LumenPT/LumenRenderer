@@ -155,13 +155,15 @@ public:
 		std::string p_string3{ p3.string() };
 		std::replace(p_string3.begin(), p_string3.end(), '\\', '/');
 
-		const std::string meshPath = p_string.append("/Sandbox/assets/models/");
+		const std::string meshPath = p_string.append("/Sandbox/assets/models/Sponza/");
+		//const std::string meshPath = p_string.append("/Sandbox/assets/gltfExternalAssets/Benchmark_Scenes/FlyingWorld_BattleOfTheTrashGod/");
 		const std::string meshPath2 = p_string2.append("/Sandbox/assets/models/EmissiveSphere/");
 		//const std::string meshPath3 = p_string3.append("/Sandbox/assets/models/knight/");
 		//Base path for meshes.
 
 		//Mesh name
-		const std::string meshName = "SanMiguel.glb";
+		//const std::string meshName = "scene.gltf";
+		const std::string meshName = "Sponza.gltf";
 		const std::string meshName2 = "EmissiveSphere.gltf";
 		//const std::string meshName3 = "scene.gltf";
 
@@ -198,9 +200,15 @@ public:
 		uint32_t seed = 38947987;
 		seed = RandomInt(seed);
 
+		//Scale the mesh up.
 		lumenPT->m_Scene = res->m_Scenes[0];
-		lumenPT->m_Scene->m_MeshInstances[0]->m_Transform.SetScale(glm::vec3(1.0f));
-		for(int i = 0; i < 5; ++i)
+		for(auto& mesh : lumenPT->m_Scene->m_MeshInstances)
+		{
+			mesh->m_Transform.SetScale(glm::vec3(1.0f));
+			mesh->SetEmissiveness({ Lumen::EmissionMode::ENABLED, {1.f, 1.f, 1.f}, 400.f });
+		}
+		
+		for(int i = 0; i < 30; ++i)
 		{
 			for (auto& node : res2->m_NodePool)
 			{
@@ -228,7 +236,7 @@ public:
 			Lumen::MeshInstance::Emissiveness emissiveness;
 			emissiveness.m_EmissionMode = Lumen::EmissionMode::OVERRIDE;
 			emissiveness.m_OverrideRadiance = glm::vec3(1.0f, 1.0f, 1.0f);
-			emissiveness.m_Scale = 25.0f;
+			emissiveness.m_Scale = 25.f;
 			mesh->SetEmissiveness(emissiveness);
 			mesh->UpdateAccelRemoveThis();
 			xOffset += 50;

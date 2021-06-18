@@ -10,7 +10,7 @@
 #include "../Shaders/CppCommon/WaveFrontDataStructs/AtomicBuffer.h"
 #include "OptixWrapper.h"
 
-CPU_ONLY void ReSTIR::Initialize(const ReSTIRSettings& a_Settings)
+void ReSTIR::Initialize(const ReSTIRSettings& a_Settings)
 {
 	m_Settings = a_Settings;
 
@@ -60,7 +60,7 @@ CPU_ONLY void ReSTIR::Initialize(const ReSTIRSettings& a_Settings)
 	cudaDeviceSynchronize();
 }
 
-CPU_ONLY void ReSTIR::Run(
+void ReSTIR::Run(
 	const WaveFront::SurfaceData* const a_CurrentPixelData,
 	const WaveFront::SurfaceData* const a_PreviousPixelData,
 	const WaveFront::MotionVectorBuffer* const a_MotionVectorBuffer,
@@ -124,7 +124,7 @@ CPU_ONLY void ReSTIR::Run(
 	if (a_DebugPrint)
 	{
 		auto size = WaveFront::GetAtomicCounter<WaveFront::TriangleLight>(a_Lights);
-		printf("Building CDF time required: %f millis.\n NumLight: %u\n", timer.measure(TimeUnit::MILLIS), size);
+		printf("Building CDF time required: %f millis.\nNumLights: %u\n", timer.measure(TimeUnit::MILLIS), size);
 		CHECKLASTCUDAERROR;
 	}
 	//Fill light bags with values from the CDF.
@@ -137,8 +137,8 @@ CPU_ONLY void ReSTIR::Run(
 			static_cast<LightBagEntry*>(m_LightBags.GetDevicePtr()), 
 			a_Lights->GetDevicePtr<WaveFront::AtomicBuffer<WaveFront::TriangleLight>>(), 
 			a_Seed);
-		CHECKLASTCUDAERROR;
 		if (a_DebugPrint) printf("Filling light bags time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
+		CHECKLASTCUDAERROR;
 	}
 
 	/*
@@ -245,7 +245,7 @@ void ReSTIR::BuildCDF(const MemoryBuffer* a_Lights)
 			m_Cdf.Resize(cdfNeededSize);
 
 			//The CDF tree requires a base 2 size. First power of 2 bigger than or equal to the number of lights.
-			const unsigned power = std::ceilf(std::log2f(static_cast<float>(numLights))) + 1;	//Take the lowest base of 2, and add 1 for the first copy.
+			const unsigned power = static_cast<unsigned>(std::ceilf(std::log2f(static_cast<float>(numLights)))) + 1u;	//Take the lowest base of 2, and add 1 for the first copy.
 			m_CdfTree.Resize(static_cast<size_t>(std::pow(2u, power)) * sizeof(float));
 		}
 
