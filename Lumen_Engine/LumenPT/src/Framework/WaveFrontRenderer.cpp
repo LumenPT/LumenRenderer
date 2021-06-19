@@ -321,6 +321,8 @@ namespace WaveFront
         ResetAtomicBuffer<WaveFront::TriangleLight>(&m_TriangleLights);
         auto lightBuffer = m_TriangleLights.GetDevicePtr<AtomicBuffer<WaveFront::TriangleLight>>();
 
+        Timer lightExtractionTimer;
+
         for (auto& meshInstance : m_Scene->m_MeshInstances)
         {
             //Only run when emission is not disabled, and override is active OR the GLTF has specified valid emissive triangles and mode is set to ENABLED.
@@ -334,8 +336,6 @@ namespace WaveFront
 
                 for (auto& prim : meshInstance->GetMesh()->m_Primitives)
                 {
-                    if(prim->m_ContainEmissive)
-                    {
                         auto ptPrim = static_cast<PTPrimitive*>(prim.get());
 
                         //Find the primitive instance in the data table.
@@ -350,7 +350,6 @@ namespace WaveFront
                             lightBuffer,
                             sceneDataTableAccessor,
                             entry->m_TableIndex);
-                    }
                 }
                 
             }
@@ -360,6 +359,8 @@ namespace WaveFront
             }
         }
 
+        printf("Time to extract all emissives in scene: %f millis.\n", lightExtractionTimer.measure(TimeUnit::MILLIS));
+    	
         //Don't render if there is no light in the scene as everything will be black anyway.
         const unsigned int numLightsInScene = GetAtomicCounter<WaveFront::TriangleLight>(&m_TriangleLights);
         if (numLightsInScene == 0)
