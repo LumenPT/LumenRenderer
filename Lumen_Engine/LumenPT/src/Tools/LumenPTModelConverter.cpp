@@ -38,15 +38,22 @@ Lumen::SceneManager::GLTFResource LumenPTModelConverter::ConvertGLTF(std::string
 	readQuotas.MaxBufferByteLength = 999999000000;
 	readQuotas.MaxFileSize = 999999000000;
 
+	printf("[File Conversion] Starting to convert %s to Ollad.\n", a_SourcePath.c_str());
+
 	if (sp.extension() == ".gltf")
 		fxDoc = LoadFromText(p, readQuotas);
 	else if (sp.extension() == ".glb")
 		fxDoc = LoadFromBinary(p, readQuotas);
 	
-
+	printf("[File Conversion] Done loading file from GLTF.\n");
 
 	auto content = GenerateContent(fxDoc, p);
+
+	printf("[File Conversion] Done generating content.\n");
+	
 	auto header = GenerateHeader(content);
+
+	printf("[File Conversion] Done generating header.\n");
 
 	volatile auto dbgfc = &content;
 
@@ -54,6 +61,8 @@ Lumen::SceneManager::GLTFResource LumenPTModelConverter::ConvertGLTF(std::string
 	std::string destPath = p.append(ms_ExtensionName);
 
 	OutputToFile(header, content.m_Blob, destPath);
+
+	printf("[File Conversion] Done outputting to file.\n");
 
 	content.m_Textures.clear();
 
@@ -296,12 +305,14 @@ void LumenPTModelConverter::SetRendererRef(LumenRenderer& a_Renderer)
 LumenPTModelConverter::FileContent LumenPTModelConverter::GenerateContent(const fx::gltf::Document& a_FxDoc, const std::string& a_SourcePath)
 {
 	FileContent fc;
-
+	
     for (uint32_t i = 0; i < a_FxDoc.images.size(); i++)
     {
 		fc.m_Textures.push_back(TextureToBlob(a_FxDoc, i, fc.m_Blob, a_SourcePath));
+		printf("[File Conversion] Extracted image %i of %i.\n", i , static_cast<int>(a_FxDoc.images.size()) - 1);
     }
 
+	int index = 0;
     for (auto& material : a_FxDoc.materials)
     {
 		auto& m = fc.m_Materials.emplace_back();
@@ -459,8 +470,13 @@ LumenPTModelConverter::FileContent LumenPTModelConverter::GenerateContent(const 
 			m.m_TintTextureId = -1;
 			m.m_SpecularTintFactor = 0.f;
 		}
+
+		printf("[File Conversion] Done generating material %i of %i.\n", index, static_cast<int>(a_FxDoc.materials.size()) - 1);
+		++index;
 	}
 
+	index = 0;
+	
     for (auto& mesh : a_FxDoc.meshes)
     {
 		auto& m = fc.m_Meshes.emplace_back();
@@ -469,12 +485,16 @@ LumenPTModelConverter::FileContent LumenPTModelConverter::GenerateContent(const 
 			m.m_Primitives.push_back(PrimitiveToBlob(a_FxDoc, primitive, fc.m_Blob));
         }
 		m.m_Header.m_NumPrimitives = m.m_Primitives.size();
+		printf("[File Conversion] Done generating mesh %i of %i.\n", index, static_cast<int>(a_FxDoc.meshes.size()) - 1);
+		++index;
     }
 
+	index = 0;
     for (auto& fxScene : a_FxDoc.scenes)
     {
 		fc.m_Scenes.push_back(MakeScene(a_FxDoc, fxScene));
-		
+		printf("[File Conversion] Done extracting scene %i of %i.\n", index, static_cast<int>(a_FxDoc.scenes.size()) - 1);
+		++index;
     }
 
 	fc.m_Blob.Trim();
@@ -844,9 +864,16 @@ LumenPTModelConverter::HeaderScene LumenPTModelConverter::MakeScene(const fx::gl
 {
 	HeaderScene hscene;
 
+	
+	int index = 0;
     for (auto rootNode : a_Scene.nodes)
     {
+		printf("[File Conversion] Now loading root node %i of %i.\n", index, static_cast<int>(a_Scene.nodes.size()) - 1);
+    	
 		LoadNode(a_FxDoc, rootNode, hscene);
+
+		printf("[File Conversion] Done loading root node %i of %i.\n", index, static_cast<int>(a_Scene.nodes.size()) - 1);
+		++index;
     }
 
 	hscene.m_Name = a_Scene.name;
@@ -876,9 +903,13 @@ void LumenPTModelConverter::LoadNode(const fx::gltf::Document& a_FxDoc, uint32_t
 		m.m_Header.m_NameLength = node.name.size();
     }
 
+	int index = 0;
+
     for (auto& ch : node.children)
     {
+		printf("[File Conversion] Now loading child node %i of %i.\n", index, static_cast<int>(node.children.size()) - 1);
 		LoadNode(a_FxDoc, ch, a_Scene, worldTransform);
+		++index;
     }
 }
 

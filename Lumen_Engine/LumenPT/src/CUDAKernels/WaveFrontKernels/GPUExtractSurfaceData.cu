@@ -65,8 +65,8 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
             //When enabled, just read the GLTF data and scale it accordingly.
             if (devicePrimitiveInstance.m_EmissionMode == Lumen::EmissionMode::ENABLED)
             {
-                emissive = tex2D<float4>(material->m_EmissiveTexture, texCoords.x, texCoords.y);
-                emissive *= material->m_MaterialData.m_Emissive * devicePrimitiveInstance.m_EmissiveColorAndScale.w;
+                emissive = material->m_MaterialData.m_Emissive * devicePrimitiveInstance.m_EmissiveColorAndScale.w;
+                emissive *= tex2D<float4>(material->m_EmissiveTexture, texCoords.x, texCoords.y);
             }
 
             //When override, take the ovverride emissive color and scale it up.
@@ -78,19 +78,18 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
             assert(!isinf(emissive.x));
             assert(!isinf(emissive.y));
             assert(!isinf(emissive.z));
-            assert(!isinf(emissive.w));
+            //assert(!isinf(emissive.w));
             assert(!isnan(emissive.x));
             assert(!isnan(emissive.y));
             assert(!isnan(emissive.z));
-            assert(!isnan(emissive.w));
+            //assert(!isnan(emissive.w));
 
             //The surface data to write to. Local copy for fast access.
             SurfaceData output;
             output.m_SurfaceFlags = SURFACE_FLAG_NONE;  //Default to no flags.
 
-
             //If emissive, set flag and 
-            if ((emissive.x > 0 || emissive.y > 0 || emissive.z > 0))
+            if ((emissive.x > 0.f || emissive.y > 0.f || emissive.z > 0.f))
             {
                 //Clamp between 0 and 1. TODO this is not HDR friendly so remove when we do that.
                 output.m_MaterialData.m_Color = emissive;
@@ -115,8 +114,8 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
                 output.m_IncomingRayDirection = currRay.m_Direction;
                 output.m_TransportFactor = currRay.m_Contribution;
                 output.m_PixelIndex = currIntersection.m_PixelIndex;
-                a_OutPut[surfaceDataIndex] = output;
             	
+                a_OutPut[surfaceDataIndex] = output;
                 continue;
             }
 

@@ -34,7 +34,9 @@ CPU_ON_GPU void FindEmissives(
     const uint32_t a_IndexBufferSize,
     unsigned int* a_NumLights)
 {
-
+	//Set to 0.
+    *a_NumLights = 0;
+	
     //const auto devMat = a_Mat->GetDeviceMaterial();
 
     //pack these into triangle
@@ -43,7 +45,6 @@ CPU_ON_GPU void FindEmissives(
 
     for (unsigned int baseIndex = 0; baseIndex < a_IndexBufferSize; baseIndex+=3)
     {
-
         //looped over 3 vertices, construct triangle
 
         const unsigned index0 = a_Indices[baseIndex + 0];
