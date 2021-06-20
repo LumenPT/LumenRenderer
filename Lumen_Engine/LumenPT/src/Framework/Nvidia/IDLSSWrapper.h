@@ -36,10 +36,10 @@ public:
 
 	virtual bool Initialize(DLSSWrapperInitParams a_InitParams) = 0;
 	virtual bool EvaluateDLSS(
-		Microsoft::WRL::ComPtr<ID3D11Resource> a_Outputbuffer = nullptr, 
-		Microsoft::WRL::ComPtr<ID3D11Resource> a_Inputbuffer = nullptr, 
-		const unsigned int& a_MotionVectors = 0, 
-		const unsigned int& a_DepthBuffer = 0) = 0;
+		Microsoft::WRL::ComPtr<ID3D11Resource> a_Outputbuffer = nullptr,
+		Microsoft::WRL::ComPtr<ID3D11Resource> a_Inputbuffer = nullptr,
+		Microsoft::WRL::ComPtr<ID3D11Resource> a_DepthBuffer = nullptr,
+		const unsigned int& a_MotionVectors = 0) = 0;
 
 	virtual std::shared_ptr<DLSSWrapperInitParams> GetDLSSParams() = 0;
 

@@ -30,6 +30,7 @@ CPU_ONLY void ExtractSurfaceData(
     WaveFront::AtomicBuffer <WaveFront::IntersectionData>* a_IntersectionData,
     WaveFront::AtomicBuffer <WaveFront::IntersectionRayData>* a_Rays,
     WaveFront::SurfaceData* a_OutPut,
+    cudaSurfaceObject_t a_DepthOutPut,
     uint2 a_Resolution,
     SceneDataTableAccessor* a_SceneDataTable);
 

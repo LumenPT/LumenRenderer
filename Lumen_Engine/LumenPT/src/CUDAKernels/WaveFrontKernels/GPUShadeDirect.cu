@@ -6,6 +6,41 @@
 #include <sutil/vec_math.h>
 #include "../disney.cuh"
 
+CPU_ON_GPU void ExtractDepthDataGpu(const SurfaceData* a_OutPut, cudaSurfaceObject_t a_DepthOutPut)
+{
+    
+    const unsigned int pixelX = blockIdx.x * blockDim.x + threadIdx.x;
+    const unsigned int pixelY = blockIdx.y * blockDim.y + threadIdx.y;
+
+    //Check if a_OutPut->m_IntersectionT > a_DepthOutPut->depthValueAtPixelIndex to avoid writing to it if the T < value already there
+    //if T > valueAtPixel ? overwrite : keep valueAtPixel
+
+    //gonna need pixel index probably
+    if (a_OutPut->m_IntersectionT > 10000.0)
+    {
+        float t = a_OutPut->m_IntersectionT;
+
+        float tt = (t - fminf(0.f, t)) / (fmaxf(1.f, t) - fminf(0.f, t));
+
+        printf("Depth Value\n", tt);
+
+        //a_DepthOutPut[a_OutPut->m_PixelIndex] = { 0, 0, 1.0 };
+        surf2Dwrite<float1>(
+            make_float1((t - fminf(0.f, t))/(fmaxf(1.f, t)-fminf(0.f, t))), //clamp to 1.0f
+            a_DepthOutPut,  //intput
+            pixelX * sizeof(float1),
+            pixelY,
+            cudaBoundaryModeClamp);
+    }
+
+    //int index = blockIdx.x * blockDim.x + threadIdx.x;
+    //int stride = blockDim.x * gridDim.x;
+    //for (int i = index; i < a_NumIntersections; i += stride)
+    //{
+    //    unsigned int surfaceDataIndex = PIXEL_DATA_INDEX(currIntersection.m_PixelIndex.m_X, currIntersection.m_PixelIndex.m_Y, a_Resolution.x);
+    //}
+}
+
 CPU_ON_GPU void ResolveDirectLightHits(
     const SurfaceData* a_SurfaceDataBuffer,
     const uint2 a_Resolution,
@@ -18,7 +53,6 @@ CPU_ON_GPU void ResolveDirectLightHits(
 
     if(pixelX < a_Resolution.x && pixelY < a_Resolution.y)
     {
-
         const unsigned int pixelDataIndex = PIXEL_DATA_INDEX(pixelX, pixelY, a_Resolution.x);
 
         auto& pixelData = a_SurfaceDataBuffer[pixelDataIndex];
@@ -36,8 +70,6 @@ CPU_ON_GPU void ResolveDirectLightHits(
         }
 
     }
-
-    
 }
 
 CPU_ON_GPU void ShadeDirect(

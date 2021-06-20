@@ -150,6 +150,9 @@ namespace WaveFront
 
         m_D3D11PixelBufferCombined = m_DX11Wrapper->CreateTexture2D({ m_Settings.renderResolution.x, m_Settings.renderResolution.y, 1 });
 
+        //Find a way to initialize this with a large value
+        m_D3D11DepthBuffer = m_DX11Wrapper->CreateTexture2D({m_Settings.renderResolution.x, m_Settings.renderResolution.y, 1});
+
         cudaTextureDesc pixelBufferDesc {};
         memset(&pixelBufferDesc, 0, sizeof(pixelBufferDesc));
 
@@ -180,6 +183,12 @@ namespace WaveFront
         m_PixelBufferCombined->Map();
         m_PixelBufferCombined->Clear();
         m_PixelBufferCombined->Unmap();
+
+        m_DepthBuffer = std::make_unique<InteropGPUTexture>(m_D3D11DepthBuffer, pixelBufferDesc);
+
+        m_DepthBuffer->Map();
+        m_DepthBuffer->Clear();
+        m_DepthBuffer->Unmap();
 
         ResizeBuffers();
 
@@ -482,6 +491,8 @@ namespace WaveFront
             m_PixelBufferCombined->Clear();
         }
 
+        m_DepthBuffer->Map();
+
         cudaDeviceSynchronize();
         CHECKLASTCUDAERROR;
 
@@ -617,6 +628,8 @@ namespace WaveFront
 		SetAtomicCounter<VolumetricIntersectionData>(&m_VolumetricIntersectionData, counterDefault);
         CHECKLASTCUDAERROR;
 
+
+
         //Pass the buffers to the optix shader for shading.
         OptixLaunchParameters rayLaunchParameters {};
         rayLaunchParameters.m_TraceType = RayType::INTERSECTION_RAY;
@@ -655,16 +668,26 @@ namespace WaveFront
 
         	if(numIntersections > 0)
         	{
+                //pass depth buffer into extract surface data
                 ExtractSurfaceData(
                     numIntersections,
                     m_IntersectionData.GetDevicePtr<AtomicBuffer<IntersectionData>>(),
                     m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>(),
                     m_SurfaceData[surfaceDataBufferIndex].GetDevicePtr<SurfaceData>(),
+                    m_DepthBuffer->GetSurfaceObject(),
                     m_Settings.renderResolution,
                     sceneDataTableAccessor);
 
+
+                //extract depth data
+                //But loop is ran per intersection on ray(depth/surfaceDataBufferIndex)(?)
+                //so only calculate depth at 
+
+                //may also need to take into account that this only runs when intersected. maybe just initialize to null
+
                 cudaDeviceSynchronize();
                 CHECKLASTCUDAERROR;
+
         	}
 
             unsigned numVolumeIntersections = 0;
@@ -756,6 +779,8 @@ namespace WaveFront
             seed = WangHash(seed);
         }
 
+
+
         //The amount of shadow rays to trace.
         unsigned numShadowRays = GetAtomicCounter<ShadowRayData>(&m_ShadowRays);
 
@@ -784,7 +809,8 @@ namespace WaveFront
                 m_Settings.renderResolution,
                 m_Settings.outputResolution,
                 pixelBuffers,
-                m_PixelBufferCombined->GetSurfaceObject(),
+                m_DepthBuffer->GetSurfaceObject(),
+                //m_PixelBufferCombined->GetSurfaceObject(),
                 m_IntermediateOutputBuffer.GetDevicePtr<uchar4>(),
                 m_Settings.blendOutput,
                 m_BlendCounter
@@ -798,7 +824,8 @@ namespace WaveFront
 
             OptixDenoiserLaunchParameters optixDenoiserLaunchParams(
                 m_Settings.renderResolution,
-                m_PixelBufferCombined->GetSurfaceObject(),
+                m_DepthBuffer->GetSurfaceObject(),
+                //m_PixelBufferCombined->GetSurfaceObject(),
                 m_OptixDenoiser->TestInput.GetDevicePtr<float3>(),
                 m_OptixDenoiser->TestOutput.GetDevicePtr<float3>()
             );
@@ -834,9 +861,40 @@ namespace WaveFront
 
             m_PixelBufferCombined->Unmap();
 
+            m_DepthBuffer->Unmap(); 
+
+            //Depth buffer hacking
+            //m_FrameSnapshot->AddBuffer([&]()
+            //    {
+            //        //auto result = m_DepthBuffer->Map();
+
+            //        std::map<std::string, FrameSnapshot::ImageBuffer> resBuffers;
+            //        m_DeferredOpenGLCalls.push([&]() {
+            //            resBuffers["DepthBuffer"].m_Memory = std::make_unique<CudaGLTexture>(GL_R32F, m_Settings.renderResolution.x,
+            //                m_Settings.renderResolution.y, sizeof(float));
+            //            });
+            //        WaitForDeferredCalls();
+
+            //        cudaMemcpy(resBuffers["DepthBuffer"].m_Memory->GetDevicePtr(), result, (m_Settings.renderResolution.x * m_Settings.renderResolution.y) * sizeof(float), cudaMemcpyKind::cudaMemcpyDeviceToDevice);
+
+            //        cudaMemcpy2DFromArray(resBuffers["DepthBuffer"].m_Memory->GetDevicePtr(),
+            //            m_Settings.renderResolution.x * sizeof(float), 
+            //            result, 
+            //            0, 
+            //            0, 
+            //            m_Settings.renderResolution.x * sizeof(float), 
+            //            m_Settings.renderResolution.y, //Y tyho
+            //            cudaMemcpyKind::cudaMemcpyDeviceToDevice);
+
+            //        return resBuffers;
+            //    });
+
+
+            CHECKLASTCUDAERROR;
+
             //m_DX11Wrapper->GetContext()->CopyResource(m_DX11Wrapper->m_D3D11PixelBufferCombined, m_D3D11PixelBufferCombined.Get());
 
-            m_DLSS->EvaluateDLSS(m_D3D11PixelBufferCombined);
+            m_DLSS->EvaluateDLSS(m_D3D11PixelBufferCombined, m_D3D11PixelBufferCombined, m_D3D11DepthBuffer);
             //m_DLSS->EvaluateDLSS(dlssInitParams, m_D3D11PixelBufferCombined, m_MotionVectors.GetMotionVectorDirectionsTex());
 
             //construct motion vector tex 

@@ -157,6 +157,10 @@ namespace WaveFront
         //Buffer used to combine light channels after denoising.
         std::unique_ptr<InteropGPUTexture> m_PixelBufferCombined;
 
+        std::unique_ptr<InteropGPUTexture> m_DepthBuffer;
+
+        Microsoft::WRL::ComPtr<ID3D11Texture2D> m_D3D11DepthBuffer;
+
         Microsoft::WRL::ComPtr<ID3D11Texture2D> m_D3D11PixelBufferSeparate;
 
         Microsoft::WRL::ComPtr<ID3D11Texture2D> m_D3D11PixelBufferCombined;

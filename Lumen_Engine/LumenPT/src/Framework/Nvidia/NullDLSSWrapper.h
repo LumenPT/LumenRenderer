@@ -11,10 +11,10 @@ public:
 
 	bool Initialize(DLSSWrapperInitParams a_InitParams) override { return false; };
 	bool EvaluateDLSS(
-		Microsoft::WRL::ComPtr<ID3D11Resource> a_Outputbuffer,
-		Microsoft::WRL::ComPtr<ID3D11Resource> a_Inputbuffer,
-		const unsigned int& a_MotionVectors,
-		const unsigned int& a_DepthBuffer) override { return false; };
+		Microsoft::WRL::ComPtr<ID3D11Resource> a_Outputbuffer = nullptr,
+		Microsoft::WRL::ComPtr<ID3D11Resource> a_Inputbuffer = nullptr,
+		Microsoft::WRL::ComPtr<ID3D11Resource> a_DepthBuffer = nullptr,
+		const unsigned int& a_MotionVectors = 0) override { return false; };
 
 	std::shared_ptr<DLSSWrapperInitParams> GetDLSSParams() { return m_Params == nullptr ? std::make_shared<DLSSWrapperInitParams>() : m_Params; };
 		
