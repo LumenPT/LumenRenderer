@@ -298,8 +298,6 @@ CPU_ONLY void PrepareOptixDenoising(WaveFront::OptixDenoiserLaunchParameters& a_
 
     const dim3 numBlocks{ blockSizeWidth, blockSizeHeight, 1 };
 
-    printf("hey\n");
-
     PrepareOptixDenoisingGPU << <numBlocks, blockSize >> > (
         a_LaunchParams.m_RenderResolution,
         a_LaunchParams.m_PixelBufferSingleChannel,
