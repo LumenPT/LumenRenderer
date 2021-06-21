@@ -63,7 +63,16 @@ CPU_ONLY void SeparateMotionVectorBufferCPU(uint64_t a_BufferSize, WaveFront::Mo
 	cudaDeviceSynchronize();
 }
 
-CPU_ON_GPU void SeparateOptixDenoiserBuffer(uint64_t a_BufferSize, const float3* a_OptixDenoiserInputBuffer, const float3* a_OptixDenoiserOutputBuffer, float3* a_OptixDenoiserInputTexture, float3* a_OptixDenoiserOutputTexture)
+CPU_ON_GPU void SeparateOptixDenoiserBuffer(
+    uint64_t a_BufferSize,
+    const float3* a_OptixDenoiserInputBuffer,
+    const float3* a_OptixDenoiserAlbedoInputBuffer,
+    const float3* a_OptixDenoiserNormalInputBuffer,
+    const float3* a_OptixDenoiserOutputBuffer,
+    float3* a_OptixDenoiserInputTexture,
+    float3* a_OptixDenoiserAlbedoInputTexture,
+    float3* a_OptixDenoiserNormalInputTexture,
+    float3* a_OptixDenoiserOutputTexture)
 {
     const uint32_t bufferSize = a_BufferSize;
     const uint32_t index = blockIdx.x * blockDim.x + threadIdx.x;
@@ -72,19 +81,41 @@ CPU_ON_GPU void SeparateOptixDenoiserBuffer(uint64_t a_BufferSize, const float3*
     for (uint32_t i = index; i < bufferSize - 1; i += stride)
     {
         float3 inputPixel = a_OptixDenoiserInputBuffer[i];
+        float3 albedoPixel = a_OptixDenoiserAlbedoInputBuffer[i];
+        float3 normalPixel = a_OptixDenoiserNormalInputBuffer[i];
         float3 outputPixel = a_OptixDenoiserOutputBuffer[i];;
     	
         a_OptixDenoiserInputTexture[i] = inputPixel;
+        a_OptixDenoiserAlbedoInputTexture[i] = albedoPixel;
+        a_OptixDenoiserNormalInputTexture[i] = normalPixel;
         a_OptixDenoiserOutputTexture[i] = outputPixel;
     }
 }
 
-CPU_ONLY void SeparateOptixDenoiserBufferCPU(uint64_t a_BufferSize, const float3* a_OptixDenoiserInputBuffer, const float3* a_OptixDenoiserOutputBuffer, float3* a_OptixDenoiserInputTexture, float3* a_OptixDenoiserOutputTexture)
+CPU_ONLY void SeparateOptixDenoiserBufferCPU(
+    uint64_t a_BufferSize,
+    const float3* a_OptixDenoiserInputBuffer,
+    const float3* a_OptixDenoiserAlbedoInputBuffer,
+    const float3* a_OptixDenoiserNormalInputBuffer,
+    const float3* a_OptixDenoiserOutputBuffer,
+    float3* a_OptixDenoiserInputTexture,
+    float3* a_OptixDenoiserAlbedoInputTexture,
+    float3* a_OptixDenoiserNormalInputTexture,
+    float3* a_OptixDenoiserOutputTexture)
 {
 
     const int blockSize = 256;
     const int numBlocks = (a_BufferSize + blockSize - 1) / blockSize;
-    SeparateOptixDenoiserBuffer<<<numBlocks, blockSize>>>(a_BufferSize, a_OptixDenoiserInputBuffer, a_OptixDenoiserOutputBuffer, a_OptixDenoiserInputTexture, a_OptixDenoiserOutputTexture);
+    SeparateOptixDenoiserBuffer<<<numBlocks, blockSize>>>(
+        a_BufferSize, 
+        a_OptixDenoiserInputBuffer,
+        a_OptixDenoiserAlbedoInputBuffer,
+        a_OptixDenoiserNormalInputBuffer,
+        a_OptixDenoiserOutputBuffer, 
+        a_OptixDenoiserInputTexture,
+        a_OptixDenoiserAlbedoInputTexture,
+        a_OptixDenoiserNormalInputTexture,
+        a_OptixDenoiserOutputTexture);
 
 	cudaDeviceSynchronize();
 }

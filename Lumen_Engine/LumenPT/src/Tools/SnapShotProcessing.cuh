@@ -25,10 +25,24 @@ CPU_ON_GPU void SeparateMotionVectorBuffer(uint64_t a_BufferSize, WaveFront::Mot
 CPU_ONLY void SeparateMotionVectorBufferCPU(uint64_t a_BufferSize, WaveFront::MotionVectorBuffer* a_MotionVectorBuffer,
     float3* a_MotionVectorDirectionBuffer, float3* a_MotionVectorMagnitudeBuffer);
 
-CPU_ON_GPU void SeparateOptixDenoiserBuffer(uint64_t a_BufferSize,
-    const float3* a_OptixDenoiserInputBuffer, const float3* a_OptixDenoiserOutputBuffer,
-    float3* a_OptixDenoiserInputTexture, float3* a_OptixDenoiserOutputTexture);
+CPU_ON_GPU void SeparateOptixDenoiserBuffer(
+    uint64_t a_BufferSize,
+    const float3* a_OptixDenoiserInputBuffer,
+    const float3* a_OptixDenoiserAlbedoInputBuffer,
+    const float3* a_OptixDenoiserNormalInputBuffer,
+    const float3* a_OptixDenoiserOutputBuffer,
+    float3* a_OptixDenoiserInputTexture,
+    float3* a_OptixDenoiserAlbedoInputTexture,
+    float3* a_OptixDenoiserNormalInputTexture,
+    float3* a_OptixDenoiserOutputTexture);
 
-CPU_ONLY void SeparateOptixDenoiserBufferCPU(uint64_t a_BufferSize,
-    const float3* a_OptixDenoiserInputBuffer, const float3* a_OptixDenoiserOutputBuffer,
-    float3* a_OptixDenoiserInputTexture, float3* a_OptixDenoiserOutputTexture);
+CPU_ONLY void SeparateOptixDenoiserBufferCPU(
+    uint64_t a_BufferSize,
+    const float3* a_OptixDenoiserInputBuffer, 
+    const float3* a_OptixDenoiserAlbedoInputBuffer,
+    const float3* a_OptixDenoiserNormalInputBuffer,
+    const float3* a_OptixDenoiserOutputBuffer,
+    float3* a_OptixDenoiserInputTexture,
+    float3* a_OptixDenoiserAlbedoInputTexture,
+    float3* a_OptixDenoiserNormalInputTexture,
+    float3* a_OptixDenoiserOutputTexture);

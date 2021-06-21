@@ -300,8 +300,11 @@ CPU_ONLY void PrepareOptixDenoising(WaveFront::OptixDenoiserLaunchParameters& a_
 
     PrepareOptixDenoisingGPU << <numBlocks, blockSize >> > (
         a_LaunchParams.m_RenderResolution,
+        a_LaunchParams.m_CurrentSurfaceData,
         a_LaunchParams.m_PixelBufferSingleChannel,
         a_LaunchParams.m_IntermediaryInput,
+        a_LaunchParams.m_AlbedoInput,
+        a_LaunchParams.m_NormalInput,
         a_LaunchParams.m_IntermediaryOutput
         );
 }
