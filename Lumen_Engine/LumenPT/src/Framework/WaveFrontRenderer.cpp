@@ -844,7 +844,7 @@ namespace WaveFront
             //cudaDeviceSynchronize();
             CHECKLASTCUDAERROR;
 
-            //FinishOptixDenoising(optixDenoiserLaunchParams);
+            FinishOptixDenoising(optixDenoiserLaunchParams);
             CHECKLASTCUDAERROR;
 
             WriteToOutput(postProcessLaunchParams);
@@ -945,12 +945,20 @@ namespace WaveFront
         m_Scene->m_Camera->UpdatePreviousFrameMatrix();
         ++frameCount;
 
+        //m_OptixDenoiser->UpdateDebugTextures();
+        //m_DeferredOpenGLCalls.push([&]() {
+        //    //m_DebugTexture = m_OptixDenoiser->m_OptixDenoiserInputTex.m_Memory->GetTexture();
+        //    m_DebugTexture = m_OptixDenoiser->m_OptixDenoiserOutputTex.m_Memory->GetTexture();
+        //    });
+        //WaitForDeferredCalls();
+
 
         // TODO: Weird debug code. Yeet?
-        m_DebugTexture = m_OutputTexture;
+        //m_DebugTexture = m_OutputBuffer->GetTexture();
         //#if defined(_DEBUG)
-        /*m_MotionVectors.GenerateDebugTextures();
-        m_DebugTexture = m_MotionVectors.GetMotionVectorMagnitudeTex();*/
+        //m_MotionVectors.GenerateDebugTextures();
+        ////m_DebugTexture = m_MotionVectors.GetMotionVectorDirectionsTex();
+        //m_DebugTexture = m_MotionVectors.GetMotionVectorMagnitudeTex();
 
         /*m_OptixDenoiser->UpdateDebugTextures();
         m_DebugTexture = m_OptixDenoiser->m_OptixDenoiserInputTex.m_Memory->GetTexture();*/

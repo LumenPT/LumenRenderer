@@ -61,10 +61,7 @@ void OptixDenoiserWrapper::Denoise(const OptixDenoiserDenoiseParams& a_DenoisePa
 
     OptixDenoiserParams optixDenoiserParams = {};
     optixDenoiserParams.denoiseAlpha = false;
-    optixDenoiserParams.blendFactor = 0.0f;
-
-    //MemoryBuffer test1(m_InitParams.m_InputWidth * m_InitParams.m_InputHeight * sizeof(float3));
-    //MemoryBuffer test2(m_InitParams.m_InputWidth * m_InitParams.m_InputHeight * sizeof(float3));
+    optixDenoiserParams.blendFactor = 1.0f;
 
     OptixDenoiserGuideLayer guideLayer = {};
 
@@ -83,7 +80,7 @@ void OptixDenoiserWrapper::Denoise(const OptixDenoiserDenoiseParams& a_DenoisePa
     outputTex.width = m_InitParams.m_InputWidth;
     outputTex.height = m_InitParams.m_InputHeight;
     outputTex.pixelStrideInBytes = sizeof(float3);
-    colorTex.rowStrideInBytes = colorTex.pixelStrideInBytes * colorTex.width;
+    outputTex.rowStrideInBytes = outputTex.pixelStrideInBytes * outputTex.width;
     outputTex.format = OPTIX_PIXEL_FORMAT_FLOAT3;
 
     CHECKLASTCUDAERROR;

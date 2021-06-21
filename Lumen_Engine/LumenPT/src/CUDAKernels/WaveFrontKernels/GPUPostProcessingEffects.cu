@@ -38,6 +38,8 @@ CPU_ON_GPU void PrepareOptixDenoisingGPU(
 
         a_IntermediaryInput[pixelDataIndex] = make_float3(colorFloat);
 
+        a_IntermediaryOutput[pixelDataIndex] = make_float3(0.5f, 0.5f, 0.5f);
+
         /*float4 color{ 0.f };
 
         surf2Dread<float4>(
