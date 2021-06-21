@@ -46,8 +46,10 @@ void OptixDenoiserWrapper::Initialize(const OptixDenoiserInitParams& a_InitParam
         m_scratch.GetSize()
     ));
 
-    TestInput.Resize(m_InitParams.m_InputWidth * m_InitParams.m_InputHeight * sizeof(float3));
-    TestOutput.Resize(m_InitParams.m_InputWidth * m_InitParams.m_InputHeight * sizeof(float3));
+    ColorInput.Resize(m_InitParams.m_InputWidth * m_InitParams.m_InputHeight * sizeof(float3));
+    AlbedoInput.Resize(m_InitParams.m_InputWidth * m_InitParams.m_InputHeight * sizeof(float3));
+    NormalInput.Resize(m_InitParams.m_InputWidth * m_InitParams.m_InputHeight * sizeof(float3));
+    ColorOutput.Resize(m_InitParams.m_InputWidth * m_InitParams.m_InputHeight * sizeof(float3));
 
     m_OptixDenoiserInputTex.m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_InitParams.m_InputWidth,
         m_InitParams.m_InputHeight, 3 * sizeof(float));;
@@ -61,7 +63,7 @@ void OptixDenoiserWrapper::Denoise(const OptixDenoiserDenoiseParams& a_DenoisePa
 
     OptixDenoiserParams optixDenoiserParams = {};
     optixDenoiserParams.denoiseAlpha = false;
-    optixDenoiserParams.blendFactor = 1.0f;
+    optixDenoiserParams.blendFactor = 0.0f;
 
     OptixDenoiserGuideLayer guideLayer = {};
 
@@ -107,8 +109,8 @@ void OptixDenoiserWrapper::UpdateDebugTextures()
 {
     SeparateOptixDenoiserBufferCPU(
         m_InitParams.m_InputWidth * m_InitParams.m_InputHeight,
-        TestInput.GetDevicePtr<float3>(),
-        TestOutput.GetDevicePtr<float3>(),
+        ColorInput.GetDevicePtr<float3>(),
+        ColorOutput.GetDevicePtr<float3>(),
         m_OptixDenoiserInputTex.m_Memory->GetDevicePtr<float3>(),
         m_OptixDenoiserOutputTex.m_Memory->GetDevicePtr<float3>()
     );

@@ -593,8 +593,8 @@ namespace WaveFront
         // TODO: render resolution used in snapshot->AddBuffer
         m_FrameSnapshot->AddBuffer([&]()
             {
-                auto optixDenoiserInput = &(m_OptixDenoiser->TestInput);
-                auto optixDenoiszerOutput = &(m_OptixDenoiser->TestOutput);
+                auto optixDenoiserInput = &(m_OptixDenoiser->ColorInput);
+                auto optixDenoiszerOutput = &(m_OptixDenoiser->ColorOutput);
 
                 std::map<std::string, FrameSnapshot::ImageBuffer> resBuffers;
                 m_DeferredOpenGLCalls.push([&]() {
@@ -826,8 +826,8 @@ namespace WaveFront
                 m_Settings.renderResolution,
                 m_DepthBuffer->GetSurfaceObject(),
                 //m_PixelBufferCombined->GetSurfaceObject(),
-                m_OptixDenoiser->TestInput.GetDevicePtr<float3>(),
-                m_OptixDenoiser->TestOutput.GetDevicePtr<float3>()
+                m_OptixDenoiser->ColorInput.GetDevicePtr<float3>(),
+                m_OptixDenoiser->ColorOutput.GetDevicePtr<float3>()
             );
 
 
@@ -836,15 +836,13 @@ namespace WaveFront
 
             OptixDenoiserDenoiseParams optixDenoiserParams = {};
             optixDenoiserParams.m_PostProcessLaunchParams = &postProcessLaunchParams;
-            /*optixDenoiserParams.m_ColorInput = m_IntermediateOutputBuffer.GetCUDAPtr();
-            optixDenoiserParams.m_Output = m_IntermediateOutputBuffer.GetCUDAPtr();*/
-            optixDenoiserParams.m_ColorInput = m_OptixDenoiser->TestInput.GetCUDAPtr();
-            optixDenoiserParams.m_Output = m_OptixDenoiser->TestOutput.GetCUDAPtr();
+            optixDenoiserParams.m_ColorInput = m_OptixDenoiser->ColorInput.GetCUDAPtr();
+            optixDenoiserParams.m_Output = m_OptixDenoiser->ColorOutput.GetCUDAPtr();
             m_OptixDenoiser->Denoise(optixDenoiserParams);
             //cudaDeviceSynchronize();
             CHECKLASTCUDAERROR;
 
-            FinishOptixDenoising(optixDenoiserLaunchParams);
+            //FinishOptixDenoising(optixDenoiserLaunchParams);
             CHECKLASTCUDAERROR;
 
             WriteToOutput(postProcessLaunchParams);

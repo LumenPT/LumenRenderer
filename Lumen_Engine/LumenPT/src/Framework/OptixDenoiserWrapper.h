@@ -40,8 +40,10 @@ public:
 
 	void UpdateDebugTextures();
 
-	MemoryBuffer TestInput;
-	MemoryBuffer TestOutput;
+	MemoryBuffer ColorInput;
+	MemoryBuffer AlbedoInput;
+	MemoryBuffer NormalInput;
+	MemoryBuffer ColorOutput;
 
 	FrameSnapshot::ImageBuffer m_OptixDenoiserInputTex;
 	FrameSnapshot::ImageBuffer m_OptixDenoiserOutputTex;
