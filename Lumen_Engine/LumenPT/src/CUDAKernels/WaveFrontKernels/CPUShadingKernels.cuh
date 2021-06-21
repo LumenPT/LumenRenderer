@@ -32,7 +32,8 @@ CPU_ONLY void ExtractSurfaceData(
     WaveFront::SurfaceData* a_OutPut,
     cudaSurfaceObject_t a_DepthOutPut,
     uint2 a_Resolution,
-    SceneDataTableAccessor* a_SceneDataTable);
+    SceneDataTableAccessor* a_SceneDataTable,
+    unsigned int a_CurrentDepth);
 
 /*
  * Called each wave after resolving a RayBatch.

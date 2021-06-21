@@ -151,7 +151,7 @@ namespace WaveFront
         m_D3D11PixelBufferCombined = m_DX11Wrapper->CreateTexture2D({ m_Settings.renderResolution.x, m_Settings.renderResolution.y, 1 });
 
         //Find a way to initialize this with a large value
-        m_D3D11DepthBuffer = m_DX11Wrapper->CreateTexture2D({m_Settings.renderResolution.x, m_Settings.renderResolution.y, 1});
+        m_D3D11DepthBuffer = m_DX11Wrapper->CreateTexture2D({m_Settings.renderResolution.x, m_Settings.renderResolution.y, 1}, DXGI_FORMAT_R32_FLOAT);
 
         cudaTextureDesc pixelBufferDesc {};
         memset(&pixelBufferDesc, 0, sizeof(pixelBufferDesc));
@@ -184,7 +184,13 @@ namespace WaveFront
         m_PixelBufferCombined->Clear();
         m_PixelBufferCombined->Unmap();
 
-        m_DepthBuffer = std::make_unique<InteropGPUTexture>(m_D3D11DepthBuffer, pixelBufferDesc);
+        cudaTextureDesc depthBufferDesc{};
+        depthBufferDesc.addressMode[0] = cudaAddressModeClamp;
+        depthBufferDesc.addressMode[0] = cudaAddressModeClamp;
+        depthBufferDesc.filterMode = cudaFilterModeLinear;
+        depthBufferDesc.readMode = cudaReadModeElementType;
+
+        m_DepthBuffer = std::make_unique<InteropGPUTexture>(m_D3D11DepthBuffer, depthBufferDesc);
 
         m_DepthBuffer->Map();
         m_DepthBuffer->Clear();
@@ -674,9 +680,10 @@ namespace WaveFront
                     m_IntersectionData.GetDevicePtr<AtomicBuffer<IntersectionData>>(),
                     m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>(),
                     m_SurfaceData[surfaceDataBufferIndex].GetDevicePtr<SurfaceData>(),
-                    m_DepthBuffer->GetSurfaceObject(),
+                    m_PixelBufferCombined->GetSurfaceObject(),
                     m_Settings.renderResolution,
-                    sceneDataTableAccessor);
+                    sceneDataTableAccessor,
+                    depth);
 
 
                 //extract depth data
@@ -809,8 +816,8 @@ namespace WaveFront
                 m_Settings.renderResolution,
                 m_Settings.outputResolution,
                 pixelBuffers,
-                m_DepthBuffer->GetSurfaceObject(),
-                //m_PixelBufferCombined->GetSurfaceObject(),
+                //m_DepthBuffer->GetSurfaceObject(),
+                m_PixelBufferCombined->GetSurfaceObject(),
                 m_IntermediateOutputBuffer.GetDevicePtr<uchar4>(),
                 m_Settings.blendOutput,
                 m_BlendCounter
@@ -818,14 +825,14 @@ namespace WaveFront
             //Post processing using CUDA kernel.
             //PostProcess(postProcessLaunchParams);
 
-            MergeOutput(postProcessLaunchParams);
+            //MergeOutput(postProcessLaunchParams);
             cudaDeviceSynchronize();
             CHECKLASTCUDAERROR;
 
             OptixDenoiserLaunchParameters optixDenoiserLaunchParams(
                 m_Settings.renderResolution,
-                m_DepthBuffer->GetSurfaceObject(),
-                //m_PixelBufferCombined->GetSurfaceObject(),
+                //m_DepthBuffer->GetSurfaceObject(),
+                m_PixelBufferCombined->GetSurfaceObject(),
                 m_OptixDenoiser->TestInput.GetDevicePtr<float3>(),
                 m_OptixDenoiser->TestOutput.GetDevicePtr<float3>()
             );
