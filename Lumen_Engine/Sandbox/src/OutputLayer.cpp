@@ -155,6 +155,8 @@ void OutputLayer::OnUpdate()
 
 			glBindTexture(GL_TEXTURE_2D, texture);
 			glUseProgram(m_Program);
+			GLint loc = glGetUniformLocation(m_Program, "a_Gamma");
+			glUniform1f(loc, m_Gamma);
 			glDrawArrays(GL_TRIANGLES, 0, 3);
 
 			glBindTexture(GL_TEXTURE_2D, 0);
@@ -606,6 +608,8 @@ void OutputLayer::ImGuiCameraSettings()
 	ImGui::DragFloat("Camera Sensitivity", &m_CameraMouseSensitivity, 0.01f, 0.0f, 1.0f, "%.2f");
 
 	ImGui::DragFloat("Camera Movement Speed", &m_CameraMovementSpeed, 0.1f, 0.0f);
+
+	ImGui::SliderFloat("Gamma strength/Brightness", &m_Gamma, 1.0f, 4.0f);
 
 	ImGui::End();
 }

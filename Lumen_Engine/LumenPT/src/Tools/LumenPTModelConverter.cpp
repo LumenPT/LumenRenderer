@@ -34,19 +34,26 @@ Lumen::SceneManager::GLTFResource LumenPTModelConverter::ConvertGLTF(std::string
 	fx::gltf::Document fxDoc;
 
 	fx::gltf::ReadQuotas readQuotas{};
-	readQuotas.MaxBufferCount = 8;
-	readQuotas.MaxBufferByteLength = 128000000;	//128MB max.
-	readQuotas.MaxFileSize = 128000000;
+	readQuotas.MaxBufferCount = 99;
+	readQuotas.MaxBufferByteLength = 999999000000;
+	readQuotas.MaxFileSize = 999999000000;
+
+	printf("[File Conversion] Starting to convert %s to Ollad.\n", a_SourcePath.c_str());
 
 	if (sp.extension() == ".gltf")
 		fxDoc = LoadFromText(p, readQuotas);
 	else if (sp.extension() == ".glb")
 		fxDoc = LoadFromBinary(p, readQuotas);
 	
-
+	printf("[File Conversion] Done loading file from GLTF.\n");
 
 	auto content = GenerateContent(fxDoc, p);
+
+	printf("[File Conversion] Done generating content.\n");
+	
 	auto header = GenerateHeader(content);
+
+	printf("[File Conversion] Done generating header.\n");
 
 	volatile auto dbgfc = &content;
 
@@ -54,6 +61,8 @@ Lumen::SceneManager::GLTFResource LumenPTModelConverter::ConvertGLTF(std::string
 	std::string destPath = p.append(ms_ExtensionName);
 
 	OutputToFile(header, content.m_Blob, destPath);
+
+	printf("[File Conversion] Done outputting to file.\n");
 
 	content.m_Textures.clear();
 
@@ -115,7 +124,7 @@ Lumen::SceneManager::GLTFResource LumenPTModelConverter::LoadFile(std::string a_
 				for (int index = 0; index < x * y; ++index)
 				{
 					uchar4* data = reinterpret_cast<uchar4*>(&texData[index * 4]);
-					data->y = std::max(data->y, static_cast<unsigned char>(1));
+					data->y = std::max(data->y, static_cast<unsigned char>(1));	//Minimal value for roughness is 1/255 (as a char).
 				}
             }
 
@@ -285,7 +294,7 @@ void LumenPTModelConverter::SetRendererRef(LumenRenderer& a_Renderer)
 
 	m_RendererRef = &a_Renderer;
 	uchar4 whitePixel = { 255,255,255,255 };
-	uchar4 diffusePixel{ 0, 255, 255, 0 };
+	uchar4 diffusePixel{ 255, 255, 255, 255 };
 	uchar4 normal = { 128, 128, 255, 0 };
 	m_DefaultWhiteTexture = m_RendererRef->CreateTexture(&whitePixel, 1, 1, true);
 	m_DefaultMetalRoughnessTexture = m_RendererRef->CreateTexture(&diffusePixel, 1, 1, false);
@@ -296,12 +305,14 @@ void LumenPTModelConverter::SetRendererRef(LumenRenderer& a_Renderer)
 LumenPTModelConverter::FileContent LumenPTModelConverter::GenerateContent(const fx::gltf::Document& a_FxDoc, const std::string& a_SourcePath)
 {
 	FileContent fc;
-
+	
     for (uint32_t i = 0; i < a_FxDoc.images.size(); i++)
     {
 		fc.m_Textures.push_back(TextureToBlob(a_FxDoc, i, fc.m_Blob, a_SourcePath));
+		printf("[File Conversion] Extracted image %i of %i.\n", i , static_cast<int>(a_FxDoc.images.size()) - 1);
     }
 
+	int index = 0;
     for (auto& material : a_FxDoc.materials)
     {
 		auto& m = fc.m_Materials.emplace_back();
@@ -317,23 +328,44 @@ LumenPTModelConverter::FileContent LumenPTModelConverter::GenerateContent(const 
 
 		m.m_DiffuseTextureId = material.pbrMetallicRoughness.baseColorTexture.index;
         if (m.m_DiffuseTextureId != -1)
+        {
+			m.m_DiffuseTextureId = a_FxDoc.textures[m.m_DiffuseTextureId].source;
 		    fc.m_Textures[m.m_DiffuseTextureId].m_TextureType = TextureType::EDiffuse;
+        }
+    	
+		assert(m.m_DiffuseTextureId < static_cast<int>(a_FxDoc.textures.size()));
 
 		m.m_NormalMapId = material.normalTexture.index;
 		if (m.m_NormalMapId != -1)
+		{
+			m.m_NormalMapId = a_FxDoc.textures[m.m_NormalMapId].source;
 			fc.m_Textures[m.m_NormalMapId].m_TextureType = TextureType::ENormal;
-		m.m_MetallicRoughnessTextureId = material.pbrMetallicRoughness.metallicRoughnessTexture.index;
+		}
 
+		assert(m.m_NormalMapId < static_cast<int>(a_FxDoc.textures.size()));
+
+		m.m_MetallicRoughnessTextureId = material.pbrMetallicRoughness.metallicRoughnessTexture.index;
 		if (m.m_MetallicRoughnessTextureId != -1)
+		{
+			m.m_MetallicRoughnessTextureId = a_FxDoc.textures[m.m_MetallicRoughnessTextureId].source;
 			fc.m_Textures[m.m_MetallicRoughnessTextureId].m_TextureType = TextureType::EMetalRoughness;
+		}
+
+		assert(m.m_MetallicRoughnessTextureId < static_cast<int>(a_FxDoc.textures.size()));
 
 		m.m_EmissiveTextureId = material.emissiveTexture.index;
 		if (m.m_EmissiveTextureId != -1)
+		{
+			m.m_EmissiveTextureId = a_FxDoc.textures[m.m_EmissiveTextureId].source;
 			fc.m_Textures[m.m_EmissiveTextureId].m_TextureType = TextureType::EEmissive;
+		}
+
+
+		assert(m.m_EmissiveTextureId < static_cast<int>(a_FxDoc.textures.size()));
 
 		//Extract the metal roughness scaling factors.
 		m.m_MetallicFactor = material.pbrMetallicRoughness.metallicFactor;
-		m.m_RoughnessFactor = material.pbrMetallicRoughness.roughnessFactor;
+		m.m_RoughnessFactor = std::fmaxf(0.01f, material.pbrMetallicRoughness.roughnessFactor);	//Can't be 0. 1/255 is smallest, so 0.01 falls within that.
 
 		//Add the Disney stuff
 
@@ -353,6 +385,7 @@ LumenPTModelConverter::FileContent LumenPTModelConverter::GenerateContent(const 
 			const float transmissionFactor = JsonGetOrDefault<float>(json, "transmissionFactor", 0.f);
 			const uint32_t transmissionTextureId = JsonGetOrDefault<uint32_t>(json, "transmissionTexture", -1);
 			m.m_TransmissionTextureId = transmissionTextureId;
+			m.m_TransmissionTextureId = a_FxDoc.textures[m.m_TransmissionTextureId].source;
 			m.m_TransmissionFactor = transmissionFactor;
 			fc.m_Textures[m.m_EmissiveTextureId].m_TextureType = TextureType::ETransmissive;
 		}
@@ -401,9 +434,11 @@ LumenPTModelConverter::FileContent LumenPTModelConverter::GenerateContent(const 
 			auto json = material.extensionsAndExtras[clearCoatExtension];
 
 			m.m_ClearCoatRoughnessTextureId = JsonGetOrDefault<uint32_t>(json, "clearcoatRoughnessTexture", -1);
+			m.m_ClearCoatRoughnessTextureId = a_FxDoc.textures[m.m_ClearCoatRoughnessTextureId].source;
 			m.m_ClearCoatRoughnessFactor = JsonGetOrDefault<float>(json, "clearcoatRoughnessFactor", 0.f);
 			m.m_ClearCoatFactor = JsonGetOrDefault<float>(json, "clearcoatFactor", 0.f);
 			m.m_ClearCoatTextureId = JsonGetOrDefault<uint32_t>(json, "clearcoatTexture", -1);
+			m.m_ClearCoatTextureId = a_FxDoc.textures[m.m_ClearCoatTextureId].source;
 			fc.m_Textures[m.m_ClearCoatTextureId].m_TextureType = TextureType::EClearCoat;
 			fc.m_Textures[m.m_ClearCoatRoughnessTextureId].m_TextureType = TextureType::EClearCoatRoughness;
 		}
@@ -435,8 +470,13 @@ LumenPTModelConverter::FileContent LumenPTModelConverter::GenerateContent(const 
 			m.m_TintTextureId = -1;
 			m.m_SpecularTintFactor = 0.f;
 		}
+
+		printf("[File Conversion] Done generating material %i of %i.\n", index, static_cast<int>(a_FxDoc.materials.size()) - 1);
+		++index;
 	}
 
+	index = 0;
+	
     for (auto& mesh : a_FxDoc.meshes)
     {
 		auto& m = fc.m_Meshes.emplace_back();
@@ -445,12 +485,16 @@ LumenPTModelConverter::FileContent LumenPTModelConverter::GenerateContent(const 
 			m.m_Primitives.push_back(PrimitiveToBlob(a_FxDoc, primitive, fc.m_Blob));
         }
 		m.m_Header.m_NumPrimitives = m.m_Primitives.size();
+		printf("[File Conversion] Done generating mesh %i of %i.\n", index, static_cast<int>(a_FxDoc.meshes.size()) - 1);
+		++index;
     }
 
+	index = 0;
     for (auto& fxScene : a_FxDoc.scenes)
     {
 		fc.m_Scenes.push_back(MakeScene(a_FxDoc, fxScene));
-		
+		printf("[File Conversion] Done extracting scene %i of %i.\n", index, static_cast<int>(a_FxDoc.scenes.size()) - 1);
+		++index;
     }
 
 	fc.m_Blob.Trim();
@@ -820,9 +864,16 @@ LumenPTModelConverter::HeaderScene LumenPTModelConverter::MakeScene(const fx::gl
 {
 	HeaderScene hscene;
 
+	
+	int index = 0;
     for (auto rootNode : a_Scene.nodes)
     {
+		printf("[File Conversion] Now loading root node %i of %i.\n", index, static_cast<int>(a_Scene.nodes.size()) - 1);
+    	
 		LoadNode(a_FxDoc, rootNode, hscene);
+
+		printf("[File Conversion] Done loading root node %i of %i.\n", index, static_cast<int>(a_Scene.nodes.size()) - 1);
+		++index;
     }
 
 	hscene.m_Name = a_Scene.name;
@@ -852,9 +903,13 @@ void LumenPTModelConverter::LoadNode(const fx::gltf::Document& a_FxDoc, uint32_t
 		m.m_Header.m_NameLength = node.name.size();
     }
 
+	int index = 0;
+
     for (auto& ch : node.children)
     {
+		printf("[File Conversion] Now loading child node %i of %i.\n", index, static_cast<int>(node.children.size()) - 1);
 		LoadNode(a_FxDoc, ch, a_Scene, worldTransform);
+		++index;
     }
 }
 
