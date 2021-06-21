@@ -838,21 +838,21 @@ namespace WaveFront
             );
 
 
-            //PrepareOptixDenoising(optixDenoiserLaunchParams);
-            //CHECKLASTCUDAERROR;
+            PrepareOptixDenoising(optixDenoiserLaunchParams);
+            CHECKLASTCUDAERROR;
 
-            //OptixDenoiserDenoiseParams optixDenoiserParams = {};
-            //optixDenoiserParams.m_PostProcessLaunchParams = &postProcessLaunchParams;
-            ///*optixDenoiserParams.m_ColorInput = m_IntermediateOutputBuffer.GetCUDAPtr();
-            //optixDenoiserParams.m_Output = m_IntermediateOutputBuffer.GetCUDAPtr();*/
-            //optixDenoiserParams.m_ColorInput = m_OptixDenoiser->TestInput.GetCUDAPtr();
-            //optixDenoiserParams.m_Output = m_OptixDenoiser->TestOutput.GetCUDAPtr();
-            //m_OptixDenoiser->Denoise(optixDenoiserParams);
-            ////cudaDeviceSynchronize();
-            //CHECKLASTCUDAERROR;
+            OptixDenoiserDenoiseParams optixDenoiserParams = {};
+            optixDenoiserParams.m_PostProcessLaunchParams = &postProcessLaunchParams;
+            /*optixDenoiserParams.m_ColorInput = m_IntermediateOutputBuffer.GetCUDAPtr();
+            optixDenoiserParams.m_Output = m_IntermediateOutputBuffer.GetCUDAPtr();*/
+            optixDenoiserParams.m_ColorInput = m_OptixDenoiser->TestInput.GetCUDAPtr();
+            optixDenoiserParams.m_Output = m_OptixDenoiser->TestOutput.GetCUDAPtr();
+            m_OptixDenoiser->Denoise(optixDenoiserParams);
+            //cudaDeviceSynchronize();
+            CHECKLASTCUDAERROR;
 
-            //FinishOptixDenoising(optixDenoiserLaunchParams);
-            //CHECKLASTCUDAERROR;
+            FinishOptixDenoising(optixDenoiserLaunchParams);
+            CHECKLASTCUDAERROR;
 
             WriteToOutput(postProcessLaunchParams);
             cudaDeviceSynchronize();
@@ -952,12 +952,20 @@ namespace WaveFront
         m_Scene->m_Camera->UpdatePreviousFrameMatrix();
         ++frameCount;
 
+        //m_OptixDenoiser->UpdateDebugTextures();
+        //m_DeferredOpenGLCalls.push([&]() {
+        //    //m_DebugTexture = m_OptixDenoiser->m_OptixDenoiserInputTex.m_Memory->GetTexture();
+        //    m_DebugTexture = m_OptixDenoiser->m_OptixDenoiserOutputTex.m_Memory->GetTexture();
+        //    });
+        //WaitForDeferredCalls();
+
 
         // TODO: Weird debug code. Yeet?
-        m_DebugTexture = m_OutputTexture;
+        //m_DebugTexture = m_OutputBuffer->GetTexture();
         //#if defined(_DEBUG)
-        /*m_MotionVectors.GenerateDebugTextures();
-        m_DebugTexture = m_MotionVectors.GetMotionVectorMagnitudeTex();*/
+        //m_MotionVectors.GenerateDebugTextures();
+        ////m_DebugTexture = m_MotionVectors.GetMotionVectorDirectionsTex();
+        //m_DebugTexture = m_MotionVectors.GetMotionVectorMagnitudeTex();
 
         /*m_OptixDenoiser->UpdateDebugTextures();
         m_DebugTexture = m_OptixDenoiser->m_OptixDenoiserInputTex.m_Memory->GetTexture();*/
