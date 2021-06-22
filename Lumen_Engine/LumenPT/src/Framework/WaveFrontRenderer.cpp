@@ -388,6 +388,8 @@ namespace WaveFront
         ResetAtomicBuffer<WaveFront::TriangleLight>(&m_TriangleLights);
         auto lightBuffer = m_TriangleLights.GetDevicePtr<AtomicBuffer<WaveFront::TriangleLight>>();
 
+        Timer lightExtractionTimer;
+
         for (auto& meshInstance : m_Scene->m_MeshInstances)
         {
             //Only run when emission is not disabled, and override is active OR the GLTF has specified valid emissive triangles and mode is set to ENABLED.
@@ -401,20 +403,20 @@ namespace WaveFront
 
                 for (auto& prim : meshInstance->GetMesh()->m_Primitives)
                 {
-                    auto ptPrim = static_cast<PTPrimitive*>(prim.get());
+                        auto ptPrim = static_cast<PTPrimitive*>(prim.get());
 
-                    //Find the primitive instance in the data table.
-                    auto& entryMap = asPTInstance->GetInstanceEntryMap();
-                    auto entry = &entryMap.at(prim.get());
-
-                    AddToLightBufferWrap(
-                        ptPrim->m_VertBuffer->GetDevicePtr<Vertex>(),
-                        ptPrim->m_IndexBuffer->GetDevicePtr<uint32_t>(),
-                        ptPrim->m_BoolBuffer->GetDevicePtr<bool>(),
-                        ptPrim->m_IndexBuffer->GetSize() / sizeof(uint32_t),
-                        lightBuffer,
-                        sceneDataTableAccessor,
-                        entry->m_TableIndex);
+                        //Find the primitive instance in the data table.
+                        auto& entryMap = asPTInstance->GetInstanceEntryMap();
+                        auto entry = &entryMap.at(prim.get());
+                    	
+                        AddToLightBufferWrap(
+                            ptPrim->m_VertBuffer->GetDevicePtr<Vertex>(),
+                            ptPrim->m_IndexBuffer->GetDevicePtr<uint32_t>(),
+                            ptPrim->m_BoolBuffer->GetDevicePtr<bool>(),
+                            ptPrim->m_IndexBuffer->GetSize() / sizeof(uint32_t),
+                            lightBuffer,
+                            sceneDataTableAccessor,
+                            entry->m_TableIndex);
                 }
                 
             }
@@ -424,6 +426,8 @@ namespace WaveFront
             }
         }
 
+        printf("Time to extract all emissives in scene: %f millis.\n", lightExtractionTimer.measure(TimeUnit::MILLIS));
+    	
         //Don't render if there is no light in the scene as everything will be black anyway.
         const unsigned int numLightsInScene = GetAtomicCounter<WaveFront::TriangleLight>(&m_TriangleLights);
         if (numLightsInScene == 0)
@@ -613,6 +617,7 @@ namespace WaveFront
         //Set the counters back to 0 for intersections and shadow rays.
         const unsigned counterDefault = 0;
         SetAtomicCounter<ShadowRayData>(&m_ShadowRays, counterDefault);
+		SetAtomicCounter<ShadowRayData>(&m_VolumetricShadowRays, counterDefault);
         SetAtomicCounter<IntersectionData>(&m_IntersectionData, counterDefault);
 		SetAtomicCounter<VolumetricIntersectionData>(&m_VolumetricIntersectionData, counterDefault);
         CHECKLASTCUDAERROR;
@@ -798,6 +803,22 @@ namespace WaveFront
             CHECKLASTCUDAERROR;
         }
 
+		//The amount of shadow rays to trace.
+		unsigned numVolumetricShadowRays = GetAtomicCounter<ShadowRayData>(&m_VolumetricShadowRays);
+
+		if (numVolumetricShadowRays > 0)
+		{
+			//The settings for shadow ray resolving.
+			OptixLaunchParameters shadowRayLaunchParameters;
+			shadowRayLaunchParameters = rayLaunchParameters;
+			shadowRayLaunchParameters.m_ResultBuffer = m_PixelBufferSeparate->GetSurfaceObject();
+			shadowRayLaunchParameters.m_ShadowRayBatch = m_VolumetricShadowRays.GetDevicePtr<AtomicBuffer<ShadowRayData>>();
+			shadowRayLaunchParameters.m_TraceType = RayType::SHADOW_RAY;
+
+			m_OptixSystem->TraceRays(numVolumetricShadowRays, shadowRayLaunchParameters);
+			cudaDeviceSynchronize();
+			CHECKLASTCUDAERROR;
+		}
         //Post-processing
         {
             // TODO: render and output resolution used in post processing
@@ -1055,7 +1076,7 @@ namespace WaveFront
 
             cudaDeviceSynchronize();
             CHECKLASTCUDAERROR;
-
+        	
             FindEmissivesWrap(
                 vertexBuffer->GetDevicePtr<Vertex>(),
                 indexBuffer->GetDevicePtr<uint32_t>(),
@@ -1070,8 +1091,6 @@ namespace WaveFront
             cudaDeviceSynchronize();
             CHECKLASTCUDAERROR;
         }
-
-
         
 
 
@@ -1330,7 +1349,7 @@ namespace WaveFront
         //Create atomic buffers. This automatically sets the counter to 0 and size to max.
         CreateAtomicBuffer<IntersectionRayData>(&m_Rays, numPrimaryRays);
         CreateAtomicBuffer<ShadowRayData>(&m_ShadowRays, numShadowRays);
-		CreateAtomicBuffer<ShadowRayData>(&m_VolumetricShadowRays, numShadowRays);
+		CreateAtomicBuffer<ShadowRayData>(&m_VolumetricShadowRays, numShadowRays * 5);	//TODO: replace hardcoded number of samples (5)
 		CreateAtomicBuffer<IntersectionData>(&m_IntersectionData, numPixels);
 		CreateAtomicBuffer<VolumetricIntersectionData>(&m_VolumetricIntersectionData, numPixels);
 

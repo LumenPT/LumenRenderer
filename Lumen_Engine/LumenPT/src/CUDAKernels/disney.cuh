@@ -317,9 +317,13 @@ __forceinline__ __device__ float3 SampleBSDF( const MaterialData& shadingData, f
  *
  * @return The float3 BSDF in terms of light transport density.
  */
-__forceinline__ __device__ float3 EvaluateBSDF( const MaterialData& shadingData, const float3& iN, const float3& iT, const float3& wow, const float3& wiw, float& pdf )
+__forceinline__ __device__ float3 EvaluateBSDF( const MaterialData& shadingData, const float3& iN, const float3& iT, const float3& wow, const float3& wiw, float& pdf)
 {
-	if (shadingData.GetTransmission() > 0.5f)
+	float3 specTransBSDF = { 0.f };
+	float specTransPDF = 0.f;
+	const float transmission = shadingData.GetTransmission();
+	
+	if (transmission > 0.f)
 	{
 		const float3 B = normalize( cross( iN, iT ) );
 		const float3 T = normalize( cross( iN, B ) );
@@ -329,33 +333,33 @@ __forceinline__ __device__ float3 EvaluateBSDF( const MaterialData& shadingData,
 		if (eta == 1) { pdf = 0; return make_float3( 0 ); }
 		float alpha_x, alpha_y, jacobian;
 		microfacet_alpha_from_roughness( shadingData.GetRoughness(), shadingData.GetAnisotropic(), alpha_x, alpha_y );
-		float3 retVal, m;
+		float3 m;
 		if (wil.z * wol.z >= 0) // reflection
 		{
 			m = half_reflection_vector( wol, wil );
 			const float cos_wom = dot( wol, m );
 			const float F = fresnel_reflectance( cos_wom, 1 / eta );
-			evaluate_reflection( make_float3(shadingData.m_Color), wol, wil, m, alpha_x, alpha_y, F, retVal );
+			evaluate_reflection( make_float3(shadingData.m_Color), wol, wil, m, alpha_x, alpha_y, F, specTransBSDF);
 			const float r_probability = choose_reflection_probability( 1, 1, F );
-			pdf = r_probability, jacobian = reflection_jacobian( wol, m, cos_wom, alpha_x, alpha_y );
+			specTransPDF = r_probability, jacobian = reflection_jacobian( wol, m, cos_wom, alpha_x, alpha_y );
 		}
 		else // refraction
 		{
 			m = half_refraction_vector( wol, wil, eta );
 			const float cos_wom = dot( wol, m );
 			const float F = fresnel_reflectance( cos_wom, 1 / eta );
-			evaluate_refraction( eta, make_float3(shadingData.m_Color), false /* adjoint */, wol, wil, m, alpha_x, alpha_y, 1 - F, retVal );
+			evaluate_refraction( eta, make_float3(shadingData.m_Color), false /* adjoint */, wol, wil, m, alpha_x, alpha_y, 1 - F, specTransBSDF);
 			const float r_probability = choose_reflection_probability( 1, 1, F );
-			pdf = 1 - r_probability, jacobian = refraction_jacobian( wol, wil, m, alpha_x, alpha_y, eta );
+			specTransPDF = 1 - r_probability, jacobian = refraction_jacobian( wol, wil, m, alpha_x, alpha_y, eta );
 		}
-		pdf *= jacobian * GGXMDF_pdf( wol, m, alpha_x, alpha_y );
-		return retVal;
+		specTransPDF *= jacobian * GGXMDF_pdf( wol, m, alpha_x, alpha_y );
+		//return retVal; Edited out by Jan because I will mix all things together.
 	}
 	if (shadingData.GetRoughness() <= 0.001f)
 	{
 		// no transport via explicit connections for specular vertices
-		pdf = 0;
-		return make_float3( 0 );
+		pdf = specTransPDF;
+		return specTransBSDF;
 	}
 	// calculate tangent matrix
 	const float3 B = normalize( cross( iN, iT ) );
@@ -393,5 +397,9 @@ __forceinline__ __device__ float3 EvaluateBSDF( const MaterialData& shadingData,
 			if (clearcoat_pdf > 0) pdf += COATWEIGHT * clearcoat_pdf, value += contrib;
 		}
 	}
-	return value;
+
+	//Edit by Jan: Mix between transmission and other lobes.
+	pdf = (pdf * (1.f - transmission));
+	pdf += (specTransPDF * transmission);
+	return (specTransBSDF * transmission) + (value * (1.f - transmission));
 }
