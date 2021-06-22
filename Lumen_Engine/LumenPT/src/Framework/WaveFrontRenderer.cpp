@@ -680,7 +680,7 @@ namespace WaveFront
                     m_IntersectionData.GetDevicePtr<AtomicBuffer<IntersectionData>>(),
                     m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>(),
                     m_SurfaceData[surfaceDataBufferIndex].GetDevicePtr<SurfaceData>(),
-                    m_PixelBufferCombined->GetSurfaceObject(),
+                    m_DepthBuffer->GetSurfaceObject(),
                     m_Settings.renderResolution,
                     sceneDataTableAccessor,
                     depth);
@@ -825,7 +825,7 @@ namespace WaveFront
             //Post processing using CUDA kernel.
             //PostProcess(postProcessLaunchParams);
 
-            //MergeOutput(postProcessLaunchParams);
+            MergeOutput(postProcessLaunchParams);
             cudaDeviceSynchronize();
             CHECKLASTCUDAERROR;
 

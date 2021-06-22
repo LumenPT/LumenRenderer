@@ -75,7 +75,7 @@ CPU_ONLY void ExtractSurfaceData(
     cudaDeviceSynchronize();
     if (a_CurrentDepth == 0)
     {
-        ExtractDepthDataGpu <<<numBlocks, blockSize>>>(a_OutPut, a_DepthOutPut);
+        //ExtractDepthDataGpu <<<numBlocks, blockSize>>>(a_OutPut, a_DepthOutPut);
     }
 
 }
