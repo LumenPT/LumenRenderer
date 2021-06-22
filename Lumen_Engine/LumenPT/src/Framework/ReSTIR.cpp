@@ -157,7 +157,7 @@ void ReSTIR::Run(
 	 */
 	timer.reset();
 	VisibilityCheck(&m_ShadowRays, reservoirPointers[currentIndex], a_CurrentPixelData, a_OptixWrapper, numPixels, a_OptixSceneHandle);
-	Shade(reservoirPointers[currentIndex], dimensions.x, dimensions.y, a_OutputBuffer);
+	Shade(reservoirPointers[currentIndex], dimensions.x, dimensions.y, a_OutputBuffer.at(static_cast<unsigned>(WaveFront::LightChannel::DIRECT)));
 	if (a_DebugPrint) printf("Primary visibility check and shading time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
 	CHECKLASTCUDAERROR;
 	
@@ -177,7 +177,7 @@ void ReSTIR::Run(
 			seed,
 			dimensions,
 			a_MotionVectorBuffer,
-			a_OutputBuffer
+			a_OutputBuffer.at(static_cast<unsigned>(WaveFront::LightChannel::DIRECT))
 		);
 		if (a_DebugPrint) printf("Temporal sampling time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
 		CHECKLASTCUDAERROR;
@@ -207,7 +207,7 @@ void ReSTIR::Run(
 		 */
 		timer.reset();
 		VisibilityCheck(&m_ShadowRays, reservoirPointers[currentIndex], a_CurrentPixelData, a_OptixWrapper, numPixels, a_OptixSceneHandle);
-		Shade(reservoirPointers[currentIndex], dimensions.x, dimensions.y, a_OutputBuffer);
+		Shade(reservoirPointers[currentIndex], dimensions.x, dimensions.y, a_OutputBuffer.at(static_cast<unsigned>(WaveFront::LightChannel::DIRECT)));
 		if (a_DebugPrint) printf("Spatial visibility check and shading time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
 		CHECKLASTCUDAERROR;
 		

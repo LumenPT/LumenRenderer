@@ -2,6 +2,7 @@
 
 #include "../Shaders/CppCommon/RenderingUtility.h"
 #include "../Shaders/CppCommon/WaveFrontDataStructs.h"
+#include "../Shaders/CppCommon/Half4.h"
 #include "../Shaders/CppCommon/Half2.h"
 #include <cuda_runtime_api.h>
 #include <cuda/device_atomic_functions.h>
@@ -17,7 +18,9 @@
 
 #define CUDA_BLOCK_SIZE_GRID dim3{32, 32, 1}
 
-__host__ void ResetReservoirs(int a_NumReservoirs, Reservoir* a_ReservoirPointer)
+__host__ void ResetReservoirs(
+    int a_NumReservoirs, 
+    Reservoir* a_ReservoirPointer)
 {
     CHECKLASTCUDAERROR;
     //Call in parallel.
@@ -30,7 +33,9 @@ __host__ void ResetReservoirs(int a_NumReservoirs, Reservoir* a_ReservoirPointer
     CHECKLASTCUDAERROR;
 }
 
-__global__ void ResetReservoirInternal(int a_NumReservoirs, Reservoir* a_ReservoirPointer)
+__global__ void ResetReservoirInternal(
+    int a_NumReservoirs, 
+    Reservoir* a_ReservoirPointer)
 {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     int stride = blockDim.x * gridDim.x;
@@ -41,7 +46,11 @@ __global__ void ResetReservoirInternal(int a_NumReservoirs, Reservoir* a_Reservo
     }
 }
 
-__host__ void FillCDF(CDF* a_Cdf, float* a_CdfTreeBuffer, WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights, unsigned a_LightCount)
+__host__ void FillCDF(
+    CDF* a_Cdf, 
+    float* a_CdfTreeBuffer, 
+    WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights, 
+    unsigned a_LightCount)
 {
 	//Note: No need to manually reset as the CDF rebuilding manually sets the sum and size.
     //First reset the CDF on the GPU.
@@ -125,7 +134,11 @@ __global__ void ResetCDF(CDF* a_Cdf)
     a_Cdf->Reset();
 }
 
-__global__ void CalculateLightWeights(float* a_CdfTreeBuffer, const WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights, unsigned a_LightCount, unsigned a_NumLeafNodes)
+__global__ void CalculateLightWeights(
+    float* a_CdfTreeBuffer, 
+    const WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights, 
+    unsigned a_LightCount, 
+    unsigned a_NumLeafNodes)
 {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     int stride = blockDim.x * gridDim.x;
@@ -149,7 +162,10 @@ __global__ void CalculateLightWeights(float* a_CdfTreeBuffer, const WaveFront::A
     }
 }
 
-__global__ void CalculateLightWeightsInCDF(CDF* a_Cdf, const WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights, unsigned a_LightCount)
+__global__ void CalculateLightWeightsInCDF(
+    CDF* a_Cdf, 
+    const WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights, 
+    unsigned a_LightCount)
 {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     int stride = blockDim.x * gridDim.x;
@@ -166,12 +182,16 @@ __global__ void CalculateLightWeightsInCDF(CDF* a_Cdf, const WaveFront::AtomicBu
     }
 }
 
-__global__ void SetCDFSize(CDF* a_Cdf, unsigned a_NumLights)
+__global__ void SetCDFSize(
+    CDF* a_Cdf, 
+    unsigned a_NumLights)
 {
     a_Cdf->SetCDFSize(a_NumLights);
 }
 
-__global__ void DebugPrintCdf(CDF* a_Cdf, float* a_CDFTree)
+__global__ void DebugPrintCdf(
+    CDF* a_Cdf, 
+    float* a_CDFTree)
 {
     //int start = a_Cdf->size - 30;
     //if (start < 0) start = 0;
@@ -206,7 +226,10 @@ __global__ void DebugPrintCdf(CDF* a_Cdf, float* a_CDFTree)
 }
 
 
-__global__ void BuildCDFTree(float* a_CdfTreeBuffer, unsigned a_NumParentNodes, unsigned a_ArrayOffset)
+__global__ void BuildCDFTree(
+    float* a_CdfTreeBuffer, 
+    unsigned a_NumParentNodes, 
+    unsigned a_ArrayOffset)
 {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     int stride = blockDim.x * gridDim.x;
@@ -222,7 +245,13 @@ __global__ void BuildCDFTree(float* a_CdfTreeBuffer, unsigned a_NumParentNodes, 
 	}
 }
 
-__global__ void FillCDFParallel(CDF* a_Cdf, float* a_CdfTreeBuffer, const WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights, unsigned a_LightCount, unsigned a_TreeDepth, unsigned a_LeafNodes)
+__global__ void FillCDFParallel(
+    CDF* a_Cdf, 
+    float* a_CdfTreeBuffer, 
+    const WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights, 
+    unsigned a_LightCount, 
+    unsigned a_TreeDepth, 
+    unsigned a_LeafNodes)
 {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     int stride = blockDim.x * gridDim.x;
@@ -274,7 +303,10 @@ __global__ void FillCDFParallel(CDF* a_Cdf, float* a_CdfTreeBuffer, const WaveFr
     }
 }
 
-__global__ void FillCDFInternalSingleThread(CDF* a_Cdf, const WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights, unsigned a_LightCount)
+__global__ void FillCDFInternalSingleThread(
+    CDF* a_Cdf, 
+    const WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights, 
+    unsigned a_LightCount)
 {
     for (int i = 0; i < a_LightCount; ++i)
     {
@@ -292,7 +324,13 @@ __global__ void FillCDFInternalSingleThread(CDF* a_Cdf, const WaveFront::AtomicB
     }
 }
 
-__host__ void FillLightBags(unsigned a_NumLightBags, unsigned a_NumLightsPerBag, CDF* a_Cdf, LightBagEntry* a_LightBagPtr, const WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights, const std::uint32_t a_Seed)
+__host__ void FillLightBags(
+    unsigned a_NumLightBags, 
+    unsigned a_NumLightsPerBag, 
+    CDF* a_Cdf, 
+    LightBagEntry* a_LightBagPtr, 
+    const WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights, 
+    const std::uint32_t a_Seed)
 {
     const unsigned numLightsTotal = a_NumLightBags * a_NumLightsPerBag;
     const int blockSize = CUDA_BLOCK_SIZE;
@@ -302,7 +340,13 @@ __host__ void FillLightBags(unsigned a_NumLightBags, unsigned a_NumLightsPerBag,
     CHECKLASTCUDAERROR;
 }
 
-__global__ void FillLightBagsInternal(unsigned a_NumLightBags, unsigned a_NumLightsPerBag, CDF* a_Cdf, LightBagEntry* a_LightBagPtr, const WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights, const std::uint32_t a_Seed)
+__global__ void FillLightBagsInternal(
+    unsigned a_NumLightBags, 
+    unsigned a_NumLightsPerBag, 
+    CDF* a_Cdf, 
+    LightBagEntry* a_LightBagPtr, 
+    const WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights, 
+    const std::uint32_t a_Seed)
 {
     const unsigned numLightsTotal = a_NumLightBags * a_NumLightsPerBag;
     int index = blockIdx.x * blockDim.x + threadIdx.x;
@@ -325,7 +369,12 @@ __global__ void FillLightBagsInternal(unsigned a_NumLightBags, unsigned a_NumLig
     }
 }
 
-__host__ void PickPrimarySamples(const LightBagEntry* const a_LightBags, Reservoir* a_Reservoirs, const ReSTIRSettings& a_Settings, const WaveFront::SurfaceData * const a_PixelData, const std::uint32_t a_Seed)
+__host__ void PickPrimarySamples(
+    const LightBagEntry* const a_LightBags, 
+    Reservoir* a_Reservoirs, 
+    const ReSTIRSettings& a_Settings, 
+    const WaveFront::SurfaceData * const a_PixelData, 
+    const std::uint32_t a_Seed)
 {	
     /*
      * This functions uses a single light bag per block.
@@ -350,7 +399,16 @@ __host__ void PickPrimarySamples(const LightBagEntry* const a_LightBags, Reservo
     CHECKLASTCUDAERROR;
 }
 
-__global__ void PickPrimarySamplesInternal(const LightBagEntry* const a_LightBags, Reservoir* a_Reservoirs, unsigned a_NumPrimarySamples, unsigned a_NumReservoirs, unsigned a_NumLightBags, unsigned a_NumLightsPerBag, const WaveFront::SurfaceData * const a_PixelData, const std::uint32_t a_Seed)
+__global__ void PickPrimarySamplesInternal(
+    const LightBagEntry* const a_LightBags, 
+    Reservoir* a_Reservoirs, 
+    unsigned a_NumPrimarySamples, 
+    unsigned a_NumReservoirs, 
+    unsigned a_NumLightBags, 
+    unsigned a_NumLightsPerBag, 
+    const WaveFront::SurfaceData * 
+    const a_PixelData, 
+    const std::uint32_t a_Seed)
 {
 	int index = blockIdx.x * blockDim.x + threadIdx.x;
     if (index >= a_NumReservoirs)
@@ -463,8 +521,11 @@ __global__ void PickPrimarySamplesInternal(const LightBagEntry* const a_LightBag
     *reservoir = fresh;
 }
 
-__host__ unsigned int GenerateReSTIRShadowRays(MemoryBuffer* a_AtomicBuffer, Reservoir* a_Reservoirs,
-    const WaveFront::SurfaceData* a_PixelData, unsigned a_NumReservoirs)
+__host__ unsigned int GenerateReSTIRShadowRays(
+    MemoryBuffer* a_AtomicBuffer, 
+    Reservoir* a_Reservoirs,
+    const WaveFront::SurfaceData* a_PixelData, 
+    unsigned a_NumReservoirs)
 {
     //Counter that is atomically incremented. Copy it to the GPU.
     WaveFront::ResetAtomicBuffer<RestirShadowRay>(a_AtomicBuffer);
@@ -482,8 +543,11 @@ __host__ unsigned int GenerateReSTIRShadowRays(MemoryBuffer* a_AtomicBuffer, Res
     return WaveFront::GetAtomicCounter<RestirShadowRay>(a_AtomicBuffer);
 }
 
-__global__ void GenerateShadowRay(WaveFront::AtomicBuffer<RestirShadowRay>* a_AtomicBuffer, Reservoir* a_Reservoirs,
-    const WaveFront::SurfaceData* a_PixelData, unsigned a_NumReservoirs)
+__global__ void GenerateShadowRay(
+    WaveFront::AtomicBuffer<RestirShadowRay>* a_AtomicBuffer, 
+    Reservoir* a_Reservoirs,
+    const WaveFront::SurfaceData* a_PixelData, 
+    unsigned a_NumReservoirs)
 {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     if (index >= a_NumReservoirs) return;
@@ -517,7 +581,11 @@ __global__ void GenerateShadowRay(WaveFront::AtomicBuffer<RestirShadowRay>* a_At
     }
 }
 
-__host__ void Shade(Reservoir* a_Reservoirs, unsigned a_Width, unsigned a_Height, cudaSurfaceObject_t a_OutputBuffer)
+__host__ void Shade(
+    Reservoir* a_Reservoirs, 
+    unsigned a_Width, 
+    unsigned a_Height, 
+    cudaSurfaceObject_t a_OutputBuffer)
 {
     const dim3 blockSize = CUDA_BLOCK_SIZE_GRID;
     const unsigned gridWidth = static_cast<unsigned>(std::ceil(static_cast<float>(a_Width) / static_cast<float>(blockSize.x)));
@@ -529,7 +597,11 @@ __host__ void Shade(Reservoir* a_Reservoirs, unsigned a_Width, unsigned a_Height
     CHECKLASTCUDAERROR;
 }
 
-__global__ void ShadeInternal(Reservoir* a_Reservoirs, unsigned a_Width, unsigned a_Height, cudaSurfaceObject_t a_OutputBuffer)
+__global__ void ShadeInternal(
+    Reservoir* a_Reservoirs, 
+    unsigned a_Width, 
+    unsigned a_Height, 
+    cudaSurfaceObject_t a_OutputBuffer)
 {
     const unsigned int pixelX = blockIdx.x * blockDim.x + threadIdx.x;
     const unsigned int pixelY = blockIdx.y * blockDim.y + threadIdx.y;
@@ -544,19 +616,26 @@ __global__ void ShadeInternal(Reservoir* a_Reservoirs, unsigned a_Width, unsigne
     ShadeReservoirs(a_Reservoirs, a_Width, pixelX, pixelY, pixelX, pixelY, a_OutputBuffer);
 }
 
-__device__ __forceinline__ void ShadeReservoirs(Reservoir* a_Reservoirs, unsigned a_Width, unsigned a_InputX, unsigned a_InputY, unsigned a_OutputX, unsigned a_OutputY, cudaSurfaceObject_t a_OutputBuffer)
+__device__ __forceinline__ void ShadeReservoirs(
+    Reservoir* a_Reservoirs, 
+    unsigned a_Width, 
+    unsigned a_InputX, 
+    unsigned a_InputY, 
+    unsigned a_OutputX, 
+    unsigned a_OutputY, 
+    cudaSurfaceObject_t a_OutputBuffer)
 {
     //The amount of samples shaded per pixel. Compile time constant. Used to scale contributions back down.
     constexpr auto numShadedSamples = ReSTIRSettings::numReservoirsPerPixel * (1 + (ReSTIRSettings::enableTemporal ? 1 : 0) + (ReSTIRSettings::enableSpatial ? 1 : 0));
 	
     //Read the current shading value in the output buffer.
-    float4 color;
-    surf2DLayeredread<float4>(
-        &color,
+    half4Ushort4 color{ 0 };
+
+    surf2Dread<ushort4>(
+        &color.m_Ushort4,
         a_OutputBuffer,
-        a_OutputX * sizeof(float4),
+        a_OutputX * sizeof(ushort4),
         a_OutputY,
-        static_cast<unsigned int>(WaveFront::LightChannel::DIRECT),
         cudaBoundaryModeTrap);
 
 	//The index of the pixel in terms of reservoirs.
@@ -572,17 +651,16 @@ __device__ __forceinline__ void ShadeReservoirs(Reservoir* a_Reservoirs, unsigne
         if (reservoir.weight > 0.f)
         {
             //Take the average contribution scaled after all reservoirs.
-            color += make_float4(reservoir.sample.unshadowedPathContribution * (reservoir.weight / static_cast<float>(numShadedSamples)), 0.f);
+            color.m_Half4 += half4(make_float4(reservoir.sample.unshadowedPathContribution * (reservoir.weight / static_cast<float>(numShadedSamples)), 0.f));
         }
     }
 
     //Write the combined values to the output buffer.
-    surf2DLayeredwrite<float4>(
-        color,
+    surf2Dwrite<ushort4>(
+        color.m_Ushort4,
         a_OutputBuffer,
-        a_OutputX * sizeof(float4),
+        a_OutputX * sizeof(ushort4),
         a_OutputY,
-        static_cast<unsigned int>(WaveFront::LightChannel::DIRECT),
         cudaBoundaryModeTrap);
 }
 
@@ -909,7 +987,7 @@ __host__ void TemporalNeighbourSampling(
     const WaveFront::SurfaceData* a_PreviousPixelData,
     const std::uint32_t a_Seed,
     uint2 a_Dimensions,
-    const cudaSurfaceObject_t a_MotionVectorBuffer
+    const cudaSurfaceObject_t a_MotionVectorBuffer,
     cudaSurfaceObject_t a_OutputBuffer
 )
 {
@@ -942,7 +1020,7 @@ __global__ void CombineTemporalSamplesInternal(
     const std::uint32_t a_Seed,
     unsigned a_NumPixels,
     uint2 a_Dimensions,
-    const cudaSurfaceObject_t a_MotionVectorBuffer
+    const cudaSurfaceObject_t a_MotionVectorBuffer,
     cudaSurfaceObject_t a_OutputBuffer
 )
 {
@@ -1042,8 +1120,13 @@ __global__ void CombineTemporalSamplesInternal(
     }
 }
 
-__device__ __inline__ void CombineUnbiased(Reservoir* a_OutputReservoir, const WaveFront::SurfaceData* a_OutputSurfaceData, int a_Count, Reservoir* a_Reservoirs,
-    const WaveFront::SurfaceData* a_SurfaceDatas, const std::uint32_t a_Seed)
+__device__ __inline__ void CombineUnbiased(
+    Reservoir* a_OutputReservoir, 
+    const WaveFront::SurfaceData* a_OutputSurfaceData, 
+    int a_Count, 
+    Reservoir* a_Reservoirs,
+    const WaveFront::SurfaceData* a_SurfaceDatas, 
+    const std::uint32_t a_Seed)
 {
     //Ensure enough reservoirs are passed.
     assert(a_Count > 1);
@@ -1114,8 +1197,12 @@ __device__ __inline__ void CombineUnbiased(Reservoir* a_OutputReservoir, const W
     *a_OutputReservoir = output;
 }
 
-__device__ __inline__ void CombineBiased(Reservoir* a_OutputReservoir, int a_Count, Reservoir* a_Reservoirs,
-    const WaveFront::SurfaceData* a_SurfaceData, const std::uint32_t a_Seed)
+__device__ __inline__ void CombineBiased(
+    Reservoir* a_OutputReservoir, 
+    int a_Count, 
+    Reservoir* a_Reservoirs,
+    const WaveFront::SurfaceData* a_SurfaceData, 
+    const std::uint32_t a_Seed)
 {
     //Ensure enough reservoirs are passed.
     assert(a_Count > 1);
@@ -1169,7 +1256,10 @@ __device__ __inline__ void CombineBiased(Reservoir* a_OutputReservoir, int a_Cou
     *a_OutputReservoir = output;
 }
 
-__device__ __inline__ void Resample(LightSample* a_Input, const WaveFront::SurfaceData* a_PixelData, LightSample* a_Output)
+__device__ __inline__ void Resample(
+    LightSample* a_Input, 
+    const WaveFront::SurfaceData* a_PixelData, 
+    LightSample* a_Output)
 {
     *a_Output = *a_Input;
 
@@ -1299,7 +1389,12 @@ __device__ __inline__ void Resample(LightSample* a_Input, const WaveFront::Surfa
 //    }
 //}
 
-__host__ void CombineReservoirBuffers(Reservoir* a_Reservoirs1, Reservoir* a_Reservoirs2, const WaveFront::SurfaceData* a_SurfaceData, unsigned a_NumReservoirs, unsigned a_Seed)
+__host__ void CombineReservoirBuffers(
+    Reservoir* a_Reservoirs1, 
+    Reservoir* a_Reservoirs2, 
+    const WaveFront::SurfaceData* a_SurfaceData, 
+    unsigned a_NumReservoirs, 
+    unsigned a_Seed)
 {
     const int blockSize = CUDA_BLOCK_SIZE;
     const int numBlocks = (a_NumReservoirs + blockSize - 1) / blockSize;
@@ -1309,7 +1404,12 @@ __host__ void CombineReservoirBuffers(Reservoir* a_Reservoirs1, Reservoir* a_Res
 
 }
 
-__global__ void CombineReservoirBuffersInternal(Reservoir* a_Reservoirs1, Reservoir* a_Reservoirs2, const WaveFront::SurfaceData* a_SurfaceData, unsigned a_NumReservoirs, unsigned a_Seed)
+__global__ void CombineReservoirBuffersInternal(
+    Reservoir* a_Reservoirs1, 
+    Reservoir* a_Reservoirs2, 
+    const WaveFront::SurfaceData* a_SurfaceData, 
+    unsigned a_NumReservoirs, 
+    unsigned a_Seed)
 {
     const int index = blockIdx.x * blockDim.x + threadIdx.x;
     const int stride = blockDim.x * gridDim.x;

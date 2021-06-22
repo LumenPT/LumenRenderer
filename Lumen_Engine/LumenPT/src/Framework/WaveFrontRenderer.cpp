@@ -626,15 +626,16 @@ namespace WaveFront
 
         //Pass the buffers to the optix shader for shading.
         OptixLaunchParameters rayLaunchParameters {};
-        rayLaunchParameters.m_TraceType = RayType::INTERSECTION_RAY;
-        rayLaunchParameters.m_MinMaxDistance = { 0.01f, 5000.f };
-        rayLaunchParameters.m_IntersectionBuffer = m_IntersectionData.GetDevicePtr<AtomicBuffer<IntersectionData>>();
-		rayLaunchParameters.m_VolumetricIntersectionBuffer = m_VolumetricIntersectionData.GetDevicePtr<AtomicBuffer<VolumetricIntersectionData>>();
-        rayLaunchParameters.m_IntersectionRayBatch = m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>();
-        rayLaunchParameters.m_SceneData = sceneDataTableAccessor;
+
         rayLaunchParameters.m_TraversableHandle = accelerationStructure;
-        // TODO: render resolution used in ray launch params
         rayLaunchParameters.m_ResolutionAndDepth = uint3{ m_Settings.renderResolution.x, m_Settings.renderResolution.y, m_Settings.depth };
+        rayLaunchParameters.m_IntersectionRayBatch = m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>();
+        rayLaunchParameters.m_IntersectionBuffer = m_IntersectionData.GetDevicePtr<AtomicBuffer<IntersectionData>>();
+        rayLaunchParameters.m_VolumetricIntersectionBuffer = m_VolumetricIntersectionData.GetDevicePtr<AtomicBuffer<VolumetricIntersectionData>>();
+        rayLaunchParameters.m_SceneData = sceneDataTableAccessor;
+        rayLaunchParameters.m_MinMaxDistance = { 0.01f, 5000.f };
+        rayLaunchParameters.m_TraceType = RayType::INTERSECTION_RAY;
+        // TODO: render resolution used in ray launch params
 
         //Set the amount of rays to trace. Initially same as screen size.
         auto numIntersectionRays = numPixels;
@@ -793,9 +794,9 @@ namespace WaveFront
 
             //The settings for shadow ray resolving.
             OptixLaunchParameters shadowRayLaunchParameters = rayLaunchParameters; //Copy settings from the intersection rays.
-            shadowRayLaunchParameters.m_TraceType = RayType::SHADOW_RAY;
-            shadowRayLaunchParameters.m_OutputChannels = pixelBuffers;
             shadowRayLaunchParameters.m_ShadowRayBatch = m_ShadowRays.GetDevicePtr<AtomicBuffer<ShadowRayData>>();
+            shadowRayLaunchParameters.m_OutputChannels = pixelBuffers;
+            shadowRayLaunchParameters.m_TraceType = RayType::SHADOW_RAY;
 
             //Tell optix to resolve the shadow rays.
             m_OptixSystem->TraceRays(numShadowRays, shadowRayLaunchParameters);
@@ -809,10 +810,9 @@ namespace WaveFront
 		if (numVolumetricShadowRays > 0)
 		{
 			//The settings for shadow ray resolving.
-			OptixLaunchParameters shadowRayLaunchParameters;
-			shadowRayLaunchParameters = rayLaunchParameters;
-			shadowRayLaunchParameters.m_ResultBuffer = m_PixelBufferSeparate->GetSurfaceObject();
+			OptixLaunchParameters shadowRayLaunchParameters = rayLaunchParameters;
 			shadowRayLaunchParameters.m_ShadowRayBatch = m_VolumetricShadowRays.GetDevicePtr<AtomicBuffer<ShadowRayData>>();
+            shadowRayLaunchParameters.m_OutputChannels = pixelBuffers;
 			shadowRayLaunchParameters.m_TraceType = RayType::SHADOW_RAY;
 
 			m_OptixSystem->TraceRays(numVolumetricShadowRays, shadowRayLaunchParameters);
