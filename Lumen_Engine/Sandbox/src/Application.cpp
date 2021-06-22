@@ -389,8 +389,8 @@ public:
 		vndbFilePath.append("/Sandbox/assets/volume/bunny.vdb");
 		auto volumeRes = m_SceneManager->m_VolumeManager.LoadVDB(vndbFilePath);
 
-		//auto volume = lumenPT->m_Scene->AddVolume();
-		//volume->SetVolume(volumeRes->m_Volume);
+		auto volume = lumenPT->m_Scene->AddVolume();
+		volume->SetVolume(volumeRes->m_Volume);
 
 
 		contextLayer->GetPipeline()->StartRendering();
