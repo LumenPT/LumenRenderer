@@ -21,8 +21,8 @@ void OptixDenoiserWrapper::Initialize(const OptixDenoiserInitParams& a_InitParam
     WaveFront::OptixWrapper& optixWrapper = *(m_InitParams.m_ServiceLocator->m_OptixWrapper);
 
     OptixDenoiserOptions options = {};
-    options.guideAlbedo = 0;
-    options.guideNormal = 0;
+    options.guideAlbedo = 1;
+    options.guideNormal = 1;
     
     OptixDenoiserModelKind denoiserModelKind = {};
     denoiserModelKind = OPTIX_DENOISER_MODEL_KIND_LDR;

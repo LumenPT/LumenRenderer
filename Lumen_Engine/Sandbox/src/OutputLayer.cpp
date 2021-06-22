@@ -240,7 +240,7 @@ void OutputLayer::OnImGuiRender()
 	{
 		ImGui::Begin("Extra Viewport for bonus swegpoints");
 
-		ImGuiUtil::DisplayImage(m_Renderer->m_DebugTexture, glm::ivec2(400, 300));
+		ImGuiUtil::DisplayImage(m_Renderer->m_DebugTexture, glm::ivec2(600, 450));
 
 		ImGui::End();
     }

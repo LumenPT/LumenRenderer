@@ -849,7 +849,7 @@ namespace WaveFront
 
             OptixDenoiserLaunchParameters optixDenoiserLaunchParams(
                 m_Settings.renderResolution,
-                m_SurfaceData[0].GetDevicePtr<SurfaceData>(),
+                m_SurfaceData[currentIndex].GetDevicePtr<SurfaceData>(),
                 m_PixelBufferCombined->GetSurfaceObject(),
                 m_OptixDenoiser->ColorInput.GetDevicePtr<float3>(),
                 m_OptixDenoiser->AlbedoInput.GetDevicePtr<float3>(),
@@ -858,21 +858,20 @@ namespace WaveFront
             );
 
 
-            /*PrepareOptixDenoising(optixDenoiserLaunchParams);
-            CHECKLASTCUDAERROR;*/
+            PrepareOptixDenoising(optixDenoiserLaunchParams);
+            CHECKLASTCUDAERROR;
 
-            //OptixDenoiserDenoiseParams optixDenoiserParams = {};
-            //optixDenoiserParams.m_PostProcessLaunchParams = &postProcessLaunchParams;
-            ///*optixDenoiserParams.m_ColorInput = m_IntermediateOutputBuffer.GetCUDAPtr();
-            //optixDenoiserParams.m_Output = m_IntermediateOutputBuffer.GetCUDAPtr();*/
-            //optixDenoiserParams.m_ColorInput = m_OptixDenoiser->TestInput.GetCUDAPtr();
-            //optixDenoiserParams.m_Output = m_OptixDenoiser->TestOutput.GetCUDAPtr();
-            //m_OptixDenoiser->Denoise(optixDenoiserParams);
-            ////cudaDeviceSynchronize();
-            //CHECKLASTCUDAERROR;
+            OptixDenoiserDenoiseParams optixDenoiserParams = {}; 
+            optixDenoiserParams.m_PostProcessLaunchParams = &postProcessLaunchParams; 
+            optixDenoiserParams.m_ColorInput = m_OptixDenoiser->ColorInput.GetCUDAPtr();
+            optixDenoiserParams.m_AlbedoInput = m_OptixDenoiser->AlbedoInput.GetCUDAPtr();
+            optixDenoiserParams.m_NormalInput = m_OptixDenoiser->NormalInput.GetCUDAPtr();
+            optixDenoiserParams.m_Output = m_OptixDenoiser->ColorOutput.GetCUDAPtr();
+            m_OptixDenoiser->Denoise(optixDenoiserParams); 
+            CHECKLASTCUDAERROR;
 
             //FinishOptixDenoising(optixDenoiserLaunchParams);
-            //CHECKLASTCUDAERROR;
+            CHECKLASTCUDAERROR;
 
             WriteToOutput(postProcessLaunchParams);
             cudaDeviceSynchronize();
