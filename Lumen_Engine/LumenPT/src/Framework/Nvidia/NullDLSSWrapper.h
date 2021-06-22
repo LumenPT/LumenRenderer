@@ -10,14 +10,15 @@ public:
 	~NullDLSSWrapper() {}
 
 	bool Initialize(DLSSWrapperInitParams a_InitParams) override { return false; };
-	bool EvaluateDLSS(
+	virtual bool EvaluateDLSS(
 		Microsoft::WRL::ComPtr<ID3D11Resource> a_Outputbuffer = nullptr,
 		Microsoft::WRL::ComPtr<ID3D11Resource> a_Inputbuffer = nullptr,
 		Microsoft::WRL::ComPtr<ID3D11Resource> a_DepthBuffer = nullptr,
-		const unsigned int& a_MotionVectors = 0) override { return false; };
+		Microsoft::WRL::ComPtr<ID3D11Resource> a_MotionVectors = nullptr,
+		Microsoft::WRL::ComPtr<ID3D11Resource> a_JitterOffset = nullptr) override;
 
 	std::shared_ptr<DLSSWrapperInitParams> GetDLSSParams() { return m_Params == nullptr ? std::make_shared<DLSSWrapperInitParams>() : m_Params; };
-		
+	std::shared_ptr<DLSSRecommendedSettings> GetRecommendedSettings() override { return m_OptimalSettings == nullptr ? std::make_shared<DLSSRecommendedSettings>() : m_OptimalSettings; };
 protected:
 
 };

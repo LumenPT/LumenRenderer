@@ -18,8 +18,9 @@ namespace WaveFront
 		inline Microsoft::WRL::ComPtr<ID3D11Device> GetDevice() { return m_D3dDevice; };
 		inline Microsoft::WRL::ComPtr<ID3D11DeviceContext> GetContext() { return m_D3dDeviceContext; };
 
-		Microsoft::WRL::ComPtr<ID3D11Texture2D> CreateTexture2D(const uint3& a_ResDepth, DXGI_FORMAT a_Format = DXGI_FORMAT_R16G16B16A16_FLOAT);
+		Microsoft::WRL::ComPtr<ID3D11Texture2D> CreateTexture2D(const uint3& a_ResDepth, DXGI_FORMAT a_Format = DXGI_FORMAT_R16G16B16A16_FLOAT, unsigned int a_BindFlag = 0);
 		Microsoft::WRL::ComPtr<ID3D11Texture2D> ResizeTexture2D(Microsoft::WRL::ComPtr<ID3D11Texture2D>& a_Tex, const uint3& a_NewSize);
+		void CreateUAV(Microsoft::WRL::ComPtr<ID3D11Resource> a_Res, const D3D11_UNORDERED_ACCESS_VIEW_DESC* a_UAVDesc, Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView> a_UAVPtr);
 
 		ID3D11Texture2D* m_D3D11PixelBufferCombined;
 

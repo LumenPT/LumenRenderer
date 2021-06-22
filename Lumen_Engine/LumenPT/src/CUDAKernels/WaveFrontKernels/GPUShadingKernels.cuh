@@ -23,7 +23,8 @@ CPU_ON_GPU void GeneratePrimaryRay(
     float3 a_W,
     float3 a_Eye,
     uint2 a_Dimensions,
-    unsigned int a_FrameCount);
+    unsigned int a_FrameCount,
+    cudaSurfaceObject_t a_JitterOutput);
 
 CPU_ON_GPU void ExtractSurfaceDataGpu(unsigned a_NumIntersections,
     AtomicBuffer<IntersectionData>* a_IntersectionData,

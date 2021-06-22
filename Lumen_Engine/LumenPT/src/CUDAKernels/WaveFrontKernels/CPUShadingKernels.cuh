@@ -14,7 +14,7 @@ class SceneDataTableAccessor;
  * Generates the camera rays.
  * Synchronizes with device at the end of the function.
  */
-CPU_ONLY void GeneratePrimaryRays(const WaveFront::PrimRayGenLaunchParameters& a_PrimRayGenParams);
+CPU_ONLY void GeneratePrimaryRays(const WaveFront::PrimRayGenLaunchParameters& a_PrimRayGenParams, cudaSurfaceObject_t a_JitterOutput);
 
 /*
  *

@@ -157,17 +157,26 @@ namespace WaveFront
         std::unique_ptr<InteropGPUTexture> m_PixelBufferCombined;
 
         std::unique_ptr<InteropGPUTexture> m_DepthBuffer;
+        
+        std::unique_ptr<InteropGPUTexture> m_JitterBuffer;
 
         //Buffer containing motion vectors
         std::unique_ptr<InteropGPUTexture> m_MotionVectorBuffer;
+        
+        Microsoft::WRL::ComPtr<ID3D11Texture2D> m_D3D11JitterBuffer;
 
         Microsoft::WRL::ComPtr<ID3D11Texture2D> m_D3D11PixelBufferSeparate;
 
         Microsoft::WRL::ComPtr<ID3D11Texture2D> m_D3D11PixelBufferCombined;
+        
+        Microsoft::WRL::ComPtr<ID3D11Texture2D> m_D3D11PixelBufferUpscaled;
 
         Microsoft::WRL::ComPtr<ID3D11Texture2D> m_D3D11DepthBuffer;
 
         Microsoft::WRL::ComPtr<ID3D11Texture2D> m_D3D11MotionVectorBuffer;
+
+        Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView> m_D3D11PixelBufferCombinedUAV;
+        Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView> m_D3D11PixelBufferUpscaledUAV;
 
         //Triangle lights.
         MemoryBuffer m_TriangleLights;

@@ -35,9 +35,9 @@ namespace WaveFront
 
     }
 
-    Microsoft::WRL::ComPtr<ID3D11Texture2D> DX11Wrapper::CreateTexture2D(const uint3& a_ResDepth, DXGI_FORMAT a_Format)
+    Microsoft::WRL::ComPtr<ID3D11Texture2D> DX11Wrapper::CreateTexture2D(const uint3& a_ResDepth, DXGI_FORMAT a_Format, unsigned int a_BindFlag)
     {
-
+        
         DXGI_SAMPLE_DESC textureSampleDesc{};
         textureSampleDesc.Count = 1;
         textureSampleDesc.Quality = 0;
@@ -50,7 +50,7 @@ namespace WaveFront
         desc.Format = a_Format; //TODO: find out how to use 16 bit float format with CUDA (DLSS & NRD requirement). Provide as param?
         desc.SampleDesc = textureSampleDesc;
         desc.Usage = D3D11_USAGE_DEFAULT;
-        desc.BindFlags = 0;
+        desc.BindFlags = a_BindFlag == 0 ? 0 : static_cast<D3D11_BIND_FLAG>(a_BindFlag);
         desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ | D3D11_CPU_ACCESS_WRITE;
         desc.MiscFlags = 0;
         // just create comptr to texture2D from (pixel) any buffer (?)
@@ -81,4 +81,8 @@ namespace WaveFront
         
     }
 
+    void DX11Wrapper::CreateUAV(Microsoft::WRL::ComPtr<ID3D11Resource> a_Res, const D3D11_UNORDERED_ACCESS_VIEW_DESC* a_UAVDesc, Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView> a_UAVPtr)
+    {
+        CHECKDX11RESULT(m_D3dDevice->CreateUnorderedAccessView(a_Res.Get(), a_UAVDesc, a_UAVPtr.GetAddressOf()));
+    }
 }

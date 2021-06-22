@@ -87,7 +87,7 @@ private:
         CONTENTVIEWMODE_COUNT
     };
 
-    int m_Dlss_SelectedMode;
+    int m_Dlss_SelectedMode = 2;    // 2 translates to "BALANCED" dlss mode 
     bool m_BlendMode = false;
 
     std::vector<std::unique_ptr<FrameSnapshot>> m_FrameSnapshots;
