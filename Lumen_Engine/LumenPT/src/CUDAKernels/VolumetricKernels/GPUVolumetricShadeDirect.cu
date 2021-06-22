@@ -5,16 +5,19 @@
 using namespace WaveFront;
 
 GPU_ONLY void VolumetricShadeDirect(
-	const unsigned int a_PixelIndex,
+	PixelIndex a_PixelIndex,
     const uint3 a_ResolutionAndDepth,
     const WaveFront::VolumetricData* a_VolumetricDataBuffer,
     WaveFront::AtomicBuffer<WaveFront::ShadowRayData>* const a_ShadowRays,
 	const AtomicBuffer<TriangleLight>* const a_Lights,
 	unsigned int& a_Seed,
     const CDF* const a_CDF,
-	float3* a_Output)
+	cudaSurfaceObject_t a_Output)
 {
-	const auto& intersection = a_VolumetricDataBuffer[a_PixelIndex];
+
+	const unsigned int pixelDataIndex = PIXEL_DATA_INDEX(a_PixelIndex.m_X, a_PixelIndex.m_Y, a_ResolutionAndDepth.x);
+	const auto& intersection = a_VolumetricDataBuffer[pixelDataIndex];
+	
 
 	if (intersection.m_ExitIntersectionT > intersection.m_EntryIntersectionT)
 	{
@@ -97,9 +100,13 @@ GPU_ONLY void VolumetricShadeDirect(
 
 			accumulatedDensity += sampledDensity;
 		}
-		//a_Output[a_PixelIndex
-		//	* static_cast<unsigned>(LightChannel::NUM_CHANNELS)
-		//	+ static_cast<unsigned>(LightChannel::VOLUMETRIC)] = make_float3(accumulatedDensity, accumulatedDensity, accumulatedDensity);
+		//surf2DLayeredwrite<float4>(
+		//	make_float4(r, g, b, 1.f),
+		//	a_Output,
+		//	a_PixelIndex.m_X * sizeof(float4),
+		//	a_PixelIndex.m_Y,
+		//	static_cast<unsigned>(LightChannel::VOLUMETRIC),
+		//	cudaBoundaryModeTrap);
 	}
     return;
 }

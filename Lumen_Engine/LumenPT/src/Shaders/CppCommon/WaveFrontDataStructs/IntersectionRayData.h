@@ -1,4 +1,5 @@
 #pragma once
+#include "PixelIndex.h"
 #include "../CudaDefines.h"
 
 #include <Optix/optix.h>
@@ -24,14 +25,14 @@ namespace WaveFront
 
         CPU_GPU IntersectionRayData()
             :
-            m_PixelIndex(0),
+            m_PixelIndex({0, 0}),
             m_Origin(make_float3(0.f, 0.f, 0.f)),
             m_Direction(make_float3(0.f, 0.f, 0.f)),
             m_Contribution(make_float3(0.f, 0.f, 0.f))
         {}
 
         CPU_GPU IntersectionRayData(
-            const unsigned a_PixelIndex,
+            const PixelIndex& a_PixelIndex,
             const float3& a_Origin,
             const float3& a_Direction,
             const float3& a_Contribution
@@ -58,7 +59,7 @@ namespace WaveFront
 
 
         //The index of the pixel that this ray contributes to.
-        unsigned int m_PixelIndex;
+        PixelIndex m_PixelIndex;
         /// <summary>
         /// <b>Description</b> \n Stores the position of the ray interpreted as a world-space position. \n
         /// <b>Default</b>: (0.f, 0.f, 0.f)

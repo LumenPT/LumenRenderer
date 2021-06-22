@@ -34,7 +34,9 @@ CPU_ON_GPU void FindEmissives(
     const uint32_t a_IndexBufferSize,
     unsigned int* a_NumLights)
 {
-
+	//Set to 0.
+    *a_NumLights = 0;
+	
     //const auto devMat = a_Mat->GetDeviceMaterial();
 
     //pack these into triangle
@@ -43,7 +45,6 @@ CPU_ON_GPU void FindEmissives(
 
     for (unsigned int baseIndex = 0; baseIndex < a_IndexBufferSize; baseIndex+=3)
     {
-
         //looped over 3 vertices, construct triangle
 
         const unsigned index0 = a_Indices[baseIndex + 0];
@@ -85,7 +86,7 @@ CPU_ON_GPU void FindEmissives(
         //    diffuseColor *= tex2D<float4>(diffuseTexture, UVCentroid.x, UVCentroid.y);
         //}
 
-        float4 emissiveColor = a_Mat->m_EmissionColor;
+        float4 emissiveColor = a_Mat->m_MaterialData.m_Emissive;
 
         if(emissiveTexture)
         {
@@ -103,8 +104,8 @@ CPU_ON_GPU void FindEmissives(
 
         const unsigned triangleIndex = baseIndex / 3; //Base index goes up by three each loop, divide by three to get the num of triangles before current value.
         //if emission not equal to 0
-        if ((finalEmission.x > 0.0f || finalEmission.y > 0.0f || finalEmission.z > 0.0f) && finalEmission.w > 0.f)
-        {
+        if ((finalEmission.x > 0.0f || finalEmission.y > 0.0f || finalEmission.z > 0.0f))
+        {        	
             a_Emissives[triangleIndex] = true;
             (*a_NumLights)++;
             continue;
@@ -161,11 +162,12 @@ CPU_ON_GPU void AddToLightBuffer(
         assert(a_SceneDataTable->GetTableEntry<DevicePrimitive>(a_InstanceId) != nullptr);
         const auto devicePrimitiveInstance = a_SceneDataTable->GetTableEntry<DevicePrimitiveInstance>(a_InstanceId);
         const auto devicePrimitive = devicePrimitiveInstance->m_Primitive;
-
+    	
         //TODO this can be optimized in case of override.
         //check first vertex of triangle to see if its in emissive buffer
         if ((devicePrimitiveInstance->m_EmissionMode == Lumen::EmissionMode::ENABLED && a_Emissives[triangleIndex] == true) || devicePrimitiveInstance->m_EmissionMode == Lumen::EmissionMode::OVERRIDE)
         {
+        	
             const unsigned index0 = a_Indices[baseIndex + 0];
             const unsigned index1 = a_Indices[baseIndex + 1];
             const unsigned index2 = a_Indices[baseIndex + 2];
@@ -210,7 +212,7 @@ CPU_ON_GPU void AddToLightBuffer(
             if (devicePrimitiveInstance->m_EmissionMode == Lumen::EmissionMode::ENABLED)
             {
                 emissive = tex2D<float4>(mat->m_EmissiveTexture, UVCentroid.x, UVCentroid.y);
-                emissive *= mat->m_EmissionColor * devicePrimitiveInstance->m_EmissiveColorAndScale.w;
+                emissive *= mat->m_MaterialData.m_Emissive * devicePrimitiveInstance->m_EmissiveColorAndScale.w;
             }
             //When override, take the ovverride emissive color and scale it up.
             else if (devicePrimitiveInstance->m_EmissionMode == Lumen::EmissionMode::OVERRIDE)
@@ -218,19 +220,28 @@ CPU_ON_GPU void AddToLightBuffer(
                 emissive = devicePrimitiveInstance->m_EmissiveColorAndScale * devicePrimitiveInstance->m_EmissiveColorAndScale.w;
             }
 
-            light.radiance = make_float3(emissive);
-            light.normal = (vert0.m_Normal + vert1.m_Normal + vert2.m_Normal) * oneThird;
+        	//Only add actually emissive lights.
+        	if(emissive.x > 0.f || emissive.y > 0.f || emissive.z > 0.f)
+        	{
+                light.radiance = make_float3(emissive);
+                light.normal = (vert0.m_Normal + vert1.m_Normal + vert2.m_Normal) * oneThird;
 
-            const float3 vec1 = light.p0 - light.p1;
-            const float3 vec2 = light.p0 - light.p2;
+        		//Transform the normal to world space.
+                float4 tempNormal = make_float4(light.normal, 0.0f);   //No translation for normals so last components = 0.f.
+                tempNormal = devicePrimitiveInstance->m_Transform * tempNormal;
+                light.normal = normalize(make_float3(tempNormal));
 
-            light.area = sqrtf(
-                pow((vec1.y * vec2.z - vec2.y * vec1.z), 2) +
-                pow((vec1.x * vec2.z - vec2.x * vec1.z), 2) +
-                pow((vec1.x * vec2.y - vec2.x * vec1.y), 2)
-            ) / 2.0f;
+                const float3 vec1 = light.p0 - light.p1;
+                const float3 vec2 = light.p0 - light.p2;
 
-            a_Lights->Add(&light);
+                light.area = sqrtf(
+                    pow((vec1.y * vec2.z - vec2.y * vec1.z), 2) +
+                    pow((vec1.x * vec2.z - vec2.x * vec1.z), 2) +
+                    pow((vec1.x * vec2.y - vec2.x * vec1.y), 2)
+                ) / 2.0f;
+
+                a_Lights->Add(&light);
+        	}
 
             //Add light to lightbuffer, but to know where the end of the buffer is, keep track of lightIndex.
             //Dont know how many lights have already been added to buffer.

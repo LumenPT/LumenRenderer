@@ -18,11 +18,11 @@
    The above copyright notice and this permission notice shall be included in
    all copies or substantial portions of the Software.
 */
-
 #ifndef GGXMDF_H
 #define GGXMDF_H
 
 #include "bsdf_math.cuh"
+#include <sutil/vec_math.h>
 
 __device__ __forceinline__ float3 make_unit_vector( const float cos_theta, const float sin_theta, const float cos_phi, const float sin_phi )
 {
@@ -44,7 +44,7 @@ __device__ __forceinline__ float GGXMDF_D( const float3 m, const float alpha_x, 
 {
 	if (m.z == 0) return sqr( alpha_x ) * INVPI;
 	const float cos_theta_2 = sqr( m.z );
-	const float sin_theta = sqrtf( max( 0.0f, 1 - cos_theta_2 ) );
+	const float sin_theta = sqrtf( fmaxf( 0.0f, 1 - cos_theta_2 ) );
 	const float tan_theta_2 = (1.0f - cos_theta_2) / cos_theta_2;
 	float stretched_roughness;
 	if (alpha_x == alpha_y || sin_theta == 0.0f) stretched_roughness = 1.0f / sqr( alpha_x );
@@ -56,7 +56,7 @@ __device__ __forceinline__ float GGXMDF_lambda( const float3 v, const float alph
 {
 	if (v.z == 0) return 0;
 	const float cos_theta_2 = v.z * v.z;
-	const float sin_theta = sqrtf( max( 0.0f, 1 - cos_theta_2 ) );
+	const float sin_theta = sqrtf( fmaxf( 0.0f, 1 - cos_theta_2 ) );
 	float projected_roughness;
 	if (alpha_x == alpha_y || sin_theta == 0.0f) projected_roughness = alpha_x;
 	else projected_roughness = sqrtf( sqr( (v.x * alpha_x) / sin_theta ) + sqr( (v.y * alpha_y) / sin_theta ) );
@@ -97,9 +97,9 @@ __device__ __forceinline__ float3 GGXMDF_sample( const float3 v, const float r0,
 	const float p2 = r * sinf( phi ) * (r1 < a ? 1.0f : stretched.z);
 #endif
 	// compute normal
-	const float3 h = p1 * t1 + p2 * t2 + sqrtf( max( 0.0f, 1.0f - p1 * p1 - p2 * p2 ) ) * stretched;
+	const float3 h = p1 * t1 + p2 * t2 + sqrtf( fmaxf( 0.0f, 1.0f - p1 * p1 - p2 * p2 ) ) * stretched;
 	// unstretch and normalize
-	return normalize( make_float3( h.x * alpha_x, h.y * alpha_y, max( 0.0f, h.z ) ) );
+	return normalize( make_float3( h.x * alpha_x, h.y * alpha_y, fmaxf( 0.0f, h.z ) ) );
 }
 __device__ __forceinline__ float GGXMDF_D( const float3 m, const float alpha )
 {
@@ -114,7 +114,7 @@ __device__ __forceinline__ float GGXMDF_lambda( const float3 v, const float alph
 {
 	if (v.z == 0) return 0;
 	const float cos_theta_2 = sqr( v.z );
-	const float sin_theta = sqrtf( max( 0.0f, 1 - cos_theta_2 ) );
+	const float sin_theta = sqrtf( fmaxf( 0.0f, 1 - cos_theta_2 ) );
 	const float tan_theta_2 = sqr( sin_theta ) / cos_theta_2;
 	return (-1.0f + sqrtf( 1.0f + sqr( alpha ) * tan_theta_2 )) * 0.5f;
 }
@@ -174,7 +174,7 @@ __device__ __forceinline__ float GTR1MDF_lambda( const float3 v, const float alp
 	if (v.z == 0) return 0;
 	// [2] section 3.2
 	const float cos_theta_2 = sqr( v.z );
-	const float sin_theta = sqrtf( max( 0.0f, 1.0f - cos_theta_2 ) );
+	const float sin_theta = sqrtf( fmaxf( 0.0f, 1.0f - cos_theta_2 ) );
 	// normal incidence; no shadowing
 	if (sin_theta == 0) return 0;
 	const float cot_theta_2 = cos_theta_2 / sqr( sin_theta );
@@ -202,7 +202,7 @@ __device__ __forceinline__ float3 GTR1MDF_sample( const float r0, const float r1
 	const float alpha = clamp( alpha_x, 0.001f, 0.999f );
 	const float alpha_2 = sqr( alpha );
 	const float cos_theta_2 = (1.0f - powf( alpha_2, 1.0f - r0 )) / (1.0f - alpha_2);
-	const float sin_theta = sqrtf( max( 0.0f, 1.0f - cos_theta_2 ) );
+	const float sin_theta = sqrtf( fmaxf( 0.0f, 1.0f - cos_theta_2 ) );
 	float cos_phi, sin_phi;
 	const float phi = TWOPI * r1;
 #if defined(__CUDACC__)
@@ -218,13 +218,13 @@ __device__ __forceinline__ float GTR1MDF_pdf( const float3 v, const float3 m, co
 	return GTR1MDF_D( m, alpha_x, alpha_y ) * fabs( m.z );
 }
 
-__device__ __forceinline__ float microfacet_alpha_from_roughness( const float roughness ) { return max( 0.001f, roughness * roughness ); }
+__device__ __forceinline__ float microfacet_alpha_from_roughness( const float roughness ) { return fmaxf( 0.001f, roughness * roughness ); }
 __device__ __forceinline__ void microfacet_alpha_from_roughness( const float roughness, const float anisotropy, REFERENCE_OF( float ) alpha_x, REFERENCE_OF( float ) alpha_y )
 {
 	const float square_roughness = roughness * roughness;
 	const float aspect = sqrtf( 1.0f + anisotropy * (anisotropy < 0 ? 0.9f : -0.9f) );
-	alpha_x = max( 0.001f, square_roughness / aspect );
-	alpha_y = max( 0.001f, square_roughness * aspect );
+	alpha_x = fmaxf( 0.001f, square_roughness / aspect );
+	alpha_y = fmaxf( 0.001f, square_roughness * aspect );
 }
 
 #endif

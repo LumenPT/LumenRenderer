@@ -4,42 +4,19 @@
  * This file contains some BRDF helper functions and math related things.
  * It's essentially here to contain anything that is shared by multiple BRDF related files.
  */
-
 #include <cuda_runtime.h>
-#include <device_launch_parameters.h>
-#include <cuda_runtime_api.h>
+#include <sutil/vec_math.h>
+//#include <math.h>
+//#include "../../vendor/Include/Cuda/cuda/helpers.h"
 
-#include "../../vendor/Include/Cuda/cuda/helpers.h"
-#include "../Framework/MemoryBuffer.h"
-#include "../Shaders/CppCommon/WaveFrontDataStructs.h"
-#include "../CUDAKernels/RandomUtilities.cuh"
-
-
-#if defined(__CUDACC__) || defined(WIN32) || defined(__linux__)
-#ifndef LH2_DEVFUNC
-#define LH2_DEVFUNC __forceinline__ __device__
-#endif
-#ifndef LH2_KERNEL
-#define LH2_KERNEL __global__
-#endif
+#define sqr(a) ((a)*(a))
 #define REFERENCE_OF(x) x&
 #define CONSTREF_OF(x) const x&
-#else
-#define LH2_DEVFUNC
-#define LH2_KERNEL
-#define REFERENCE_OF(x) inout x
-#define CONSTREF_OF(x) in x
 
-#define fabs abs
-#define sqrtf sqrt
-#define expf exp
-#define sinf sin
-#define cosf cos
-#define logf log
-#define powf pow
-#define sqr(a) ((a)*(a))
-#define adjoint false
-#endif
+__device__ __forceinline__ float lerp(const float a, const float b, const float t)
+{
+	return a + t * (b - a);
+}
 
 #ifndef PI
 #define PI					3.14159265358979323846264f
@@ -76,8 +53,6 @@
 #endif
 
 
-
-#define CHAR2FLT(a,s) (((float)(((a)>>s)&255))*(1.0f/255.0f))
 
 __device__ __forceinline__ void SetupTangentSpace(const float3& N, float3& T, float3& B)
 {
@@ -125,9 +100,6 @@ __device__ __forceinline__ float3 Tangent2World(const float3& V, const float3& N
 #define GGXMDF		1001
 #define GTR1MDF		1002
 
-#define min fminf
-#define max fmaxf
-
 
 /*
  * Some generic math defines.
@@ -152,17 +124,13 @@ __device__ __forceinline__ float Cos2Theta(const float3& w) { return w.z * w.z; 
 __device__ __forceinline__ float Sin2Theta(const float3& w) { return fmaxf(0.f, 1.f - Cos2Theta(w)); }
 __device__ __forceinline__ float SinTheta(const float3& w) { return sqrtf(Sin2Theta(w)); }
 __device__ __forceinline__ float AbsCosTheta(const float3& w) { return fabsf(w.z); }
-__device__ __forceinline__ float CosPhi(const float3& w) { float sinTheta = SinTheta(w); return (sinTheta == 0) ? 1 : clamp(w.x / sinTheta, -1, 1); }
-__device__ __forceinline__ float SinPhi(const float3& w) { float sinTheta = SinTheta(w); return (sinTheta == 0) ? 0 : clamp(w.y / sinTheta, -1, 1); }
+__device__ __forceinline__ float CosPhi(const float3& w) { float sinTheta = SinTheta(w); return (sinTheta == 0) ? 1 : clamp(w.x / sinTheta, -1.f, 1.f); }
+__device__ __forceinline__ float SinPhi(const float3& w) { float sinTheta = SinTheta(w); return (sinTheta == 0) ? 0 : clamp(w.y / sinTheta, -1.f, 1.f); }
 __device__ __forceinline__ float Cos2Phi(const float3& w) { return CosPhi(w) * CosPhi(w); }
 __device__ __forceinline__ float Sin2Phi(const float3& w) { return SinPhi(w) * SinPhi(w); }
 __device__ __forceinline__ float TanTheta(const float3& w) { return SinTheta(w) / CosTheta(w); }
 __device__ __forceinline__ float Tan2Theta(const float3& w) { return Sin2Theta(w) / Cos2Theta(w); }
 
-
-#ifndef __USE_GNU // sincosf is a GNU extension
-static inline void sincosf(const float a, float* s, float* c) { *s = sinf(a); *c = cosf(a); }
-#endif
 
 __device__ __forceinline__ float3 DiffuseReflectionCosWeighted(const float r0, const float r1)
 {

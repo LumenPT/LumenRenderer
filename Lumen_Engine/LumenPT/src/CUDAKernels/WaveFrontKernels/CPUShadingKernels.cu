@@ -3,6 +3,7 @@
 #include "../../Framework/CudaUtilities.h"
 #include "../../Shaders/CppCommon/ReSTIRData.h"
 #include "../../Framework/ReSTIR.h"
+#include <cmath>
 
 using namespace WaveFront;
 
@@ -61,21 +62,27 @@ CPU_ONLY void ExtractSurfaceData(
     unsigned a_NumIntersections, 
     AtomicBuffer<IntersectionData>* a_IntersectionData, 
     AtomicBuffer<IntersectionRayData>* a_Rays, 
-    SurfaceData* a_OutPut, 
+    SurfaceData* a_OutPut,
+    uint2 a_Resolution,
     SceneDataTableAccessor* a_SceneDataTable)
 {
-    const int blockSize = 256;
+    const int blockSize = 512;
     const int numBlocks = (a_NumIntersections + blockSize - 1) / blockSize;
 
-    ExtractSurfaceDataGpu<<<numBlocks, blockSize>>>(a_NumIntersections, a_IntersectionData, a_Rays, a_OutPut, a_SceneDataTable);
+    ExtractSurfaceDataGpu<<<numBlocks, blockSize>>>(a_NumIntersections, a_IntersectionData, a_Rays, a_OutPut, a_Resolution, a_SceneDataTable);
 }
 
 CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
 {
-    //Calculate how many blocks and threads should be used based on the amount of pixels.
-    const int numPixels = a_ShadingParams.m_ResolutionAndDepth.x * a_ShadingParams.m_ResolutionAndDepth.y;
-    const int blockSize = 512;
-    const int numBlocks = (numPixels + blockSize - 1) / blockSize;
+
+    const dim3 blockSize {16, 16 ,1};
+
+    const unsigned blockSizeWidth = 
+        static_cast<unsigned>(std::ceil(static_cast<float>(a_ShadingParams.m_ResolutionAndDepth.x) / static_cast<float>(blockSize.x)));
+    const unsigned blockSizeHeight = 
+        static_cast<unsigned>(std::ceil(static_cast<float>(a_ShadingParams.m_ResolutionAndDepth.y) / static_cast<float>(blockSize.y)));
+
+    const dim3 numBlocks {blockSizeWidth, blockSizeHeight, 1};
 
     auto seed = WangHash(a_ShadingParams.m_Seed);
     //TODO
@@ -106,7 +113,7 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
          */
         ResolveDirectLightHits<<<numBlocks, blockSize>>>(
             a_ShadingParams.m_CurrentSurfaceData,
-            numPixels,
+            uint2{a_ShadingParams.m_ResolutionAndDepth.x, a_ShadingParams.m_ResolutionAndDepth.y},
             a_ShadingParams.m_Output
         );
 
@@ -116,16 +123,13 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
         a_ShadingParams.m_ReSTIR->Run(
             a_ShadingParams.m_CurrentSurfaceData,
             a_ShadingParams.m_TemporalSurfaceData,
-            a_ShadingParams.m_TriangleLights,
-            a_ShadingParams.m_CameraDirection,
-            seed,
-            a_ShadingParams.m_OptixSceneHandle,
-            a_ShadingParams.m_ShadowRays,
-            a_ShadingParams.m_OptixSystem,
             a_ShadingParams.m_MotionVectorBuffer,
+            a_ShadingParams.m_OptixWrapper,
+            a_ShadingParams.m_OptixSceneHandle,
+            a_ShadingParams.m_TriangleLights,
+            a_ShadingParams.m_Seed,
             a_ShadingParams.m_Output,
-            true
-        );
+            true);
     }
     else
     {
@@ -136,66 +140,55 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
         //    a_ShadingParams.m_ReSTIR->BuildCDF(a_ShadingParams.m_TriangleLights);
         //}
 
-		CDF* cdfPtr = a_ShadingParams.m_ReSTIR->GetCdfGpuPointer();
+        CDF* CDFPtr = a_ShadingParams.m_ReSTIR->GetCdfGpuPointer();
 
         //Generate shadow rays for direct lights.
 
-        ShadeDirect << <numBlocks, blockSize >> > (
+        ShadeDirect<<<numBlocks, blockSize>>>(
             a_ShadingParams.m_ResolutionAndDepth,
-            a_ShadingParams.m_TemporalSurfaceData,
             a_ShadingParams.m_CurrentSurfaceData,
-			a_ShadingParams.m_VolumetricData,
-            a_ShadingParams.m_ShadowRays,
-			a_ShadingParams.m_VolumetricShadowRays,
+            a_ShadingParams.m_CurrentVolumetricData,
             a_ShadingParams.m_TriangleLights->GetDevicePtr<AtomicBuffer<TriangleLight>>(),
-            seed,
-            a_ShadingParams.m_CurrentDepth,
-            cdfPtr,
-			a_ShadingParams.m_Output);
+            a_ShadingParams.m_Seed,
+            CDFPtr,
+            a_ShadingParams.m_SolidShadowRayBuffer,
+            a_ShadingParams.m_VolumetricShadowRayBuffer,
+            a_ShadingParams.m_Output);
     }
 
+    cudaDeviceSynchronize();
+    CHECKLASTCUDAERROR;
+	
     //Update the seed.
     seed = WangHash(a_ShadingParams.m_Seed);
 
     //Generate secondary rays only when there's a wave after this.
     if(a_ShadingParams.m_CurrentDepth < a_ShadingParams.m_ResolutionAndDepth.z - 1)
     {
-        const int blockSize = 512;
-        const int numBlocks = (a_ShadingParams.m_NumIntersections + blockSize - 1) / blockSize;
 
-        ShadeIndirect << <numBlocks, blockSize >> > (
+        ShadeIndirect <<<numBlocks, blockSize >>> (
             a_ShadingParams.m_ResolutionAndDepth,
-            a_ShadingParams.m_CameraPosition,
             a_ShadingParams.m_CurrentSurfaceData,
-            a_ShadingParams.m_IntersectionData,
             a_ShadingParams.m_RayBuffer,
-            a_ShadingParams.m_NumIntersections,
-            a_ShadingParams.m_CurrentDepth,
             seed);
 
-        cudaDeviceSynchronize();
     }
 
-    //const int blockSize = 512;
-    //const int numBlocks = (a_ShadingParams.m_NumIntersections + blockSize - 1) / blockSize;
-    //DEBUGShadePrimIntersections<<<numBlocks, blockSize>>>(
-    //    a_ShadingParams.m_ResolutionAndDepth,
-    //    a_ShadingParams.m_CurrentSurfaceData,
-    //    a_ShadingParams.m_Output);
+    cudaDeviceSynchronize();
 }
 
 CPU_ONLY void PostProcess(const PostProcessLaunchParameters& a_PostProcessParams)
 {
-    //TODO
-    /*
-     * Not needed now. Can be implemented later.
-     * For now just merge the final light contributions to get the final pixel color.
-     */
 
     //The amount of pixels and threads/blocks needed to apply effects.
-    const int numPixels = a_PostProcessParams.m_RenderResolution.x * a_PostProcessParams.m_RenderResolution.y;
-    const int blockSize = 256;
-    const int numBlocks = (numPixels + blockSize - 1) / blockSize;
+    const dim3 blockSize{ 32, 32 ,1 };
+
+    const unsigned blockSizeWidth =
+        static_cast<unsigned>(std::ceil(static_cast<float>(a_PostProcessParams.m_RenderResolution.x) / static_cast<float>(blockSize.x)));
+    const unsigned blockSizeHeight =
+        static_cast<unsigned>(std::ceil(static_cast<float>(a_PostProcessParams.m_RenderResolution.y) / static_cast<float>(blockSize.y)));
+
+    const dim3 numBlocks{ blockSizeWidth, blockSizeHeight, 1 };
 
     //TODO before merging.
     //Denoise<<<numBlocks, blockSize >>>();
@@ -205,8 +198,8 @@ CPU_ONLY void PostProcess(const PostProcessLaunchParameters& a_PostProcessParams
 
     MergeOutputChannels << <numBlocks, blockSize >> > (
         a_PostProcessParams.m_RenderResolution,
-        a_PostProcessParams.m_WavefrontOutput,
-        a_PostProcessParams.m_ProcessedOutput,
+        a_PostProcessParams.m_PixelBufferMultiChannel,
+        a_PostProcessParams.m_PixelBufferSingleChannel,
         a_PostProcessParams.m_BlendOutput,
         a_PostProcessParams.m_BlendCount
         );
@@ -218,9 +211,12 @@ CPU_ONLY void PostProcess(const PostProcessLaunchParameters& a_PostProcessParams
     //TODO copy merged results into image output after having run DLSS.
     DLSS << <numBlocks, blockSize >> > ();
 
-    const int numPixelsUpscaled = a_PostProcessParams.m_OutputResolution.x * a_PostProcessParams.m_OutputResolution.y;
-    const int blockSizeUpscaled = 256;
-    const int numBlocksUpscaled = (numPixelsUpscaled + blockSizeUpscaled - 1) / blockSizeUpscaled;
+    const unsigned blockSizeWidthUpscaled =
+        static_cast<unsigned>(std::ceil(static_cast<float>(a_PostProcessParams.m_OutputResolution.x) / static_cast<float>(blockSize.x)));
+    const unsigned blockSizeHeightUpscaled =
+        static_cast<unsigned>(std::ceil(static_cast<float>(a_PostProcessParams.m_OutputResolution.y) / static_cast<float>(blockSize.y)));
+
+    const dim3 numBlocksUpscaled{ blockSizeWidthUpscaled, blockSizeHeightUpscaled, 1 };
 
     /*cudaDeviceSynchronize();
     CHECKLASTCUDAERROR;*/
@@ -232,9 +228,9 @@ CPU_ONLY void PostProcess(const PostProcessLaunchParameters& a_PostProcessParams
     CHECKLASTCUDAERROR;*/
 
     //TODO This is temporary till the post-processing is  in place. Let the last stage copy it directly to the output buffer.
-    WriteToOutput << <numBlocksUpscaled, blockSizeUpscaled >> > (
+    WriteToOutput << <numBlocksUpscaled, blockSize >>> (
         a_PostProcessParams.m_OutputResolution,
-        a_PostProcessParams.m_ProcessedOutput,
+        a_PostProcessParams.m_PixelBufferSingleChannel,
         a_PostProcessParams.m_FinalOutput
         );
 }

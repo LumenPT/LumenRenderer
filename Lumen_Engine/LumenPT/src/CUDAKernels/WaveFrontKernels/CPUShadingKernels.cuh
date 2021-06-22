@@ -29,7 +29,8 @@ CPU_ONLY void ExtractSurfaceData(
     unsigned a_NumIntersections,
     WaveFront::AtomicBuffer <WaveFront::IntersectionData>* a_IntersectionData,
     WaveFront::AtomicBuffer <WaveFront::IntersectionRayData>* a_Rays,
-    WaveFront::SurfaceData* a_OutPut, 
+    WaveFront::SurfaceData* a_OutPut,
+    uint2 a_Resolution,
     SceneDataTableAccessor* a_SceneDataTable);
 
 /*

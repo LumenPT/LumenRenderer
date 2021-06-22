@@ -19,7 +19,9 @@
 
 #include "Tools/ImGuiUtil.h"
 
-#include "ModelLoaderWidget.h"
+#include "Lumen/ToolUI/ModelLoaderWidget.h"
+#include "Lumen/ToolUI/SceneGraph.h"
+#include "../vendor/stb/stb_image_write.h"
 
 #include "Glad/glad.h"
 
@@ -29,7 +31,6 @@
 
 #include <iostream>
 
-#include "../../LumenPT/src/Framework/CudaUtilities.h"
 
 OutputLayer::OutputLayer()
 	: m_CameraMovementSpeed(300.0f)
@@ -108,6 +109,8 @@ void OutputLayer::OnAttach()
 	}
 
 	m_ModelLoaderWidget = std::make_unique<ModelLoaderWidget>(*m_LayerServices->m_SceneManager, m_Renderer->m_Scene);
+	m_SceneGraph = std::make_unique<Lumen::SceneGraph>();
+	m_SceneGraph->SetRendererRef(*m_Renderer);
 }
 
 void OutputLayer::OnUpdate()
@@ -130,8 +133,12 @@ void OutputLayer::OnUpdate()
 		m_Renderer->BeginSnapshot();
 	}
 
+	if (Lumen::Input::IsKeyPressed(LMN_KEY_EQUAL))
+	{
+		MakeScreenshot(std::filesystem::current_path().string() + "\\Screenshots\\" + DefaultScreenshotName());
+	}
+
 	auto texture = m_Renderer->GetOutputTexture(); // TRACE SUM
-	HandleSceneInput();
 	m_LastFrameTex = texture;
 	m_SmallViewportFrameTex = texture;
 
@@ -148,6 +155,8 @@ void OutputLayer::OnUpdate()
 
 			glBindTexture(GL_TEXTURE_2D, texture);
 			glUseProgram(m_Program);
+			GLint loc = glGetUniformLocation(m_Program, "a_Gamma");
+			glUniform1f(loc, m_Gamma);
 			glDrawArrays(GL_TRIANGLES, 0, 3);
 
 			glBindTexture(GL_TEXTURE_2D, 0);
@@ -392,7 +401,13 @@ void OutputLayer::OnImGuiRender()
 
 	if (newRes != m_Renderer->GetRenderResolution())
 	{
+		newRes = glm::min(newRes, 4000u);
 		m_Renderer->SetRenderResolution(newRes);
+	}
+
+	if (ImGui::Button("Screenshot"))
+	{
+		MakeScreenshot(std::filesystem::current_path().string() + "\\Screenshots\\" + DefaultScreenshotName());
 	}
 
 	ImGui::End();
@@ -402,6 +417,7 @@ void OutputLayer::OnImGuiRender()
 	/////////////////////////////////////////////////
 
 	m_ModelLoaderWidget->Display();
+	m_SceneGraph->Display(*m_Renderer->m_Scene);
 }
 
 void OutputLayer::OnEvent(Lumen::Event& a_Event)
@@ -581,40 +597,6 @@ void OutputLayer::HandleCameraInput(Camera& a_Camera)
 	//a_Camera.SetYaw(a_Camera.GetYaw() + yawRotation);
 }
 
-void OutputLayer::HandleSceneInput()
-{
-
-	if (!m_Renderer)
-	{
-		printf("Error: No rendering pipeline present in the output layer!");
-		return;
-	}
-
-    static uint16_t keyDown = 0;
-
-	if (!ImGui::IsAnyItemActive())
-	{
-		if (!keyDown)
-		{
-			for (auto preset : m_ScenePresets)
-			{
-				if (Lumen::Input::IsKeyPressed(preset.m_Key))
-				{
-					preset.m_Function();
-					keyDown = preset.m_Key;
-
-					break;
-				}
-			}
-		}
-		else
-		{
-			if (!Lumen::Input::IsKeyPressed(keyDown))
-				keyDown = 0;
-		}
-	}
-}
-
 void OutputLayer::ImGuiCameraSettings()
 {
 
@@ -626,6 +608,8 @@ void OutputLayer::ImGuiCameraSettings()
 	ImGui::DragFloat("Camera Sensitivity", &m_CameraMouseSensitivity, 0.01f, 0.0f, 1.0f, "%.2f");
 
 	ImGui::DragFloat("Camera Movement Speed", &m_CameraMovementSpeed, 0.1f, 0.0f);
+
+	ImGui::SliderFloat("Gamma strength/Brightness", &m_Gamma, 1.0f, 4.0f);
 
 	ImGui::End();
 }
@@ -740,4 +724,23 @@ void OutputLayer::ContentViewDropDown()
 			ImGui::Text("X: %0.3f Y: %0.3f Z: %0.3f W: %0.3f", content.x, content.y, content.z, content.w);
 		};
 	}
+}
+
+void OutputLayer::MakeScreenshot(std::string a_ScreenshotFileName)
+{
+	uint32_t w, h;
+	auto pixels = m_Renderer->GetOutputTexturePixels(w, h);
+	std::filesystem::path p = a_ScreenshotFileName;
+	std::filesystem::create_directories(p.parent_path());
+	auto err = stbi_write_png(a_ScreenshotFileName.c_str(), w, h, 4, pixels.data(), 0);
+	assert(err);
+}
+
+std::string OutputLayer::DefaultScreenshotName()
+{
+	time_t now = time(0);
+	tm* time = gmtime(&now);
+	std::string name = "Screenshot" + std::to_string(time->tm_mday) + std::to_string(time->tm_mon) + '-'
+		+ std::to_string(time->tm_hour) + std::to_string(time->tm_min) + std::to_string(time->tm_sec) + ".png";
+	return name;
 }

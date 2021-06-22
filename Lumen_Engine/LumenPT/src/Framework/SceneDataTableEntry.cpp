@@ -6,6 +6,7 @@
 SceneDataTableEntryBase::SceneDataTableEntryBase()
     : m_Dirty(true) // The entries are initialized as dirty so that they can be added into the table at the next update
     , m_TableIndex(0)
+    , m_TableIndexValid(false)
     , m_Size(0)
     , m_RawData(nullptr)
     , m_EntryListRef(nullptr)
@@ -14,7 +15,7 @@ SceneDataTableEntryBase::SceneDataTableEntryBase()
 
 SceneDataTableEntryBase::~SceneDataTableEntryBase()
 {
-
+    
 }
 
 void SceneDataTableEntryBase::UpdateGeneratorReference()

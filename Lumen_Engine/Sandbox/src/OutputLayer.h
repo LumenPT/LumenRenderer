@@ -10,6 +10,11 @@
 #include "Renderer/Camera.h"
 #include "Tools/FrameSnapshot.h"
 
+namespace Lumen
+{
+    class SceneGraph;
+}
+
 class Camera;
 
 class LumenRenderer;
@@ -48,6 +53,9 @@ private:
     void InitContentViewNameTable();
     void ContentViewDropDown();
 
+    void MakeScreenshot(std::string a_ScreenshotFileName);
+    std::string DefaultScreenshotName();
+
     std::shared_ptr<LumenRenderer> m_Renderer;
     //std::unique_ptr<LumenPT> m_LumenPT;
 
@@ -57,8 +65,10 @@ private:
 
     float m_CameraMouseSensitivity;
     float m_CameraMovementSpeed;
+    float m_Gamma = 2.2f;
 
     std::unique_ptr<class ModelLoaderWidget> m_ModelLoaderWidget;
+    std::unique_ptr<Lumen::SceneGraph> m_SceneGraph;
 
     enum ContentViewMode
     {
@@ -119,10 +129,12 @@ private:
     "                                                                                         "
     "in vec2 a_UV; // the input variable from the vertex shader (same name and same type)\n   "
     "                                                                                         "
+    "uniform float a_Gamma; // gamma correction strength \n                                   "
     "uniform sampler2D u_Texture;\n                                                           "
     "                                                                                         "
     "void main()\n                                                                            "
     "{                                                                                        "
     "    FragColor = texture(u_Texture, a_UV);                                                "
+    "    FragColor.rgb = pow(FragColor.rgb, vec3(1.0/a_Gamma));                               "
     "}                                                                                        ";
 };

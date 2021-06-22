@@ -14,9 +14,6 @@ PTMeshInstance::PTMeshInstance(PTServiceLocator& a_ServiceLocator)
     // Register the instance to the dependency callback of its transform.
     // This ensures that DependencyCallback() is called when the transform changes.
     m_Transform.AddDependent(*this);
-    m_EmissionMode = Lumen::EmissionMode::ENABLED;
-    m_EmissiveOverride = { 0.f, 0.f, 0.f };
-    m_EmissionScale = 1.f;
 }
 
 
@@ -26,11 +23,6 @@ PTMeshInstance::PTMeshInstance(const Lumen::MeshInstance& a_Instance, PTServiceL
     m_Transform = a_Instance.m_Transform;
     m_Transform.AddDependent(*this);
     m_MeshRef = a_Instance.GetMesh();
-    m_EmissionMode = Lumen::EmissionMode::ENABLED;
-    m_EmissiveOverride = { 0.f, 0.f, 0.f };
-    m_EmissionScale = 1.f;
-
-
 }
 
 void PTMeshInstance::SetSceneRef(PTScene* a_SceneRef)
@@ -38,13 +30,13 @@ void PTMeshInstance::SetSceneRef(PTScene* a_SceneRef)
     // This is called when the mesh is first added to the scene. Essentially immediately flags the scene for an update.
     m_SceneRef = a_SceneRef;
     m_SceneRef->MarkSceneForUpdate();
-    UpdateRaytracingData();
+    MarkSceneDataAsDirty();
 }
 
 void PTMeshInstance::DependencyCallback()
 {
     m_SceneRef->MarkSceneForUpdate();
-    UpdateRaytracingData();
+    MarkSceneDataAsDirty();
 }
 
 
@@ -53,7 +45,7 @@ void PTMeshInstance::SetMesh(std::shared_ptr<Lumen::ILumenMesh> a_Mesh)
     MeshInstance::SetMesh(a_Mesh);
     // Because the mesh used by the instance was changed, the scene's structure needs to be rebuild to reflect the change.
     m_SceneRef->MarkSceneForUpdate();
-    UpdateRaytracingData();
+    MarkSceneDataAsDirty();
 }
 
 bool PTMeshInstance::VerifyAccelerationStructure()
@@ -115,18 +107,27 @@ OptixTraversableHandle PTMeshInstance::GetAccelerationStructureHandle() const
     return m_AccelerationStructure->m_TraversableHandle;
 }
 
+void PTMeshInstance::SetEmissiveness(const Emissiveness& a_EmissiveProperties)
+{
+    MeshInstance::SetEmissiveness(a_EmissiveProperties);
+    MarkSceneDataAsDirty();
+
+}
+
 void PTMeshInstance::SetAdditionalColor(glm::vec4 a_AdditionalColor)
 {
     m_AdditionalColor = a_AdditionalColor;
-    UpdateRaytracingData(); // I hate this so much but IDK how to do it better
+    //UpdateRaytracingData(); // I hate this so much but IDK how to do it better
 }
 
 void PTMeshInstance::UpdateRaytracingData()
 {
-    if (!m_MeshRef || !m_SceneRef)
+    if (!m_SceneDataDirty || !m_MeshRef || !m_SceneRef)
         return;
 
-    //std::vector<OptixInstance> instances;
+    m_SceneDataDirty = false;
+
+    std::vector<OptixInstance> instances;
 
     for (auto& prim : m_MeshRef->m_Primitives)
     {
@@ -134,7 +135,7 @@ void PTMeshInstance::UpdateRaytracingData()
 
         SceneDataTableEntry<DevicePrimitiveInstance>* entry;
         if (m_EntryMap.find(prim.get()) == m_EntryMap.end())
-            m_EntryMap[prim.get()] = m_SceneRef->m_SceneDataTable->AddEntry<DevicePrimitiveInstance>();
+            m_EntryMap[prim.get()] = m_SceneRef->AddDataTableEntry<DevicePrimitiveInstance>();
 
         entry = &m_EntryMap.at(prim.get());
 
@@ -147,8 +148,15 @@ void PTMeshInstance::UpdateRaytracingData()
 
         entryData.m_Primitive = ptPrim->m_DevicePrimitive;
         entryData.m_Transform = sutil::Matrix4x4(reinterpret_cast<float*>(&glmTransform[0]));
-        entryData.m_EmissionMode = m_EmissionMode;
-        entryData.m_EmissiveColorAndScale = make_float4(m_EmissiveOverride.x, m_EmissiveOverride.y, m_EmissiveOverride.z, m_EmissionScale);
+
+        assert(static_cast<int>(m_EmissiveProperties.m_EmissionMode) >= 0 && static_cast<int>(m_EmissiveProperties.m_EmissionMode) < 3);
+    	
+        entryData.m_EmissionMode = m_EmissiveProperties.m_EmissionMode;
+        entryData.m_EmissiveColorAndScale = make_float4(
+            m_EmissiveProperties.m_OverrideRadiance.x,
+            m_EmissiveProperties.m_OverrideRadiance.y,
+            m_EmissiveProperties.m_OverrideRadiance.z,
+            m_EmissiveProperties.m_Scale);
 
         //Check for overridden materials. If defined, overwrite the material pointer.
         if(m_OverrideMaterial != nullptr)

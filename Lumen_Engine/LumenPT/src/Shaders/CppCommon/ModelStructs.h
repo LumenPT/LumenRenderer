@@ -10,6 +10,8 @@ typedef unsigned long long cudaTextureObject_t;
 #endif
 #include <sutil/Matrix.h>
 
+#include "MaterialStructs.h"
+
 namespace Lumen {
     enum class EmissionMode;
 }
@@ -29,23 +31,31 @@ struct Vertex
 // Common material struct meant as a way to access a model's material on the GPU
 struct DeviceMaterial
 {
-
     DeviceMaterial()
-        :
-    m_DiffuseColor({0.f, 0.f, 0.f, 0.f}),
-    m_EmissionColor({0.f, 0.f, 0.f, 0.f}),
-    m_DiffuseTexture(0),
-    m_EmissiveTexture(0),
-    m_MetalRoughnessTexture(0),
-    m_NormalTexture(0)
-    {}
+        //Initialize everything with 0.
+	    : m_MaterialData(0.f),
+		  m_ClearCoatTexture(0),
+		  m_ClearCoatRoughnessTexture(0),
+	      m_TransmissionTexture(0),
+	      m_DiffuseTexture(0),
+	      m_EmissiveTexture(0),
+	      m_MetalRoughnessTexture(0),
+	      m_NormalTexture(0), m_TintTexture(0)
+    {
+    }
 
-    NONAMESPACE::float4 m_DiffuseColor;
-    NONAMESPACE::float4 m_EmissionColor;
+	//Tightly packed material data.
+    MaterialData m_MaterialData;
+
+	//Texture objects.
+    cudaTextureObject_t m_ClearCoatTexture;
+    cudaTextureObject_t m_ClearCoatRoughnessTexture;
+    cudaTextureObject_t m_TransmissionTexture;
     cudaTextureObject_t m_DiffuseTexture;
     cudaTextureObject_t m_EmissiveTexture;
     cudaTextureObject_t m_MetalRoughnessTexture;
     cudaTextureObject_t m_NormalTexture;
+    cudaTextureObject_t m_TintTexture;
 };
 
 //TODO: change this naming because it is confusing, it could be name DevicePrimitiveArray or DeviceMesh

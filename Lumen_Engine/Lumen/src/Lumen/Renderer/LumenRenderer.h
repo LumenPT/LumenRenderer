@@ -53,12 +53,52 @@ public:
 	// Struct used to initialize a material
 	struct MaterialData
 	{
+		MaterialData(): m_DiffuseColor(1.f, 1.f, 1.f, 1.f), m_EmissionVal(0.f, 0.f, 0.f), m_TransmissionFactor(0.f),
+                        m_ClearCoatFactor(0),
+                        m_ClearCoatRoughnessFactor(0),
+                        m_IndexOfRefraction(1.f),
+                        m_SpecularFactor(0),
+                        m_SpecularTintFactor(0),
+						m_SubSurfaceFactor(0),
+                        m_Luminance(1.f),
+                        m_Anisotropic(0),
+                        m_SheenFactor(0),
+						m_SheenTintFactor(0),
+						m_MetallicFactor(1.f),
+						m_RoughnessFactor(1.f),
+                        m_TintFactor(1.f, 1.f, 1.f),
+                        m_Transmittance(1.f, 1.f, 1.f)
+        {
+        }
+
 		glm::vec4 m_DiffuseColor;
 		glm::vec3 m_EmissionVal;
 		std::shared_ptr<Lumen::ILumenTexture> m_DiffuseTexture;
 		std::shared_ptr<Lumen::ILumenTexture> m_NormalMap;
 		std::shared_ptr<Lumen::ILumenTexture> m_MetallicRoughnessTexture;
 		std::shared_ptr<Lumen::ILumenTexture> m_EmissiveTexture;
+
+		//Disney!
+		std::shared_ptr<Lumen::ILumenTexture> m_TransmissionTexture;
+		std::shared_ptr<Lumen::ILumenTexture> m_ClearCoatTexture;
+		std::shared_ptr<Lumen::ILumenTexture> m_ClearCoatRoughnessTexture;
+		std::shared_ptr<Lumen::ILumenTexture> m_TintTexture;
+
+		float m_TransmissionFactor;
+		float m_ClearCoatFactor;
+		float m_ClearCoatRoughnessFactor;
+		float m_IndexOfRefraction;
+		float m_SpecularFactor;
+		float m_SpecularTintFactor;
+		float m_SubSurfaceFactor;
+		float m_Luminance;
+		float m_Anisotropic;
+		float m_SheenFactor;
+		float m_SheenTintFactor;
+		float m_MetallicFactor;
+		float m_RoughnessFactor;
+		glm::vec3 m_TintFactor;
+		glm::vec3 m_Transmittance;
 	};
 
 	// Struct used to initialize a scene
@@ -90,7 +130,7 @@ public:
 
 	};
 
-	LumenRenderer() {};
+	LumenRenderer()	{};
 	LumenRenderer(const InitializationData& a_InitializationData) {};
 	virtual ~LumenRenderer() = default;
 
@@ -108,15 +148,19 @@ public:
 	// Create a mesh from the provided primitives
 	virtual std::shared_ptr<Lumen::ILumenMesh> CreateMesh(std::vector<std::shared_ptr<Lumen::ILumenPrimitive>>& a_Primitives) = 0;
 	// Create a texture from the provided texture data
-	virtual std::shared_ptr<Lumen::ILumenTexture> CreateTexture(void* a_PixelData, uint32_t a_Width, uint32_t a_Height) = 0;
+	virtual std::shared_ptr<Lumen::ILumenTexture> CreateTexture(void* a_PixelData, uint32_t a_Width, uint32_t a_Height, bool a_Normalize) = 0;
 	// Create a material from the provided material data
+	std::shared_ptr<Lumen::ILumenMaterial> CreateMaterial();
 	virtual std::shared_ptr<Lumen::ILumenMaterial> CreateMaterial(const MaterialData& a_MaterialData) = 0;
 	// Create a scene from the provided scene data
 	virtual std::shared_ptr<Lumen::ILumenScene> CreateScene(SceneData a_SceneData = {});
 	// Create a volume from the provided file path
 	virtual std::shared_ptr<Lumen::ILumenVolume> CreateVolume(const std::string& a_FilePath) = 0;
 
+	void CreateDefaultResources();
+
 	virtual unsigned int GetOutputTexture() = 0;	//scene argument may be redundant... or not
+	virtual std::vector<uint8_t> GetOutputTexturePixels(uint32_t& a_Width, uint32_t& a_Height) = 0;
 
 	virtual void SetRenderResolution(glm::uvec2 a_NewResolution) = 0;
 	virtual void SetOutputResolution(glm::uvec2 a_NewResolution) = 0;
@@ -145,7 +189,11 @@ public:
 
 	//Debug GLuint texture accessible by application
 	GLuint m_DebugTexture;
-	
+
+
 private:
+	std::shared_ptr<Lumen::ILumenTexture> m_DefaultWhiteTexture;
+	std::shared_ptr<Lumen::ILumenTexture> m_DefaultNormalTexture;
+	std::shared_ptr<Lumen::ILumenTexture> m_DefaultDiffuseTexture;
 		
 };

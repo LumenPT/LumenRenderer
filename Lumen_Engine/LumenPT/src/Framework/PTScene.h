@@ -7,6 +7,9 @@
 
 #include <set>
 
+#include "SceneDataTableEntry.h"
+#include "SceneDataTable.h"
+
 struct PTServiceLocator;
 class PTMeshInstance;
 class SceneDataTable;
@@ -36,10 +39,20 @@ public:
     // Updates the instance acceleration structure of the scene
     void UpdateSceneAccelerationStructure();
 
-    std::unique_ptr<SceneDataTable> m_SceneDataTable;
+    template <typename T>
+    SceneDataTableEntry<T> AddDataTableEntry ()
+    {
+        return m_SceneDataTable->AddEntry<T>();
+    };
+
+    SceneDataTableAccessor* GetSceneDataTableAccessor();
+
 private:
+    void UpdateSceneDataTable();
+
     // Reference to the path tracer service locator. Necessary when updating the scene acceleration structure
     PTServiceLocator& m_Services;
+    std::unique_ptr<SceneDataTable> m_SceneDataTable;
 
     // Handle for the acceleration structure of the scene
     std::unique_ptr<class AccelerationStructure> m_SceneAccelerationStructure;

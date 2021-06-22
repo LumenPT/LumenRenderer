@@ -89,10 +89,6 @@ add_compile_definitions(CONFIG_NAME=\"${CONFIG_NAME}\")
 add_subdirectory ("LumenPT/vendor/openvdb")
 	#NanoVDB
 add_subdirectory ("LumenPT/vendor/openvdb/nanovdb")
-	#NRD
-if(${USE_NVIDIA_DENOISER})
-	#add_subdirectory ("LumenPT/vendor/RayTracingDenoiser")
-endif()
 	#Lumen
 add_subdirectory ("Lumen")
 	#LumenPT

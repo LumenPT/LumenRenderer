@@ -18,7 +18,7 @@ namespace WaveFront
 			m_EntryT(-1.f),
 			m_ExitT(-1.f),
 			m_VolumeGrid(nullptr),
-			m_PixelIndex(0)
+			m_PixelIndex({0, 0})
 		{
 		}
 
@@ -30,7 +30,7 @@ namespace WaveFront
 			nanovdb::FloatGrid* a_VolumeGrid,
 			unsigned int a_PrimitiveIndex,
 			unsigned int a_InstanceId,
-			unsigned int a_PixelIndex)
+			const PixelIndex& a_PixelIndex)
 			:
 			m_RayArrayIndex(a_RayArrayIndex),
 			m_EntryT(a_EntryT),
@@ -57,7 +57,7 @@ namespace WaveFront
 		unsigned int m_RayArrayIndex;
 
 		//The index of the pixel/surface that this intersection affects.
-		unsigned int m_PixelIndex;
+		PixelIndex m_PixelIndex;
 
 		//Distance along ray to entry of volumetric bounding box
 		float m_EntryT;

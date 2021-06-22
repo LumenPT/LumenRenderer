@@ -1,6 +1,7 @@
 #pragma once
 
 #include <unordered_map>
+#include <set>
 
 // The base class is necessary to have a common way of storing all entries in the generator class,
 // Despite them all having different data attached to them
@@ -19,6 +20,7 @@ public:
 
     // The index that is used to access this entry within the scene data table
     uint32_t m_TableIndex;
+    bool m_TableIndexValid;
 
 protected:
     // Update the pointer within the generator to point to a new entry in the case of movement
@@ -29,6 +31,7 @@ protected:
 
     // Reference to the list containing the entry
     std::unordered_map<uint64_t, SceneDataTableEntryBase*>* m_EntryListRef;
+    std::set<uint64_t>* m_KeyListRef;
 
     uint64_t m_Key; // Key used to find the entry in the list
     bool m_Dirty; // Has the entry been modified since last time the table was updated
@@ -79,6 +82,9 @@ SceneDataTableEntry<T>::~SceneDataTableEntry()
     // This is used to determine if this is the real instance that is being deleted
     if (m_EntryListRef)
         m_EntryListRef->erase(m_Key);
+    if (m_KeyListRef)
+        m_KeyListRef->emplace(m_Key);
+        
 }
 
 template <typename T>
@@ -90,6 +96,7 @@ SceneDataTableEntry<T>::SceneDataTableEntry(SceneDataTableEntry<T>&& a_Other)
 
     // Invalidate the original entry so that its destruction is not reflected in the generator
     a_Other.m_EntryListRef = nullptr;
+    a_Other.m_KeyListRef = nullptr;
 
     // The raw data pointer is changed because the entry is allocated at a new place in memory
     m_RawData = &m_Data;
@@ -104,6 +111,7 @@ SceneDataTableEntry<T>& SceneDataTableEntry<T>::operator=(SceneDataTableEntry<T>
 
     // Invalidate the original entry so that its destruction is not reflected in the generator
     a_Other.m_EntryListRef = nullptr;
+    a_Other.m_KeyListRef = nullptr;
 
     // The raw data pointer is changed because the entry is allocated at a new place in memory
     m_RawData = &m_Data;
