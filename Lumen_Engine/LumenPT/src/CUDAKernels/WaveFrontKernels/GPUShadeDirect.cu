@@ -8,27 +8,42 @@
 
 CPU_ON_GPU void ExtractDepthDataGpu(const SurfaceData* a_OutPut, cudaSurfaceObject_t a_DepthOutPut)
 {
+    uint2 resolution = { 1280, 720 };
     
     const unsigned int pixelX = blockIdx.x * blockDim.x + threadIdx.x;
     const unsigned int pixelY = blockIdx.y * blockDim.y + threadIdx.y;
 
+    const unsigned int pixelIndexTable = PIXEL_DATA_INDEX(pixelX, pixelY, resolution.x);
+
     //Check if a_OutPut->m_IntersectionT > a_DepthOutPut->depthValueAtPixelIndex to avoid writing to it if the T < value already there
     //if T > valueAtPixel ? overwrite : keep valueAtPixel
+    
+    //printf("DEEEEEEEPTH!!!!!!!!! \n");
 
     //gonna need pixel index probably
-    if (a_OutPut->m_IntersectionT > 10000.0)
+    if (pixelX < resolution.x && pixelY < resolution.y)
     {
-        float t = a_OutPut->m_IntersectionT;
+        //if (a_OutPut[pixelIndexTable].m_IntersectionT < 0)
+        //{
+        //    return; 
+        //}
 
-        float tt = (t - fminf(0.f, t)) / (fmaxf(1.f, t) - fminf(0.f, t));
+        //float t = a_OutPut[pixelIndexTable].m_IntersectionT;
 
-        printf("Depth Value\n", tt);
+        //float tt = (t - fminf(0.f, t)) / (fmaxf(1.f, t) - fminf(0.f, t));
+
+        half4Ushort4 name = { 1.f };
+        printf("Depth Value %su %su %su %su \n", name.m_Ushort4.x, name.m_Ushort4.y, name.m_Ushort4.z, name.m_Ushort4.w);
+
+        
 
         //a_DepthOutPut[a_OutPut->m_PixelIndex] = { 0, 0, 1.0 };
-        surf2Dwrite<float1>(
-            make_float1((t - fminf(0.f, t))/(fmaxf(1.f, t)-fminf(0.f, t))), //clamp to 1.0f
+        surf2Dwrite<ushort4>(
+            //name.m_Ushort4,
+            make_ushort4(1, 1, 1, 1),
+            //make_float1((t - fminf(0.f, t))/(fmaxf(1.f, t)-fminf(0.f, t))), //clamp to 1.0f
             a_DepthOutPut,  //intput
-            pixelX * sizeof(float1),
+            pixelX * sizeof(ushort4),
             pixelY,
             cudaBoundaryModeClamp);
     }

@@ -94,8 +94,8 @@ public:
 		settings.depth = 5;
 		settings.minIntersectionT = 0.1f;
 		settings.maxIntersectionT = 5000.f;
-		settings.renderResolution = { 800, 600 };
-		settings.outputResolution = { 800, 600 };
+		settings.renderResolution = { 1280, 720 };
+		settings.outputResolution = { 1280, 720 };
 		//settings.outputResolution = { 1280, 720 };
 		settings.blendOutput = false;	//When true will blend output instead of overwriting it (high res image over time if static scene).
 
@@ -158,12 +158,14 @@ public:
 		std::replace(p_string3.begin(), p_string3.end(), '\\', '/');
 
 		const std::string meshPath = p_string.append("/Sandbox/assets/models/Sponza/");
+		//const std::string meshPath = p_string.append("/Sandbox/assets/gltfExternalAssets/Benchmark_Scenes/Bistro3BinaryNoParenting/");
 		const std::string meshPath2 = p_string2.append("/Sandbox/assets/models/EmissiveSphere/");
 		//const std::string meshPath3 = p_string3.append("/Sandbox/assets/models/knight/");
 		//Base path for meshes.
 
 		//Mesh name
 		const std::string meshName = "Sponza.gltf";
+		//const std::string meshName = "Bistro3BinaryNoParenting.glb";
 		const std::string meshName2 = "EmissiveSphere.gltf";
 		//const std::string meshName3 = "scene.gltf";
 

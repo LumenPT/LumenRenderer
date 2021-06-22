@@ -65,14 +65,18 @@ CPU_ONLY void ExtractSurfaceData(
     SurfaceData* a_OutPut,
     cudaSurfaceObject_t a_DepthOutPut,
     uint2 a_Resolution,
-    SceneDataTableAccessor* a_SceneDataTable)
+    SceneDataTableAccessor* a_SceneDataTable,
+    unsigned int a_CurrentDepth)
 {
     const int blockSize = 512;
     const int numBlocks = (a_NumIntersections + blockSize - 1) / blockSize;
 
     ExtractSurfaceDataGpu<<<numBlocks, blockSize>>>(a_NumIntersections, a_IntersectionData, a_Rays, a_OutPut, a_Resolution, a_SceneDataTable);
     cudaDeviceSynchronize();
-    ExtractDepthDataGpu <<<numBlocks, blockSize>>>(a_OutPut, a_DepthOutPut);
+    if (a_CurrentDepth == 0)
+    {
+        //ExtractDepthDataGpu <<<numBlocks, blockSize>>>(a_OutPut, a_DepthOutPut);
+    }
 
 }
 
