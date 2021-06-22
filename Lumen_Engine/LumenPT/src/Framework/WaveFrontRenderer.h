@@ -121,6 +121,8 @@ namespace WaveFront
         void SetOutputResolutionInternal(glm::uvec2 a_NewResolution);
         void WaitForDeferredCalls(); // Stalls the thread until all calls that are deferred to other treads are performed
 
+        void FinalizeFrameStats();
+
         //OpenGL buffer to write output to.
         std::unique_ptr<CudaGLTexture> m_OutputBuffer;
 
@@ -213,6 +215,8 @@ namespace WaveFront
         bool m_StartSnapshot;
 
         LumenPTModelConverter m_ModelConverter;
+
+        FrameStats m_CurrentFrameStats;
     };
 }
 #endif

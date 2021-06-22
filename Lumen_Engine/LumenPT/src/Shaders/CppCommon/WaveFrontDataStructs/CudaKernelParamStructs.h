@@ -6,7 +6,7 @@
 #include "MotionVectorsGenerationData.h"
 
 class ReSTIR;
-
+struct FrameStats;
 namespace WaveFront
 {
     class OptixWrapper;
@@ -116,6 +116,7 @@ namespace WaveFront
         AtomicBuffer<ShadowRayData>* m_VolumetricShadowRayBuffer;
         ReSTIR* m_ReSTIR;
         cudaSurfaceObject_t m_Output;
+        FrameStats* m_FrameStats;
     };
 
     struct PostProcessLaunchParameters
