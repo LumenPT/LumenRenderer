@@ -45,6 +45,7 @@ namespace WaveFront
         D3D11_TEXTURE2D_DESC desc{};
         desc.Width = a_ResDepth.x;
         desc.Height = a_ResDepth.y;
+        desc.MipLevels = 1;
         desc.ArraySize = a_ResDepth.z;
         desc.Format = a_Format; //TODO: find out how to use 16 bit float format with CUDA (DLSS & NRD requirement). Provide as param?
         desc.SampleDesc = textureSampleDesc;
