@@ -74,11 +74,9 @@ __host__ void FillCDF(CDF* a_Cdf, float* a_CdfTreeBuffer, WaveFront::AtomicBuffe
     const unsigned blockCount = (a_LightCount + blockSize - 1) / blockSize;
     CalculateLightWeightsInCDF<<<blockCount, blockSize>>>(a_Cdf, a_Lights, a_LightCount);
     CHECKLASTCUDAERROR;
-    printf("Done calculating weights!\n");
     thrust::device_ptr<float> cdfStart(reinterpret_cast<float*>(reinterpret_cast<char*>(a_Cdf) + (2 * sizeof(unsigned))));
     thrust::device_ptr<float> cdfEnd(cdfStart + a_LightCount);
     thrust::inclusive_scan(cdfStart, cdfEnd, cdfStart);
-    printf("Done running prefix scan!\n");
 	
     //NOTE: Commented out because thrust offers a simpler version.
     ////Use 512 threads per block, since these are relatively tiny operations.
