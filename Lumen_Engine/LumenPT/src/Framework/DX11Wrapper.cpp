@@ -59,14 +59,25 @@ namespace WaveFront
 
     }
 
-    Microsoft::WRL::ComPtr<ID3D11Texture2D> DX11Wrapper::ResizeTexture2D(Microsoft::WRL::ComPtr<ID3D11Texture2D>& a_Tex, const uint2& a_NewSize)
+    Microsoft::WRL::ComPtr<ID3D11Texture2D> DX11Wrapper::ResizeTexture2D(Microsoft::WRL::ComPtr<ID3D11Texture2D>& a_Tex, const uint3& a_NewSize)
     {
         D3D11_TEXTURE2D_DESC desc;
         a_Tex->GetDesc(&desc);
-        desc.Width = a_NewSize.x;
-        desc.Height = a_NewSize.y;
-        CHECKDX11RESULT(m_D3dDevice->CreateTexture2D(&desc, nullptr, &a_Tex)); //Data is lost now
+
+        if( a_NewSize.x != desc.Width   ||
+            a_NewSize.y != desc.Height  ||
+            a_NewSize.z != desc.ArraySize)
+        {
+
+            desc.Width = a_NewSize.x;
+            desc.Height = a_NewSize.y;
+            desc.ArraySize = a_NewSize.z;
+            CHECKDX11RESULT(m_D3dDevice->CreateTexture2D(&desc, nullptr, a_Tex.ReleaseAndGetAddressOf())); //Data is lost 
+            
+        }
+
         return a_Tex;
+        
     }
 
 }

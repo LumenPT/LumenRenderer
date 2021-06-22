@@ -29,7 +29,11 @@ public:
 
     ~InteropGPUTexture();
 
-    void Map(
+    bool RegisterResource(const ComPtr<ID3D11Resource>& a_Resource);
+
+    static void UnRegisterResource(const ComPtr<ID3D11Resource>& a_Resource);
+
+    bool Map(
         unsigned int a_ArrayIndex = 0,
         unsigned int a_MipLevel = 0,
         unsigned int a_MapFlags = cudaGraphicsMapFlagsNone);
@@ -42,9 +46,6 @@ public:
     const cudaSurfaceObject_t& GetSurfaceObject();
 
 private:
-
-    void RegisterResource(
-        const ComPtr<ID3D11Resource>& a_TextureResource);
 
     void CreateTextureObject();
 
@@ -60,7 +61,11 @@ private:
     cudaSurfaceObject_t m_SurfaceObject;
 
     //TODO: maybe needs a different container types for performance, Registering only happens during creation of the buffer and resizing, Mapping happens every frame.
-    static std::map<ComPtr<ID3D11Resource>, std::shared_ptr<cudaGraphicsResource_t>> s_RegisteredResources; 
+    static std::map<const ComPtr<ID3D11Resource>,
+        std::pair<
+            std::shared_ptr<cudaGraphicsResource_t>,
+            std::set<InteropGPUTexture*>>> s_RegisteredResources;
+
     static std::set<std::shared_ptr<cudaGraphicsResource_t>> s_MappedResources; 
 
 };

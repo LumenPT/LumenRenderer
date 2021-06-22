@@ -8,7 +8,14 @@
 
 using namespace Microsoft::WRL;
 
-std::map<ComPtr<ID3D11Resource>, std::shared_ptr<cudaGraphicsResource_t>> InteropGPUTexture::s_RegisteredResources = {};
+std::map<
+    const ComPtr<ID3D11Resource>,
+    std::pair<
+        std::shared_ptr<cudaGraphicsResource_t>,
+        std::set<InteropGPUTexture*>
+    >
+> InteropGPUTexture::s_RegisteredResources = {};
+
 std::set<std::shared_ptr<cudaGraphicsResource_t>> InteropGPUTexture::s_MappedResources = {};
 
 InteropGPUTexture::InteropGPUTexture(
@@ -35,19 +42,104 @@ InteropGPUTexture::~InteropGPUTexture()
 
 }
 
-void InteropGPUTexture::Map(
+bool InteropGPUTexture::RegisterResource(const ComPtr<ID3D11Resource>& a_Resource)
+{
+
+    //Check if the resource is already registered.
+    const auto resourceIterator = s_RegisteredResources.find(a_Resource);
+
+    //If the resource is already registered...
+    if (resourceIterator != s_RegisteredResources.end())
+    {
+
+        std::set<InteropGPUTexture*>& registeredTextures = resourceIterator->second.second;
+
+        //Check if this texture is not already registered.
+        if (registeredTextures.find(this) == registeredTextures.end())
+        {
+
+            const auto insert = registeredTextures.insert(this); //Try to insert as a registered texture.
+            if (insert.second)
+            {
+                m_Resource = resourceIterator->second.first;
+            }
+            else return false; //Texture has not been registered, failed to insert.
+        }
+        else return true; //Texture has already been registered, no need to register again.
+    }
+    else //If the resource is not registered yet...
+    {
+
+        
+        cudaGraphicsResource_t resource = { nullptr };
+        //Get a set of registered textures to a certain resource, initialize with current texture.
+        const std::set<InteropGPUTexture*> registeredTextures = { this };
+
+        //Register the resource.
+        CHECKCUDAERROR(cudaGraphicsD3D11RegisterResource(&resource, a_Resource.Get(), m_RegisterFlags));
+
+        //Store the resource as a shared_ptr for book keeping.
+        std::shared_ptr<cudaGraphicsResource_t> resourcePtr = std::make_shared<cudaGraphicsResource_t>(resource);
+
+        //Try to insert as a registered texture resource.
+        const auto insert = s_RegisteredResources.insert({a_Resource, std::make_pair(resourcePtr, registeredTextures)});
+        if(insert.second)
+        {
+
+            //Add shared_ptr reference to the texture resource.
+            m_Resource = resourcePtr;
+            
+        }
+    }
+
+}
+
+void InteropGPUTexture::UnRegisterResource(const ComPtr<ID3D11Resource>& a_Resource)
+{
+
+    //Check if the resource is registered.
+    const auto resourceIterator = s_RegisteredResources.find(a_Resource);
+    //If the resource if registered...
+    if (resourceIterator != s_RegisteredResources.end())
+    {
+
+        //Unregister the resource.
+        CHECKCUDAERROR(cudaGraphicsUnregisterResource(*resourceIterator->second.first));
+
+        std::set<InteropGPUTexture*>& registeredTextures = resourceIterator->second.second;
+
+        for (InteropGPUTexture* const texture : registeredTextures)
+        {
+
+            texture->m_Resource = nullptr;
+
+        }
+
+        s_RegisteredResources.erase(resourceIterator);
+        return;
+
+    }
+    else return;
+    //Resource is not unregistered, as it was not registered.
+    //However, the goal is met, the resource is not registered (anymore) after this call.
+
+}
+
+bool InteropGPUTexture::Map(
     unsigned a_ArrayIndex, 
     unsigned a_MipLevel,
     unsigned a_MapFlags)
 {
 
     assert(m_Resource != nullptr && "Resource was not initialized !");
+    bool success = true;
 
     if(s_MappedResources.find(m_Resource) == s_MappedResources.end())
     {
 
         CHECKCUDAERROR(cudaGraphicsMapResources(1, m_Resource.get()));
-        s_MappedResources.insert(m_Resource);
+
+        success = s_MappedResources.insert(m_Resource).second;
 
     }
 
@@ -56,6 +148,8 @@ void InteropGPUTexture::Map(
         *m_Resource,
         a_ArrayIndex,
         a_MipLevel));
+
+    return success;
 
 }
 
@@ -154,30 +248,6 @@ const cudaSurfaceObject_t& InteropGPUTexture::GetSurfaceObject()
     }
 
     return m_SurfaceObject;
-
-}
-
-void InteropGPUTexture::RegisterResource(const ComPtr<ID3D11Resource>& a_TextureResource)
-{
-
-    const auto resourceIterator = s_RegisteredResources.find(a_TextureResource);
-    if (resourceIterator != s_RegisteredResources.end())
-    {
-        m_Resource = resourceIterator->second;
-        return;
-    }
-    else
-    {
-
-        cudaGraphicsResource_t tempPtr = nullptr;
-
-        CHECKCUDAERROR(cudaGraphicsD3D11RegisterResource(&tempPtr, a_TextureResource.Get(), m_RegisterFlags));
-
-        m_Resource = std::make_shared<cudaGraphicsResource_t>(tempPtr);
-
-        s_RegisteredResources.insert({ a_TextureResource, m_Resource });
-        
-    }
 
 }
 

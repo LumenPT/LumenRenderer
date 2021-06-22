@@ -33,7 +33,10 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(unsigned a_NumIntersections,
     SceneDataTableAccessor* a_SceneDataTable);
 
     
-CPU_ON_GPU void ExtractDepthDataGpu(const SurfaceData* a_OutPut, cudaSurfaceObject_t a_DepthOutPut);
+CPU_ON_GPU void ExtractDepthDataGpu(
+    const SurfaceData* a_SurfaceData,
+    cudaSurfaceObject_t a_DepthOutPut,
+    uint2 a_Resolution);
 
 //Called during shading
 

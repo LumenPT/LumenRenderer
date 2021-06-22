@@ -72,10 +72,20 @@ CPU_ONLY void ExtractSurfaceData(
     const int numBlocks = (a_NumIntersections + blockSize - 1) / blockSize;
 
     ExtractSurfaceDataGpu<<<numBlocks, blockSize>>>(a_NumIntersections, a_IntersectionData, a_Rays, a_OutPut, a_Resolution, a_SceneDataTable);
+
     cudaDeviceSynchronize();
     if (a_CurrentDepth == 0)
     {
-        //ExtractDepthDataGpu <<<numBlocks, blockSize>>>(a_OutPut, a_DepthOutPut);
+
+        const dim3 blockSize2d{ 16, 16 ,1 };
+        const unsigned blockSizeWidth =
+            static_cast<unsigned>(std::ceil(static_cast<float>(a_Resolution.x) / static_cast<float>(blockSize2d.x)));
+        const unsigned blockSizeHeight =
+            static_cast<unsigned>(std::ceil(static_cast<float>(a_Resolution.y) / static_cast<float>(blockSize2d.y)));
+
+        const dim3 numBlocks2d{ blockSizeWidth, blockSizeHeight, 1 };
+
+        ExtractDepthDataGpu <<<numBlocks2d, blockSize2d>>>(a_OutPut, a_DepthOutPut, a_Resolution);
     }
 
 }
@@ -267,13 +277,6 @@ CPU_ONLY void WriteToOutput(const PostProcessLaunchParameters& a_PostProcessPara
 {
     //The amount of pixels and threads/blocks needed to apply effects.
     const dim3 blockSize{ 32, 32 ,1 };
-
-    const unsigned blockSizeWidth =
-        static_cast<unsigned>(std::ceil(static_cast<float>(a_PostProcessParams.m_RenderResolution.x) / static_cast<float>(blockSize.x)));
-    const unsigned blockSizeHeight =
-        static_cast<unsigned>(std::ceil(static_cast<float>(a_PostProcessParams.m_RenderResolution.y) / static_cast<float>(blockSize.y)));
-
-    const dim3 numBlocks{ blockSizeWidth, blockSizeHeight, 1 };
 
     const unsigned blockSizeWidthUpscaled =
         static_cast<unsigned>(std::ceil(static_cast<float>(a_PostProcessParams.m_OutputResolution.x) / static_cast<float>(blockSize.x)));
