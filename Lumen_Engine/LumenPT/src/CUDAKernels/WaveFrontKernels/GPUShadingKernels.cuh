@@ -36,7 +36,8 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(unsigned a_NumIntersections,
 CPU_ON_GPU void ExtractDepthDataGpu(
     const SurfaceData* a_SurfaceData,
     cudaSurfaceObject_t a_DepthOutPut,
-    uint2 a_Resolution);
+    uint2 a_Resolution,
+    float2 a_MinMaxDistance);
 
 //Called during shading
 

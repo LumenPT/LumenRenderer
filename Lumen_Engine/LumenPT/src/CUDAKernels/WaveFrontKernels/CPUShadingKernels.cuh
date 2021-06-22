@@ -33,6 +33,7 @@ CPU_ONLY void ExtractSurfaceData(
     cudaSurfaceObject_t a_DepthOutPut,
     uint2 a_Resolution,
     SceneDataTableAccessor* a_SceneDataTable,
+    float2 a_MinMaxDepth,
     unsigned int a_CurrentDepth);
 
 /*

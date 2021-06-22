@@ -668,6 +668,8 @@ namespace WaveFront
 
         auto seed = WangHash(frameCount);
 
+        float2 minMaxDepth = make_float2(m_Settings.minIntersectionT, m_Settings.maxIntersectionT);
+
         /*
          * Resolve rays and shade at every depth.
          */
@@ -689,15 +691,18 @@ namespace WaveFront
 
         	if(numIntersections > 0)
         	{
+
                 //pass depth buffer into extract surface data
                 ExtractSurfaceData(
                     numIntersections,
                     m_IntersectionData.GetDevicePtr<AtomicBuffer<IntersectionData>>(),
                     m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>(),
                     m_SurfaceData[surfaceDataBufferIndex].GetDevicePtr<SurfaceData>(),
-                    m_PixelBufferCombined->GetSurfaceObject(),
+                    m_DepthBuffer->GetSurfaceObject(),
+                    //m_PixelBufferCombined->GetSurfaceObject(),
                     m_Settings.renderResolution,
                     sceneDataTableAccessor,
+                    minMaxDepth,
                     depth);
 
 
@@ -838,7 +843,7 @@ namespace WaveFront
             //Post processing using CUDA kernel.
             //PostProcess(postProcessLaunchParams);
 
-            //MergeOutput(postProcessLaunchParams);
+            MergeOutput(postProcessLaunchParams);
             cudaDeviceSynchronize();
             CHECKLASTCUDAERROR;
 

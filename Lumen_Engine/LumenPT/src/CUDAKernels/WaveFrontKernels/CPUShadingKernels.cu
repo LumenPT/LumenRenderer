@@ -66,6 +66,7 @@ CPU_ONLY void ExtractSurfaceData(
     cudaSurfaceObject_t a_DepthOutPut,
     uint2 a_Resolution,
     SceneDataTableAccessor* a_SceneDataTable,
+    float2 a_MinMaxDepth,
     unsigned int a_CurrentDepth)
 {
     const int blockSize = 512;
@@ -85,7 +86,7 @@ CPU_ONLY void ExtractSurfaceData(
 
         const dim3 numBlocks2d{ blockSizeWidth, blockSizeHeight, 1 };
 
-        ExtractDepthDataGpu <<<numBlocks2d, blockSize2d>>>(a_OutPut, a_DepthOutPut, a_Resolution);
+        ExtractDepthDataGpu <<<numBlocks2d, blockSize2d>>>(a_OutPut, a_DepthOutPut, a_Resolution, a_MinMaxDepth);
     }
 
 }
