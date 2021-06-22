@@ -9,6 +9,7 @@
 #include "../Framework/MemoryBuffer.h"
 #include "../Shaders/CppCommon/WaveFrontDataStructs.h"
 #include "../CUDAKernels/RandomUtilities.cuh"
+#include <thrust/sort.h>
 
 /*
  * Macros used to access elements at a certain index.
@@ -24,11 +25,28 @@ namespace WaveFront {
     struct TriangleLight;
 }
 
+
+struct TriangleLightComparator
+{
+    __host__ __device__ bool operator()(const WaveFront::TriangleLight& lhs, const WaveFront::TriangleLight& rhs) const
+	{
+        return ((lhs.radiance.x + lhs.radiance.y + lhs.radiance.z) / 3.f) < ((rhs.radiance.x + rhs.radiance.y + rhs.radiance.z) / 3.f);
+    }
+};
+
+struct CdfComparator
+{
+    __host__ __device__ bool operator()(const WaveFront::TriangleLight& lhs, const WaveFront::TriangleLight& rhs) const
+    {
+        return ((lhs.radiance.x + lhs.radiance.y + lhs.radiance.z) / 3.f) + ((rhs.radiance.x + rhs.radiance.y + rhs.radiance.z) / 3.f);
+    }
+};
+
 __host__ void ResetReservoirs(int a_NumReservoirs, Reservoir* a_ReservoirPointer);
 
 __global__ void ResetReservoirInternal(int a_NumReservoirs, Reservoir* a_ReservoirPointer);
 
-__host__ void FillCDF(CDF* a_Cdf, float* a_CdfTreeBuffer, const WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights, unsigned a_LightCount);
+__host__ void FillCDF(CDF* a_Cdf, float* a_CdfTreeBuffer, WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights, unsigned a_LightCount);
 
 __global__ void ResetCDF(CDF* a_Cdf);
 
@@ -53,6 +71,12 @@ __global__ void BuildCDFTree(float* a_CdfTreeBuffer, unsigned a_NumParentNodes, 
  * Calculate the weights for each light and output to the CDF tree.
  */
 __global__ void CalculateLightWeights(float* a_CdfTreeBuffer, const WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights, unsigned a_LightCount, unsigned a_NumLeafNodes);
+
+/*
+ * Calculate light weights and directly put them in the CDF.
+ */
+__global__ void CalculateLightWeightsInCDF(CDF* a_Cdf, const WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights, unsigned a_LightCount);
+
 
 /*
  * Traverse the binary tree to fill the CDF with the sums of the light buffer.

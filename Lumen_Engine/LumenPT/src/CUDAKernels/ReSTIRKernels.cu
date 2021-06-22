@@ -9,6 +9,8 @@
 #include "../Framework/Timer.h"
 #include "disney.cuh"
 #include "../Framework/CudaUtilities.h"
+#include <thrust/sort.h>
+#include <thrust/device_ptr.h>
 
 #define CUDA_BLOCK_SIZE 256
 
@@ -38,7 +40,7 @@ __global__ void ResetReservoirInternal(int a_NumReservoirs, Reservoir* a_Reservo
     }
 }
 
-__host__ void FillCDF(CDF* a_Cdf, float* a_CdfTreeBuffer, const WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights, unsigned a_LightCount)
+__host__ void FillCDF(CDF* a_Cdf, float* a_CdfTreeBuffer, WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights, unsigned a_LightCount)
 {
 	//Note: No need to manually reset as the CDF rebuilding manually sets the sum and size.
     //First reset the CDF on the GPU.
@@ -49,37 +51,65 @@ __host__ void FillCDF(CDF* a_Cdf, float* a_CdfTreeBuffer, const WaveFront::Atomi
 	//Note: Disabled because horribly slow.
     //Run from one thread because it's not thread safe to append the sum of each element.
     //FillCDFInternalSingleThread <<<1, 1>>> (a_Cdf, a_Lights, a_LightCount);
+
+
+	//Sort the light buffer so that lights with low values are at the start.
+	//This prevents floating point inaccuracies mounting up and completely nullifying light contributions.
+	//By adding small lights first, their prefix sum in the CDF will have many significant bits where it matters.
+	//First get the right GPU pointer offsets.
+    char* lightsStart = reinterpret_cast<char*>(a_Lights) + (2 * sizeof(unsigned int)); //Atomic buffer contains two unsigned ints before the actual data.
+    char* lightsEnd = lightsStart + (sizeof(WaveFront::TriangleLight) * a_LightCount); 
+    thrust::device_ptr<WaveFront::TriangleLight> start(reinterpret_cast<WaveFront::TriangleLight*>(lightsStart));
+    thrust::device_ptr<WaveFront::TriangleLight> end(reinterpret_cast<WaveFront::TriangleLight*>(lightsEnd));
+    thrust::sort(start, end, TriangleLightComparator());
 	
-	//Use 512 threads per block, since these are relatively tiny operations.
+
+
+    /*
+	 * Thrust offers a parallel prefix sum scan algorithm.
+	 * First calculate the weights in the CDF, then in-place append.
+	 */
+     //Use 512 threads per block, since these are relatively tiny operations.
     const unsigned blockSize = 512;
-    const unsigned treeDepth = std::ceil(std::log2f(a_LightCount)); //The total depth of the tree, in terms of operations to be performed.
-    const unsigned numLeafNodes = std::pow(2u, treeDepth);
-    const unsigned blockCount = (numLeafNodes + blockSize - 1) / blockSize;
-	
-    //Calculate the light weights and output to the tree buffer. Threads for lights that are no present will deposit 0 weight to keep the tree valid.
-    CalculateLightWeights<<<blockCount, blockSize>>>(a_CdfTreeBuffer, a_Lights, a_LightCount, numLeafNodes);
+    const unsigned blockCount = (a_LightCount + blockSize - 1) / blockSize;
+    CalculateLightWeightsInCDF<<<blockCount, blockSize>>>(a_Cdf, a_Lights, a_LightCount);
     CHECKLASTCUDAERROR;
-    cudaDeviceSynchronize();
+    printf("Done calculating weights!\n");
+    thrust::device_ptr<float> cdfStart(reinterpret_cast<float*>(reinterpret_cast<char*>(a_Cdf) + (2 * sizeof(unsigned))));
+    thrust::device_ptr<float> cdfEnd(cdfStart + a_LightCount);
+    thrust::inclusive_scan(cdfStart, cdfEnd, cdfStart);
+    printf("Done running prefix scan!\n");
 	
-	//Offset into the array to start writing the tree.
-    unsigned arrayOffset = numLeafNodes;
+    //NOTE: Commented out because thrust offers a simpler version.
+    ////Use 512 threads per block, since these are relatively tiny operations.
+    //const unsigned blockSize = 512;
+    //const unsigned treeDepth = std::ceil(std::log2f(a_LightCount)); //The total depth of the tree, in terms of operations to be performed.
+    //const unsigned numLeafNodes = std::pow(2u, treeDepth);
+    //const unsigned blockCount = (numLeafNodes + blockSize - 1) / blockSize;
+	//Calculate the light weights and output to the tree buffer. Threads for lights that are no present will deposit 0 weight to keep the tree valid.
+    //CalculateLightWeights << <blockCount, blockSize >> > (a_CdfTreeBuffer, a_Lights, a_LightCount, numLeafNodes);
+    //CHECKLASTCUDAERROR;
+    //cudaDeviceSynchronize();
+	//
+	////Offset into the array to start writing the tree.
+ //   unsigned arrayOffset = numLeafNodes;
+	//
+	////Loop over each depth and build the tree.
+	//for(auto depth = 0u; depth < treeDepth; ++depth)
+	//{
+ //       const unsigned numThreads = std::pow(2, treeDepth - (depth + 1));   //Half the amount of threads as there are lights at a depth.
+ //       const int numBlocks = (numThreads + blockSize - 1) / blockSize;
+ //       BuildCDFTree <<<numBlocks, blockSize >>> (a_CdfTreeBuffer, numThreads, arrayOffset - 1);  //numThreads is the amount of nodes to be written.
+ //       arrayOffset /= 2;   //Half the offset, as half the amount of root nodes exist at the parent.
+	//	CHECKLASTCUDAERROR;
+ //       cudaDeviceSynchronize();
+	//}
+
+	////Spawn a thread per element in the CDF. Fill by traversing down tree on the left.
+ //   FillCDFParallel <<<((a_LightCount + blockSize - 1) / blockSize), blockSize >>> (a_Cdf, a_CdfTreeBuffer, a_Lights, a_LightCount, treeDepth, numLeafNodes);
+ //   cudaDeviceSynchronize();
+ //   CHECKLASTCUDAERROR;
 	
-	//Loop over each depth and build the tree.
-	for(auto depth = 0u; depth < treeDepth; ++depth)
-	{
-        const unsigned numThreads = std::pow(2, treeDepth - (depth + 1));   //Half the amount of threads as there are lights at a depth.
-        const int numBlocks = (numThreads + blockSize - 1) / blockSize;
-        BuildCDFTree <<<numBlocks, blockSize >>> (a_CdfTreeBuffer, numThreads, arrayOffset - 1);  //numThreads is the amount of nodes to be written.
-        arrayOffset /= 2;   //Half the offset, as half the amount of root nodes exist at the parent.
-		CHECKLASTCUDAERROR;
-        cudaDeviceSynchronize();
-	}
-
-	//Spawn a thread per element in the CDF. Fill by traversing down tree on the left.
-    FillCDFParallel <<<((a_LightCount + blockSize - 1) / blockSize), blockSize >>> (a_Cdf, a_CdfTreeBuffer, a_Lights, a_LightCount, treeDepth, numLeafNodes);
-    cudaDeviceSynchronize();
-    CHECKLASTCUDAERROR;
-
 	//Set the CDF to the right size.
     SetCDFSize<<<1, 1>>>(a_Cdf, a_LightCount);
 	
@@ -120,6 +150,23 @@ __global__ void CalculateLightWeights(float* a_CdfTreeBuffer, const WaveFront::A
     }
 }
 
+__global__ void CalculateLightWeightsInCDF(CDF* a_Cdf, const WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights, unsigned a_LightCount)
+{
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    int stride = blockDim.x * gridDim.x;
+
+    //Loop over all the light indices assigned to this thread.
+    for (int i = index; i < a_LightCount; i += stride)
+    {
+        //Light weight is just the average radiance for now.
+        const float3 radiance = a_Lights->GetData(i)->radiance;
+        assert(radiance.x >= 0.f && radiance.y >= 0.f && radiance.z >= 0.f && "Radiance needs to be positive, no taking away the light in the soul.");
+
+        //Output to the END of the buffer so that the tree can be built on top with root = 0.
+        a_Cdf->data[i] = (radiance.x + radiance.y + radiance.z) / 3.f;
+    }
+}
+
 __global__ void SetCDFSize(CDF* a_Cdf, unsigned a_NumLights)
 {
     a_Cdf->SetCDFSize(a_NumLights);
@@ -127,23 +174,36 @@ __global__ void SetCDFSize(CDF* a_Cdf, unsigned a_NumLights)
 
 __global__ void DebugPrintCdf(CDF* a_Cdf, float* a_CDFTree)
 {
-    int start = a_Cdf->size - 30;
-    if (start < 0) start = 0;
+    //int start = a_Cdf->size - 30;
+    //if (start < 0) start = 0;
 
-    const unsigned treeSize = powf(2.f, ceilf(log2f(a_Cdf->size)));
+    //const unsigned treeSize = powf(2.f, ceilf(log2f(a_Cdf->size)));
 
-    printf("CDF Entry 0: %f\n", a_Cdf->data[0]);
-    printf("CDF Tree Entry 0: %f\n", a_CDFTree[treeSize - 1]);
+    //printf("CDF Entry 0: %f\n", a_Cdf->data[0]);
+    //printf("CDF Tree Entry 0: %f\n", a_CDFTree[treeSize - 1]);
 	
-    for (int i = start; i < a_Cdf->size; ++i)
-    {
-        printf("CDF Entry %i: %f\n", i, a_Cdf->data[i]);
-    }
+    //for (int i = start; i < a_Cdf->size; ++i)
+    //{
+    //    printf("CDF Entry %i: %f\n", i, a_Cdf->data[i]);
+    //}
 
-    for (int i = 0; i < min(30u, a_Cdf->size - 1); ++i)
-    {
-        printf("CDF tree node %i: %f\n", i, a_CDFTree[i]);
-    }
+    //for (int i = 0; i < min(30u, a_Cdf->size - 1); ++i)
+    //{
+    //    printf("CDF tree node %i: %f\n", i, a_CDFTree[i]);
+    //}
+
+	//Check CDF validity.
+    float prev = 0.f;
+	for(int i = 0; i < a_Cdf->size; ++i)
+	{
+        const float current = a_Cdf->data[i];
+		if(current - prev < EPSILON)
+		{
+            printf("CDF entry %i is the same as %i. Value: %f.\n", i, i - 1, current);
+		}
+        prev = current;
+		
+	}
 }
 
 
@@ -212,39 +272,6 @@ __global__ void FillCDFParallel(CDF* a_Cdf, float* a_CdfTreeBuffer, const WaveFr
 
         //Finally add to the CDF when all branches relevant for the index have been appended.
         a_Cdf->Insert(lightIndex, sum);
-
-    	/*
-    	 * TODO: below code doesn't properly add in all cases (bottom leaves don't get added).
-    	 */
-     //   unsigned split = a_LeafNodes / 2;
-     //   unsigned splitStep = split / 2;
-     //   unsigned rootIndex = 0;
-     //   float sum = a_CdfTreeBuffer[a_LeafNodes - 1];   //Because the bottom level of the tree can't reach the left-most node, I add it manually here.
-    	////
-    	////Traverse down the tree starting at element 0 (root node).
-    	//for(int depth = 0; depth < a_TreeDepth; ++depth)
-    	//{
-    	//	//Light index lies to the left of the node split, which means that the right side does not affect it at all. Go down the left node.
-     //       if(lightIndex < split)
-     //       {            	
-     //           rootIndex = (2 * rootIndex) + 1;
-     //           split -= splitStep;
-     //       }
-    	//	//Right of the node split, so left node affects it fully. Go down the right node.
-     //       else
-     //       {
-     //           const auto leftIndex = (2 * rootIndex) + 1;
-     //           sum += a_CdfTreeBuffer[leftIndex];
-     //           rootIndex = leftIndex + 1;  //Right node index
-     //           split += splitStep;
-     //       }
-
-    	//	//Half the amount of step per split.
-     //       splitStep /= 2;
-    	//}
-
-    	////Set the prefix sum for this light index in the CDF.
-     //   a_Cdf->Insert(lightIndex, sum);
     }
 }
 
@@ -292,6 +319,9 @@ __global__ void FillLightBagsInternal(unsigned a_NumLightBags, unsigned a_NumLig
         unsigned lIndex;
         float pdf;
         a_Cdf->Get(random, lIndex, pdf);
+    	
+        assert(pdf >= 0.f);
+    	
         a_LightBagPtr[i] = LightBagEntry{*a_Lights->GetData(lIndex), pdf};
     }
 }
@@ -414,7 +444,7 @@ __global__ void PickPrimarySamplesInternal(const LightBagEntry* const a_LightBag
         assert(!isnan(lightSample.solidAnglePdf));
         assert(!isinf(lightSample.solidAnglePdf));
         assert(lightSample.solidAnglePdf >= 0.f);
-
+    	
         assert(!isnan(initialPdf));
         assert(!isinf(initialPdf));
         assert(initialPdf > 0.f);
