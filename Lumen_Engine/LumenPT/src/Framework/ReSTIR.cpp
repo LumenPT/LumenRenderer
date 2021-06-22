@@ -66,7 +66,7 @@ CPU_ONLY void ReSTIR::Initialize(const ReSTIRSettings& a_Settings)
 CPU_ONLY void ReSTIR::Run(
 	const WaveFront::SurfaceData* const a_CurrentPixelData,
 	const WaveFront::SurfaceData* const a_PreviousPixelData,
-	const WaveFront::MotionVectorBuffer* const a_MotionVectorBuffer,
+	const cudaSurfaceObject_t a_MotionVectorBuffer,
 	const WaveFront::OptixWrapper* const a_OptixWrapper,
 	const OptixTraversableHandle a_OptixSceneHandle,
 	const MemoryBuffer* const a_Lights,

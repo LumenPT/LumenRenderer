@@ -33,7 +33,7 @@ public:
 	CPU_ONLY void Run(
 		const WaveFront::SurfaceData* const a_CurrentPixelData,
 		const WaveFront::SurfaceData* const a_PreviousPixelData,
-		const WaveFront::MotionVectorBuffer* const a_MotionVectorBuffer,
+		const cudaSurfaceObject_t a_MotionVectorBuffer,
 		const WaveFront::OptixWrapper* const a_OptixWrapper,
 		const OptixTraversableHandle a_OptixSceneHandle,
 		const MemoryBuffer* const a_Lights,

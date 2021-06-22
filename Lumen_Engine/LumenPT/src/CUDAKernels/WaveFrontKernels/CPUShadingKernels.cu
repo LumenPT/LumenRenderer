@@ -1,31 +1,12 @@
 #include "CPUShadingKernels.cuh"
 #include "GPUShadingKernels.cuh"
+#include "../MotionVectors.cuh"
 #include "../../Framework/CudaUtilities.h"
 #include "../../Shaders/CppCommon/ReSTIRData.h"
 #include "../../Framework/ReSTIR.h"
 #include <cmath>
 
 using namespace WaveFront;
-
-//CPU_GPU void HaltonSequence(
-//    int index,
-//    int base,
-//    float* result)
-//{
-//    ++index;
-//
-//    float f = 1.f;
-//    float r = 0.f;
-//
-//    while (index > 0)
-//    {
-//        f = f / base;
-//        r = r + f * (index % base);
-//        index = index / base;
-//    }
-//
-//    *result = r;
-//}
 
 CPU_ONLY void GeneratePrimaryRays(const PrimRayGenLaunchParameters& a_PrimaryRayGenParams)
 {
@@ -45,15 +26,29 @@ CPU_ONLY void GeneratePrimaryRays(const PrimRayGenLaunchParameters& a_PrimaryRay
 
 CPU_ONLY void GenerateMotionVectors(MotionVectorsGenerationData& a_MotionVectorsData)
 {
-    const int numPixels = a_MotionVectorsData.m_ScreenResolution.x * a_MotionVectorsData.m_ScreenResolution.y;
-    const int blockSize = 256;
-    const int numBlocks = (numPixels + blockSize - 1) / blockSize;
+    
+    const dim3 blockSize{ 16, 16 ,1 };
 
-    GenerateMotionVector << <numBlocks, blockSize >> > (
+    const unsigned blockSizeWidth =
+        static_cast<unsigned>(std::ceil(static_cast<float>(a_MotionVectorsData.m_RenderResolution.x) / static_cast<float>(blockSize.x)));
+    const unsigned blockSizeHeight =
+        static_cast<unsigned>(std::ceil(static_cast<float>(a_MotionVectorsData.m_RenderResolution.y) / static_cast<float>(blockSize.y)));
+
+    const dim3 numBlocks{ blockSizeWidth, blockSizeHeight, 1 };
+
+    const sutil::Matrix<4,4> matrix = a_MotionVectorsData.m_ProjectionMatrix * a_MotionVectorsData.m_PrevViewMatrix;
+
+    sutil::Matrix<4,4>* matrixDevPtr = { nullptr };
+    cudaMalloc(&matrixDevPtr, sizeof(matrix));
+    cudaMemcpy(matrixDevPtr, &matrix, sizeof(matrix), cudaMemcpyHostToDevice);
+
+    GenerateMotionVector<<<numBlocks, blockSize>>>(
         a_MotionVectorsData.m_MotionVectorBuffer,
-        a_MotionVectorsData.a_CurrentSurfaceData,
-        a_MotionVectorsData.m_ScreenResolution,
-        a_MotionVectorsData.m_ProjectionMatrix * a_MotionVectorsData.m_PrevViewMatrix);
+        a_MotionVectorsData.m_CurrentSurfaceData,
+        a_MotionVectorsData.m_RenderResolution,
+        matrixDevPtr);
+
+    cudaFree(matrixDevPtr);
 
     cudaDeviceSynchronize();
 }

@@ -14,13 +14,11 @@
 #include "CudaGLTexture.h"
 #include "SceneDataTable.h"
 #include "../CUDAKernels/WaveFrontKernels.cuh"
-#include "../CUDAKernels/WaveFrontKernels/EmissiveLookup.cuh"
 #include "../Shaders/CppCommon/WaveFrontDataStructs.h"
 #include "CudaUtilities.h"
 #include "ReSTIR.h"
 #include "../Tools/FrameSnapshot.h"
 #include "../Tools/SnapShotProcessing.cuh"
-#include "MotionVectors.h"
 //#include "Lumen/Window.h"
 #include "Lumen/LumenApp.h"
 #include "DX11Wrapper.h"
@@ -146,20 +144,29 @@ namespace WaveFront
         //Set up pixel output buffers.
 
         // TODO: DX11 Pixel Buffer render resolution input
+
+        //Create d3d11 texture2D which will be used for the pixel-buffer-separate containing the different light channels.
         m_D3D11PixelBufferSeparate = m_DX11Wrapper->CreateTexture2D({ m_Settings.renderResolution.x, m_Settings.renderResolution.y, s_numLightChannels});
 
+        //Create d3d11 texture2D which will be used for the pixel-buffer-combined containing the merged light channels.
         m_D3D11PixelBufferCombined = m_DX11Wrapper->CreateTexture2D({ m_Settings.renderResolution.x, m_Settings.renderResolution.y, 1 });
 
+        //Create d3d11 texture2D which will be used for the depth buffer containing the depth values for each pixel.
         m_D3D11DepthBuffer = m_DX11Wrapper->CreateTexture2D({m_Settings.renderResolution.x, m_Settings.renderResolution.y, 1}, DXGI_FORMAT_R32_FLOAT);
 
+        //Create d3d11 texture2D which will be used for the motion vector buffer containing the motion vectors for each pixel.
+        m_D3D11MotionVectorBuffer = m_DX11Wrapper->CreateTexture2D({ m_Settings.renderResolution.x, m_Settings.renderResolution.y, 1 }, DXGI_FORMAT_R16G16_FLOAT);
+
+        //Description of the cuda texture created with an interop-texture for each pixel buffer.
         cudaTextureDesc pixelBufferDesc {};
         memset(&pixelBufferDesc, 0, sizeof(pixelBufferDesc));
 
         pixelBufferDesc.addressMode[0] = cudaAddressModeClamp;
-        pixelBufferDesc.addressMode[0] = cudaAddressModeClamp;
+        pixelBufferDesc.addressMode[1] = cudaAddressModeClamp;
         pixelBufferDesc.filterMode = cudaFilterModePoint;
         pixelBufferDesc.readMode = cudaReadModeElementType;
 
+        //Create interop-textures for each light channel contained in the pixel-buffer-separate.
         for(unsigned int channelIndex = 0; channelIndex < s_numLightChannels; ++channelIndex)
         {
             m_PixelBufferSeparate[channelIndex] = 
@@ -174,6 +181,7 @@ namespace WaveFront
             m_PixelBufferSeparate[channelIndex]->Unmap();
         }
 
+        //Create interop-texture for the single light channel contained in the pixel-buffer-combined.
         m_PixelBufferCombined =
             std::make_unique<InteropGPUTexture>(
                 m_D3D11PixelBufferCombined,
@@ -185,19 +193,35 @@ namespace WaveFront
         m_PixelBufferCombined->Clear();
         m_PixelBufferCombined->Unmap();
 
+        //Create interop-texture for the depth buffer.
         cudaTextureDesc depthBufferDesc{};
         memset(&depthBufferDesc, 0, sizeof(depthBufferDesc));
 
         depthBufferDesc.addressMode[0] = cudaAddressModeClamp;
-        depthBufferDesc.addressMode[0] = cudaAddressModeClamp;
+        depthBufferDesc.addressMode[1] = cudaAddressModeClamp;
         depthBufferDesc.filterMode = cudaFilterModeLinear;
         depthBufferDesc.readMode = cudaReadModeElementType;
 
         m_DepthBuffer = std::make_unique<InteropGPUTexture>(m_D3D11DepthBuffer, depthBufferDesc);
 
+        //Make sure the depth-buffer is initialized with 0s
         m_DepthBuffer->Map();
         m_DepthBuffer->Clear();
         m_DepthBuffer->Unmap();
+
+        cudaTextureDesc motionVectorBufferDesc{};
+        memset(&motionVectorBufferDesc, 0, sizeof(motionVectorBufferDesc));
+
+        motionVectorBufferDesc.addressMode[0] = cudaAddressModeClamp;
+        motionVectorBufferDesc.addressMode[1] = cudaAddressModeClamp;
+        motionVectorBufferDesc.filterMode = cudaFilterModePoint;
+        motionVectorBufferDesc.readMode = cudaReadModeElementType;
+
+        m_MotionVectorBuffer = std::make_unique<InteropGPUTexture>(m_D3D11MotionVectorBuffer, motionVectorBufferDesc);
+
+        m_MotionVectorBuffer->Map();
+        m_MotionVectorBuffer->Clear();
+        m_MotionVectorBuffer->Unmap();
 
         ResizeBuffers();
 
@@ -501,6 +525,7 @@ namespace WaveFront
         }
 
         m_DepthBuffer->Map();
+        m_MotionVectorBuffer->Map();
 
         cudaDeviceSynchronize();
         CHECKLASTCUDAERROR;
@@ -540,64 +565,7 @@ namespace WaveFront
         //Set the atomic counter for primary rays to the amount of pixels.
         SetAtomicCounter<IntersectionRayData>(&m_Rays, numPixels);
 
-        //##ToolsBookmark
-        //Example of defining how to add buffers to the pixel debugger tool
-        //This lambda is NOT ran every frame, it is only ran when the output layer requests a snapshot
-        m_FrameSnapshot->AddBuffer([&]()
-            {
-                // The buffers that need to be given to the tool are provided via a map as shown below
-                // Notice that CudaGLTextures are used, as opposed to memory buffers. This is to enable the data to be used with OpenGL
-                // and thus displayed via ImGui
-                std::map<std::string, FrameSnapshot::ImageBuffer> resBuffers;
-
-                // TODO: render resolution used for snapshots
-                m_DeferredOpenGLCalls.push([&]() {
-                    resBuffers["Origins"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
-                        m_Settings.renderResolution.y, 3 * sizeof(float));
-
-                    resBuffers["Directions"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
-                        m_Settings.renderResolution.y, 3 * sizeof(float));
-
-                    resBuffers["Contributions"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
-                        m_Settings.renderResolution.y, 3 * sizeof(float));
-                    });
-
-                WaitForDeferredCalls();
-                // A CUDA kernel used to separate the interleave primary ray buffer into 3 different buffers
-                // This is the main reason we use a lambda, as it needs to be defined how to interpret the data
-                SeparateIntersectionRayBufferCPU((m_Rays.GetSize() - sizeof(uint32_t)) / sizeof(IntersectionRayData),
-                    m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>(),
-                    m_Settings.renderResolution,                            // TODO: render resolution used for intersection ray buffer separation
-                    resBuffers.at("Origins").m_Memory->GetDevicePtr<float3>(),
-                    resBuffers.at("Directions").m_Memory->GetDevicePtr<float3>(),
-                    resBuffers.at("Contributions").m_Memory->GetDevicePtr<float3>());
-
-                return resBuffers;
-            });
-
-        // TODO: render resolution used in snapshot->AddBuffer
-        m_FrameSnapshot->AddBuffer([&]()
-            {
-                auto motionVectorBuffer = m_MotionVectors.GetMotionVectorBuffer();
-
-                std::map<std::string, FrameSnapshot::ImageBuffer> resBuffers;
-                m_DeferredOpenGLCalls.push([&]() {
-                    resBuffers["Motion vector direction"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
-                        m_Settings.renderResolution.y, 3 * sizeof(float));
-
-                    resBuffers["Motion vector magnitude"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
-                        m_Settings.renderResolution.y, 3 * sizeof(float));
-                    });
-                WaitForDeferredCalls();
-
-                SeparateMotionVectorBufferCPU(m_Settings.renderResolution.x * m_Settings.renderResolution.y,
-                    motionVectorBuffer->GetDevicePtr<MotionVectorBuffer>(),
-                    resBuffers.at("Motion vector direction").m_Memory->GetDevicePtr<float3>(),
-                    resBuffers.at("Motion vector magnitude").m_Memory->GetDevicePtr<float3>()
-                );
-
-                return resBuffers;
-            });
+        
 
         // TODO: render resolution used in snapshot->AddBuffer
         m_FrameSnapshot->AddBuffer([&]()
@@ -699,7 +667,7 @@ namespace WaveFront
                     m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>(),
                     m_SurfaceData[surfaceDataBufferIndex].GetDevicePtr<SurfaceData>(),
                     m_DepthBuffer->GetSurfaceObject(),
-                    //m_PixelBufferCombined->GetSurfaceObject(),
+                    //m_PixelBufferCombined->GetSurfaceObject(), //To debug the depth buffer.
                     m_Settings.renderResolution,
                     sceneDataTableAccessor,
                     minMaxDepth,
@@ -740,6 +708,7 @@ namespace WaveFront
             //motion vector generation
             if (depth == 0)
             {
+
                 glm::mat4 previousFrameMatrix, currentFrameMatrix;
                 m_Scene->m_Camera->GetMatrixData(previousFrameMatrix, currentFrameMatrix);
                 sutil::Matrix4x4 prevFrameMatrixArg = ConvertGLMtoSutilMat4(previousFrameMatrix);
@@ -748,13 +717,16 @@ namespace WaveFront
                 sutil::Matrix4x4 projectionMatrixArg = ConvertGLMtoSutilMat4(projectionMatrix);
 
                 MotionVectorsGenerationData motionVectorsGenerationData;
-                motionVectorsGenerationData.m_MotionVectorBuffer = nullptr;
-                motionVectorsGenerationData.a_CurrentSurfaceData = m_SurfaceData[currentIndex].GetDevicePtr<SurfaceData>();
+                motionVectorsGenerationData.m_MotionVectorBuffer = m_MotionVectorBuffer->GetSurfaceObject();
+                motionVectorsGenerationData.m_CurrentSurfaceData = m_SurfaceData[currentIndex].GetDevicePtr<SurfaceData>();
                 // TODO: Render resolution used in motion vector generation data
-                motionVectorsGenerationData.m_ScreenResolution = make_uint2(m_Settings.renderResolution.x, m_Settings.renderResolution.y);
+                motionVectorsGenerationData.m_RenderResolution = make_uint2(m_Settings.renderResolution.x, m_Settings.renderResolution.y);
                 motionVectorsGenerationData.m_PrevViewMatrix = prevFrameMatrixArg.inverse();
                 motionVectorsGenerationData.m_ProjectionMatrix = projectionMatrixArg;
-                m_MotionVectors.Update(motionVectorsGenerationData);
+
+                GenerateMotionVectors(motionVectorsGenerationData);
+                CHECKLASTCUDAERROR
+
             }
 
             /*
@@ -766,7 +738,7 @@ namespace WaveFront
                 m_SurfaceData[surfaceDataBufferIndex].GetDevicePtr<SurfaceData>(),
                 m_SurfaceData[temporalIndex].GetDevicePtr<SurfaceData>(),
                 m_VolumetricData[volumetricDataBufferIndex].GetDevicePtr<VolumetricData>(),
-                m_MotionVectors.GetMotionVectorBuffer()->GetDevicePtr<MotionVectorBuffer>(),
+                m_MotionVectorBuffer->GetSurfaceObject(),
                 &m_TriangleLights,
                 accelerationStructure,
                 m_OptixSystem.get(),
@@ -814,8 +786,6 @@ namespace WaveFront
         if (numShadowRays > 0)
         {
 
-            
-
             //The settings for shadow ray resolving.
             OptixLaunchParameters shadowRayLaunchParameters = rayLaunchParameters; //Copy settings from the intersection rays.
             shadowRayLaunchParameters.m_TraceType = RayType::SHADOW_RAY;
@@ -857,7 +827,6 @@ namespace WaveFront
                 m_OptixDenoiser->ColorOutput.GetDevicePtr<float3>()
             );
 
-
             /*PrepareOptixDenoising(optixDenoiserLaunchParams);
             CHECKLASTCUDAERROR;*/
 
@@ -874,6 +843,7 @@ namespace WaveFront
             //FinishOptixDenoising(optixDenoiserLaunchParams);
             //CHECKLASTCUDAERROR;
 
+            //TODO: move to after DLSS and NRD runs... (Requires mapping to use in CUDA again).
             WriteToOutput(postProcessLaunchParams);
             cudaDeviceSynchronize();
             CHECKLASTCUDAERROR;
@@ -889,7 +859,10 @@ namespace WaveFront
             m_PixelBufferCombined->Unmap();
 
             //Unmap depth buffer
-            m_DepthBuffer->Unmap(); 
+            m_DepthBuffer->Unmap();
+
+            //Unmap motion vector buffer
+            m_MotionVectorBuffer->Unmap();
 
             // TODO: Render and output resolutions used in DLSS init params
             std::shared_ptr<DLSSWrapperInitParams> params = m_DLSS->GetDLSSParams();
@@ -898,8 +871,6 @@ namespace WaveFront
             params->m_OutputImageWidth = m_Settings.outputResolution.x;
             params->m_OutputImageHeight = m_Settings.outputResolution.y;
             params->m_DLSSMode = static_cast<DLSSWrapperInitParams::DLSSMode>(m_DlssMode);
-            
-
 
             CHECKLASTCUDAERROR;
 
@@ -1318,6 +1289,7 @@ namespace WaveFront
 
         //Single channel pixel buffer.
         m_PixelBufferCombined->Unmap();
+
         InteropGPUTexture::UnRegisterResource(m_D3D11PixelBufferCombined);
 
         m_DX11Wrapper->ResizeTexture2D(m_D3D11PixelBufferCombined, { m_Settings.renderResolution.x, m_Settings.renderResolution.y, 1 });
@@ -1326,6 +1298,30 @@ namespace WaveFront
         m_PixelBufferCombined->Map();
         m_PixelBufferCombined->Clear();
         m_PixelBufferCombined->Unmap();
+
+        //Depth buffer.
+        m_DepthBuffer->Unmap();
+
+        InteropGPUTexture::UnRegisterResource(m_D3D11DepthBuffer);
+
+        m_DX11Wrapper->ResizeTexture2D(m_D3D11DepthBuffer, { m_Settings.renderResolution.x, m_Settings.renderResolution.y, 1 });
+
+        m_DepthBuffer->RegisterResource(m_D3D11DepthBuffer);
+        m_DepthBuffer->Map();
+        m_DepthBuffer->Clear();
+        m_DepthBuffer->Unmap();
+
+        //Motion vector buffer.
+        m_MotionVectorBuffer->Unmap();
+
+        InteropGPUTexture::UnRegisterResource(m_D3D11MotionVectorBuffer);
+
+        m_DX11Wrapper->ResizeTexture2D(m_D3D11MotionVectorBuffer, { m_Settings.renderResolution.x, m_Settings.renderResolution.y, 1 });
+
+        m_MotionVectorBuffer->RegisterResource(m_D3D11MotionVectorBuffer);
+        m_MotionVectorBuffer->Map();
+        m_MotionVectorBuffer->Clear();
+        m_MotionVectorBuffer->Unmap();
         
         //Initialize the ray buffers. Note: These are not initialized but Reset() is called when the waves start.
         const auto numPrimaryRays = numPixels;
@@ -1349,9 +1345,6 @@ namespace WaveFront
 		{
 			volumetricDataBuffer.Resize(numPixels * sizeof(VolumetricData));
 		}
-
-        // TODO: motion vectors initialized with render resolution
-        m_MotionVectors.Init(make_uint2(m_Settings.renderResolution.x, m_Settings.renderResolution.y));
 
         //Use mostly the default values.
         ReSTIRSettings rSettings;

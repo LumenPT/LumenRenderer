@@ -5,7 +5,6 @@
 //#define __CUDACC__ //TODO: temp defined
 #include <cuda_fp16.h>
 #include <vector_types.h>
-#include <surface_functions.h>
 
 struct half4
 {

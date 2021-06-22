@@ -2,6 +2,7 @@
 
 #include "../Shaders/CppCommon/RenderingUtility.h"
 #include "../Shaders/CppCommon/WaveFrontDataStructs.h"
+#include "../Shaders/CppCommon/Half2.h"
 #include <cuda_runtime_api.h>
 #include <cuda/device_atomic_functions.h>
 #include <cassert>
@@ -749,7 +750,7 @@ __host__ void TemporalNeighbourSampling(
     const WaveFront::SurfaceData* a_PreviousPixelData,
     const std::uint32_t a_Seed,
     uint2 a_Dimensions,
-    const WaveFront::MotionVectorBuffer* const a_MotionVectorBuffer
+    const cudaSurfaceObject_t a_MotionVectorBuffer
 )
 {
     const unsigned numReservoirs = a_Dimensions.x * a_Dimensions.y * ReSTIRSettings::numReservoirsPerPixel;
@@ -779,7 +780,7 @@ __global__ void CombineTemporalSamplesInternal(
     const std::uint32_t a_Seed,
     unsigned a_NumReservoirs,
     uint2 a_Dimensions,
-    const WaveFront::MotionVectorBuffer* const a_MotionVectorBuffer
+    const cudaSurfaceObject_t a_MotionVectorBuffer
 )
 {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
@@ -788,15 +789,25 @@ __global__ void CombineTemporalSamplesInternal(
     const auto pixelIndex = index / ReSTIRSettings::numReservoirsPerPixel;
     const auto currentDepth = index - (pixelIndex * ReSTIRSettings::numReservoirsPerPixel);
 
+    int y = pixelIndex / a_Dimensions.x;
+    int x = pixelIndex - (y * a_Dimensions.x);
+
     Reservoir toCombine[2];
     WaveFront::SurfaceData pixelPointers[2];
 
-    const auto velocity = -a_MotionVectorBuffer->GetMotionVectorData(pixelIndex).m_Velocity;
+    half2Ushort2 motionVector = {half2{0.f, 0.f}};
+
+    surf2Dread<ushort2>(
+        &motionVector.m_Ushort2,
+        a_MotionVectorBuffer,
+        x * sizeof(ushort2),
+        y,
+        cudaBoundaryModeTrap);
+
+    const auto velocity = motionVector.AsFloat2();
     const int movedX = roundf(static_cast<float>(a_Dimensions.x) * velocity.x);
     const int movedY = roundf(static_cast<float>(a_Dimensions.y) * velocity.y);
-
-    int y = pixelIndex / a_Dimensions.x;
-    int x = pixelIndex - (y * a_Dimensions.x);
+    
     y += movedY;
     x += movedX;
 

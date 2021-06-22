@@ -126,12 +126,6 @@ CPU_ON_GPU void WriteToOutput(
     uchar4* a_Output
 );
 
-CPU_ON_GPU void GenerateMotionVector(
-    MotionVectorBuffer* a_Buffer,
-    const SurfaceData* a_CurrentSurfaceData,
-    uint2 a_Resolution,
-    sutil::Matrix4x4 a_PrevViewProjMatrix);
-
 CPU_ON_GPU void PrepareOptixDenoisingGPU(
     const uint2 a_RenderResolution,
     const SurfaceData* a_CurrentSurfaceData,

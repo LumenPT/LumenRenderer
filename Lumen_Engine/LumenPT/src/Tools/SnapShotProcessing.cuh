@@ -19,11 +19,11 @@ CPU_ONLY void SeparateIntersectionRayBufferCPU(uint64_t a_BufferSize, WaveFront:
     uint2 a_Resolution,
     float3* a_OriginBuffer, float3* a_DirectionBuffer, float3* a_ContributionBuffer);
 
-CPU_ON_GPU void SeparateMotionVectorBuffer(uint64_t a_BufferSize, WaveFront::MotionVectorBuffer* a_MotionVectorBuffer,
-    float3* a_MotionVectorDirectionBuffer, float3* a_MotionVectorMagnitudeBuffer);
-
-CPU_ONLY void SeparateMotionVectorBufferCPU(uint64_t a_BufferSize, WaveFront::MotionVectorBuffer* a_MotionVectorBuffer,
-    float3* a_MotionVectorDirectionBuffer, float3* a_MotionVectorMagnitudeBuffer);
+//CPU_ON_GPU void SeparateMotionVectorBuffer(uint64_t a_BufferSize, WaveFront::MotionVectorBuffer* a_MotionVectorBuffer,
+//    float3* a_MotionVectorDirectionBuffer, float3* a_MotionVectorMagnitudeBuffer);
+//
+//CPU_ONLY void SeparateMotionVectorBufferCPU(uint64_t a_BufferSize, WaveFront::MotionVectorBuffer* a_MotionVectorBuffer,
+//    float3* a_MotionVectorDirectionBuffer, float3* a_MotionVectorMagnitudeBuffer);
 
 CPU_ON_GPU void SeparateOptixDenoiserBuffer(
     uint64_t a_BufferSize,

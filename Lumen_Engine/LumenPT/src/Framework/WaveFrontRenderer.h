@@ -4,7 +4,6 @@
 #include "CudaGLTexture.h"
 #include "MemoryBuffer.h"
 #include "InteropGPUTexture.h"
-#include "MotionVectors.h"
 #include "../Shaders/CppCommon/WaveFrontDataStructs.h"
 #include "PTServiceLocator.h"
 #include "Nvidia/INRDWrapper.h"
@@ -159,17 +158,20 @@ namespace WaveFront
 
         std::unique_ptr<InteropGPUTexture> m_DepthBuffer;
 
-        Microsoft::WRL::ComPtr<ID3D11Texture2D> m_D3D11DepthBuffer;
+        //Buffer containing motion vectors
+        std::unique_ptr<InteropGPUTexture> m_MotionVectorBuffer;
 
         Microsoft::WRL::ComPtr<ID3D11Texture2D> m_D3D11PixelBufferSeparate;
 
         Microsoft::WRL::ComPtr<ID3D11Texture2D> m_D3D11PixelBufferCombined;
 
+        Microsoft::WRL::ComPtr<ID3D11Texture2D> m_D3D11DepthBuffer;
+
+        Microsoft::WRL::ComPtr<ID3D11Texture2D> m_D3D11MotionVectorBuffer;
+
         //Triangle lights.
         MemoryBuffer m_TriangleLights;
 
-    	//Buffer containing motion vectors
-        MotionVectors m_MotionVectors;
 
         //Optix system
         std::unique_ptr<OptixWrapper> m_OptixSystem;
