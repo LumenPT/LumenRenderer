@@ -371,23 +371,34 @@ LumenPTModelConverter::FileContent LumenPTModelConverter::GenerateContent(const 
 
 		//Non-GLTF specified values.
 		m.m_Luminance = 1.f;
-		m.m_Transmittance[0] = 1.f;
-		m.m_Transmittance[1] = 1.f;
-		m.m_Transmittance[2] = 1.f;
+		m.m_Transmittance[0] = 0.f;	//Default to 0 because this is actually how much is absorbed.
+		m.m_Transmittance[1] = 0.f;
+		m.m_Transmittance[2] = 0.f;
 		m.m_SubSurfaceFactor = 0.f;
 		m.m_Anisotropic = 0.f;
 
+		nlohmann::json extensions;
+		if(material.extensionsAndExtras.contains("extensions"))
+		{
+			extensions = material.extensionsAndExtras["extensions"];
+		}
+    	
         //Transmission
 		constexpr auto transmissionExtension = "KHR_materials_transmission";
-		if(material.extensionsAndExtras.contains(transmissionExtension))
+		if(extensions.contains(transmissionExtension))
 		{
-			auto json = material.extensionsAndExtras[transmissionExtension];
+			auto json = extensions[transmissionExtension];
 			const float transmissionFactor = JsonGetOrDefault<float>(json, "transmissionFactor", 0.f);
+			m.m_TransmissionFactor = transmissionFactor;
+			
 			const uint32_t transmissionTextureId = JsonGetOrDefault<uint32_t>(json, "transmissionTexture", -1);
 			m.m_TransmissionTextureId = transmissionTextureId;
-			m.m_TransmissionTextureId = a_FxDoc.textures[m.m_TransmissionTextureId].source;
-			m.m_TransmissionFactor = transmissionFactor;
-			fc.m_Textures[m.m_EmissiveTextureId].m_TextureType = TextureType::ETransmissive;
+
+			if (m.m_TransmissionTextureId != -1)
+			{
+				m.m_TransmissionTextureId = a_FxDoc.textures[m.m_TransmissionTextureId].source;
+				fc.m_Textures[m.m_TransmissionTextureId].m_TextureType = TextureType::ETransmissive;
+			}
 		}
 		//Not specified, default values.
 		else
@@ -398,10 +409,10 @@ LumenPTModelConverter::FileContent LumenPTModelConverter::GenerateContent(const 
 
 		//Sheen
 		constexpr auto sheenExtension = "KHR_materials_sheen";
-		if (material.extensionsAndExtras.contains(sheenExtension))
+		if (extensions.contains(sheenExtension))
 		{
 			//Note: Disney and GLTF seem to have quite different sheen properties. Just do this I guess and then manually set if we wanna tweak it.
-			auto json = material.extensionsAndExtras[sheenExtension];
+			auto json = extensions[sheenExtension];
 			const float sheenFactor = JsonGetOrDefault<float>(json, "sheenRoughnessFactor", 0.f);
 			m.m_SheenFactor = sheenFactor;
 			m.m_SheenTintFactor = 1.f;
@@ -415,9 +426,9 @@ LumenPTModelConverter::FileContent LumenPTModelConverter::GenerateContent(const 
 
 		//IOR
 		constexpr auto iorExtension = "KHR_materials_ior";
-		if (material.extensionsAndExtras.contains(iorExtension))
+		if (extensions.contains(iorExtension))
 		{
-			auto json = material.extensionsAndExtras[iorExtension];
+			auto json = extensions[iorExtension];
 			const float ior = JsonGetOrDefault<float>(json, "ior", 1.f);
 			m.m_IndexOfRefraction = ior;
 		}
@@ -429,18 +440,30 @@ LumenPTModelConverter::FileContent LumenPTModelConverter::GenerateContent(const 
 
 		//Clearcoat
 		constexpr auto clearCoatExtension = "KHR_materials_clearcoat";
-		if (material.extensionsAndExtras.contains(clearCoatExtension))
+		if (extensions.contains(clearCoatExtension))
 		{
-			auto json = material.extensionsAndExtras[clearCoatExtension];
+			auto json = extensions[clearCoatExtension];
 
 			m.m_ClearCoatRoughnessTextureId = JsonGetOrDefault<uint32_t>(json, "clearcoatRoughnessTexture", -1);
 			m.m_ClearCoatRoughnessTextureId = a_FxDoc.textures[m.m_ClearCoatRoughnessTextureId].source;
-			m.m_ClearCoatRoughnessFactor = JsonGetOrDefault<float>(json, "clearcoatRoughnessFactor", 0.f);
-			m.m_ClearCoatFactor = JsonGetOrDefault<float>(json, "clearcoatFactor", 0.f);
 			m.m_ClearCoatTextureId = JsonGetOrDefault<uint32_t>(json, "clearcoatTexture", -1);
 			m.m_ClearCoatTextureId = a_FxDoc.textures[m.m_ClearCoatTextureId].source;
-			fc.m_Textures[m.m_ClearCoatTextureId].m_TextureType = TextureType::EClearCoat;
-			fc.m_Textures[m.m_ClearCoatRoughnessTextureId].m_TextureType = TextureType::EClearCoatRoughness;
+
+			if (m.m_ClearCoatRoughnessTextureId != -1)
+			{
+				m.m_ClearCoatRoughnessTextureId = a_FxDoc.textures[m.m_ClearCoatRoughnessTextureId].source;
+				fc.m_Textures[m.m_ClearCoatRoughnessTextureId].m_TextureType = TextureType::EClearCoatRoughness;
+			}
+
+			if (m.m_ClearCoatTextureId != -1)
+			{
+				m.m_ClearCoatTextureId = a_FxDoc.textures[m.m_ClearCoatTextureId].source;
+				fc.m_Textures[m.m_ClearCoatTextureId].m_TextureType = TextureType::EClearCoat;
+			}
+			
+			m.m_ClearCoatRoughnessFactor = JsonGetOrDefault<float>(json, "clearcoatRoughnessFactor", 0.f);
+			m.m_ClearCoatFactor = JsonGetOrDefault<float>(json, "clearcoatFactor", 0.f);
+
 		}
 		//Not specified, default values.
 		else
@@ -453,15 +476,19 @@ LumenPTModelConverter::FileContent LumenPTModelConverter::GenerateContent(const 
 
 		//Specular and Tint (loaded from the specular stuff I guess). Sheen also uses the tint.
 		constexpr auto specularExtension = "KHR_materials_specular";
-		if (material.extensionsAndExtras.contains(specularExtension))
+		if (extensions.contains(specularExtension))
 		{
-			auto json = material.extensionsAndExtras[specularExtension];
+			auto json = extensions[specularExtension];
 
 			m.m_SpecularFactor = JsonGetOrDefault<float>(json, "specularFactor", 0.f);
 			m.m_TintTextureId = JsonGetOrDefault<uint32_t>(json, "specularColorTexture", -1);
 			m.m_SpecularTintFactor = 1.f;
-			fc.m_Textures[m.m_ClearCoatTextureId].m_TextureType = TextureType::EClearCoat;
 
+			if (m.m_TintTextureId != -1)
+			{
+				m.m_TintTextureId = a_FxDoc.textures[m.m_TintTextureId].source;
+				fc.m_Textures[m.m_TintTextureId].m_TextureType = TextureType::ETint;
+			}
 		}
 		//Not specified, default values.
 		else

@@ -88,37 +88,6 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
             SurfaceData output;
             output.m_SurfaceFlags = SURFACE_FLAG_NONE;  //Default to no flags.
 
-            //If emissive, set flag and 
-            if ((emissive.x > 0.f || emissive.y > 0.f || emissive.z > 0.f))
-            {
-                //Clamp between 0 and 1. TODO this is not HDR friendly so remove when we do that.
-                output.m_MaterialData.m_Color = emissive;
-                float maximum = fmaxf(output.m_MaterialData.m_Color.x, fmaxf(output.m_MaterialData.m_Color.y, output.m_MaterialData.m_Color.z));
-                output.m_MaterialData.m_Color /= maximum;
-
-                //Set the output flag. Because this surface is emissive, it will never be shaded and paths are always terminated.
-                //NOTE: Surface data position is not set, neither is normal. This means that it is not safe to do anything on an emissive surface that is randomly hit.
-                output.m_SurfaceFlags |= SURFACE_FLAG_EMISSIVE;
-                output.m_PixelIndex = currIntersection.m_PixelIndex;
-                a_OutPut[surfaceDataIndex] = output;
-            	
-                continue;
-            }
-
-            //Check for alpha discard (discard anything that is somewhat transparent).
-            if (textureColor.w < 0.51f)
-            {
-                //The position of intersection is set so that the ray can continue onward.
-                output.m_SurfaceFlags |= SURFACE_FLAG_ALPHA_TRANSPARENT;
-                output.m_Position = currRay.m_Origin + currRay.m_Direction * currIntersection.m_IntersectionT;
-                output.m_IncomingRayDirection = currRay.m_Direction;
-                output.m_TransportFactor = currRay.m_Contribution;
-                output.m_PixelIndex = currIntersection.m_PixelIndex;
-            	
-                a_OutPut[surfaceDataIndex] = output;
-                continue;
-            }
-
             //Take the local normal and tangent, then calculate the bitangent.
             float4 localNormal = make_float4(normalize(A->m_Normal * W + B->m_Normal * U + C->m_Normal * V), 0.f);
             float4 localTangent =
@@ -146,6 +115,40 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
                 normalMapNormal.x * tangentWorld.y + normalMapNormal.y * bitangentWorld.y + normalMapNormal.z * normalWorld.y,
                 normalMapNormal.x * tangentWorld.z + normalMapNormal.y * bitangentWorld.z + normalMapNormal.z * normalWorld.z
             ));//Matrix multiply except manually because I don't like sutil.
+
+            //If emissive, set flag and 
+            if ((emissive.x > 0.f || emissive.y > 0.f || emissive.z > 0.f))
+            {
+                //Clamp between 0 and 1. TODO this is not HDR friendly so remove when we do that.
+                output.m_MaterialData.m_Color = emissive;
+                float maximum = fmaxf(output.m_MaterialData.m_Color.x, fmaxf(output.m_MaterialData.m_Color.y, output.m_MaterialData.m_Color.z));
+                output.m_MaterialData.m_Color /= maximum;
+
+                //Set the output flag. Because this surface is emissive, it will never be shaded and paths are always terminated.
+                //NOTE: Surface data position is not set, neither is normal. This means that it is not safe to do anything on an emissive surface that is randomly hit.
+                output.m_SurfaceFlags |= SURFACE_FLAG_EMISSIVE;
+                output.m_PixelIndex = currIntersection.m_PixelIndex;
+                output.m_IntersectionT = currIntersection.m_IntersectionT;
+                output.m_Normal = normalMapNormal;
+                a_OutPut[surfaceDataIndex] = output;
+
+                continue;
+            }
+
+            //Check for alpha discard (discard anything that is somewhat transparent).
+            if (textureColor.w < 0.51f)
+            {
+                //The position of intersection is set so that the ray can continue onward.
+                output.m_SurfaceFlags |= SURFACE_FLAG_ALPHA_TRANSPARENT;
+                output.m_Position = currRay.m_Origin + currRay.m_Direction * currIntersection.m_IntersectionT;
+                output.m_IncomingRayDirection = currRay.m_Direction;
+                output.m_TransportFactor = currRay.m_Contribution;
+                output.m_PixelIndex = currIntersection.m_PixelIndex;
+                output.m_IntersectionT = currIntersection.m_IntersectionT;
+                output.m_Normal = normalMapNormal;
+                a_OutPut[surfaceDataIndex] = output;
+                continue;
+            }
 
             //ETA is air to surface.
             float eta = 1.f / material->m_MaterialData.GetRefractiveIndex();
@@ -192,27 +195,27 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
             output.m_MaterialData.SetRefractiveIndex(eta);
 
 
-        	////////TODO Comment this out. Debugging only.
-         //   if(i == 220200)
-         //   {
-         //       printf("Surface data material values:\n");
-         //       printf("- Color: %f %f %f %f\n", output.m_MaterialData.m_Color.x, output.m_MaterialData.m_Color.y, output.m_MaterialData.m_Color.z, output.m_MaterialData.m_Color.w);
-         //       printf("- Emissive: %f %f %f %f\n", output.m_MaterialData.m_Emissive.x, output.m_MaterialData.m_Emissive.y, output.m_MaterialData.m_Emissive.z, output.m_MaterialData.m_Emissive.w);
-         //       printf("- Tint: %f %f %f\n", output.m_MaterialData.m_Tint.x, output.m_MaterialData.m_Tint.y, output.m_MaterialData.m_Tint.z);
-         //       printf("- Transmittance: %f %f %f\n", output.m_MaterialData.m_Transmittance.x, output.m_MaterialData.m_Transmittance.y, output.m_MaterialData.m_Transmittance.z);
-         //       printf("- IOR: %f\n", output.m_MaterialData.GetRefractiveIndex());
-         //       printf("- Spec: %f\n", output.m_MaterialData.GetSpecular());
-         //       printf("- SpecTint: %f\n", output.m_MaterialData.GetSpecTint());
-         //       printf("- Luminance: %f\n", output.m_MaterialData.GetLuminance());
-         //       printf("- Metallic: %f\n", output.m_MaterialData.GetMetallic());
-         //       printf("- Roughness: %f\n", output.m_MaterialData.GetRoughness());
-         //       printf("- SubSurface: %f\n", output.m_MaterialData.GetSubSurface());
-         //       printf("- Anisotropic: %f\n", output.m_MaterialData.GetAnisotropic());
-         //       printf("- Sheen: %f\n", output.m_MaterialData.GetSheen());
-         //       printf("- SheenTint: %f\n", output.m_MaterialData.GetSheenTint());
-         //       printf("- ClearCoat: %f\n", output.m_MaterialData.GetClearCoat());
-         //       printf("- Transmission: %f\n", output.m_MaterialData.GetTransmission());
-         //   }
+        	//////TODO Comment this out. Debugging only.
+            //if(i == 220200)
+            //{
+            //    printf("Surface data material values:\n");
+            //    printf("- Color: %f %f %f %f\n", output.m_MaterialData.m_Color.x, output.m_MaterialData.m_Color.y, output.m_MaterialData.m_Color.z, output.m_MaterialData.m_Color.w);
+            //    printf("- Emissive: %f %f %f %f\n", output.m_MaterialData.m_Emissive.x, output.m_MaterialData.m_Emissive.y, output.m_MaterialData.m_Emissive.z, output.m_MaterialData.m_Emissive.w);
+            //    printf("- Tint: %f %f %f\n", output.m_MaterialData.m_Tint.x, output.m_MaterialData.m_Tint.y, output.m_MaterialData.m_Tint.z);
+            //    printf("- Transmittance: %f %f %f\n", output.m_MaterialData.m_Transmittance.x, output.m_MaterialData.m_Transmittance.y, output.m_MaterialData.m_Transmittance.z);
+            //    printf("- IOR: %f\n", output.m_MaterialData.GetRefractiveIndex());
+            //    printf("- Spec: %f\n", output.m_MaterialData.GetSpecular());
+            //    printf("- SpecTint: %f\n", output.m_MaterialData.GetSpecTint());
+            //    printf("- Luminance: %f\n", output.m_MaterialData.GetLuminance());
+            //    printf("- Metallic: %f\n", output.m_MaterialData.GetMetallic());
+            //    printf("- Roughness: %f\n", output.m_MaterialData.GetRoughness());
+            //    printf("- SubSurface: %f\n", output.m_MaterialData.GetSubSurface());
+            //    printf("- Anisotropic: %f\n", output.m_MaterialData.GetAnisotropic());
+            //    printf("- Sheen: %f\n", output.m_MaterialData.GetSheen());
+            //    printf("- SheenTint: %f\n", output.m_MaterialData.GetSheenTint());
+            //    printf("- ClearCoat: %f\n", output.m_MaterialData.GetClearCoat());
+            //    printf("- Transmission: %f\n", output.m_MaterialData.GetTransmission());
+            //}
         	
             a_OutPut[surfaceDataIndex] = output;
         }
