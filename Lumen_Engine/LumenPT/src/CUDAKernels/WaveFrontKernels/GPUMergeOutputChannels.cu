@@ -22,19 +22,32 @@ CPU_ON_GPU void MergeOutputChannels(
 #pragma unroll 
         for(unsigned int channelIndex = 0; channelIndex < numChannels; ++channelIndex)
         {
+			//Merge all channels except volumetric
+			if (static_cast<LightChannel>(channelIndex) != LightChannel::VOLUMETRIC)
+			{
+				float4 channelColor{ 0.f };
+				surf2DLayeredread<float4>(
+					&channelColor,
+					a_Input,
+					pixelX * sizeof(float4),
+					pixelY,
+					channelIndex,
+					cudaBoundaryModeTrap);
 
-            float4 channelColor{ 0.f };
-            surf2DLayeredread<float4>(
-                &channelColor,
-                a_Input,
-                pixelX * sizeof(float4),
-                pixelY,
-                channelIndex,
-                cudaBoundaryModeTrap);
-
-            mergedColor += channelColor;
-
+				mergedColor += channelColor;
+			}
         }
+		//Blend volumetric
+		float4 channelColor{ 0.f };
+		surf2DLayeredread<float4>(
+			&channelColor,
+			a_Input,
+			pixelX * sizeof(float4),
+			pixelY,
+			static_cast<unsigned>(LightChannel::VOLUMETRIC),
+			cudaBoundaryModeTrap);
+
+		mergedColor = mergedColor * (1.0f - channelColor.w) + channelColor * channelColor.w;
 
         //If enabled, average between frames.
         if(a_BlendOutput)
