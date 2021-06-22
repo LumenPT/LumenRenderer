@@ -28,6 +28,7 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(unsigned a_NumIntersections,
     AtomicBuffer<IntersectionData>* a_IntersectionData,
     AtomicBuffer<IntersectionRayData>* a_Rays,
     SurfaceData* a_OutPut,
+    uint2 a_Resolution,
     SceneDataTableAccessor* a_SceneDataTable);
 
 //Called during shading
@@ -39,16 +40,14 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(unsigned a_NumIntersections,
  */
 CPU_ON_GPU void ShadeDirect(
     const uint3 a_ResolutionAndDepth,
-    const SurfaceData* a_TemporalSurfaceDatBuffer,
     const SurfaceData* a_SurfaceDataBuffer,
     const VolumetricData* a_VolumetricDataBuffer,
-    AtomicBuffer<ShadowRayData>* const a_ShadowRays,
-	AtomicBuffer<ShadowRayData>* const a_VolumetricShadowRays,
     const AtomicBuffer<TriangleLight>* const a_Lights,
     const unsigned a_Seed,
-    const unsigned a_CurrentDepth,
-    const CDF* const a_CDF = nullptr,
-	float3* a_Output = nullptr		//TODO: remove a_Output
+    const CDF* const a_CDF,
+    AtomicBuffer<ShadowRayData>* const a_ShadowRays,
+    AtomicBuffer<ShadowRayData>* const a_VolumetricShadowRays,
+    cudaSurfaceObject_t a_Output		//TODO: remove a_Output
     );
 
 /*
@@ -57,8 +56,8 @@ CPU_ON_GPU void ShadeDirect(
  */
 CPU_ON_GPU void ResolveDirectLightHits(
     const SurfaceData* a_SurfaceDataBuffer,
-    const unsigned a_NumPixels,
-    float3* a_OutputChannels
+    const uint2 a_Resolution,
+    cudaSurfaceObject_t a_OutputChannels
 );
 
 /*
@@ -71,14 +70,11 @@ CPU_ON_GPU void ShadeSpecular();
  */
 CPU_ON_GPU void ShadeIndirect(
     const uint3 a_ResolutionAndDepth,
-    const float3 a_CameraPosition,
     const SurfaceData* a_SurfaceDataBuffer,
-    const AtomicBuffer<IntersectionData>* a_Intersections,
     AtomicBuffer<IntersectionRayData>* a_IntersectionRays,
-    const unsigned a_NumIntersections,
-    const unsigned a_CurrentDepth,
     const unsigned a_Seed
 );
+
 
 
 CPU_ON_GPU void DEBUGShadePrimIntersections(
@@ -99,8 +95,8 @@ CPU_ON_GPU void Denoise();
  */
 CPU_ON_GPU void MergeOutputChannels(
     const uint2 a_Resolution,
-    const float3* const a_Input,
-    float3* const a_Output,
+    const cudaSurfaceObject_t a_Input,
+    const cudaSurfaceObject_t a_Output,
     const bool a_BlendOutput,
     const unsigned a_BlendCount
 );
@@ -118,7 +114,7 @@ CPU_ON_GPU void PostProcessingEffects();
 //Temporary step till post-processing is in place.
 CPU_ON_GPU void WriteToOutput(
     const uint2 a_Resolution,
-    const float3* const a_Input,
+    const cudaSurfaceObject_t a_Input,
     uchar4* a_Output
 );
 

@@ -8,17 +8,14 @@
 #include "Cuda/vector_functions.h"
 
 PTMaterial::PTMaterial()
-    : m_DiffuseColor(), m_EmissiveColor(), m_TransmissionFactor(0), m_ClearCoatFactor(0), m_ClearCoatRoughnessFactor(0),
-      m_IndexOfRefraction(1.f),
-      m_SpecularFactor(0),
-      m_SpecularTintFactor(0),
-      m_SubSurfaceFactor(0), m_Luminance(0), m_Anisotropic(0),
-      m_SheenFactor(0.f), m_SheenTintFactor(0), m_MetallicFactor(1.f), m_RoughnessFactor(1.f),
-      m_TintFactor(make_float3(0.f)), m_Transmittance(),
+    : m_MaterialData(0.f),
       m_DeviceMaterialDirty(true)
 {
     // Allocate the GPU memory for the GPU material representation
     m_DeviceMemoryBuffer = std::make_unique<MemoryBuffer>(sizeof(DeviceMaterial));
+
+	//Set the roughness to 1 by default.
+    m_MaterialData.SetRoughness(1.f);
 }
 
 DeviceMaterial* PTMaterial::GetDeviceMaterial() const
@@ -40,7 +37,7 @@ DeviceMaterial* PTMaterial::GetDeviceMaterial() const
 
 void PTMaterial::SetDiffuseColor(const glm::vec4& a_NewDiffuseColor)
 {
-    m_DiffuseColor = make_float4(a_NewDiffuseColor.x, a_NewDiffuseColor.y, a_NewDiffuseColor.z, a_NewDiffuseColor.w);
+    m_MaterialData.SetColor(make_float4(a_NewDiffuseColor.x, a_NewDiffuseColor.y, a_NewDiffuseColor.z, a_NewDiffuseColor.w));
     m_DeviceMaterialDirty = true;
 }
 
@@ -52,7 +49,7 @@ void PTMaterial::SetDiffuseTexture(std::shared_ptr<Lumen::ILumenTexture> a_NewDi
 
 void PTMaterial::SetEmission(const glm::vec3& a_EmissiveVal)
 {
-    m_EmissiveColor = make_float4(a_EmissiveVal.x, a_EmissiveVal.y, a_EmissiveVal.z, 1.f);
+    m_MaterialData.SetEmissive(make_float3(a_EmissiveVal.x, a_EmissiveVal.y, a_EmissiveVal.z));
     m_DeviceMaterialDirty = true;
 }
 
@@ -76,12 +73,14 @@ void PTMaterial::SetNormalTexture(std::shared_ptr<Lumen::ILumenTexture> a_Normal
 
 glm::vec4 PTMaterial::GetDiffuseColor() const
 {
-    return glm::vec4(m_DiffuseColor.x, m_DiffuseColor.y, m_DiffuseColor.z, m_DiffuseColor.w);
+    const auto diffuseColor = m_MaterialData.GetColor();
+    return glm::vec4(diffuseColor.x, diffuseColor.y, diffuseColor.z, diffuseColor.w);
 }
 
 glm::vec3 PTMaterial::GetEmissiveColor() const
 {
-    return glm::vec3(m_EmissiveColor.x, m_EmissiveColor.y, m_EmissiveColor.z);
+    const auto emissiveColor = m_MaterialData.GetEmissive();
+    return glm::vec3(emissiveColor.x, emissiveColor.y, emissiveColor.z);
 }
 
 
@@ -98,9 +97,6 @@ Lumen::ILumenTexture& PTMaterial::GetEmissiveTexture() const
 DeviceMaterial PTMaterial::CreateDeviceMaterial() const
 {
     DeviceMaterial m;
-    m.m_DiffuseColor = m_DiffuseColor;
-    m.m_EmissionColor = m_EmissiveColor;
-
     //Should always have a default loaded.
     if (m_MetalRoughnessTexture)
         m.m_MetalRoughnessTexture = **m_MetalRoughnessTexture;
@@ -112,21 +108,10 @@ DeviceMaterial PTMaterial::CreateDeviceMaterial() const
     if (m_EmissiveTexture)
         m.m_EmissiveTexture = **m_EmissiveTexture;
 
-
     if (m_DiffuseTexture)
     {
         m.m_DiffuseTexture = **m_DiffuseTexture;
     }
-
-
-    //Disney BSDF stuff
-    m.m_TransmissionFactor = m_TransmissionFactor;
-    m.m_ClearCoatFactor = m_ClearCoatFactor;
-    m.m_IndexOfRefraction = m_IndexOfRefraction;
-    m.m_ClearCoatRoughnessFactor = m_ClearCoatRoughnessFactor;
-    m.m_SpecularFactor = m_SpecularFactor;
-    m.m_SpecularTintFactor = m_SpecularTintFactor;
-    m.m_SubSurfaceFactor = m_SubSurfaceFactor;
 
     if(m_TransmissionTexture)
     {
@@ -148,16 +133,19 @@ DeviceMaterial PTMaterial::CreateDeviceMaterial() const
         m.m_TintTexture = **m_TintTexture;
     }
 
-    m.m_Luminance = m_Luminance;
-    m.m_SheenFactor = m_SheenFactor;
-    m.m_SheenTintFactor = m_SheenTintFactor;
-    m.m_TintFactor = m_TintFactor;
-    m.m_Anisotropic = m_Anisotropic;
-    m.m_TransmittanceFactor = m_Transmittance;
+	//Ensure all textures are present, as defaults are required.
+    assert(m_TintTexture);
+    assert(m_ClearCoatRoughnessTexture);
+    assert(m_ClearCoatTexture);
+    assert(m_TransmissionTexture);
+    assert(m_DiffuseTexture);
+    assert(m_EmissiveTexture);
+    assert(m_NormalTexture);
+    assert(m_MetalRoughnessTexture);
 
-    m.m_MetallicFactor = m_MetallicFactor;
-    m.m_RoughnessFactor = m_RoughnessFactor;
-
+    //Set the tightly packed properties.
+    m.m_MaterialData = m_MaterialData;
+	
     return m;
 }
 
@@ -181,49 +169,50 @@ void PTMaterial::SetTransmissionTexture(std::shared_ptr<Lumen::ILumenTexture> a_
 
 void PTMaterial::SetClearCoatFactor(float a_Factor)
 {
-    m_ClearCoatFactor = a_Factor;
+    m_MaterialData.SetClearCoat(a_Factor);
     m_DeviceMaterialDirty = true;
 }
 
 void PTMaterial::SetClearCoatRoughnessFactor(float a_Factor)
 {
-    m_ClearCoatRoughnessFactor = a_Factor;
+	//Invert because our shading uses gloss instead of roughness.
+    m_MaterialData.SetClearCoatGloss(1.f - a_Factor);
     m_DeviceMaterialDirty = true;
 }
 
 void PTMaterial::SetIndexOfRefraction(float a_Factor)
 {
-    m_IndexOfRefraction = a_Factor;
+    m_MaterialData.SetRefractiveIndex(a_Factor);
     m_DeviceMaterialDirty = true;
 }
 
 void PTMaterial::SetTransmissionFactor(float a_Factor)
 {
-    m_TransmissionFactor = a_Factor;
+    m_MaterialData.SetTransmission(a_Factor);
     m_DeviceMaterialDirty = true;
 }
 
 void PTMaterial::SetSpecularFactor(float a_Factor)
 {
-    m_SpecularFactor = a_Factor;
+    m_MaterialData.SetSpecular(a_Factor);
     m_DeviceMaterialDirty = true;
 }
 
 void PTMaterial::SetSpecularTintFactor(float a_Factor)
 {
-    m_SpecularTintFactor = a_Factor;
+    m_MaterialData.SetSpecTint(a_Factor);
     m_DeviceMaterialDirty = true;
 }
 
 void PTMaterial::SetSubSurfaceFactor(float a_Factor)
 {
-    m_SubSurfaceFactor = a_Factor;
+    m_MaterialData.SetSubSurface(a_Factor);
     m_DeviceMaterialDirty = true;
 }
 
 void PTMaterial::SetLuminance(float a_Factor)
 {
-    m_Luminance = a_Factor;
+    m_MaterialData.SetLuminance(a_Factor);
     m_DeviceMaterialDirty = true;
 }
 
@@ -235,42 +224,43 @@ void PTMaterial::SetTintTexture(std::shared_ptr<Lumen::ILumenTexture> a_Texture)
 
 void PTMaterial::SetTintFactor(const glm::vec3& a_Factor)
 {
-    m_TintFactor = make_float3(a_Factor.x, a_Factor.y, a_Factor.z);
+    m_MaterialData.SetTint(make_float3(a_Factor.x, a_Factor.y, a_Factor.z));
     m_DeviceMaterialDirty = true;
 }
 
 void PTMaterial::SetAnisotropic(float a_Factor)
 {
-    m_Anisotropic = a_Factor;
+    m_MaterialData.SetAnisotropic(a_Factor);
     m_DeviceMaterialDirty = true;
 }
 
 void PTMaterial::SetSheenFactor(float a_Factor)
 {
-    m_SheenFactor = a_Factor;
+    m_MaterialData.SetSheen(a_Factor);
     m_DeviceMaterialDirty = true;
 }
 
 void PTMaterial::SetSheenTintFactor(float a_Factor)
 {
-    m_SheenTintFactor = a_Factor;
+    m_MaterialData.SetSheenTint(a_Factor);
     m_DeviceMaterialDirty = true;
 }
 
 void PTMaterial::SetTransmittanceFactor(const glm::vec3& a_Factor)
 {
-    m_Transmittance = make_float3(a_Factor.x, a_Factor.y, a_Factor.z);
+    m_MaterialData.SetTransmittance(make_float3(a_Factor.x, a_Factor.y, a_Factor.z));
     m_DeviceMaterialDirty = true;
 }
 
 void PTMaterial::SetMetallicFactor(float a_Factor)
 {
-    m_MetallicFactor = a_Factor;
+    m_MaterialData.SetMetallic(a_Factor);
     m_DeviceMaterialDirty = true;
 }
 
 void PTMaterial::SetRoughnessFactor(float a_Factor)
 {
-    m_RoughnessFactor = a_Factor;
+    assert(a_Factor > 0.f && a_Factor <= 1.f && "Roughness can't be 0. ");
+    m_MaterialData.SetRoughness(a_Factor);
     m_DeviceMaterialDirty = true;
 }

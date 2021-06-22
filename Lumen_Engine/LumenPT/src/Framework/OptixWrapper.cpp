@@ -514,7 +514,7 @@ void OptixWrapper::SetupShaderBindingTable()
 void OptixWrapper::OptixDebugCallback(unsigned a_Level, const char* a_Tag, const char* a_Message, void*)
 {
 
-    std::printf("%u::%s:: %s\n\n", a_Level, a_Tag, a_Message);
+    std::printf("[Optix Debug Callback]: (Level: %u) (Tag: %s) Message: %s\n\n", a_Level, a_Tag, a_Message);
 
 }
 

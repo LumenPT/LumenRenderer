@@ -3,12 +3,14 @@
 #include "OptixWrapper.h"
 #include "CudaGLTexture.h"
 #include "MemoryBuffer.h"
+#include "GpuTexture.h"
 #include "MotionVectors.h"
 #include "../Shaders/CppCommon/WaveFrontDataStructs.h"
 #include "PTServiceLocator.h"
 #include "Nvidia/INRDWrapper.h"
 #include "Nvidia/IDLSSWrapper.h"
 #include "../Tools/LumenPTModelConverter.h"
+#include "OptixDenoiserWrapper.h" 
 
 #include "Renderer/LumenRenderer.h"
 
@@ -62,7 +64,7 @@ namespace WaveFront
 
         std::unique_ptr<Lumen::ILumenPrimitive> CreatePrimitive(PrimitiveData& a_PrimitiveData) override;
         std::shared_ptr<Lumen::ILumenMesh> CreateMesh(std::vector<std::shared_ptr<Lumen::ILumenPrimitive>>& a_Primitives) override;
-        std::shared_ptr<Lumen::ILumenTexture> CreateTexture(void* a_PixelData, uint32_t a_Width, uint32_t a_Height) override;
+        std::shared_ptr<Lumen::ILumenTexture> CreateTexture(void* a_PixelData, uint32_t a_Width, uint32_t a_Height, bool a_Normalize) override;
         std::shared_ptr<Lumen::ILumenMaterial> CreateMaterial(const MaterialData& a_MaterialData) override;
         std::shared_ptr<Lumen::ILumenVolume> CreateVolume(const std::string& a_FilePath) override;
         std::shared_ptr<Lumen::ILumenScene> CreateScene(SceneData a_SceneData) override;
@@ -149,10 +151,10 @@ namespace WaveFront
         MemoryBuffer m_VolumetricShadowRays;
 
         //Buffer used for output of separate channels of light.
-        MemoryBuffer m_PixelBufferSeparate;
+        std::unique_ptr<GpuTexture<float4>> m_PixelBufferSeparate;
 
         //Buffer used to combine light channels after denoising.
-        MemoryBuffer m_PixelBufferCombined;
+        std::unique_ptr<GpuTexture<float4>> m_PixelBufferCombined;
 
         //Triangle lights.
         MemoryBuffer m_TriangleLights;
@@ -163,11 +165,16 @@ namespace WaveFront
         //Optix system
         std::unique_ptr<OptixWrapper> m_OptixSystem;
 
+        //DX11System
+        std::unique_ptr<DX11Wrapper> m_DX11Wrapper;
+
         //NRI Wrapper
         std::unique_ptr<INRDWrapper> m_NRD;
 
         //DLSS Wrapper
         std::unique_ptr<IDLSSWrapper> m_DLSS;
+
+        std::unique_ptr<OptixDenoiserWrapper> m_OptixDenoiser;
 
         //ReSTIR
         std::unique_ptr<ReSTIR> m_ReSTIR;

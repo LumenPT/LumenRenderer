@@ -12,9 +12,11 @@
 
 
 CPU_ON_GPU void SeparateIntersectionRayBuffer(WaveFront::AtomicBuffer<WaveFront::IntersectionRayData>* a_IntersectionBuffer,
+    uint2 a_Resolution,
     float3* a_OriginBuffer, float3* a_DirectionBuffer, float3* a_ContributionBuffer);
 
 CPU_ONLY void SeparateIntersectionRayBufferCPU(uint64_t a_BufferSize, WaveFront::AtomicBuffer<WaveFront::IntersectionRayData>* a_IntersectionBuffer,
+    uint2 a_Resolution,
     float3* a_OriginBuffer, float3* a_DirectionBuffer, float3* a_ContributionBuffer);
 
 CPU_ON_GPU void SeparateMotionVectorBuffer(uint64_t a_BufferSize, WaveFront::MotionVectorBuffer* a_MotionVectorBuffer,

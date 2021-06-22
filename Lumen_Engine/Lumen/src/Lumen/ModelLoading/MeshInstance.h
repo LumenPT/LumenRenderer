@@ -38,6 +38,7 @@ namespace Lumen
         MeshInstance()
             : m_AdditionalColor(1.0f, 1.0f, 1.0f, 1.0f)
             , m_EmissiveProperties()
+    		, m_PreviousEmissionMode(m_EmissiveProperties.m_EmissionMode)
             , m_Name("Unnamed mesh instance")
         {
         }

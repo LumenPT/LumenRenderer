@@ -27,11 +27,11 @@ namespace WaveFront
         CPU_GPU IntersectionData()
             :
             m_RayArrayIndex(0),
-            m_IntersectionT(-1.f),
-            m_Barycentrics({0.f, 0.f}),
-            m_PrimitiveIndex(0),
+            m_PixelIndex({ 0, 0 }),
             m_InstanceId(0),
-            m_PixelIndex(0)
+            m_PrimitiveIndex(0),
+            m_Barycentrics({0.f, 0.f}),
+            m_IntersectionT(-1.f)
         {}
 
         CPU_GPU IntersectionData(
@@ -40,14 +40,14 @@ namespace WaveFront
             float2 a_Barycentrics,
             unsigned int a_PrimitiveIndex,
             unsigned int a_InstanceId,
-            unsigned int a_PixelIndex)
+            const PixelIndex& a_PixelIndex)
             :
             m_RayArrayIndex(a_RayArrayIndex),
-            m_IntersectionT(a_IntersectionT),
-            m_Barycentrics(a_Barycentrics),
-            m_PrimitiveIndex(a_PrimitiveIndex),
+            m_PixelIndex(a_PixelIndex),
             m_InstanceId(a_InstanceId),
-            m_PixelIndex(a_PixelIndex)
+            m_PrimitiveIndex(a_PrimitiveIndex),
+            m_Barycentrics(a_Barycentrics),
+            m_IntersectionT(a_IntersectionT)
         {}
 
 
@@ -81,20 +81,29 @@ namespace WaveFront
         /// </summary>
         unsigned int m_RayArrayIndex;
 
-        //The index of the pixel/surface that this intersection affects.
-        unsigned int m_PixelIndex;
+        /// <summary>
+        /// <b>Description</b> \n The pixel indices of the pixel that the ray affects. \n
+        /// <b>Default</b>: 0,0
+        /// </summary>
+        PixelIndex m_PixelIndex;
 
-        //Instance ID unique to the surface intersected.
+        /// <summary>
+        /// <b>Description</b> \n The unique instance ID of the surface that has been intersected with. \n
+        /// <b>Default</b>: 0
+        /// </summary>
         unsigned int m_InstanceId;
-
-        //The barycentric coordinates of the triangle hit.
-        float2 m_Barycentrics;
 
         /// <summary>
         /// <b>Description</b> \n The index of the primitive(triangle, quad, etc.) of the mesh that the ray intersected with. \n
         /// <b>Default</b>: 0
         /// </summary>
         unsigned int m_PrimitiveIndex;
+
+        /// <summary>
+        /// <b>Description</b> \n The U- & V-barycentric coordinates of the intersection point on the triangle that has been interested. \n
+        /// <b>Default</b>: 0.f, 0.f
+        /// </summary>
+        float2 m_Barycentrics;
 
         /// <summary>
         /// <b>Description</b> \n Distance along the ray the intersection happened. \n

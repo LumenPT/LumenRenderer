@@ -78,6 +78,8 @@ namespace WaveFront
             const OptixLaunchParameters& a_LaunchParams,
             CUstream a_CUDAStream = nullptr) const;
 
+        OptixDeviceContext GetDeviceContext() { return m_DeviceContext; }
+
     private:
 
         bool Initialize(const InitializationData& a_InitializationData);

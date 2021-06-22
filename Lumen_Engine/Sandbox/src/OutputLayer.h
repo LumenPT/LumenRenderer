@@ -70,6 +70,7 @@ private:
 
     float m_CameraMouseSensitivity;
     float m_CameraMovementSpeed;
+    float m_Gamma = 2.2f;
 
     std::unique_ptr<class ModelLoaderWidget> m_ModelLoaderWidget;
     std::unique_ptr<Lumen::SceneGraph> m_SceneGraph;
@@ -170,10 +171,12 @@ private:
     "                                                                                         "
     "in vec2 a_UV; // the input variable from the vertex shader (same name and same type)\n   "
     "                                                                                         "
+    "uniform float a_Gamma; // gamma correction strength \n                                   "
     "uniform sampler2D u_Texture;\n                                                           "
     "                                                                                         "
     "void main()\n                                                                            "
     "{                                                                                        "
     "    FragColor = texture(u_Texture, a_UV);                                                "
+    "    FragColor.rgb = pow(FragColor.rgb, vec3(1.0/a_Gamma));                               "
     "}                                                                                        ";
 };

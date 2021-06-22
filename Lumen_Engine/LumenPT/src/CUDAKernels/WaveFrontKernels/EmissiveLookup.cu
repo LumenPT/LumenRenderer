@@ -34,7 +34,9 @@ CPU_ON_GPU void FindEmissives(
     const uint32_t a_IndexBufferSize,
     unsigned int* a_NumLights)
 {
-
+	//Set to 0.
+    *a_NumLights = 0;
+	
     //const auto devMat = a_Mat->GetDeviceMaterial();
 
     //pack these into triangle
@@ -43,7 +45,6 @@ CPU_ON_GPU void FindEmissives(
 
     for (unsigned int baseIndex = 0; baseIndex < a_IndexBufferSize; baseIndex+=3)
     {
-
         //looped over 3 vertices, construct triangle
 
         const unsigned index0 = a_Indices[baseIndex + 0];
@@ -85,7 +86,7 @@ CPU_ON_GPU void FindEmissives(
         //    diffuseColor *= tex2D<float4>(diffuseTexture, UVCentroid.x, UVCentroid.y);
         //}
 
-        float4 emissiveColor = a_Mat->m_EmissionColor;
+        float4 emissiveColor = a_Mat->m_MaterialData.m_Emissive;
 
         if(emissiveTexture)
         {
@@ -103,8 +104,8 @@ CPU_ON_GPU void FindEmissives(
 
         const unsigned triangleIndex = baseIndex / 3; //Base index goes up by three each loop, divide by three to get the num of triangles before current value.
         //if emission not equal to 0
-        if ((finalEmission.x > 0.0f || finalEmission.y > 0.0f || finalEmission.z > 0.0f) && finalEmission.w > 0.f)
-        {
+        if ((finalEmission.x > 0.0f || finalEmission.y > 0.0f || finalEmission.z > 0.0f))
+        {        	
             a_Emissives[triangleIndex] = true;
             (*a_NumLights)++;
             continue;
@@ -161,11 +162,12 @@ CPU_ON_GPU void AddToLightBuffer(
         assert(a_SceneDataTable->GetTableEntry<DevicePrimitive>(a_InstanceId) != nullptr);
         const auto devicePrimitiveInstance = a_SceneDataTable->GetTableEntry<DevicePrimitiveInstance>(a_InstanceId);
         const auto devicePrimitive = devicePrimitiveInstance->m_Primitive;
-
+    	
         //TODO this can be optimized in case of override.
         //check first vertex of triangle to see if its in emissive buffer
         if ((devicePrimitiveInstance->m_EmissionMode == Lumen::EmissionMode::ENABLED && a_Emissives[triangleIndex] == true) || devicePrimitiveInstance->m_EmissionMode == Lumen::EmissionMode::OVERRIDE)
         {
+        	
             const unsigned index0 = a_Indices[baseIndex + 0];
             const unsigned index1 = a_Indices[baseIndex + 1];
             const unsigned index2 = a_Indices[baseIndex + 2];
@@ -210,7 +212,7 @@ CPU_ON_GPU void AddToLightBuffer(
             if (devicePrimitiveInstance->m_EmissionMode == Lumen::EmissionMode::ENABLED)
             {
                 emissive = tex2D<float4>(mat->m_EmissiveTexture, UVCentroid.x, UVCentroid.y);
-                emissive *= mat->m_EmissionColor * devicePrimitiveInstance->m_EmissiveColorAndScale.w;
+                emissive *= mat->m_MaterialData.m_Emissive * devicePrimitiveInstance->m_EmissiveColorAndScale.w;
             }
             //When override, take the ovverride emissive color and scale it up.
             else if (devicePrimitiveInstance->m_EmissionMode == Lumen::EmissionMode::OVERRIDE)
