@@ -602,24 +602,36 @@ namespace WaveFront
         // TODO: render resolution used in snapshot->AddBuffer
         m_FrameSnapshot->AddBuffer([&]()
             {
-                auto optixDenoiserInput = &(m_OptixDenoiser->TestInput);
-                auto optixDenoiszerOutput = &(m_OptixDenoiser->TestOutput);
+                auto optixDenoiserInput = &(m_OptixDenoiser->ColorInput);
+                auto OptixDenoiserAlbedoInput = &(m_OptixDenoiser->AlbedoInput);
+                auto OptixDenoiserNormalInput = &(m_OptixDenoiser->NormalInput);
+                auto optixDenoiszerOutput = &(m_OptixDenoiser->ColorOutput);
 
                 std::map<std::string, FrameSnapshot::ImageBuffer> resBuffers;
                 m_DeferredOpenGLCalls.push([&]() {
-                    resBuffers["Optix denoiser input"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
+                    resBuffers["Optix denoiser color input"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
                         m_Settings.renderResolution.y, 3 * sizeof(float));
 
-                    resBuffers["Optix denoiser output"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
+                    resBuffers["Optix denoiser albedo input"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
+                        m_Settings.renderResolution.y, 3 * sizeof(float));
+
+                    resBuffers["Optix denoiser normal input"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
+                        m_Settings.renderResolution.y, 3 * sizeof(float));
+
+                    resBuffers["Optix denoiser color output"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
                         m_Settings.renderResolution.y, 3 * sizeof(float));
                     });
                 WaitForDeferredCalls();
 
                 SeparateOptixDenoiserBufferCPU(m_Settings.renderResolution.x * m_Settings.renderResolution.y,
                     optixDenoiserInput->GetDevicePtr<float3>(),
+                    OptixDenoiserAlbedoInput->GetDevicePtr<float3>(),
+                    OptixDenoiserNormalInput->GetDevicePtr<float3>(),
                     optixDenoiszerOutput->GetDevicePtr<float3>(),
-                    resBuffers.at("Optix denoiser input").m_Memory->GetDevicePtr<float3>(),
-                    resBuffers.at("Optix denoiser output").m_Memory->GetDevicePtr<float3>()
+                    resBuffers.at("Optix denoiser color input").m_Memory->GetDevicePtr<float3>(),
+                    resBuffers.at("Optix denoiser albedo input").m_Memory->GetDevicePtr<float3>(),
+                    resBuffers.at("Optix denoiser normal input").m_Memory->GetDevicePtr<float3>(),
+                    resBuffers.at("Optix denoiser color output").m_Memory->GetDevicePtr<float3>()
                 );
 
                 return resBuffers;
@@ -832,9 +844,12 @@ namespace WaveFront
 
             OptixDenoiserLaunchParameters optixDenoiserLaunchParams(
                 m_Settings.renderResolution,
+                m_SurfaceData[0].GetDevicePtr<SurfaceData>(),
                 m_PixelBufferCombined->GetSurfaceObject(),
-                m_OptixDenoiser->TestInput.GetDevicePtr<float3>(),
-                m_OptixDenoiser->TestOutput.GetDevicePtr<float3>()
+                m_OptixDenoiser->ColorInput.GetDevicePtr<float3>(),
+                m_OptixDenoiser->AlbedoInput.GetDevicePtr<float3>(),
+                m_OptixDenoiser->NormalInput.GetDevicePtr<float3>(),
+                m_OptixDenoiser->ColorOutput.GetDevicePtr<float3>()
             );
 
 
@@ -926,12 +941,14 @@ namespace WaveFront
         m_Scene->m_Camera->UpdatePreviousFrameMatrix();
         ++frameCount;
 
-        //m_OptixDenoiser->UpdateDebugTextures();
-        //m_DeferredOpenGLCalls.push([&]() {
-        //    //m_DebugTexture = m_OptixDenoiser->m_OptixDenoiserInputTex.m_Memory->GetTexture();
-        //    m_DebugTexture = m_OptixDenoiser->m_OptixDenoiserOutputTex.m_Memory->GetTexture();
-        //    });
-        //WaitForDeferredCalls();
+        m_OptixDenoiser->UpdateDebugTextures();
+        m_DeferredOpenGLCalls.push([&]() {
+            //m_DebugTexture = m_OptixDenoiser->m_OptixDenoiserInputTex.m_Memory->GetTexture();
+            //m_DebugTexture = m_OptixDenoiser->m_OptixDenoiserAlbedoInputTex.m_Memory->GetTexture();
+            //m_DebugTexture = m_OptixDenoiser->m_OptixDenoiserNormalInputTex.m_Memory->GetTexture();
+            m_DebugTexture = m_OptixDenoiser->m_OptixDenoiserOutputTex.m_Memory->GetTexture();
+            });
+        WaitForDeferredCalls();
 
 
         // TODO: Weird debug code. Yeet?

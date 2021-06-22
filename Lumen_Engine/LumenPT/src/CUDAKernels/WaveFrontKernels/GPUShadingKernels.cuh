@@ -133,8 +133,11 @@ CPU_ON_GPU void GenerateMotionVector(
 
 CPU_ON_GPU void PrepareOptixDenoisingGPU(
     const uint2 a_RenderResolution,
+    const SurfaceData* a_CurrentSurfaceData,
     const cudaSurfaceObject_t a_PixelBufferSingleChannel,
     float3* a_IntermediaryInput,
+    float3* a_AlbedoInput,
+    float3* a_NormalInput,
     float3* a_IntermediaryOutput);
 
 CPU_ON_GPU void FinishOptixDenoisingGPU(

@@ -24,6 +24,8 @@ struct OptixDenoiserDenoiseParams
 {
 	WaveFront::PostProcessLaunchParameters* m_PostProcessLaunchParams;
 	CUdeviceptr m_ColorInput;
+	CUdeviceptr m_AlbedoInput;
+	CUdeviceptr m_NormalInput;
 	CUdeviceptr m_Output;
 };
 
@@ -40,10 +42,14 @@ public:
 
 	void UpdateDebugTextures();
 
-	MemoryBuffer TestInput;
-	MemoryBuffer TestOutput;
+	MemoryBuffer ColorInput;
+	MemoryBuffer AlbedoInput;
+	MemoryBuffer NormalInput;
+	MemoryBuffer ColorOutput;
 
 	FrameSnapshot::ImageBuffer m_OptixDenoiserInputTex;
+	FrameSnapshot::ImageBuffer m_OptixDenoiserAlbedoInputTex;
+	FrameSnapshot::ImageBuffer m_OptixDenoiserNormalInputTex;
 	FrameSnapshot::ImageBuffer m_OptixDenoiserOutputTex;
 
 protected:

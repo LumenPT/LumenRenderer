@@ -46,10 +46,16 @@ void OptixDenoiserWrapper::Initialize(const OptixDenoiserInitParams& a_InitParam
         m_scratch.GetSize()
     ));
 
-    TestInput.Resize(m_InitParams.m_InputWidth * m_InitParams.m_InputHeight * sizeof(float3));
-    TestOutput.Resize(m_InitParams.m_InputWidth * m_InitParams.m_InputHeight * sizeof(float3));
+    ColorInput.Resize(m_InitParams.m_InputWidth * m_InitParams.m_InputHeight * sizeof(float3));
+    AlbedoInput.Resize(m_InitParams.m_InputWidth * m_InitParams.m_InputHeight * sizeof(float3));
+    NormalInput.Resize(m_InitParams.m_InputWidth * m_InitParams.m_InputHeight * sizeof(float3));
+    ColorOutput.Resize(m_InitParams.m_InputWidth * m_InitParams.m_InputHeight * sizeof(float3));
 
     m_OptixDenoiserInputTex.m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_InitParams.m_InputWidth,
+        m_InitParams.m_InputHeight, 3 * sizeof(float));;
+    m_OptixDenoiserAlbedoInputTex.m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_InitParams.m_InputWidth,
+        m_InitParams.m_InputHeight, 3 * sizeof(float));;
+    m_OptixDenoiserNormalInputTex.m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_InitParams.m_InputWidth,
         m_InitParams.m_InputHeight, 3 * sizeof(float));;
     m_OptixDenoiserOutputTex.m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_InitParams.m_InputWidth,
         m_InitParams.m_InputHeight, 3 * sizeof(float));;
@@ -61,9 +67,25 @@ void OptixDenoiserWrapper::Denoise(const OptixDenoiserDenoiseParams& a_DenoisePa
 
     OptixDenoiserParams optixDenoiserParams = {};
     optixDenoiserParams.denoiseAlpha = false;
-    optixDenoiserParams.blendFactor = 1.0f;
+    optixDenoiserParams.blendFactor = 0.0f;
 
     OptixDenoiserGuideLayer guideLayer = {};
+
+    OptixImage2D& albedoTex = guideLayer.albedo;
+    albedoTex.data = a_DenoiseParams.m_AlbedoInput;
+    albedoTex.width = m_InitParams.m_InputWidth;
+    albedoTex.height = m_InitParams.m_InputHeight;
+    albedoTex.pixelStrideInBytes = sizeof(float3);
+    albedoTex.rowStrideInBytes = albedoTex.pixelStrideInBytes * albedoTex.width;
+    albedoTex.format = OPTIX_PIXEL_FORMAT_FLOAT3;
+
+    OptixImage2D& normalTex = guideLayer.normal;
+    normalTex.data = a_DenoiseParams.m_NormalInput;
+    normalTex.width = m_InitParams.m_InputWidth;
+    normalTex.height = m_InitParams.m_InputHeight;
+    normalTex.pixelStrideInBytes = sizeof(float3);
+    normalTex.rowStrideInBytes = normalTex.pixelStrideInBytes * normalTex.width;
+    normalTex.format = OPTIX_PIXEL_FORMAT_FLOAT3;
 
     OptixDenoiserLayer inputOutputLayer = {};
 
@@ -107,9 +129,13 @@ void OptixDenoiserWrapper::UpdateDebugTextures()
 {
     SeparateOptixDenoiserBufferCPU(
         m_InitParams.m_InputWidth * m_InitParams.m_InputHeight,
-        TestInput.GetDevicePtr<float3>(),
-        TestOutput.GetDevicePtr<float3>(),
+        ColorInput.GetDevicePtr<float3>(),
+        AlbedoInput.GetDevicePtr<float3>(),
+        NormalInput.GetDevicePtr<float3>(),
+        ColorOutput.GetDevicePtr<float3>(),
         m_OptixDenoiserInputTex.m_Memory->GetDevicePtr<float3>(),
+        m_OptixDenoiserAlbedoInputTex.m_Memory->GetDevicePtr<float3>(),
+        m_OptixDenoiserNormalInputTex.m_Memory->GetDevicePtr<float3>(),
         m_OptixDenoiserOutputTex.m_Memory->GetDevicePtr<float3>()
     );
 }

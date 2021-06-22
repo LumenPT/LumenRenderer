@@ -12,8 +12,11 @@ CPU_ON_GPU void PostProcessingEffects()
 
 CPU_ON_GPU void PrepareOptixDenoisingGPU(
     const uint2 a_RenderResolution,
+    const SurfaceData* a_CurrentSurfaceData,
     const cudaSurfaceObject_t a_PixelBufferSingleChannel,
     float3* a_IntermediaryInput,
+    float3* a_AlbedoInput,
+    float3* a_NormalInput,
     float3* a_IntermediaryOutput)
 {
     const unsigned int pixelX = blockIdx.x * blockDim.x + threadIdx.x;
@@ -38,21 +41,9 @@ CPU_ON_GPU void PrepareOptixDenoisingGPU(
 
         a_IntermediaryInput[pixelDataIndex] = make_float3(colorFloat);
 
-        a_IntermediaryOutput[pixelDataIndex] = make_float3(0.5f, 0.5f, 0.5f);
-
-        /*float4 color{ 0.f };
-
-        surf2Dread<float4>(
-            &color,
-            a_PixelBufferSingleChannel,
-            pixelX * sizeof(float4),
-            pixelY,
-            cudaBoundaryModeTrap);
-
-        a_IntermediaryInput[pixelDataIndex] = make_float3(color.x, color.y, color.z);*/
-        //a_IntermediaryOutput[pixelDataIndex] = make_float3(color.x, color.y, color.z); //TODO: for testing, remove
-
-        //printf("%f %f %f\n", color.x, color.y, color.z);
+        float4 albedo = a_CurrentSurfaceData[pixelDataIndex].m_MaterialData.m_Color;
+        a_AlbedoInput[pixelDataIndex] = make_float3(albedo.x, albedo.y, albedo.z);
+        a_NormalInput[pixelDataIndex] = a_CurrentSurfaceData[pixelDataIndex].m_Normal;
     }
 }
 

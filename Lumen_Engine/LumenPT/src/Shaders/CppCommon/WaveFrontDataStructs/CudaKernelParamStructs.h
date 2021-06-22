@@ -158,22 +158,31 @@ namespace WaveFront
 
         CPU_ONLY OptixDenoiserLaunchParameters(
             const uint2& a_RenderResolution,
+            const SurfaceData* a_CurrentSurfaceData,
             const cudaSurfaceObject_t a_PixelBufferSingleChannel,
             float3* a_IntermediaryInput,
+            float3* a_AlbedoInput,
+            float3* a_NormalInput,
             float3* a_IntermediaryOutput
         )
             :
             m_RenderResolution(a_RenderResolution),
+            m_CurrentSurfaceData(a_CurrentSurfaceData),
             m_PixelBufferSingleChannel(a_PixelBufferSingleChannel),
             m_IntermediaryInput(a_IntermediaryInput),
+            m_AlbedoInput(a_AlbedoInput),
+            m_NormalInput(a_NormalInput),
             m_IntermediaryOutput(a_IntermediaryOutput)
         {}
 
         CPU_ONLY ~OptixDenoiserLaunchParameters() = default;
 
         const uint2& m_RenderResolution;
+        const SurfaceData* m_CurrentSurfaceData;
         const cudaSurfaceObject_t m_PixelBufferSingleChannel;
         float3* m_IntermediaryInput;
+        float3* m_AlbedoInput;
+        float3* m_NormalInput;
         float3* m_IntermediaryOutput;
     };
 }
