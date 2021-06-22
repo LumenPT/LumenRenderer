@@ -73,6 +73,7 @@ private:
 
     std::unique_ptr<class ModelLoaderWidget> m_ModelLoaderWidget;
     std::unique_ptr<Lumen::SceneGraph> m_SceneGraph;
+    std::unique_ptr<class Profiler> m_Profiler;
 
     enum ContentViewMode
     {
@@ -137,6 +138,7 @@ private:
 
     std::deque<FrameStats> m_PreviousFramesStats;
     const uint32_t m_MaxStoredFrames = 5 * 60 * 60; // 5 minutes of running at 60FPS
+    uint32_t m_BarsDisplayed;
 
     uint32_t m_LastFrameTex;
     uint32_t m_SmallViewportFrameTex;

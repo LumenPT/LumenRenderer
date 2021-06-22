@@ -21,6 +21,7 @@
 
 #include "Lumen/ToolUI/ModelLoaderWidget.h"
 #include "Lumen/ToolUI/SceneGraph.h"
+#include "Lumen/ToolUI/Profiler.h"
 #include "../vendor/stb/stb_image_write.h"
 
 #include "Glad/glad.h"
@@ -112,6 +113,7 @@ void OutputLayer::OnAttach()
 	m_ModelLoaderWidget = std::make_unique<ModelLoaderWidget>(*m_LayerServices->m_SceneManager, m_Renderer->m_Scene);
 	m_SceneGraph = std::make_unique<Lumen::SceneGraph>();
 	m_SceneGraph->SetRendererRef(*m_Renderer);
+	m_Profiler = std::make_unique<Profiler>();
 }
 
 void OutputLayer::OnUpdate()
@@ -318,66 +320,11 @@ void OutputLayer::OnImGuiRender()
 
     }
 
+	auto lastFrame = m_Renderer->GetLastFrameStats();
+	m_Profiler->AddUniqueStats(lastFrame);
     if (m_EnabledTools.m_Profiler)
     {
-		auto lastFrame = m_Renderer->GetLastFrameStats();
-        if (lastFrame.m_Id && (m_PreviousFramesStats.empty() || m_PreviousFramesStats.back().m_Id != lastFrame.m_Id))
-        {
-			m_PreviousFramesStats.push_back(lastFrame);
-
-            if (m_PreviousFramesStats.size() > m_MaxStoredFrames)
-            {
-				m_PreviousFramesStats.pop_front();
-            }            
-        }
-
-		if (!m_PreviousFramesStats.empty())
-		{
-
-
-			ImGui::Begin("Profiler");
-
-			std::map<std::string, std::vector<uint64_t>> processedData;
-
-			for (auto& time : m_PreviousFramesStats[0].m_Times)
-			{
-				processedData[time.first] = std::vector<uint64_t>();
-				processedData[time.first].reserve(m_PreviousFramesStats.size());
-			}
-
-			std::vector<uint64_t> previous(m_PreviousFramesStats.size(), 0);
-
-			uint64_t maxTime = 0;
-
-			for (auto& data : processedData)
-			{
-				for (int i = 0; i < m_PreviousFramesStats.size(); i++)
-				{
-					auto n = previous[i] + m_PreviousFramesStats[i].m_Times[data.first];
-					data.second.push_back(n);
-					previous[i] = n;
-                    if (i > static_cast<int>(m_PreviousFramesStats.size()) - 400)
-                    {
-					    maxTime = std::max(maxTime, n);                        
-                    }
-				}
-			}
-
-			ImPlot::SetNextPlotLimitsY(0.0, static_cast<double>(maxTime) * 1.1, ImGuiCond_Always);
-			ImPlot::SetNextPlotLimitsX(static_cast<double>(m_PreviousFramesStats.size()) - 300.0, static_cast<double>(m_PreviousFramesStats.size()), ImGuiCond_Always);
-
-			if (ImPlot::BeginPlot("Frame Times"))
-			{
-				for (auto iter = processedData.crbegin(); iter != processedData.crend(); ++iter)
-				{
-					auto pair = *iter;
-					ImPlot::PlotBars(pair.first.c_str(), pair.second.data(), pair.second.size(), 1.0f);
-				}
-				ImPlot::EndPlot();
-			}
-
-			ImGui::End();
-		}
+    	m_Profiler->Display();
     }
 
 
@@ -488,7 +435,7 @@ void OutputLayer::HandleCameraInput(Camera& a_Camera)
 		return;
 	}
 
-    if (!ImGui::IsAnyItemActive() && Lumen::Input::IsMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT))
+    if (!ImGui::IsAnyItemHovered() && !ImGui::IsAnyItemActive() && Lumen::Input::IsMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT))
 	{
 		auto delta = Lumen::Input::GetMouseDelta();
 
