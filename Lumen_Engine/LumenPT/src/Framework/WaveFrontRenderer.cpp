@@ -543,6 +543,7 @@ namespace WaveFront
         //Set the counters back to 0 for intersections and shadow rays.
         const unsigned counterDefault = 0;
         SetAtomicCounter<ShadowRayData>(&m_ShadowRays, counterDefault);
+		SetAtomicCounter<ShadowRayData>(&m_VolumetricShadowRays, counterDefault);
         SetAtomicCounter<IntersectionData>(&m_IntersectionData, counterDefault);
 		SetAtomicCounter<VolumetricIntersectionData>(&m_VolumetricIntersectionData, counterDefault);
         CHECKLASTCUDAERROR;
@@ -702,6 +703,24 @@ namespace WaveFront
             cudaDeviceSynchronize();
             CHECKLASTCUDAERROR;
         }
+
+		//The amount of shadow rays to trace.
+		unsigned numVolumetricShadowRays = GetAtomicCounter<ShadowRayData>(&m_VolumetricShadowRays);
+
+		if (numVolumetricShadowRays > 0)
+		{
+			//The settings for shadow ray resolving.
+			OptixLaunchParameters shadowRayLaunchParameters;
+			shadowRayLaunchParameters = rayLaunchParameters;
+			shadowRayLaunchParameters.m_ResultBuffer = m_PixelBufferSeparate->GetSurfaceObject();
+			shadowRayLaunchParameters.m_ShadowRayBatch = m_VolumetricShadowRays.GetDevicePtr<AtomicBuffer<ShadowRayData>>();
+			shadowRayLaunchParameters.m_TraceType = RayType::SHADOW_RAY;
+
+			//Tell optix to resolve the shadow rays.
+			m_OptixSystem->TraceRays(numVolumetricShadowRays, shadowRayLaunchParameters);
+			cudaDeviceSynchronize();
+			CHECKLASTCUDAERROR;
+		}
 
         PostProcessLaunchParameters postProcessLaunchParams(
             m_Settings.renderResolution,
@@ -1084,7 +1103,7 @@ namespace WaveFront
         //Create atomic buffers. This automatically sets the counter to 0 and size to max.
         CreateAtomicBuffer<IntersectionRayData>(&m_Rays, numPrimaryRays);
         CreateAtomicBuffer<ShadowRayData>(&m_ShadowRays, numShadowRays);
-		CreateAtomicBuffer<ShadowRayData>(&m_VolumetricShadowRays, numShadowRays);
+		CreateAtomicBuffer<ShadowRayData>(&m_VolumetricShadowRays, numShadowRays * 5);	//TODO: replace hardcoded number of samples (5)
 		CreateAtomicBuffer<IntersectionData>(&m_IntersectionData, numPixels);
 		CreateAtomicBuffer<VolumetricIntersectionData>(&m_VolumetricIntersectionData, numPixels);
 
