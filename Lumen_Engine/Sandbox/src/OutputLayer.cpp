@@ -806,6 +806,12 @@ void OutputLayer::MakeScreenshot(std::string a_ScreenshotFileName)
 {
 	uint32_t w, h;
 	auto pixels = m_Renderer->GetOutputTexturePixels(w, h);
+	for (size_t i = 0; i < pixels.size(); i += 4)
+	{
+		pixels[i + 0] = std::powf(static_cast<float>(pixels[i + 0]) / static_cast<float>(255), 1.0f / m_Gamma) * 255;
+		pixels[i + 1] = std::powf(static_cast<float>(pixels[i + 1]) / static_cast<float>(255), 1.0f / m_Gamma) * 255;
+		pixels[i + 2] = std::powf(static_cast<float>(pixels[i + 2]) / static_cast<float>(255), 1.0f / m_Gamma) * 255;
+	}
 	std::filesystem::path p = a_ScreenshotFileName;
 	std::filesystem::create_directories(p.parent_path());
 	auto err = stbi_write_png(a_ScreenshotFileName.c_str(), w, h, 4, pixels.data(), 0);
@@ -816,7 +822,7 @@ std::string OutputLayer::DefaultScreenshotName()
 {
 	time_t now = time(0);
 	tm* time = gmtime(&now);
-	std::string name = "Screenshot" + std::to_string(time->tm_mday) + std::to_string(time->tm_mon) + '-'
-		+ std::to_string(time->tm_hour) + std::to_string(time->tm_min) + std::to_string(time->tm_sec) + ".png";
+	std::string name = "Screenshot" + std::to_string(time->tm_mday) + std::to_string(time->tm_mon + 1) + '-'
+		+ std::to_string(time->tm_hour + 2) + std::to_string(time->tm_min) + std::to_string(time->tm_sec) + ".png";
 	return name;
 }

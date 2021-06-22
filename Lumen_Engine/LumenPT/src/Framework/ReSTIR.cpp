@@ -68,8 +68,8 @@ void ReSTIR::Run(
 	const WaveFront::MotionVectorBuffer* const a_MotionVectorBuffer,
 	const WaveFront::OptixWrapper* const a_OptixWrapper,
 	const OptixTraversableHandle a_OptixSceneHandle,
-	const MemoryBuffer* const a_Lights,
 	const std::uint32_t a_Seed,
+	const MemoryBuffer* const a_Lights,
 	cudaSurfaceObject_t a_OutputBuffer,
     FrameStats& a_FrameStats, bool a_DebugPrint
 )

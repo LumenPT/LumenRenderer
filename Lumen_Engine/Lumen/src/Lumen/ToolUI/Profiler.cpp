@@ -144,6 +144,7 @@ void Profiler::Display()
 }
 void Profiler::Plot(std::vector<std::string>& a_Shown, uint64_t a_MaxY)
 {
+    float debug = 0.0f;
     if (a_Shown.size() != m_ProcessedData.size())
     {
         auto startId = GetStartingId();
@@ -184,7 +185,7 @@ void Profiler::Plot(std::vector<std::string>& a_Shown, uint64_t a_MaxY)
             {
                 auto wheel = Lumen::Input::GetMouseWheel().y;
                 m_BarsDisplayed += -wheel * 3.0f;
-
+                debug = wheel;
                 if (Lumen::Input::IsMouseButtonPressed(0)) // LMB
                 {
                     m_BarOffset += m_BarsDisplayed / 1000.0f * -Lumen::Input::GetMouseDeltaX();
@@ -217,7 +218,8 @@ void Profiler::Plot(std::vector<std::string>& a_Shown, uint64_t a_MaxY)
             {
                 auto wheel = Lumen::Input::GetMouseWheel().y;
                 m_BarsDisplayed += -wheel * 3.0f;
-
+                printf("Profiler %f", wheel);
+                debug = wheel;
                 if (Lumen::Input::IsMouseButtonPressed(0)) // LMB
                 {
                     m_BarOffset += m_BarsDisplayed / 1000.0f * -Lumen::Input::GetMouseDeltaX();
@@ -229,7 +231,7 @@ void Profiler::Plot(std::vector<std::string>& a_Shown, uint64_t a_MaxY)
             ImPlot::EndPlot();
         }        
     }
-
+    ImGui::Text("%f", debug);
     m_TableStatsId = m_TableStatsId > 0 ? static_cast<uint64_t>(m_TableStatsId) : 0;
     m_TableStatsId = std::min(m_TableStatsId, m_PreviousFramesStats.size() - 1);
 }
