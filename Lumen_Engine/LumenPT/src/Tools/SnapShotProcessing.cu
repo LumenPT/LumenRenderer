@@ -83,6 +83,9 @@ CPU_ON_GPU void SeparateOptixDenoiserBuffer(
         float3 inputPixel = a_OptixDenoiserInputBuffer[i];
         float3 albedoPixel = a_OptixDenoiserAlbedoInputBuffer[i];
         float3 normalPixel = a_OptixDenoiserNormalInputBuffer[i];
+
+        normalPixel = (normalPixel + 1.f) / 2.f;
+
         float3 outputPixel = a_OptixDenoiserOutputBuffer[i];;
     	
         a_OptixDenoiserInputTexture[i] = inputPixel;
