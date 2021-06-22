@@ -251,6 +251,13 @@ struct CDF
         //Pdf is proportional to all entries in the dataset.
         a_LightIndex = entry;    	
         a_LightPdf = (higher - lower) / sum;
+
+    	if(a_LightPdf <= 0.f)
+    	{
+            printf("Invalid PDF: %f.  Entry: %i  Total size: %i  Rng: %f.  Higher: %f.  Lower: %f.\n", a_LightPdf, a_LightIndex, size, a_Value, higher, lower);
+    	}
+
+        assert(a_LightPdf > 0.f);
     }
 
     /*

@@ -914,8 +914,6 @@ namespace WaveFront
             cudaDeviceSynchronize();
             CHECKLASTCUDAERROR;
         }
-
-
         
 
 

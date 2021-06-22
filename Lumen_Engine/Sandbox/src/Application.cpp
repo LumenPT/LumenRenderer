@@ -162,7 +162,7 @@ public:
 		//Base path for meshes.
 
 		//Mesh name
-		//const std::string meshName = "scene.gltf";
+		//const std::string meshName = "Bistro4.gltf";
 		const std::string meshName = "Sponza.gltf";
 		const std::string meshName2 = "EmissiveSphere.gltf";
 		//const std::string meshName3 = "scene.gltf";
@@ -204,11 +204,13 @@ public:
 		lumenPT->m_Scene = res->m_Scenes[0];
 		for(auto& mesh : lumenPT->m_Scene->m_MeshInstances)
 		{
-			mesh->m_Transform.SetScale(glm::vec3(1.0f));
-			mesh->SetEmissiveness({ Lumen::EmissionMode::ENABLED, {1.f, 1.f, 1.f}, 400.f });
+			mesh->m_Transform.SetScale(glm::vec3{ 1.f });
+			//mesh->m_Transform.SetScale(mesh->m_Transform.GetScale() * 10.f);
+			mesh->SetEmissiveness({ Lumen::EmissionMode::ENABLED, {1.f, 1.f, 1.f}, 6.f });
+			mesh->UpdateAccelRemoveThis();
 		}
 		
-		for(int i = 0; i < 30; ++i)
+		for(int i = 0; i < 120; ++i)
 		{
 			for (auto& node : res2->m_NodePool)
 			{
