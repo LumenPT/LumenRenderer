@@ -4,10 +4,22 @@
 
 class SceneDataTableAccessor;
 
-//CPU_GPU void HaltonSequence(
-//    int index,
-//    int base,
-//    float* result);
+struct ExtractSurfaceDataParams
+{
+
+    unsigned m_NumIntersections;
+    WaveFront::AtomicBuffer <WaveFront::IntersectionData>* m_IntersectionData;
+    WaveFront::AtomicBuffer <WaveFront::IntersectionRayData>* m_Rays;
+    SceneDataTableAccessor* m_SceneDataTable;
+    WaveFront::SurfaceData* m_SurfaceDataOutPut;
+    cudaSurfaceObject_t m_DepthOutPut;
+    cudaSurfaceObject_t m_NormalRoughnessOutput;
+    uint2 m_Resolution;
+    float2 m_MinMaxDepth;
+    unsigned int m_CurrentDepth;
+
+};
+
 
 /*
  * Called at start of frame.
@@ -25,16 +37,7 @@ CPU_ONLY void GenerateMotionVectors(WaveFront::MotionVectorsGenerationData& a_Mo
  * Extract the surface data for the current depth.
  * Requires the rays and intersection buffers.
  */
-CPU_ONLY void ExtractSurfaceData(
-    unsigned a_NumIntersections,
-    WaveFront::AtomicBuffer <WaveFront::IntersectionData>* a_IntersectionData,
-    WaveFront::AtomicBuffer <WaveFront::IntersectionRayData>* a_Rays,
-    WaveFront::SurfaceData* a_OutPut,
-    cudaSurfaceObject_t a_DepthOutPut,
-    uint2 a_Resolution,
-    SceneDataTableAccessor* a_SceneDataTable,
-    float2 a_MinMaxDepth,
-    unsigned int a_CurrentDepth);
+CPU_ONLY void ExtractSurfaceData(const ExtractSurfaceDataParams& a_ExtractionParams);
 
 /*
  * Called each wave after resolving a RayBatch.

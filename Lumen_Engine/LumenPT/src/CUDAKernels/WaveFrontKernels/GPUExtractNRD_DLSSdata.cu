@@ -3,9 +3,10 @@
 
 #include <device_launch_parameters.h>
 
-CPU_ON_GPU void ExtractDepthDataGpu(
+CPU_ON_GPU void ExtractNRD_DLSSdataGpu(
     const SurfaceData* a_SurfaceData, 
     cudaSurfaceObject_t a_DepthOutPut,
+    cudaSurfaceObject_t a_NormalRoughnessOutput,
     uint2 a_Resolution,
     float2 a_MinMaxDistance)
 {
@@ -20,11 +21,14 @@ CPU_ON_GPU void ExtractDepthDataGpu(
     
     if (pixelX < a_Resolution.x && pixelY < a_Resolution.y)
     {
-        float t = a_SurfaceData[pixelDataIndex].m_IntersectionT;
+
+        const WaveFront::SurfaceData& surfaceData = a_SurfaceData[pixelDataIndex];
+
+        float t = surfaceData.m_IntersectionT;
         
         //float1 t = make_float1(a_SurfaceData[pixelDataIndex].m_IntersectionT);
 
-        if (a_SurfaceData[pixelDataIndex].m_IntersectionT < 0.f)  //below 0 == no intersection
+        if (t < 0.f)  //below 0 == no intersection
         {
             float1 nullResult = make_float1(0.f);
 
@@ -64,6 +68,19 @@ CPU_ON_GPU void ExtractDepthDataGpu(
             result,
             a_DepthOutPut,  //intput
             pixelX * sizeof(float1),
+            pixelY,
+            cudaBoundaryModeTrap);
+
+        //Normal-Roughness extraction
+
+        const float roughness = surfaceData.m_MaterialData.GetRoughness();
+
+        half4Ushort4 normalRougnhess{ make_float4(surfaceData.m_Normal, roughness) };
+
+        surf2Dwrite<ushort4>(
+            normalRougnhess.m_Ushort4,
+            a_NormalRoughnessOutput,
+            pixelX * sizeof(ushort4),
             pixelY,
             cudaBoundaryModeTrap);
 

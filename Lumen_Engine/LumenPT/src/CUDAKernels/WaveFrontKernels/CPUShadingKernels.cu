@@ -53,35 +53,38 @@ CPU_ONLY void GenerateMotionVectors(MotionVectorsGenerationData& a_MotionVectors
     cudaDeviceSynchronize();
 }
 
-CPU_ONLY void ExtractSurfaceData(
-    unsigned a_NumIntersections, 
-    AtomicBuffer<IntersectionData>* a_IntersectionData, 
-    AtomicBuffer<IntersectionRayData>* a_Rays, 
-    SurfaceData* a_OutPut,
-    cudaSurfaceObject_t a_DepthOutPut,
-    uint2 a_Resolution,
-    SceneDataTableAccessor* a_SceneDataTable,
-    float2 a_MinMaxDepth,
-    unsigned int a_CurrentDepth)
+CPU_ONLY void ExtractSurfaceData(const ExtractSurfaceDataParams& a_ExtractionParams)
 {
     const int blockSize = 512;
-    const int numBlocks = (a_NumIntersections + blockSize - 1) / blockSize;
+    const int numBlocks = (a_ExtractionParams.m_NumIntersections + blockSize - 1) / blockSize;
 
-    ExtractSurfaceDataGpu<<<numBlocks, blockSize>>>(a_NumIntersections, a_IntersectionData, a_Rays, a_OutPut, a_Resolution, a_SceneDataTable);
+    ExtractSurfaceDataGpu<<<numBlocks, blockSize>>>(
+        a_ExtractionParams.m_NumIntersections,
+        a_ExtractionParams.m_IntersectionData, 
+        a_ExtractionParams.m_Rays, 
+        a_ExtractionParams.m_SurfaceDataOutPut, 
+        a_ExtractionParams.m_Resolution,
+        a_ExtractionParams.m_SceneDataTable);
 
     cudaDeviceSynchronize();
-    if (a_CurrentDepth == 0)
+    if (a_ExtractionParams.m_CurrentDepth == 0)
     {
 
         const dim3 blockSize2d{ 16, 16 ,1 };
         const unsigned blockSizeWidth =
-            static_cast<unsigned>(std::ceil(static_cast<float>(a_Resolution.x) / static_cast<float>(blockSize2d.x)));
+            static_cast<unsigned>(std::ceil(static_cast<float>(a_ExtractionParams.m_Resolution.x) / static_cast<float>(blockSize2d.x)));
         const unsigned blockSizeHeight =
-            static_cast<unsigned>(std::ceil(static_cast<float>(a_Resolution.y) / static_cast<float>(blockSize2d.y)));
+            static_cast<unsigned>(std::ceil(static_cast<float>(a_ExtractionParams.m_Resolution.y) / static_cast<float>(blockSize2d.y)));
 
         const dim3 numBlocks2d{ blockSizeWidth, blockSizeHeight, 1 };
 
-        ExtractDepthDataGpu <<<numBlocks2d, blockSize2d>>>(a_OutPut, a_DepthOutPut, a_Resolution, a_MinMaxDepth);
+        ExtractNRD_DLSSdataGpu<<<numBlocks2d, blockSize2d>>>(
+            a_ExtractionParams.m_SurfaceDataOutPut, 
+            a_ExtractionParams.m_DepthOutPut,
+            a_ExtractionParams.m_NormalRoughnessOutput,
+            a_ExtractionParams.m_Resolution,
+            a_ExtractionParams.m_MinMaxDepth);
+
     }
 
 }
