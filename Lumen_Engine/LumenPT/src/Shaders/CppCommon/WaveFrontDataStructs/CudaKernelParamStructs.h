@@ -7,7 +7,7 @@
 #include <array>
 
 class ReSTIR;
-
+struct FrameStats;
 namespace WaveFront
 {
     class OptixWrapper;
@@ -117,6 +117,7 @@ namespace WaveFront
         AtomicBuffer<ShadowRayData>* m_VolumetricShadowRayBuffer;
         ReSTIR* m_ReSTIR;
         std::array<cudaSurfaceObject_t, static_cast<unsigned>(LightChannel::NUM_CHANNELS)> m_OutputChannels;
+        FrameStats* m_FrameStats;
     };
 
     struct PostProcessLaunchParameters

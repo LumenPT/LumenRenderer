@@ -251,6 +251,8 @@ namespace WaveFront
         dlssInitParams.m_pServiceLocator = &m_ServiceLocator;
         m_DLSS->Initialize(dlssInitParams);*/
 
+
+        m_CurrentFrameStats.m_Id = 0;
     }
 
     void WaveFrontRenderer::BeginSnapshot()
@@ -380,8 +382,8 @@ namespace WaveFront
 
         auto end = std::chrono::high_resolution_clock::now();
 
-        auto milli = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
-        printf("\n\nTime elapsed to build scene data table: %li milliseconds\n\n", milli);
+        auto micro = std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count();
+        m_CurrentFrameStats.m_Times["Scene data table generation"] = micro;
 
         CHECKLASTCUDAERROR;
 
@@ -491,7 +493,6 @@ namespace WaveFront
                 });
         }
         CHECKLASTCUDAERROR;
-
 
         //Index of the current and last frame to access buffers.
         const auto currentIndex = m_FrameIndex;
@@ -764,6 +765,7 @@ namespace WaveFront
                 m_ReSTIR.get(),
                 pixelBuffers);
 
+            shadingLaunchParams.m_FrameStats = &m_CurrentFrameStats;
             //Reset the ray buffer so that indirect shading can fill it again.
             ResetAtomicBuffer<IntersectionRayData>(&m_Rays);
             cudaDeviceSynchronize();
@@ -966,6 +968,9 @@ namespace WaveFront
         m_DebugTexture = m_OptixDenoiser->m_OptixDenoiserInputTex.m_Memory->GetTexture();*/
 
         m_SnapshotReady = recordingSnapshot;
+
+        FinalizeFrameStats();
+
         CHECKLASTCUDAERROR;
 
         printf("Total frame time: %f milliseconds.\n", timer.measure(TimeUnit::MILLIS));
@@ -1414,5 +1419,14 @@ namespace WaveFront
         }
     }
 
+    void WaveFrontRenderer::FinalizeFrameStats()
+    {
+        std::lock_guard lk(m_FrameStatsMutex);
+
+        m_LastFrameStats = m_CurrentFrameStats;
+        m_LastFrameStats.m_Id++;
+        m_CurrentFrameStats = {};
+        m_CurrentFrameStats.m_Id = m_LastFrameStats.m_Id;
+    }
 }
 #endif

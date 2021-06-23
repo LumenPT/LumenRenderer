@@ -36,11 +36,11 @@ public:
 		const cudaSurfaceObject_t a_MotionVectorBuffer,
 		const WaveFront::OptixWrapper* const a_OptixWrapper,
 		const OptixTraversableHandle a_OptixSceneHandle,
-		const MemoryBuffer* const a_Lights,
 		const std::uint32_t a_Seed,
+		const MemoryBuffer* const a_Lights,
 		std::array<cudaSurfaceObject_t, static_cast<unsigned>(WaveFront::LightChannel::NUM_CHANNELS)> a_OutputBuffer,
-		bool a_DebugPrint = false
-	);
+        struct FrameStats& a_FrameStats, bool a_DebugPrint = false
+    );
 
 	/*
 	 * Update the CDF for the given light sources.

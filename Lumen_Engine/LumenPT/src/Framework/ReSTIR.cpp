@@ -3,6 +3,8 @@
 #ifdef WAVEFRONT
 #include "ReSTIR.h"
 
+#include "Lumen/Renderer/LumenRenderer.h"
+
 #include <cassert>
 #include <cuda_runtime.h>
 
@@ -66,10 +68,10 @@ void ReSTIR::Run(
 	const cudaSurfaceObject_t a_MotionVectorBuffer,
 	const WaveFront::OptixWrapper* const a_OptixWrapper,
 	const OptixTraversableHandle a_OptixSceneHandle,
-	const MemoryBuffer* const a_Lights,
 	const std::uint32_t a_Seed,
+	const MemoryBuffer* const a_Lights,
 	std::array<cudaSurfaceObject_t, static_cast<unsigned>(WaveFront::LightChannel::NUM_CHANNELS)> a_OutputBuffer,
-	bool a_DebugPrint
+    FrameStats& a_FrameStats, bool a_DebugPrint
 )
 {
 	//TODO:
@@ -224,6 +226,7 @@ void ReSTIR::Run(
 
 	printf("Total ReSTIR runtime: %f millis.\n", totalTimer.measure(TimeUnit::MILLIS));
 
+	a_FrameStats.m_Times["ReSTIR"] = totalTimer.measure(TimeUnit::MICROS);
 
 	//Ensure that swap buffers is called.
 	m_SwapDirtyFlag = false;
