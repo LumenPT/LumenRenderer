@@ -26,7 +26,9 @@ struct OptixDenoiserDenoiseParams
 	CUdeviceptr m_ColorInput;
 	CUdeviceptr m_AlbedoInput;
 	CUdeviceptr m_NormalInput;
-	CUdeviceptr m_Output;
+	CUdeviceptr m_FlowInput;
+	CUdeviceptr m_PrevColorOutput;
+	CUdeviceptr m_ColorOutput;
 };
 
 class OptixDenoiserWrapper
@@ -46,7 +48,9 @@ public:
 	MemoryBuffer AlbedoInput;
 	MemoryBuffer NormalInput;
 	MemoryBuffer FlowInput;
-	MemoryBuffer ColorOutput;
+
+	MemoryBuffer& GetColorOutput() { return ColorOutput[m_currentColorOutputIndex]; }
+	MemoryBuffer& GetPrevColorOutput() { return ColorOutput[(m_currentColorOutputIndex + 1) % ms_colorOutputNum]; }
 
 	FrameSnapshot::ImageBuffer m_OptixDenoiserInputTex;
 	FrameSnapshot::ImageBuffer m_OptixDenoiserAlbedoInputTex;
@@ -54,6 +58,10 @@ public:
 	FrameSnapshot::ImageBuffer m_OptixDenoiserOutputTex;
 
 protected:
+
+	static const size_t ms_colorOutputNum = 2;
+	std::array<MemoryBuffer, OptixDenoiserWrapper::ms_colorOutputNum> ColorOutput;
+	size_t m_currentColorOutputIndex = 0;
 
 	OptixDenoiser         m_Denoiser = nullptr;
 	OptixDenoiserParams   m_Params = {};

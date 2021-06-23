@@ -627,7 +627,7 @@ namespace WaveFront
                 auto optixDenoiserInput = &(m_OptixDenoiser->ColorInput);
                 auto OptixDenoiserAlbedoInput = &(m_OptixDenoiser->AlbedoInput);
                 auto OptixDenoiserNormalInput = &(m_OptixDenoiser->NormalInput);
-                auto optixDenoiszerOutput = &(m_OptixDenoiser->ColorOutput);
+                auto optixDenoiszerOutput = &(m_OptixDenoiser->GetColorOutput());
 
                 std::map<std::string, FrameSnapshot::ImageBuffer> resBuffers;
                 m_DeferredOpenGLCalls.push([&]() {
@@ -895,7 +895,7 @@ namespace WaveFront
                 m_OptixDenoiser->AlbedoInput.GetDevicePtr<float3>(),
                 m_OptixDenoiser->NormalInput.GetDevicePtr<float3>(),
                 m_OptixDenoiser->FlowInput.GetDevicePtr<float2>(),
-                m_OptixDenoiser->ColorOutput.GetDevicePtr<float3>()
+                m_OptixDenoiser->GetColorOutput().GetDevicePtr<float3>()
             );
 
             PrepareOptixDenoising(optixDenoiserLaunchParams);
@@ -906,7 +906,9 @@ namespace WaveFront
             optixDenoiserParams.m_ColorInput = m_OptixDenoiser->ColorInput.GetCUDAPtr();
             optixDenoiserParams.m_AlbedoInput = m_OptixDenoiser->AlbedoInput.GetCUDAPtr();
             optixDenoiserParams.m_NormalInput = m_OptixDenoiser->NormalInput.GetCUDAPtr();
-            optixDenoiserParams.m_Output = m_OptixDenoiser->ColorOutput.GetCUDAPtr();
+            optixDenoiserParams.m_FlowInput = m_OptixDenoiser->FlowInput.GetCUDAPtr();
+            optixDenoiserParams.m_PrevColorOutput = m_OptixDenoiser->GetPrevColorOutput().GetCUDAPtr();
+            optixDenoiserParams.m_ColorOutput = m_OptixDenoiser->GetColorOutput().GetCUDAPtr();
             m_OptixDenoiser->Denoise(optixDenoiserParams); 
             CHECKLASTCUDAERROR;
 
