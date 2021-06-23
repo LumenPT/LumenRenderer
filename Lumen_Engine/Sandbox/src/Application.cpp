@@ -157,7 +157,7 @@ public:
 		std::string p_string3{ p3.string() };
 		std::replace(p_string3.begin(), p_string3.end(), '\\', '/');
 
-		const std::string meshPath = p_string.append("/Sandbox/assets/models/Tavern/");
+		const std::string meshPath = p_string.append("/Sandbox/assets/models/Sponza/");
 		//const std::string meshPath = p_string.append("/Sandbox/assets/gltfExternalAssets/Benchmark_Scenes/FlyingWorld_BattleOfTheTrashGod/");
 		const std::string meshPath2 = p_string2.append("/Sandbox/assets/models/EmissiveSphere/");
 		//const std::string meshPath3 = p_string3.append("/Sandbox/assets/models/knight/");
