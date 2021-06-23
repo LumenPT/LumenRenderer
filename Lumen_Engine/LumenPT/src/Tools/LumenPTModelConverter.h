@@ -217,7 +217,7 @@ private:
 
     static HeaderPrimitive PrimitiveToBlob(const fx::gltf::Document& a_FxDoc, const fx::gltf::Primitive& a_FxPrimitive, Blob& a_Blob);
 
-    static std::vector<uint8_t> GenerateTangentBinary(std::vector<uint8_t>& a_PosBinary, std::vector<uint8_t>& a_TexBinary, std::vector<uint8_t>& a_IndexBinary, uint32_t a_IndexSize);
+    static std::vector<uint8_t> GenerateTangentBinary(std::vector<uint8_t>& a_PosBinary, std::vector<uint8_t>& a_NormalBinary, std::vector<uint8_t>& a_TexBinary, std::vector<uint8_t>& a_IndexBinary, uint32_t a_IndexSize);
 
     struct InterleaveInput
     {

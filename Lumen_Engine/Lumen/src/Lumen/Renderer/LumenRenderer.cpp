@@ -1,6 +1,8 @@
 #include "lmnpch.h"
 #include "LumenRenderer.h"
 
+#include <mutex>
+
 Lumen::SceneManager::GLTFResource LumenRenderer::OpenCustomFileFormat(const std::string& a_OriginalFilePath)
 {
     // By default, there is no custom file format, so we return an empty GLTFResource so that the scene manager can load the file normally.
@@ -48,9 +50,16 @@ std::shared_ptr<Lumen::ILumenScene> LumenRenderer::CreateScene(SceneData a_Scene
 void LumenRenderer::CreateDefaultResources()
 {
     uchar4 whitePixel = { 255,255,255,255 };
-    uchar4 diffusePixel{ 255, 255, 255, 0 };
+    uchar4 diffusePixel{ 255, 255, 255, 255 };
     uchar4 normal = { 128, 128, 255, 0 };
-    m_DefaultWhiteTexture = CreateTexture(&whitePixel, 1, 1);
-    m_DefaultDiffuseTexture = CreateTexture(&diffusePixel, 1, 1);
-    m_DefaultNormalTexture = CreateTexture(&normal, 1, 1);
+    m_DefaultWhiteTexture = CreateTexture(&whitePixel, 1, 1, false);
+    m_DefaultDiffuseTexture = CreateTexture(&diffusePixel, 1, 1, false);
+    m_DefaultNormalTexture = CreateTexture(&normal, 1, 1, false);
+}
+
+FrameStats LumenRenderer::GetLastFrameStats()
+{
+    std::lock_guard<std::mutex> lk(m_FrameStatsMutex);
+
+    return m_LastFrameStats;
 }

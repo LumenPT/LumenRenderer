@@ -14,10 +14,10 @@ class PTTexture : public Lumen::ILumenTexture
 public:
 
     // Create a texture from a given file path. Uses stb_image, so most common image format are supported.
-    PTTexture(std::string a_Path);
+    PTTexture(std::string a_Path, bool a_Normalize);
 
     // Create a texture from raw pixel data
-    PTTexture(void* a_PixelData, cudaChannelFormatDesc& a_FormatDesc, uint32_t a_Width, uint32_t a_Height);
+    PTTexture(void* a_PixelData, cudaChannelFormatDesc& a_FormatDesc, uint32_t a_Width, uint32_t a_Height, bool a_Normalize);
 
     ~PTTexture();
 
@@ -26,7 +26,7 @@ public:
 
 private:
 
-    void CreateTextureObject(void* a_PixelData, cudaChannelFormatDesc& a_FormatDesc, uint32_t a_Width, uint32_t a_Height);
+    void CreateTextureObject(void* a_PixelData, cudaChannelFormatDesc& a_FormatDesc, uint32_t a_Width, uint32_t a_Height, bool a_Normalize);
 
     uint32_t m_Width; // Texture width
     uint32_t m_Height; // Texture height

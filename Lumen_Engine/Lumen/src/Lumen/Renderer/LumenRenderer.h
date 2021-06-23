@@ -11,6 +11,7 @@
 #include <glm/vec4.hpp>
 
 #include <memory>
+#include <mutex>
 #include <string>
 #include <filesystem>
 #include "Glad/glad.h"
@@ -25,10 +26,19 @@ namespace Lumen
 	class ILumenMaterial;
 }
 
+struct FrameStats
+{
+	uint64_t m_Id = 0;
+	std::map<std::string, uint64_t> m_Times;
+	// Expand if necessary
+};
+
 // Base class for the renderer which is used to abstract away API implementation details
 class LumenRenderer
 {
 public:
+
+	
 
 	// Structu used to initialize a primitive
 	struct PrimitiveData
@@ -56,12 +66,16 @@ public:
 		MaterialData(): m_DiffuseColor(1.f, 1.f, 1.f, 1.f), m_EmissionVal(0.f, 0.f, 0.f), m_TransmissionFactor(0.f),
                         m_ClearCoatFactor(0),
                         m_ClearCoatRoughnessFactor(0),
-                        m_IndexOfRefraction(0),
+                        m_IndexOfRefraction(1.f),
                         m_SpecularFactor(0),
-                        m_SpecularTintFactor(0), m_SubSurfaceFactor(0),
-                        m_Luminance(0),
+                        m_SpecularTintFactor(0),
+						m_SubSurfaceFactor(0),
+                        m_Luminance(1.f),
                         m_Anisotropic(0),
-                        m_SheenFactor(0), m_SheenTintFactor(0), m_MetallicFactor(1.f), m_RoughnessFactor(1.f),
+                        m_SheenFactor(0),
+						m_SheenTintFactor(0),
+						m_MetallicFactor(1.f),
+						m_RoughnessFactor(1.f),
                         m_TintFactor(1.f, 1.f, 1.f),
                         m_Transmittance(1.f, 1.f, 1.f)
         {
@@ -144,7 +158,7 @@ public:
 	// Create a mesh from the provided primitives
 	virtual std::shared_ptr<Lumen::ILumenMesh> CreateMesh(std::vector<std::shared_ptr<Lumen::ILumenPrimitive>>& a_Primitives) = 0;
 	// Create a texture from the provided texture data
-	virtual std::shared_ptr<Lumen::ILumenTexture> CreateTexture(void* a_PixelData, uint32_t a_Width, uint32_t a_Height) = 0;
+	virtual std::shared_ptr<Lumen::ILumenTexture> CreateTexture(void* a_PixelData, uint32_t a_Width, uint32_t a_Height, bool a_Normalize) = 0;
 	// Create a material from the provided material data
 	std::shared_ptr<Lumen::ILumenMaterial> CreateMaterial();
 	virtual std::shared_ptr<Lumen::ILumenMaterial> CreateMaterial(const MaterialData& a_MaterialData) = 0;
@@ -183,13 +197,19 @@ public:
 	virtual std::unique_ptr<FrameSnapshot> EndSnapshot() = 0;
 	std::shared_ptr<Lumen::ILumenScene> m_Scene;
 
+	FrameStats GetLastFrameStats();
+
 	//Debug GLuint texture accessible by application
 	GLuint m_DebugTexture;
 
+protected:
+
+	FrameStats m_LastFrameStats;
+	std::mutex m_FrameStatsMutex;
 
 private:
 	std::shared_ptr<Lumen::ILumenTexture> m_DefaultWhiteTexture;
 	std::shared_ptr<Lumen::ILumenTexture> m_DefaultNormalTexture;
 	std::shared_ptr<Lumen::ILumenTexture> m_DefaultDiffuseTexture;
-		
+
 };

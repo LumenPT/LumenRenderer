@@ -148,6 +148,9 @@ void PTMeshInstance::UpdateRaytracingData()
 
         entryData.m_Primitive = ptPrim->m_DevicePrimitive;
         entryData.m_Transform = sutil::Matrix4x4(reinterpret_cast<float*>(&glmTransform[0]));
+
+        assert(static_cast<int>(m_EmissiveProperties.m_EmissionMode) >= 0 && static_cast<int>(m_EmissiveProperties.m_EmissionMode) < 3);
+    	
         entryData.m_EmissionMode = m_EmissiveProperties.m_EmissionMode;
         entryData.m_EmissiveColorAndScale = make_float4(
             m_EmissiveProperties.m_OverrideRadiance.x,

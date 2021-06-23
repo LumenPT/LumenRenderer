@@ -9,3 +9,5 @@
 #include "WaveFrontDataStructs/SurfaceData.h"
 #include "WaveFrontDataStructs/VolumetricData.h"
 #include "WaveFrontDataStructs/LightData.h"
+
+#define PIXEL_DATA_INDEX(PIXELX, PIXELY, WIDTH) ((PIXELY * WIDTH) + PIXELX)

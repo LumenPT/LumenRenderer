@@ -23,6 +23,7 @@
 #pragma once
 #include "ggxmdf.cuh"
 #include <sutil/vec_math.h>
+#include "../Shaders/CppCommon/MaterialStructs.h"
 
 __device__ __forceinline__ void fresnel_reflectance_dielectric( float& reflectance, const float& eta, const float cos_theta_i, const float cos_theta_t )
 {
@@ -120,7 +121,7 @@ __device__ __forceinline__ float refraction_jacobian( const float3& wo, const fl
 
 // IMPLEMENTATION
 
-__device__ __forceinline__ float3 SampleBSDF_frosted( const ShadingData shadingData, float3 iN, const float3 N, const float3 iT, const float3 wow, const float distance,
+__device__ __forceinline__ float3 SampleBSDF_frosted( const MaterialData& shadingData, float3 iN, const float3 N, const float3 iT, const float3 wow, const float distance,
 	const float r3, const float r4, const float r5, REFERENCE_OF( float3 ) wiw, REFERENCE_OF( float ) pdf, REFERENCE_OF( bool ) specular
 #ifdef __CUDACC__
 	, bool adjoint = false
@@ -133,14 +134,14 @@ __device__ __forceinline__ float3 SampleBSDF_frosted( const ShadingData shadingD
 	const float3 B = normalize( cross( iN, iT ) );
 	const float3 T = normalize( cross( iN, B ) );
 	const float3 wol = World2Tangent( wow, iN, T, B );
-	const float eta = flip < 0 ? (1 / ETA) : ETA;
+	const float eta = flip < 0 ? (1 / shadingData.GetRefractiveIndex()) : shadingData.GetRefractiveIndex();
 	if (eta == 1) return make_float3( 0 );
 	const float3 beer = make_float3(
-		expf( -shadingData.transmittance.x * distance * 2.0f ),
-		expf( -shadingData.transmittance.y * distance * 2.0f ),
-		expf( -shadingData.transmittance.z * distance * 2.0f ) );
+		expf( -shadingData.m_Transmittance.x * distance * 2.0f ),
+		expf( -shadingData.m_Transmittance.y * distance * 2.0f ),
+		expf( -shadingData.m_Transmittance.z * distance * 2.0f ) );
 	float alpha_x, alpha_y;
-	microfacet_alpha_from_roughness( ROUGHNESS, ANISOTROPIC, alpha_x, alpha_y );
+	microfacet_alpha_from_roughness( shadingData.GetRoughness(), shadingData.GetAnisotropic(), alpha_x, alpha_y );
 	const float3 m = GGXMDF_sample( wol, r3, r4, alpha_x, alpha_y );
 	const float rcp_eta = 1 / eta;
 	const float cos_wom = clamp( dot( wol, m ), -1.0f, 1.0f );
@@ -151,14 +152,14 @@ __device__ __forceinline__ float3 SampleBSDF_frosted( const ShadingData shadingD
 	{
 		wil = reflect( wol * -1.0f, m );
 		if (wil.z * wol.z <= 0) return make_float3( 0 );
-		evaluate_reflection( shadingData.color, wol, wil, m, alpha_x, alpha_y, F, retVal );
+		evaluate_reflection( make_float3(shadingData.m_Color), wol, wil, m, alpha_x, alpha_y, F, retVal );
 		pdf = F, jacobian = reflection_jacobian( wol, m, cos_wom, alpha_x, alpha_y );
 	}
 	else // compute refracted direction
 	{
 		wil = refracted_direction( wol, m, cos_wom, cos_theta_t, eta );
 		if (wil.z * wol.z > 0) return make_float3( 0 );
-		evaluate_refraction( rcp_eta, shadingData.color, adjoint, wol, wil, m, alpha_x, alpha_y, 1 - F, retVal );
+		evaluate_refraction( rcp_eta, make_float3(shadingData.m_Color), adjoint, wol, wil, m, alpha_x, alpha_y, 1 - F, retVal );
 		pdf = 1 - F, jacobian = refraction_jacobian( wol, wil, m, alpha_x, alpha_y, rcp_eta );
 	}
 	pdf *= jacobian * GGXMDF_pdf( wol, m, alpha_x, alpha_y );
@@ -166,24 +167,24 @@ __device__ __forceinline__ float3 SampleBSDF_frosted( const ShadingData shadingD
 	return retVal * beer;
 }
 
-__device__ __forceinline__ float3 EvaluateBSDF_frosted( const ShadingData shadingData, const float3 iN, const float3 iT,
+__device__ __forceinline__ float3 EvaluateBSDF_frosted( const MaterialData& shadingData, const float3 iN, const float3 iT,
 	const float3 wow, const float3 wiw, REFERENCE_OF( float ) pdf )
 {
 	const float3 B = normalize( cross( iN, iT ) );
 	const float3 T = normalize( cross( iN, B ) );
 	const float3 wol = World2Tangent( wow, iN, T, B );
 	const float3 wil = World2Tangent( wiw, iN, T, B );
-	const float eta = wol.z > 0 ? ETA : (1.0f / ETA);
+	const float eta = wol.z > 0 ? shadingData.GetRefractiveIndex() : (1.0f / shadingData.GetRefractiveIndex());
 	if (eta == 1) { pdf = 0; return make_float3( 0 ); }
 	float alpha_x, alpha_y, jacobian;
-	microfacet_alpha_from_roughness( ROUGHNESS, ANISOTROPIC, alpha_x, alpha_y );
+	microfacet_alpha_from_roughness( shadingData.GetRoughness(), shadingData.GetAnisotropic(), alpha_x, alpha_y );
 	float3 retVal, m;
 	if (wil.z * wol.z >= 0) // reflection
 	{
 		m = half_reflection_vector( wol, wil );
 		const float cos_wom = dot( wol, m );
 		const float F = fresnel_reflectance( cos_wom, 1 / eta );
-		evaluate_reflection( shadingData.color, wol, wil, m, alpha_x, alpha_y, F, retVal );
+		evaluate_reflection( make_float3(shadingData.m_Color), wol, wil, m, alpha_x, alpha_y, F, retVal );
 		const float r_probability = choose_reflection_probability( 1, 1, F );
 		pdf = r_probability, jacobian = reflection_jacobian( wol, m, cos_wom, alpha_x, alpha_y );
 	}
@@ -192,7 +193,7 @@ __device__ __forceinline__ float3 EvaluateBSDF_frosted( const ShadingData shadin
 		m = half_refraction_vector( wol, wil, eta );
 		const float cos_wom = dot( wol, m );
 		const float F = fresnel_reflectance( cos_wom, 1 / eta );
-		evaluate_refraction( eta, shadingData.color, false /* adjoint */, wol, wil, m, alpha_x, alpha_y, 1 - F, retVal );
+		evaluate_refraction( eta, make_float3(shadingData.m_Color), false /* adjoint */, wol, wil, m, alpha_x, alpha_y, 1 - F, retVal );
 		const float r_probability = choose_reflection_probability( 1, 1, F );
 		pdf = 1 - r_probability, jacobian = refraction_jacobian( wol, wil, m, alpha_x, alpha_y, eta );
 	}

@@ -4,7 +4,7 @@
 #include "bsdf_math.cuh"
 #include "ggxmdf.cuh"
 #include "frosted.cuh"
-#include "../Shaders/CppCommon/ShadingData.h"
+#include "../Shaders/CppCommon/MaterialStructs.h"
 #include <sutil/vec_math.h>
 
 
@@ -34,19 +34,19 @@ __forceinline__ __device__ float schlick_fresnel( const float u ) { const float 
 __forceinline__ __device__ void mix_spectra( const float3& a, const float3& b, const float t, float3& result ) { result = (1.0f - t) * a + t * b; }
 __forceinline__ __device__ void mix_one_with_spectra( const float3& b, const float t, float3& result ) { result = (1.0f - t) + t * b; }
 __forceinline__ __device__ void mix_spectra_with_one( const float3& a, const float t, float3& result ) { result = (1.0f - t) * a + t; }
-__forceinline__ __device__ float clearcoat_roughness( const ShadingData& shadingData ) { return lerp( 0.1f, 0.001f, CLEARCOATGLOSS ); }
-__forceinline__ __device__ void DisneySpecularFresnel( const ShadingData& shadingData, const float3& o, const float3& h, float3& value )
+__forceinline__ __device__ float clearcoat_roughness( const MaterialData& shadingData ) { return lerp( 0.1f, 0.001f, shadingData.GetClearCoatGloss() ); }
+__forceinline__ __device__ void DisneySpecularFresnel( const MaterialData& shadingData, const float3& o, const float3& h, float3& value )
 {
-	mix_one_with_spectra( TINT, SPECTINT, value );
-	value *= SPECULAR * 0.08f;
-	mix_spectra( value, shadingData.color, METALLIC, value );
+	mix_one_with_spectra( shadingData.GetTint(), shadingData.GetSpecTint(), value );
+	value *= shadingData.GetSpecular() * 0.08f;
+	mix_spectra( value, make_float3(shadingData.m_Color), shadingData.GetMetallic(), value );
 	const float cos_oh = fabs( dot( o, h ) );
 	mix_spectra_with_one( value, schlick_fresnel( cos_oh ), value );
 }
-__forceinline__ __device__ void DisneyClearcoatFresnel( const ShadingData& shadingData, const float3& o, const float3& h, float3& value )
+__forceinline__ __device__ void DisneyClearcoatFresnel( const MaterialData& shadingData, const float3& o, const float3& h, float3& value )
 {
 	const float cos_oh = fabs( dot( o, h ) );
-	value = make_float3( lerp( 0.04f, 1.0f, schlick_fresnel( cos_oh ) ) * 0.25f * CLEARCOAT );
+	value = make_float3( lerp( 0.04f, 1.0f, schlick_fresnel( cos_oh ) ) * 0.25f * shadingData.GetClearCoat() );
 }
 __forceinline__ __device__ bool force_above_surface( float3& direction, const float3& normal )
 {
@@ -78,7 +78,7 @@ __forceinline__ __device__ bool Refract_L( const float3& wi, const float3& n, co
 }
 
 template <unsigned MDF>
-__forceinline__ __device__ void sample_mf( const ShadingData& shadingData, const float r0, const float r1, const float alpha_x, const float alpha_y,
+__forceinline__ __device__ void sample_mf( const MaterialData& shadingData, const float r0, const float r1, const float alpha_x, const float alpha_y,
 	/* const float3& gN, */ const float3& wol, /* OUT: */ float3& wil, float& pdf, float3& value )
 {
 	if (wol.z == 0) { value = make_float3( 0 ); pdf = 0; return; }
@@ -99,7 +99,7 @@ __forceinline__ __device__ void sample_mf( const ShadingData& shadingData, const
 }
 
 template <unsigned MDF>
-__forceinline__ __device__ float evaluate_mf( const ShadingData& shadingData, const float alpha_x, const float alpha_y, const float3& wol, const float3& wil, const float3& m, float3& bsdf )
+__forceinline__ __device__ float evaluate_mf( const MaterialData& shadingData, const float alpha_x, const float alpha_y, const float3& wol, const float3& wil, const float3& m, float3& bsdf )
 {
 	if (wol.z == 0 || wil.z == 0) return 0;
 	// flip the incoming and outgoing vectors to be in the same hemisphere as the shading normal if needed.
@@ -112,7 +112,7 @@ __forceinline__ __device__ float evaluate_mf( const ShadingData& shadingData, co
 	return (MDF == GGXMDF ? GGXMDF_pdf( wol, m, alpha_x, alpha_y ) : GTR1MDF_pdf( wol, m, alpha_x, alpha_y )) / fabs( 4.0f * cos_oh );
 }
 
-__forceinline__ __device__ float evaluate_diffuse( const ShadingData& shadingData, const float3& iN, const float3& wow, const float3& wiw, const float3& m, float3& value )
+__forceinline__ __device__ float evaluate_diffuse( const MaterialData& shadingData, const float3& iN, const float3& wow, const float3& wiw, const float3& m, float3& value )
 {
 	const float cos_on = dot( iN, wow );
 	const float cos_in = dot( iN, wiw );
@@ -120,32 +120,32 @@ __forceinline__ __device__ float evaluate_diffuse( const ShadingData& shadingDat
 	const float fl = schlick_fresnel( cos_in );
 	const float fv = schlick_fresnel( cos_on );
 	float fd = 0;
-	if (SUBSURFACE != 1.0f)
+	if (shadingData.GetSubSurface() != 1.0f)
 	{
-		const float fd90 = 0.5f + 2.0f * sqr( cos_ih ) * ROUGHNESS;
+		const float fd90 = 0.5f + 2.0f * sqr( cos_ih ) * shadingData.GetRoughness();
 		const float one = 1.f;
 		fd = lerp( one, fd90, fl ) * lerp( one, fd90, fv );
 	}
-	if (SUBSURFACE > 0)
+	if (shadingData.GetSubSurface() > 0)
 	{
 		// Based on Hanrahan-Krueger BRDF approximation of isotropic BSRDF. 1.25 is used to (roughly) preserve albedo.
-		const float fss90 = sqr( cos_ih ) * ROUGHNESS; // "flatten" retroreflection based on roughness
+		const float fss90 = sqr( cos_ih ) * shadingData.GetRoughness(); // "flatten" retroreflection based on roughness
 		const float fss = lerp( 1.0f, fss90, fl ) * lerp( 1.0f, fss90, fv );
 		const float ss = 1.25f * (fss * (1.0f / (fabs( cos_on ) + fabs( cos_in )) - 0.5f) + 0.5f);
-		fd = lerp( fd, ss, SUBSURFACE );
+		fd = lerp( fd, ss, shadingData.GetSubSurface() );
 	}
-	value = shadingData.color * fd * INVPI * (1.0f - METALLIC);
+	value = make_float3(shadingData.m_Color) * fd * INVPI * (1.0f - shadingData.GetMetallic());
 	return fabs( cos_in ) * INVPI;
 }
 
-__forceinline__ __device__ float evaluate_sheen( const ShadingData& shadingData, const float3& wow, const float3& wiw, const float3& m, float3& value )
+__forceinline__ __device__ float evaluate_sheen( const MaterialData& shadingData, const float3& wow, const float3& wiw, const float3& m, float3& value )
 {
 	// this code is mostly ported from the GLSL implementation in Disney's BRDF explorer.
 	const float3 h( normalize( wow + wiw ) );
 	const float cos_ih = dot( wiw, m );
 	const float fh = schlick_fresnel( cos_ih );
-	mix_one_with_spectra( TINT, SHEENTINT, value );
-	value *= fh * SHEEN * (1.0f - METALLIC);
+	mix_one_with_spectra( shadingData.GetTint(), shadingData.GetSheenTint(), value );
+	value *= fh * shadingData.GetSheen() * (1.0f - shadingData.GetMetallic());
 	return 1.0f / (2 * PI); // return the probability density of the sampled direction
 }
 
@@ -170,7 +170,7 @@ __forceinline__ __device__ float evaluate_sheen( const ShadingData& shadingData,
  *
  * @return The float3 BSDF in terms of light transport density.
  */
-__forceinline__ __device__ float3 SampleBSDF( const ShadingData& shadingData, float3 iN, const float3& N, const float3& iT, const float3& wow, const float distance,
+__forceinline__ __device__ float3 SampleBSDF( const MaterialData& shadingData, float3 iN, const float3& N, const float3& iT, const float3& wow, const float distance,
 	const float r0, const float r1, const float r2, float3& wiw, float& pdf, bool& specular
 #ifdef __CUDACC__
 	, bool adjoint = false
@@ -185,20 +185,20 @@ __forceinline__ __device__ float3 SampleBSDF( const ShadingData& shadingData, fl
 	const float3 T = normalize( cross( iN, B ) );
 	
 	// consider (rough) dielectrics
-	if (r0 < TRANSMISSION)
+	if (r0 < shadingData.GetTransmission())
 	{
 		
 		specular = true;
-		const float r3 = r0 / TRANSMISSION;
+		const float r3 = r0 / shadingData.GetTransmission();
 		const float3 wol = World2Tangent( wow, iN, T, B );
-		const float eta = flip < 0 ? (1 / ETA) : ETA;
+		const float eta = flip < 0 ? (1 / shadingData.GetRefractiveIndex()) : shadingData.GetRefractiveIndex();
 		if (eta == 1) return make_float3( 0 );			//NOTE: I guess this is not possible, as the ray would just continue unobstructed.
 		const float3 beer = make_float3(
-			expf( -shadingData.transmittance.x * distance * 2.0f ),
-			expf( -shadingData.transmittance.y * distance * 2.0f ),
-			expf( -shadingData.transmittance.z * distance * 2.0f ) );
+			expf( -shadingData.m_Transmittance.x * distance * 2.0f ),
+			expf( -shadingData.m_Transmittance.y * distance * 2.0f ),
+			expf( -shadingData.m_Transmittance.z * distance * 2.0f ) );
 		float alpha_x, alpha_y;
-		microfacet_alpha_from_roughness( ROUGHNESS, ANISOTROPIC, alpha_x, alpha_y );
+		microfacet_alpha_from_roughness( shadingData.GetRoughness(), shadingData.GetAnisotropic(), alpha_x, alpha_y );
 		const float3 m = GGXMDF_sample( wol, r1, r3, alpha_x, alpha_y );
 		const float rcp_eta = 1 / eta, cos_wom = clamp( dot( wol, m ), -1.0f, 1.0f );
 		float cos_theta_t, jacobian;
@@ -208,14 +208,14 @@ __forceinline__ __device__ float3 SampleBSDF( const ShadingData& shadingData, fl
 		{
 			wil = reflect( wol * -1.0f, m );
 			if (wil.z * wol.z <= 0) return make_float3( 0 );
-			evaluate_reflection( shadingData.color, wol, wil, m, alpha_x, alpha_y, F, retVal );
+			evaluate_reflection( make_float3(shadingData.m_Color), wol, wil, m, alpha_x, alpha_y, F, retVal );
 			pdf = F, jacobian = reflection_jacobian( wol, m, cos_wom, alpha_x, alpha_y );
 		}
 		else // compute refracted direction
 		{
 			wil = refracted_direction( wol, m, cos_wom, cos_theta_t, eta );
 			if (wil.z * wol.z > 0) return make_float3( 0 );
-			evaluate_refraction( rcp_eta, shadingData.color, adjoint, wol, wil, m, alpha_x, alpha_y, 1 - F, retVal );
+			evaluate_refraction( rcp_eta, make_float3(shadingData.m_Color), adjoint, wol, wil, m, alpha_x, alpha_y, 1 - F, retVal );
 			pdf = 1 - F, jacobian = refraction_jacobian( wol, wil, m, alpha_x, alpha_y, rcp_eta );
 		}
 		pdf *= jacobian * GGXMDF_pdf( wol, m, alpha_x, alpha_y );
@@ -223,9 +223,9 @@ __forceinline__ __device__ float3 SampleBSDF( const ShadingData& shadingData, fl
 		return retVal * beer;
 	}
 	// not a dielectric: normalize r0 to r3
-	const float r3 = (r0 - TRANSMISSION) / (1 - TRANSMISSION);
+	const float r3 = (r0 - shadingData.GetTransmission()) / (1 - shadingData.GetTransmission());
 	// compute component weights and cdf
-	float4 weights = make_float4( lerp( LUMINANCE, 0.f, METALLIC ), lerp( SHEEN, 0.f, METALLIC ), lerp( SPECULAR, 1.f, METALLIC ), CLEARCOAT * 0.25f );
+	float4 weights = make_float4( lerp( shadingData.GetLuminance(), 0.f, shadingData.GetMetallic() ), lerp( shadingData.GetSheen(), 0.f, shadingData.GetMetallic() ), lerp( shadingData.GetSpecular(), 1.f, shadingData.GetMetallic() ), shadingData.GetClearCoat() * 0.25f );
 	weights *= 1.0f / (weights.x + weights.y + weights.z + weights.w);
 	const float4 cdf = make_float4( weights.x, weights.x + weights.y, weights.x + weights.y + weights.z, 0 );
 	// sample a random component
@@ -259,7 +259,7 @@ __forceinline__ __device__ float3 SampleBSDF( const ShadingData& shadingData, fl
 			// Disney's specular
 			const float r2 = (r3 - cdf.y) / (cdf.z - cdf.y); // reuse r3 after normalization
 			float alpha_x, alpha_y;
-			microfacet_alpha_from_roughness( ROUGHNESS, ANISOTROPIC, alpha_x, alpha_y );
+			microfacet_alpha_from_roughness( shadingData.GetRoughness(), shadingData.GetAnisotropic(), alpha_x, alpha_y );
 			sample_mf<GGXMDF>( shadingData, r2, r1, alpha_x, alpha_y, wol, wil, component_pdf, value );
 			probability = SPECWEIGHT * component_pdf, SPECWEIGHT = 0;
 		}
@@ -288,7 +288,7 @@ __forceinline__ __device__ float3 SampleBSDF( const ShadingData& shadingData, fl
 		if (SPECWEIGHT > 0)
 		{
 			float alpha_x, alpha_y;
-			microfacet_alpha_from_roughness( ROUGHNESS, ANISOTROPIC, alpha_x, alpha_y );
+			microfacet_alpha_from_roughness( shadingData.GetRoughness(), shadingData.GetAnisotropic(), alpha_x, alpha_y );
 			probability += SPECWEIGHT * evaluate_mf<GGXMDF>( shadingData, alpha_x, alpha_y, wol, wil, m, contrib );
 			value += contrib;
 		}
@@ -317,51 +317,55 @@ __forceinline__ __device__ float3 SampleBSDF( const ShadingData& shadingData, fl
  *
  * @return The float3 BSDF in terms of light transport density.
  */
-__forceinline__ __device__ float3 EvaluateBSDF( const ShadingData& shadingData, const float3& iN, const float3& iT, const float3& wow, const float3& wiw, float& pdf )
+__forceinline__ __device__ float3 EvaluateBSDF( const MaterialData& shadingData, const float3& iN, const float3& iT, const float3& wow, const float3& wiw, float& pdf)
 {
-	if (TRANSMISSION > 0.5f)
+	float3 specTransBSDF = { 0.f };
+	float specTransPDF = 0.f;
+	const float transmission = shadingData.GetTransmission();
+	
+	if (transmission > 0.f)
 	{
 		const float3 B = normalize( cross( iN, iT ) );
 		const float3 T = normalize( cross( iN, B ) );
 		const float3 wol = World2Tangent( wow, iN, T, B );
 		const float3 wil = World2Tangent( wiw, iN, T, B );
-		const float eta = wol.z > 0 ? ETA : (1.0f / ETA);
+		const float eta = wol.z > 0 ? shadingData.GetRefractiveIndex() : (1.0f / shadingData.GetRefractiveIndex());
 		if (eta == 1) { pdf = 0; return make_float3( 0 ); }
 		float alpha_x, alpha_y, jacobian;
-		microfacet_alpha_from_roughness( ROUGHNESS, ANISOTROPIC, alpha_x, alpha_y );
-		float3 retVal, m;
+		microfacet_alpha_from_roughness( shadingData.GetRoughness(), shadingData.GetAnisotropic(), alpha_x, alpha_y );
+		float3 m;
 		if (wil.z * wol.z >= 0) // reflection
 		{
 			m = half_reflection_vector( wol, wil );
 			const float cos_wom = dot( wol, m );
 			const float F = fresnel_reflectance( cos_wom, 1 / eta );
-			evaluate_reflection( shadingData.color, wol, wil, m, alpha_x, alpha_y, F, retVal );
+			evaluate_reflection( make_float3(shadingData.m_Color), wol, wil, m, alpha_x, alpha_y, F, specTransBSDF);
 			const float r_probability = choose_reflection_probability( 1, 1, F );
-			pdf = r_probability, jacobian = reflection_jacobian( wol, m, cos_wom, alpha_x, alpha_y );
+			specTransPDF = r_probability, jacobian = reflection_jacobian( wol, m, cos_wom, alpha_x, alpha_y );
 		}
 		else // refraction
 		{
 			m = half_refraction_vector( wol, wil, eta );
 			const float cos_wom = dot( wol, m );
 			const float F = fresnel_reflectance( cos_wom, 1 / eta );
-			evaluate_refraction( eta, shadingData.color, false /* adjoint */, wol, wil, m, alpha_x, alpha_y, 1 - F, retVal );
+			evaluate_refraction( eta, make_float3(shadingData.m_Color), false /* adjoint */, wol, wil, m, alpha_x, alpha_y, 1 - F, specTransBSDF);
 			const float r_probability = choose_reflection_probability( 1, 1, F );
-			pdf = 1 - r_probability, jacobian = refraction_jacobian( wol, wil, m, alpha_x, alpha_y, eta );
+			specTransPDF = 1 - r_probability, jacobian = refraction_jacobian( wol, wil, m, alpha_x, alpha_y, eta );
 		}
-		pdf *= jacobian * GGXMDF_pdf( wol, m, alpha_x, alpha_y );
-		return retVal;
+		specTransPDF *= jacobian * GGXMDF_pdf( wol, m, alpha_x, alpha_y );
+		//return retVal; Edited out by Jan because I will mix all things together.
 	}
-	if (ROUGHNESS <= 0.001f)
+	if (shadingData.GetRoughness() <= 0.001f)
 	{
 		// no transport via explicit connections for specular vertices
-		pdf = 0;
-		return make_float3( 0 );
+		pdf = specTransPDF;
+		return specTransBSDF;
 	}
 	// calculate tangent matrix
 	const float3 B = normalize( cross( iN, iT ) );
 	const float3 T = normalize( cross( iN, B ) );
 	// compute component weights
-	float4 weights = make_float4( lerp( LUMINANCE, 0.f, METALLIC ), lerp( SHEEN, 0.f, METALLIC ), lerp( SPECULAR, 1.f, METALLIC ), CLEARCOAT * 0.25f );
+	float4 weights = make_float4( lerp( shadingData.GetLuminance(), 0.f, shadingData.GetMetallic() ), lerp( shadingData.GetSheen(), 0.f, shadingData.GetMetallic() ), lerp( shadingData.GetSpecular(), 1.f, shadingData.GetMetallic() ), shadingData.GetClearCoat() * 0.25f );
 	weights *= 1.0f / (weights.x + weights.y + weights.z + weights.w);
 	// compute pdf
 	pdf = 0;
@@ -380,7 +384,7 @@ __forceinline__ __device__ float3 EvaluateBSDF( const ShadingData& shadingData, 
 		if (SPECWEIGHT > 0)
 		{
 			float alpha_x, alpha_y;
-			microfacet_alpha_from_roughness( ROUGHNESS, ANISOTROPIC, alpha_x, alpha_y );
+			microfacet_alpha_from_roughness( shadingData.GetRoughness(), shadingData.GetAnisotropic(), alpha_x, alpha_y );
 			float3 contrib;
 			const float spec_pdf = evaluate_mf<GGXMDF>( shadingData, alpha_x, alpha_y, wol, wil, m, contrib );
 			if (spec_pdf > 0) pdf += SPECWEIGHT * spec_pdf, value += contrib;
@@ -393,5 +397,9 @@ __forceinline__ __device__ float3 EvaluateBSDF( const ShadingData& shadingData, 
 			if (clearcoat_pdf > 0) pdf += COATWEIGHT * clearcoat_pdf, value += contrib;
 		}
 	}
-	return value;
+
+	//Edit by Jan: Mix between transmission and other lobes.
+	pdf = (pdf * (1.f - transmission));
+	pdf += (specTransPDF * transmission);
+	return (specTransBSDF * transmission) + (value * (1.f - transmission));
 }

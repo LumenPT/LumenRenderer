@@ -227,7 +227,6 @@ void Lumen::SceneGraph::Display(ILumenScene& a_Scene)
             }
         }
 
-
     }
     else if (m_SelectedVolumeInstance != nullptr)
     {
@@ -259,10 +258,10 @@ void Lumen::SceneGraph::TransformEditor(Transform& a_Transform)
     if (s != a_Transform.GetScale())
         a_Transform.SetScale(s);
 
-    auto deltaR = a_Transform.GetRotationEuler() - r;
+    auto deltaR = r - a_Transform.GetRotationEuler();
     if (glm::length(deltaR) != 0)
     {
-        glm::quat deltaRQuat(deltaR);
+        glm::quat deltaRQuat(glm::radians(deltaR));
         a_Transform.Rotate(deltaRQuat);
     }
 }

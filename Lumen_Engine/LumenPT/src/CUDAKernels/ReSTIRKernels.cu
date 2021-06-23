@@ -5,11 +5,16 @@
 #include <cuda_runtime_api.h>
 #include <cuda/device_atomic_functions.h>
 #include <cassert>
-
+#include <cmath>
+#include "../Framework/Timer.h"
 #include "disney.cuh"
 #include "../Framework/CudaUtilities.h"
+#include <thrust/sort.h>
+#include <thrust/device_ptr.h>
 
 #define CUDA_BLOCK_SIZE 256
+
+#define CUDA_BLOCK_SIZE_GRID dim3{32, 32, 1}
 
 __host__ void ResetReservoirs(int a_NumReservoirs, Reservoir* a_ReservoirPointer)
 {
@@ -18,7 +23,7 @@ __host__ void ResetReservoirs(int a_NumReservoirs, Reservoir* a_ReservoirPointer
     const int blockSize = CUDA_BLOCK_SIZE;
     const int numBlocks = (a_NumReservoirs + blockSize - 1) / blockSize;
     ResetReservoirInternal<<<numBlocks, blockSize>>>(a_NumReservoirs, a_ReservoirPointer);
-
+	
     //TODO: Wait after every task may not be needed.Check if it is required between kernel calls.
     cudaDeviceSynchronize();
     CHECKLASTCUDAERROR;
@@ -35,20 +40,83 @@ __global__ void ResetReservoirInternal(int a_NumReservoirs, Reservoir* a_Reservo
     }
 }
 
-__host__ void FillCDF(CDF* a_Cdf, const WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights, unsigned a_LightCount)
+__host__ void FillCDF(CDF* a_Cdf, float* a_CdfTreeBuffer, WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights, unsigned a_LightCount)
 {
-    //TODO: This is not efficient single threaded.
-    //TODO: Use this: https://developer.nvidia.com/gpugems/gpugems3/part-vi-gpu-computing/chapter-39-parallel-prefix-sum-scan-cuda
-
+	//Note: No need to manually reset as the CDF rebuilding manually sets the sum and size.
     //First reset the CDF on the GPU.
-    ResetCDF<<<1,1>>>(a_Cdf);
+    //ResetCDF<<<1,1>>>(a_Cdf);
+    //cudaDeviceSynchronize();
+    //CHECKLASTCUDAERROR;
+
+	//Note: Disabled because horribly slow.
+    //Run from one thread because it's not thread safe to append the sum of each element.
+    //FillCDFInternalSingleThread <<<1, 1>>> (a_Cdf, a_Lights, a_LightCount);
+
+
+	//Sort the light buffer so that lights with low values are at the start.
+	//This prevents floating point inaccuracies mounting up and completely nullifying light contributions.
+	//By adding small lights first, their prefix sum in the CDF will have many significant bits where it matters.
+	//First get the right GPU pointer offsets.
+    char* lightsStart = reinterpret_cast<char*>(a_Lights) + (2 * sizeof(unsigned int)); //Atomic buffer contains two unsigned ints before the actual data.
+    char* lightsEnd = lightsStart + (sizeof(WaveFront::TriangleLight) * a_LightCount); 
+    thrust::device_ptr<WaveFront::TriangleLight> start(reinterpret_cast<WaveFront::TriangleLight*>(lightsStart));
+    thrust::device_ptr<WaveFront::TriangleLight> end(reinterpret_cast<WaveFront::TriangleLight*>(lightsEnd));
+    thrust::sort(start, end, TriangleLightComparator());
+	
+
+
+    /*
+	 * Thrust offers a parallel prefix sum scan algorithm.
+	 * First calculate the weights in the CDF, then in-place append.
+	 */
+     //Use 512 threads per block, since these are relatively tiny operations.
+    const unsigned blockSize = 512;
+    const unsigned blockCount = (a_LightCount + blockSize - 1) / blockSize;
+    CalculateLightWeightsInCDF<<<blockCount, blockSize>>>(a_Cdf, a_Lights, a_LightCount);
+    CHECKLASTCUDAERROR;
+    thrust::device_ptr<float> cdfStart(reinterpret_cast<float*>(reinterpret_cast<char*>(a_Cdf) + (2 * sizeof(unsigned))));
+    thrust::device_ptr<float> cdfEnd(cdfStart + a_LightCount);
+    thrust::inclusive_scan(cdfStart, cdfEnd, cdfStart);
+	
+    //NOTE: Commented out because thrust offers a simpler version.
+    ////Use 512 threads per block, since these are relatively tiny operations.
+    //const unsigned blockSize = 512;
+    //const unsigned treeDepth = std::ceil(std::log2f(a_LightCount)); //The total depth of the tree, in terms of operations to be performed.
+    //const unsigned numLeafNodes = std::pow(2u, treeDepth);
+    //const unsigned blockCount = (numLeafNodes + blockSize - 1) / blockSize;
+	//Calculate the light weights and output to the tree buffer. Threads for lights that are no present will deposit 0 weight to keep the tree valid.
+    //CalculateLightWeights << <blockCount, blockSize >> > (a_CdfTreeBuffer, a_Lights, a_LightCount, numLeafNodes);
+    //CHECKLASTCUDAERROR;
+    //cudaDeviceSynchronize();
+	//
+	////Offset into the array to start writing the tree.
+ //   unsigned arrayOffset = numLeafNodes;
+	//
+	////Loop over each depth and build the tree.
+	//for(auto depth = 0u; depth < treeDepth; ++depth)
+	//{
+ //       const unsigned numThreads = std::pow(2, treeDepth - (depth + 1));   //Half the amount of threads as there are lights at a depth.
+ //       const int numBlocks = (numThreads + blockSize - 1) / blockSize;
+ //       BuildCDFTree <<<numBlocks, blockSize >>> (a_CdfTreeBuffer, numThreads, arrayOffset - 1);  //numThreads is the amount of nodes to be written.
+ //       arrayOffset /= 2;   //Half the offset, as half the amount of root nodes exist at the parent.
+	//	CHECKLASTCUDAERROR;
+ //       cudaDeviceSynchronize();
+	//}
+
+	////Spawn a thread per element in the CDF. Fill by traversing down tree on the left.
+ //   FillCDFParallel <<<((a_LightCount + blockSize - 1) / blockSize), blockSize >>> (a_Cdf, a_CdfTreeBuffer, a_Lights, a_LightCount, treeDepth, numLeafNodes);
+ //   cudaDeviceSynchronize();
+ //   CHECKLASTCUDAERROR;
+	
+	//Set the CDF to the right size.
+    SetCDFSize<<<1, 1>>>(a_Cdf, a_LightCount);
+	
     cudaDeviceSynchronize();
     CHECKLASTCUDAERROR;
 
-    //Run from one thread because it's not thread safe to append the sum of each element.
-    FillCDFInternal <<<1, 1>>> (a_Cdf, a_Lights, a_LightCount);
-    cudaDeviceSynchronize();
-    CHECKLASTCUDAERROR;
+	//TODO remove
+    //DebugPrintCdf<<<1,1>>>(a_Cdf, a_CdfTreeBuffer);
+
 }
 
 __global__ void ResetCDF(CDF* a_Cdf)
@@ -56,7 +124,156 @@ __global__ void ResetCDF(CDF* a_Cdf)
     a_Cdf->Reset();
 }
 
-__global__ void FillCDFInternal(CDF* a_Cdf, const WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights, unsigned a_LightCount)
+__global__ void CalculateLightWeights(float* a_CdfTreeBuffer, const WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights, unsigned a_LightCount, unsigned a_NumLeafNodes)
+{
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    int stride = blockDim.x * gridDim.x;
+
+    //Loop over all the light indices assigned to this thread.
+    for (int i = index; i < a_NumLeafNodes; i += stride)
+    {
+        float weight = 0.f;
+
+    	//If there is a light with this index, calculate the weight.
+        if(i < a_LightCount)
+        {
+            //Light weight is just the average radiance for now.
+            const float3 radiance = a_Lights->GetData(i)->radiance;
+            assert(radiance.x >= 0.f && radiance.y >= 0.f && radiance.z >= 0.f && "Radiance needs to be positive, no taking away the light in the soul.");
+            weight = (radiance.x + radiance.y + radiance.z) / 3.f;
+        }
+
+    	//Output to the END of the buffer so that the tree can be built on top with root = 0.
+        a_CdfTreeBuffer[i + a_NumLeafNodes - 1] = weight;
+    }
+}
+
+__global__ void CalculateLightWeightsInCDF(CDF* a_Cdf, const WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights, unsigned a_LightCount)
+{
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    int stride = blockDim.x * gridDim.x;
+
+    //Loop over all the light indices assigned to this thread.
+    for (int i = index; i < a_LightCount; i += stride)
+    {
+        //Light weight is just the average radiance for now.
+        const float3 radiance = a_Lights->GetData(i)->radiance;
+        assert(radiance.x >= 0.f && radiance.y >= 0.f && radiance.z >= 0.f && "Radiance needs to be positive, no taking away the light in the soul.");
+
+        //Output to the END of the buffer so that the tree can be built on top with root = 0.
+        a_Cdf->data[i] = (radiance.x + radiance.y + radiance.z) / 3.f;
+    }
+}
+
+__global__ void SetCDFSize(CDF* a_Cdf, unsigned a_NumLights)
+{
+    a_Cdf->SetCDFSize(a_NumLights);
+}
+
+__global__ void DebugPrintCdf(CDF* a_Cdf, float* a_CDFTree)
+{
+    //int start = a_Cdf->size - 30;
+    //if (start < 0) start = 0;
+
+    //const unsigned treeSize = powf(2.f, ceilf(log2f(a_Cdf->size)));
+
+    //printf("CDF Entry 0: %f\n", a_Cdf->data[0]);
+    //printf("CDF Tree Entry 0: %f\n", a_CDFTree[treeSize - 1]);
+	
+    //for (int i = start; i < a_Cdf->size; ++i)
+    //{
+    //    printf("CDF Entry %i: %f\n", i, a_Cdf->data[i]);
+    //}
+
+    //for (int i = 0; i < min(30u, a_Cdf->size - 1); ++i)
+    //{
+    //    printf("CDF tree node %i: %f\n", i, a_CDFTree[i]);
+    //}
+
+	//Check CDF validity.
+    float prev = 0.f;
+	for(int i = 0; i < a_Cdf->size; ++i)
+	{
+        const float current = a_Cdf->data[i];
+		if(current - prev < EPSILON)
+		{
+            printf("CDF entry %i is the same as %i. Value: %f.\n", i, i - 1, current);
+		}
+        prev = current;
+		
+	}
+}
+
+
+__global__ void BuildCDFTree(float* a_CdfTreeBuffer, unsigned a_NumParentNodes, unsigned a_ArrayOffset)
+{
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    int stride = blockDim.x * gridDim.x;
+	
+	//Loop over all the light indices assigned to this thread.
+    for (int i = index; i < a_NumParentNodes; i += stride)
+    {
+        //Combine the previous two elements into a single new element, and output it in the right position.
+        const int childRoot = a_ArrayOffset + (2 * i);
+        const int parentRoot = (childRoot - 1) / 2;
+        const float sum = a_CdfTreeBuffer[childRoot] + a_CdfTreeBuffer[childRoot + 1];
+        a_CdfTreeBuffer[parentRoot] = sum;
+	}
+}
+
+__global__ void FillCDFParallel(CDF* a_Cdf, float* a_CdfTreeBuffer, const WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights, unsigned a_LightCount, unsigned a_TreeDepth, unsigned a_LeafNodes)
+{
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    int stride = blockDim.x * gridDim.x;
+
+	//For every light, traverse the tree and find the sum.
+    for (int lightIndex = index; lightIndex < a_LightCount; lightIndex += stride)
+    {
+        unsigned start = 0;
+        unsigned end = a_LeafNodes - 1;
+        unsigned branchIndex = 0;
+    	
+        /*
+         * The appended value found by traversing the tree.
+         * When the tree reaches the bottom level, it terminates, and so the element at light index
+         * is not actually added.
+         * to solve this, start by reading the bottom element derived from the light index.
+         */
+        float sum = a_CdfTreeBuffer[(a_LeafNodes - 1) + lightIndex];    
+    	
+        for(int depth = 0; depth < a_TreeDepth; ++depth)
+        {
+        	//Center of the nodes remaining.
+            const int split = (start + end) / 2;
+
+        	//Light index lies left of the split, so the right nodes are fully discarded.
+        	if(lightIndex <= split)
+        	{        		
+        		//Go down the tree on the left.
+                branchIndex = (2 * branchIndex) + 1;
+        		
+        		//Adjust the search range to the left.
+                end = split;
+        	}
+        	//Light index lies in right nodes. Append left and traverse down the right side.
+            else
+            {
+                //Go down the tree on the right. Append the found 
+                const auto leftIndex = (2 * branchIndex) + 1;
+                sum += a_CdfTreeBuffer[leftIndex];
+                branchIndex = leftIndex + 1;  //Right node index
+            	
+            	//Adjust the search region to the right.
+                start = split + 1;
+            }
+        }
+
+        //Finally add to the CDF when all branches relevant for the index have been appended.
+        a_Cdf->Insert(lightIndex, sum);
+    }
+}
+
+__global__ void FillCDFInternalSingleThread(CDF* a_Cdf, const WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights, unsigned a_LightCount)
 {
     for (int i = 0; i < a_LightCount; ++i)
     {
@@ -65,7 +282,7 @@ __global__ void FillCDFInternal(CDF* a_Cdf, const WaveFront::AtomicBuffer<WaveFr
 
         //printf("Radiance: %f, %f, %f LightCount: %i \n", radiance.x, radiance.y, radiance.z, a_LightCount);
 
-        assert(radiance.x >= 0.f && radiance.y >= 0.f && radiance.z >= 0.f && "Radiance needs to be positive, no taking away the light in the soul");
+        assert(radiance.x >= 0.f && radiance.y >= 0.f && radiance.z >= 0.f && "Radiance needs to be positive, no taking away the light in the soul.");
 
         const float weight = (radiance.x + radiance.y + radiance.z) / 3.f;
         assert(weight >= 0.f);
@@ -91,7 +308,7 @@ __global__ void FillLightBagsInternal(unsigned a_NumLightBags, unsigned a_NumLig
     int stride = blockDim.x * gridDim.x;
 
     for (int i = index; i < numLightsTotal; i += stride)
-    {
+    {    	
         //Generate a random float between 0 and 1.
         auto seed = WangHash(a_Seed + WangHash(i));
         const float random = RandomFloat(seed);
@@ -100,6 +317,9 @@ __global__ void FillLightBagsInternal(unsigned a_NumLightBags, unsigned a_NumLig
         unsigned lIndex;
         float pdf;
         a_Cdf->Get(random, lIndex, pdf);
+    	
+        assert(pdf >= 0.f);
+    	
         a_LightBagPtr[i] = LightBagEntry{*a_Lights->GetData(lIndex), pdf};
     }
 }
@@ -164,17 +384,13 @@ __global__ void PickPrimarySamplesInternal(const LightBagEntry* const a_LightBag
     //The current pixel index.
     const WaveFront::SurfaceData pixel = a_PixelData[pixelIndex];
 
-    //If the surface is emissive, don't apply ReSTIR.
-    if(pixel.m_Emissive)
+    //If the surface is not a valid intersection, set its weight to 0 to prevent reuse.
+    if(pixel.m_SurfaceFlags)
     {
+        a_Reservoirs[index].weight = 0.f;
         return;
     }
 
-    //If no intersection exists at this pixel, do nothing.
-    if(pixel.m_IntersectionT <= 0.f)
-    {
-        return;
-    }
 
     //Base Seed depending on pixel index.
     auto seed = WangHash(a_Seed + WangHash(index));
@@ -226,7 +442,7 @@ __global__ void PickPrimarySamplesInternal(const LightBagEntry* const a_LightBag
         assert(!isnan(lightSample.solidAnglePdf));
         assert(!isinf(lightSample.solidAnglePdf));
         assert(lightSample.solidAnglePdf >= 0.f);
-
+    	
         assert(!isnan(initialPdf));
         assert(!isinf(initialPdf));
         assert(initialPdf > 0.f);
@@ -246,7 +462,8 @@ __global__ void PickPrimarySamplesInternal(const LightBagEntry* const a_LightBag
     *reservoir = fresh;
 }
 
-__host__ unsigned int GenerateReSTIRShadowRays(MemoryBuffer* a_AtomicBuffer, Reservoir* a_Reservoirs, const WaveFront::SurfaceData* a_PixelData, unsigned a_NumReservoirs)
+__host__ unsigned int GenerateReSTIRShadowRays(MemoryBuffer* a_AtomicBuffer, Reservoir* a_Reservoirs,
+    const WaveFront::SurfaceData* a_PixelData, unsigned a_NumReservoirs)
 {
     //Counter that is atomically incremented. Copy it to the GPU.
     WaveFront::ResetAtomicBuffer<RestirShadowRay>(a_AtomicBuffer);
@@ -264,7 +481,8 @@ __host__ unsigned int GenerateReSTIRShadowRays(MemoryBuffer* a_AtomicBuffer, Res
     return WaveFront::GetAtomicCounter<RestirShadowRay>(a_AtomicBuffer);
 }
 
-__global__ void GenerateShadowRay(WaveFront::AtomicBuffer<RestirShadowRay>* a_AtomicBuffer, Reservoir* a_Reservoirs, const WaveFront::SurfaceData* a_PixelData, unsigned a_NumReservoirs)
+__global__ void GenerateShadowRay(WaveFront::AtomicBuffer<RestirShadowRay>* a_AtomicBuffer, Reservoir* a_Reservoirs,
+    const WaveFront::SurfaceData* a_PixelData, unsigned a_NumReservoirs)
 {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     if (index >= a_NumReservoirs) return;
@@ -273,7 +491,7 @@ __global__ void GenerateShadowRay(WaveFront::AtomicBuffer<RestirShadowRay>* a_At
     const WaveFront::SurfaceData pixelData = a_PixelData[pixelIndex];
 
     //Only run for valid intersections.
-    if(pixelData.m_IntersectionT > 0.f && !pixelData.m_Emissive)
+    if(!pixelData.m_SurfaceFlags)
     {
         //If the reservoir has a weight, add a shadow ray.
         const Reservoir reservoir = a_Reservoirs[index];
@@ -291,101 +509,176 @@ __global__ void GenerateShadowRay(WaveFront::AtomicBuffer<RestirShadowRay>* a_At
             ray.direction = pixelToLight;
             ray.origin = pixelData.m_Position;
             ray.distance = l - 0.05f; //Make length a little bit shorter to prevent self-shadowing.
-
+        	
             //TODO: this is a slow operation. Perhaps it's better to create multiple shadow rays per thread, store them locally, then add them at once?
             a_AtomicBuffer->Add(&ray);
         }         
     }
 }
 
-/*
- * Generate the shadow rays used for final shading.
- */
-__host__ unsigned int GenerateReSTIRShadowRaysShading(MemoryBuffer* a_AtomicBuffer, Reservoir* a_Reservoirs, const WaveFront::SurfaceData* a_PixelData, unsigned a_NumPixels)
+__host__ void Shade(Reservoir* a_Reservoirs, unsigned a_Width, unsigned a_Height, cudaSurfaceObject_t a_OutputBuffer)
 {
-    //Counter that is atomically incremented. Copy it to the GPU.
-    WaveFront::ResetAtomicBuffer<RestirShadowRayShading>(a_AtomicBuffer);
+    const dim3 blockSize = CUDA_BLOCK_SIZE_GRID;
+    const unsigned gridWidth = static_cast<unsigned>(std::ceil(static_cast<float>(a_Width) / static_cast<float>(blockSize.x)));
+    const unsigned gridHeight = static_cast<unsigned>(std::ceil(static_cast<float>(a_Height) / static_cast<float>(blockSize.y)));
+    const dim3 numBlocks {gridWidth, gridHeight, 1};
 
-    const auto devicePtr = a_AtomicBuffer->GetDevicePtr<WaveFront::AtomicBuffer<RestirShadowRayShading>>();
+    ShadeInternal << <numBlocks, blockSize >> > (a_Reservoirs, a_Width, a_Height, a_OutputBuffer);
+    cudaDeviceSynchronize();
+    CHECKLASTCUDAERROR;
+}
 
-    //Call in parallel.
-    const int blockSize = CUDA_BLOCK_SIZE;
-    const int numBlocks = (a_NumPixels + blockSize - 1) / blockSize;
+__global__ void ShadeInternal(Reservoir* a_Reservoirs, unsigned a_Width, unsigned a_Height, cudaSurfaceObject_t a_OutputBuffer)
+{
+    const unsigned int pixelX = blockIdx.x * blockDim.x + threadIdx.x;
+    const unsigned int pixelY = blockIdx.y * blockDim.y + threadIdx.y;
 
+    //Make sure to not go out of bounds.
+    if(pixelX >= a_Width || pixelY >= a_Height)
+    {
+        return;
+    }
+
+	//Inlined shading function to shade this pixel at every depth in this reservoir set.
+    ShadeReservoirs(a_Reservoirs, a_Width, pixelX, pixelY, pixelX, pixelY, a_OutputBuffer);
+}
+
+__device__ __forceinline__ void ShadeReservoirs(Reservoir* a_Reservoirs, unsigned a_Width, unsigned a_InputX, unsigned a_InputY, unsigned a_OutputX, unsigned a_OutputY, cudaSurfaceObject_t a_OutputBuffer)
+{
+    //The amount of samples shaded per pixel. Compile time constant. Used to scale contributions back down.
+    constexpr auto numShadedSamples = ReSTIRSettings::numReservoirsPerPixel * (1 + (ReSTIRSettings::enableTemporal ? 1 : 0) + (ReSTIRSettings::enableSpatial ? 1 : 0));
+	
+    //Read the current shading value in the output buffer.
+    float4 color;
+    surf2DLayeredread<float4>(
+        &color,
+        a_OutputBuffer,
+        a_OutputX * sizeof(float4),
+        a_OutputY,
+        static_cast<unsigned int>(WaveFront::LightChannel::DIRECT),
+        cudaBoundaryModeTrap);
+
+	//The index of the pixel in terms of reservoirs.
+    const auto pixelDataIndex = PIXEL_DATA_INDEX(a_InputX, a_InputY, a_Width);
+	
+    //Extract and scale reservoir shading values. Append to color.
     for (int depth = 0; depth < ReSTIRSettings::numReservoirsPerPixel; ++depth)
     {
-        GenerateShadowRayShading <<<numBlocks, blockSize >>> (devicePtr, a_Reservoirs, a_PixelData, a_NumPixels, depth);
-    }
-    cudaDeviceSynchronize();
+        //Local copy of the reservoir in question.
+        auto& reservoir = a_Reservoirs[RESERVOIR_INDEX(pixelDataIndex, depth, ReSTIRSettings::numReservoirsPerPixel)];
 
-    CHECKLASTCUDAERROR;
-
-    //Copy value back to the CPU.
-    return WaveFront::GetAtomicCounter<RestirShadowRayShading>(a_AtomicBuffer);
-}
-
-__global__ void GenerateShadowRayShading(WaveFront::AtomicBuffer<RestirShadowRayShading>* a_AtomicBuffer, Reservoir* a_Reservoirs, const WaveFront::SurfaceData* a_PixelData, unsigned a_NumPixels, unsigned a_Depth)
-{
-    int index = blockIdx.x * blockDim.x + threadIdx.x;
-    if (index >= a_NumPixels) return;
-
-    const WaveFront::SurfaceData pixelData = a_PixelData[index];
-
-    //Only run for valid intersections.
-    if (pixelData.m_IntersectionT > 0.f && !pixelData.m_Emissive)
-    {
-        //If the reservoir has a weight, add a shadow ray.
-        const auto reservoirIndex = RESERVOIR_INDEX(index, a_Depth, ReSTIRSettings::numReservoirsPerPixel);
-        const Reservoir reservoir = a_Reservoirs[reservoirIndex];
-
+        //If the reservoir has a weight, append it to the shading.
         if (reservoir.weight > 0.f)
         {
-            float3 pixelToLight = (reservoir.sample.position - pixelData.m_Position);
-            const float l = length(pixelToLight);
-            pixelToLight /= l;
-
-            assert(fabsf(length(pixelToLight) - 1.f) <= FLT_EPSILON * 5.f);
-
-            RestirShadowRayShading ray;
-            ray.index = reservoirIndex;
-            ray.direction = pixelToLight;
-            ray.origin = pixelData.m_Position;
-            ray.distance = l - 0.05f; //Make length a little bit shorter to prevent self-shadowing.
-
             //Take the average contribution scaled after all reservoirs.
-            ray.contribution = (reservoir.sample.unshadowedPathContribution * (reservoir.weight / static_cast<float>(ReSTIRSettings::numReservoirsPerPixel)));
-        	
-            //TODO: this is a slow operation. Perhaps it's better to create multiple shadow rays per thread, store them locally, then add them at once?
-            a_AtomicBuffer->Add(&ray);
+            color += make_float4(reservoir.sample.unshadowedPathContribution * (reservoir.weight / static_cast<float>(numShadedSamples)), 0.f);
         }
     }
+
+    //Write the combined values to the output buffer.
+    surf2DLayeredwrite<float4>(
+        color,
+        a_OutputBuffer,
+        a_OutputX * sizeof(float4),
+        a_OutputY,
+        static_cast<unsigned int>(WaveFront::LightChannel::DIRECT),
+        cudaBoundaryModeTrap);
 }
 
+///*
+// * Generate the shadow rays used for final shading.
+// */
+//__host__ unsigned int GenerateReSTIRShadowRaysShading(MemoryBuffer* a_AtomicBuffer, Reservoir* a_Reservoirs, const WaveFront::SurfaceData* a_PixelData, uint2 a_Resolution)
+//{
+//    //Counter that is atomically incremented. Copy it to the GPU.
+//    WaveFront::ResetAtomicBuffer<RestirShadowRayShading>(a_AtomicBuffer);
+//
+//    const auto devicePtr = a_AtomicBuffer->GetDevicePtr<WaveFront::AtomicBuffer<RestirShadowRayShading>>();
+//
+//    //Call in parallel.
+//    const dim3 blockSize = CUDA_BLOCK_SIZE_GRID;
+//
+//    const unsigned gridWidth = static_cast<unsigned>(std::ceil(static_cast<float>(a_Resolution.x) / static_cast<float>(blockSize.x)));
+//    const unsigned gridHeight = static_cast<unsigned>(std::ceil(static_cast<float>(a_Resolution.y) / static_cast<float>(blockSize.y)));
+//
+//    const dim3 numBlocks {gridWidth, gridHeight, 1};
+//
+//    for (int depth = 0; depth < ReSTIRSettings::numReservoirsPerPixel; ++depth)
+//    {
+//        GenerateShadowRayShading <<<numBlocks, blockSize >>> (devicePtr, a_Reservoirs, a_PixelData, a_Resolution, depth);
+//    }
+//    cudaDeviceSynchronize();
+//
+//    CHECKLASTCUDAERROR;
+//
+//    //Copy value back to the CPU.
+//    return WaveFront::GetAtomicCounter<RestirShadowRayShading>(a_AtomicBuffer);
+//}
+//
+//__global__ void GenerateShadowRayShading(WaveFront::AtomicBuffer<RestirShadowRayShading>* a_AtomicBuffer, Reservoir* a_Reservoirs, const WaveFront::SurfaceData* a_PixelData, uint2 a_Resolution, unsigned a_Depth)
+//{
+//
+//    const unsigned int pixelX = blockIdx.x * blockDim.x + threadIdx.x;
+//    const unsigned int pixelY = blockIdx.y * blockDim.y + threadIdx.y;
+//
+//    //Make sure to not go out of bounds.
+//    if(pixelX >= a_Resolution.x || pixelY >= a_Resolution.y)
+//    {
+//        return;
+//    }
+//
+//    const unsigned int pixelDataIndex = PIXEL_DATA_INDEX(pixelX, pixelY, a_Resolution.x);
+//
+//    const WaveFront::SurfaceData pixelData = a_PixelData[pixelDataIndex];
+//
+//    //Only run for valid intersections.
+//    if (!pixelData.m_SurfaceFlags)
+//    {
+//        //If the reservoir has a weight, add a shadow ray.
+//        const auto reservoirIndex = RESERVOIR_INDEX(pixelDataIndex, a_Depth, ReSTIRSettings::numReservoirsPerPixel);
+//        const Reservoir reservoir = a_Reservoirs[reservoirIndex];
+//
+//        if (reservoir.weight > 0.f)
+//        {
+//            float3 pixelToLight = (reservoir.sample.position - pixelData.m_Position);
+//            const float l = length(pixelToLight);
+//            pixelToLight /= l;
+//
+//            assert(fabsf(length(pixelToLight) - 1.f) <= FLT_EPSILON * 5.f);
+//
+//            RestirShadowRayShading ray;
+//            ray.index = reservoirIndex;
+//            ray.pixelIndex = { pixelX, pixelY };
+//            ray.direction = pixelToLight;
+//            ray.origin = pixelData.m_Position;
+//            ray.distance = l - 0.05f; //Make length a little bit shorter to prevent self-shadowing.
+//
+//            //Take the average contribution scaled after all reservoirs.
+//            ray.contribution = (reservoir.sample.unshadowedPathContribution * (reservoir.weight / static_cast<float>(ReSTIRSettings::numReservoirsPerPixel)));
+//        	
+//            //TODO: this is a slow operation. Perhaps it's better to create multiple shadow rays per thread, store them locally, then add them at once?
+//            a_AtomicBuffer->Add(&ray);
+//        }
+//    }
+//}
 
-__host__ void SpatialNeighbourSampling(Reservoir* a_Reservoirs, Reservoir* a_SwapBuffer, const WaveFront::SurfaceData* a_PixelData, const std::uint32_t a_Seed, uint2 a_Dimensions)
+
+__host__ Reservoir* SpatialNeighbourSampling(
+    Reservoir* a_InputReservoirs,
+    Reservoir* a_SwapBuffer1,
+    Reservoir* a_SwapBuffer2,
+    const WaveFront::SurfaceData* a_PixelData,
+    const std::uint32_t a_Seed,
+    uint2 a_Dimensions
+)
 {
-    /*
-     * TODO:
-     * This is tricky because it's a matter of balancing local data and random access.
-     * Right now it's very slow because the amount of data locally required per neigbour is too much.
-     * This stalls the pipeline and threads in a block.
-     * Less threads per block makes this somewhat better up to a certain extent.
-     *
-     * Having everything as pointers is not ideal because now it does random access and trashes the cache.
-     *
-     * The ideal solution:
-     * - All data as pointers.
-     * - All data is located in the same place in memory.
-     * - One thread per reservoir (so also per depth).
-     * - Maybe limit the amount of threads per block for optimal cache hits.
-     * - Blocks in the same SM need to operate on the same region of pixel data.
-     */
     const unsigned numReservoirs = a_Dimensions.x * a_Dimensions.y * ReSTIRSettings::numReservoirsPerPixel;
     const int blockSize = CUDA_BLOCK_SIZE;
     const int numBlocks = (numReservoirs + blockSize - 1) / blockSize;
 
-    Reservoir* fromBuffer = a_Reservoirs;
-    Reservoir* toBuffer = a_SwapBuffer;
+	//Initially, copy from the current reservoirs. After depth 0 the two swap buffers are used.
+    Reservoir* fromBuffer = a_InputReservoirs;
+    Reservoir* toBuffer = a_SwapBuffer1;
 
     //Synchronize between each swap, and then swap the buffers.
     for (int iteration = 0; iteration < ReSTIRSettings::numSpatialIterations; ++iteration)
@@ -395,42 +688,56 @@ __host__ void SpatialNeighbourSampling(Reservoir* a_Reservoirs, Reservoir* a_Swa
         CHECKLASTCUDAERROR;
 
         //Swap the pointers for in and output.
-        Reservoir* temp = fromBuffer;
-        fromBuffer = toBuffer;
-        toBuffer = temp;
+    	if(iteration == 0)
+    	{
+            fromBuffer = a_SwapBuffer1;
+            toBuffer = a_SwapBuffer2;
+    	}
+        else
+        {
+            Reservoir* temp = fromBuffer;
+            fromBuffer = toBuffer;
+            toBuffer = temp;
+        }
     }
 
+	//Buffer currently containing the combined reservoirs.
+    return fromBuffer;
 }
 
-__global__ void SpatialNeighbourSamplingInternal(Reservoir* a_Reservoirs, Reservoir* a_SwapBuffer,
-    const WaveFront::SurfaceData* a_PixelData, const std::uint32_t a_Seed, uint2 a_Dimensions,
-    unsigned a_NumReservoirs)
+__global__ void SpatialNeighbourSamplingInternal(
+    Reservoir* a_ReservoirsIn,
+    Reservoir* a_ReservoirsOut,
+    const WaveFront::SurfaceData* a_PixelData,
+    const std::uint32_t a_Seed,
+    uint2 a_Dimensions,
+    unsigned a_NumReservoirs
+)
 {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     if (index >= a_NumReservoirs) return;
 
     //Storage for reservoirs and pixels to be combined.
-    const WaveFront::SurfaceData* toCombinePixelData[ReSTIRSettings::numSpatialSamples + 1];
-    Reservoir* toCombineReservoirs[ReSTIRSettings::numSpatialSamples + 1];
+    const WaveFront::SurfaceData* toCombinePixelData[ReSTIRSettings::numSpatialSamples];
+    Reservoir* toCombineReservoirs[ReSTIRSettings::numSpatialSamples];
 
     //The seed unique to this pixel.
     auto seed =  WangHash(a_Seed + index);
 
     const auto pixelIndex = index / ReSTIRSettings::numReservoirsPerPixel;
     const auto currentDepth = index - (pixelIndex * ReSTIRSettings::numReservoirsPerPixel);
-    toCombinePixelData[0] = &a_PixelData[pixelIndex];
+
+	//Current surface data.
+    auto& currentSurfaceData = a_PixelData[pixelIndex];
 
     //Only run when there's an intersection for this pixel.
-    if (toCombinePixelData[0]->m_IntersectionT > 0.f && !toCombinePixelData[0]->m_Emissive)
+    if (!currentSurfaceData.m_SurfaceFlags)
     {
         const int y = pixelIndex / a_Dimensions.x;
         const int x = pixelIndex - (y * a_Dimensions.x);
+        int count = 0;
 
-        toCombineReservoirs[0] = &a_Reservoirs[index];
-
-        int count = 1;
-
-        for (int neighbour = 1; neighbour <= ReSTIRSettings::numSpatialSamples; ++neighbour)
+        for (int neighbour = 0; neighbour < ReSTIRSettings::numSpatialSamples; ++neighbour)
         {
             //TODO This generates a square rn. Make it within a circle.
             const int neighbourY = round((RandomFloat(seed) * 2.f - 1.f) * static_cast<float>(ReSTIRSettings::spatialSampleRadius)) + y;
@@ -449,18 +756,18 @@ __global__ void SpatialNeighbourSamplingInternal(Reservoir* a_Reservoirs, Reserv
                 toCombinePixelData[count] = &a_PixelData[neighbourIndex];
 
                 //Only run for valid depths and non-emissive surfaces.
-                if (toCombinePixelData[count]->m_IntersectionT > 0.f && !toCombinePixelData[count]->m_Emissive)
+                if (!toCombinePixelData[count]->m_SurfaceFlags)
                 {
-                    toCombineReservoirs[count] = &a_Reservoirs[RESERVOIR_INDEX(neighbourIndex, currentDepth, ReSTIRSettings::numReservoirsPerPixel)];
+                    toCombineReservoirs[count] = &a_ReservoirsIn[RESERVOIR_INDEX(neighbourIndex, currentDepth, ReSTIRSettings::numReservoirsPerPixel)];
                     //Gotta stay positive.
                     assert(toCombineReservoirs[count]->weight >= 0.f);
 
                     //Discard samples that are too different.
                     const float depth1 = toCombinePixelData[count]->m_IntersectionT;
-                    const float depth2 = toCombinePixelData[0]->m_IntersectionT;
+                    const float depth2 = currentSurfaceData.m_IntersectionT;
                     const float depthDifPct = fabs(depth1 - depth2) / ((depth1 + depth2) / 2.f);
 
-                    const float angleDif = dot(toCombinePixelData[count]->m_Normal, toCombinePixelData[0]->m_Normal);	//Between 0 and 1 (0 to 90 degrees). 
+                    const float angleDif = dot(toCombinePixelData[count]->m_Normal, currentSurfaceData.m_Normal);	//Between 0 and 1 (0 to 90 degrees). 
                     static constexpr float MAX_ANGLE_COS = 0.72222222223f;	//Dot product is cos of the angle. If higher than this value, it's within 25 degrees.
 
                     //If the samples are similar enough, up the counter. This will means the samples are not overwritten and will be merged.
@@ -482,19 +789,8 @@ __global__ void SpatialNeighbourSamplingInternal(Reservoir* a_Reservoirs, Reserv
                 //Output reservoir.
                 Reservoir output;
 
-                //First sample needs no resampling.
-                auto* reservoir = toCombineReservoirs[0];
-                const float weight = static_cast<float>(reservoir->sampleCount) * reservoir->weight * reservoir->sample.solidAnglePdf;
-
-                assert(!isnan(weight));
-                assert(!isinf(weight));
-                assert(weight >= 0.f);
-            	
-                output.Update(reservoir->sample, weight, a_Seed);
-                sampleCountSum += reservoir->sampleCount;
-
                 //Iterate over the intersection data to combine.
-                for (int i = 1; i < count; ++i)
+                for (int i = 0; i < count; ++i)
                 {
                     auto* reservoir = toCombineReservoirs[i];
                     LightSample resampled;
@@ -525,7 +821,7 @@ __global__ void SpatialNeighbourSamplingInternal(Reservoir* a_Reservoirs, Reserv
                 assert(!isinf(output.weightSum));
 
                 //Override the reservoir for the output at this depth.
-                a_SwapBuffer[index] = output;
+                a_ReservoirsOut[index] = output;
             }
             else
             {
@@ -533,19 +829,8 @@ __global__ void SpatialNeighbourSamplingInternal(Reservoir* a_Reservoirs, Reserv
                 Reservoir output;
                 int sampleCountSum = 0;
 
-                //First sample needs no resampling.
-                auto* reservoir = toCombineReservoirs[0];
-                const float weight = static_cast<float>(reservoir->sampleCount) * reservoir->weight * reservoir->sample.solidAnglePdf;
-
-                assert(!isnan(weight));
-                assert(!isinf(weight));
-                assert(weight >= 0.f);
-            	
-                output.Update(reservoir->sample, weight, a_Seed);
-                sampleCountSum += reservoir->sampleCount;
-
                 //Merge the other reservoirs in.
-                for (int i = 1; i < count; ++i)
+                for (int i = 0; i < count; ++i)
                 {
                     auto* otherReservoir = toCombineReservoirs[i];
                     LightSample resampled;
@@ -580,7 +865,7 @@ __global__ void SpatialNeighbourSamplingInternal(Reservoir* a_Reservoirs, Reserv
 
                     if (resampled.solidAnglePdf > 0)
                     {
-                        correction += a_Reservoirs[index].sampleCount;
+                        correction += a_ReservoirsOut[index].sampleCount;
                     }
                 }
 
@@ -602,14 +887,14 @@ __global__ void SpatialNeighbourSamplingInternal(Reservoir* a_Reservoirs, Reserv
                 assert(!isinf(output.weightSum));
 
                 //Store the output reservoir for the pixel.
-                a_SwapBuffer[index] = output;
+                a_ReservoirsOut[index] = output;
             }
         }
         //Not enough reservoirs to combine, but still data needs to be passed on.
         else
         {
-            //Copy the reservoir over directly without any combining.
-            a_SwapBuffer[index] = *toCombineReservoirs[0];
+            //Set the output reservoir to 0 if there was no valid candidates. Will be auto discarded when combined for next frame.
+            a_ReservoirsOut[index].Reset();
         }
     }
     
@@ -623,15 +908,26 @@ __host__ void TemporalNeighbourSampling(
     const WaveFront::SurfaceData* a_PreviousPixelData,
     const std::uint32_t a_Seed,
     uint2 a_Dimensions,
-    WaveFront::MotionVectorBuffer* a_MotionVectorBuffer
+    const WaveFront::MotionVectorBuffer* const a_MotionVectorBuffer,
+    cudaSurfaceObject_t a_OutputBuffer
 )
 {
-    const unsigned numReservoirs = a_Dimensions.x * a_Dimensions.y * ReSTIRSettings::numReservoirsPerPixel;
+    const unsigned numPixels = a_Dimensions.x * a_Dimensions.y;
     const int blockSize = CUDA_BLOCK_SIZE;
-    const int numBlocks = (numReservoirs + blockSize - 1) / blockSize;
+    const int numBlocks = (numPixels + blockSize - 1) / blockSize;
 
-    CombineTemporalSamplesInternal << <numBlocks, blockSize >> > (a_CurrentReservoirs, a_PreviousReservoirs,
-                                                                  a_CurrentPixelData, a_PreviousPixelData, a_Seed, numReservoirs, a_Dimensions, a_MotionVectorBuffer);
+    CombineTemporalSamplesInternal <<<numBlocks, blockSize >>> (
+        a_CurrentReservoirs, 
+        a_PreviousReservoirs,
+        a_CurrentPixelData, 
+        a_PreviousPixelData, 
+        a_Seed, 
+        numPixels,
+        a_Dimensions, 
+        a_MotionVectorBuffer,
+        a_OutputBuffer
+        );
+
     cudaDeviceSynchronize();
     CHECKLASTCUDAERROR;
 }
@@ -643,66 +939,93 @@ __global__ void CombineTemporalSamplesInternal(
     const WaveFront::SurfaceData* a_CurrentPixelData,
     const WaveFront::SurfaceData* a_PreviousPixelData,
     const std::uint32_t a_Seed,
-    unsigned a_NumReservoirs,
+    unsigned a_NumPixels,
     uint2 a_Dimensions,
-    WaveFront::MotionVectorBuffer* a_MotionVectorBuffer
+    const WaveFront::MotionVectorBuffer* const a_MotionVectorBuffer,
+    cudaSurfaceObject_t a_OutputBuffer
 )
 {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
-    if (index >= a_NumReservoirs) return;
+    if (index >= a_NumPixels) return;
 
-    const auto pixelIndex = index / ReSTIRSettings::numReservoirsPerPixel;
-    const auto currentDepth = index - (pixelIndex * ReSTIRSettings::numReservoirsPerPixel);
-
-    Reservoir toCombine[2];
-    WaveFront::SurfaceData pixelPointers[2];
-
-    const auto velocity = -a_MotionVectorBuffer->GetMotionVectorData(pixelIndex).m_Velocity;
+	//Get the motion vector and X,Y coordinates from the current index (one index per pixel).
+    const auto velocity = -a_MotionVectorBuffer->GetMotionVectorData(index).m_Velocity;
     const int movedX = roundf(static_cast<float>(a_Dimensions.x) * velocity.x);
     const int movedY = roundf(static_cast<float>(a_Dimensions.y) * velocity.y);
-
-    int y = pixelIndex / a_Dimensions.x;
-    int x = pixelIndex - (y * a_Dimensions.x);
-    y += movedY;
-    x += movedX;
+    const int currentPixelY = index / a_Dimensions.x;
+    const int currentPixelX = index - (currentPixelY * a_Dimensions.x);
+    int temporalPixelY = currentPixelY + movedY;
+    int temporalPixelX = currentPixelX + movedX;
+	
 
     //Set to current pixel index so that invalid values will just try to match the same pixel in the last frame. Who knows if it works?
-    int temporalIndex = pixelIndex;
-    if(y >= 0 && y < a_Dimensions.y && x >= 0 && x < a_Dimensions.x)
+    int temporalIndex = index;
+    if (temporalPixelY >= 0 && temporalPixelY < a_Dimensions.y && temporalPixelX >= 0 && temporalPixelX < a_Dimensions.x)
     {
-        temporalIndex = PIXEL_INDEX(x, y, a_Dimensions.x);
+        temporalIndex = PIXEL_INDEX(temporalPixelX, temporalPixelY, a_Dimensions.x);
+    }
+    else
+    {
+    	//Set to current coords when out of bounds.
+        temporalPixelX = currentPixelX;
+        temporalPixelY = currentPixelY;
     }
 
-    pixelPointers[0] = a_PreviousPixelData[temporalIndex];
-    pixelPointers[1] = a_CurrentPixelData[pixelIndex];
+    assert(temporalIndex >= 0 && temporalIndex < a_NumPixels);
+    assert(index >= 0 && index < a_NumPixels);
 
-    //Ensure that the depth of both samples is valid, and then combine them at each depth.
-    if (pixelPointers[0].m_IntersectionT > 0.f && pixelPointers[1].m_IntersectionT > 0.f && !pixelPointers[0].m_Emissive && !pixelPointers[1].m_Emissive)
+    /*
+     * Combine the reservoirs for every depth.
+     * Also perform the shading.
+     */
+	
+    for (int currentDepth = 0; currentDepth < ReSTIRSettings::numReservoirsPerPixel; ++currentDepth)
     {
-        toCombine[0] = a_PreviousReservoirs[RESERVOIR_INDEX(temporalIndex, currentDepth, ReSTIRSettings::numReservoirsPerPixel)];
-        toCombine[1] = a_CurrentReservoirs[index];
+        Reservoir toCombine[2];
+        WaveFront::SurfaceData pixelPointers[2];
+        const auto reservoirIndex = RESERVOIR_INDEX(index, currentDepth, ReSTIRSettings::numReservoirsPerPixel);
+        const auto temporalReservoirIndex = RESERVOIR_INDEX(temporalIndex, currentDepth, ReSTIRSettings::numReservoirsPerPixel);
 
-        //Discard samples that are too different.
-        const float depth1 = pixelPointers[0].m_IntersectionT;
-        const float depth2 = pixelPointers[1].m_IntersectionT;
-        const float depthDifPct = fabs(depth1 - depth2) / ((depth1 + depth2) / 2.f);
+        assert(reservoirIndex >= 0 && reservoirIndex < a_NumPixels* ReSTIRSettings::numReservoirsPerPixel);
+        assert(temporalReservoirIndex >= 0 && temporalReservoirIndex < a_NumPixels* ReSTIRSettings::numReservoirsPerPixel);
+    	
+        //The amount of samples shaded per pixel. Compile time constant. Used to scale contributions back down.
+        constexpr auto numShadedSamples = ReSTIRSettings::numReservoirsPerPixel * (1 + (ReSTIRSettings::enableTemporal ? 1 : 0) + (ReSTIRSettings::enableSpatial ? 1 : 0));
 
-        const float angleDif = dot(pixelPointers[0].m_Normal, pixelPointers[1].m_Normal);	//Between 0 and 1 (0 to 90 degrees). 
-        static constexpr float MAX_ANGLE_COS = 0.72222222223f;	//Dot product is cos of the angle. If higher than this value, it's within 25 degrees.
+        pixelPointers[0] = a_PreviousPixelData[temporalIndex];
+        pixelPointers[1] = a_CurrentPixelData[index];
 
-        //Only do something if the samples are not vastly different.
-        if (depthDifPct < 0.10f && angleDif > MAX_ANGLE_COS)
+        //Ensure that the depth of both samples is valid, and then combine them at each depth.
+        if (!pixelPointers[0].m_SurfaceFlags && !pixelPointers[1].m_SurfaceFlags)
         {
-            //Cap sample count at 20x current to reduce temporal influence. Would grow infinitely large otherwise.
-            toCombine[0].sampleCount = min(toCombine[0].sampleCount, toCombine[1].sampleCount * 20);
+            toCombine[0] = a_PreviousReservoirs[temporalReservoirIndex];
+            toCombine[1] = a_CurrentReservoirs[reservoirIndex];
 
-            if (ReSTIRSettings::enableBiased)
+            //Discard samples that are too different.
+            const float depth1 = pixelPointers[0].m_IntersectionT;
+            const float depth2 = pixelPointers[1].m_IntersectionT;
+            const float depthDifPct = fabs(depth1 - depth2) / ((depth1 + depth2) / 2.f);
+
+            const float angleDif = dot(pixelPointers[0].m_Normal, pixelPointers[1].m_Normal);	//Between 0 and 1 (0 to 90 degrees). 
+            static constexpr float MAX_ANGLE_COS = 0.72222222223f;	//Dot product is cos of the angle. If higher than this value, it's within 25 degrees.
+
+            //Only do something if the samples are not vastly different.
+            if (depthDifPct < 0.10f && angleDif > MAX_ANGLE_COS)
             {
-                CombineBiased(&a_CurrentReservoirs[index], 2, &toCombine[0], &pixelPointers[1], WangHash(a_Seed + index));
-            }
-            else
-            {
-                CombineUnbiased(&a_CurrentReservoirs[index], &pixelPointers[1], 2, &toCombine[0], &pixelPointers[0], WangHash(a_Seed + index));
+                //Shade before combining the reservoirs into the current reservoir.
+                ShadeReservoirs(a_PreviousReservoirs, a_Dimensions.x, temporalPixelX, temporalPixelY, currentPixelX, currentPixelY, a_OutputBuffer);
+
+                //Cap sample count at 20x current to reduce temporal influence. Would grow infinitely large otherwise.
+                toCombine[0].sampleCount = min(toCombine[0].sampleCount, toCombine[1].sampleCount * 20);
+
+                if (ReSTIRSettings::enableBiased)
+                {
+                    CombineBiased(&a_CurrentReservoirs[index], 2, &toCombine[0], &pixelPointers[1], WangHash(a_Seed + index));
+                }
+                else
+                {
+                    CombineUnbiased(&a_CurrentReservoirs[index], &pixelPointers[1], 2, &toCombine[0], &pixelPointers[0], WangHash(a_Seed + index));
+                }
             }
         }
     }
@@ -871,7 +1194,7 @@ __device__ __inline__ void Resample(LightSample* a_Input, const WaveFront::Surfa
     //const auto unshadowedPathContribution = brdf * solidAngle * cosIn * a_Output->radiance;
 
     float pdf = 0.f;
-    const auto bsdf = EvaluateBSDF(a_PixelData->m_ShadingData, a_PixelData->m_Normal, a_PixelData->m_Tangent, -a_PixelData->m_IncomingRayDirection, pixelToLightDir, pdf);
+    const auto bsdf = EvaluateBSDF(a_PixelData->m_MaterialData, a_PixelData->m_Normal, a_PixelData->m_Tangent, -a_PixelData->m_IncomingRayDirection, pixelToLightDir, pdf);
 	
     //If contribution to lobe is 0, just discard. Also goes for NAN which is sometimes sadly present with specular vertices.
     const auto added = pdf + bsdf.x + bsdf.y + bsdf.z;
@@ -900,61 +1223,103 @@ __device__ __inline__ void Resample(LightSample* a_Input, const WaveFront::Surfa
         z) / 3.f;
 }
 
-__host__ void GenerateWaveFrontShadowRays(Reservoir* a_Reservoirs, const WaveFront::SurfaceData* a_PixelData, WaveFront::AtomicBuffer<WaveFront::ShadowRayData>* a_AtomicBuffer, unsigned a_NumPixels)
-{
-    //Call in parallel.
-    const int blockSize = CUDA_BLOCK_SIZE;
-    const int numBlocks = (a_NumPixels + blockSize - 1) / blockSize;
+//__host__ void GenerateWaveFrontShadowRays(Reservoir* a_Reservoirs, const WaveFront::SurfaceData* a_PixelData, WaveFront::AtomicBuffer<WaveFront::ShadowRayData>* a_AtomicBuffer, unsigned a_NumPixels)
+//{
+//    //Call in parallel.
+//    const int blockSize = CUDA_BLOCK_SIZE;
+//    const int numBlocks = (a_NumPixels + blockSize - 1) / blockSize;
+//
+//    //Separate invocations for each depth to add a stride.
+//    for (int depth = 0; depth < ReSTIRSettings::numReservoirsPerPixel; ++depth)
+//    {
+//        GenerateWaveFrontShadowRaysInternal << <numBlocks, blockSize >> > (a_Reservoirs, a_PixelData, a_AtomicBuffer, a_NumPixels, depth);
+//    }
+//    cudaDeviceSynchronize();
+//    CHECKLASTCUDAERROR;
+//}
+//
+//__global__ void GenerateWaveFrontShadowRaysInternal(Reservoir* a_Reservoirs, const WaveFront::SurfaceData* a_PixelData, WaveFront::AtomicBuffer<WaveFront::ShadowRayData>* a_AtomicBuffer, unsigned a_NumPixels, unsigned a_Depth)
+//{
+//    int index = blockIdx.x * blockDim.x + threadIdx.x;
+//    int stride = blockDim.x * gridDim.x;
+//
+//    for (int i = index; i < a_NumPixels; i += stride)
+//    {
+//        const WaveFront::SurfaceData* pixel = &a_PixelData[i];
+//
+//        //Only generate shadow rays for pixels that hit a surface that is not emissive.
+//        if(!(pixel->m_SurfaceFlags))
+//        {
+//            /*
+//             * TODO
+//             * Note: This currently divides the expected contribution per reservoir by the amount of reservoirs.
+//             * It's essentially like scaling down so that the total adds up to 100% if all shadow rays pass.
+//             * This does shoot one shadow ray per reservoir, but I think that's needed for accurate results.
+//             * If we are really desperate we could average the reservoir results and then send a single shadow ray.
+//             */
+//
+//            //Get the contribution and scale it down based on the number of reservoirs.
+//            Reservoir* reservoir = &a_Reservoirs[RESERVOIR_INDEX(i, a_Depth, ReSTIRSettings::numReservoirsPerPixel)];
+//
+//            //Only send shadow rays for reservoirs that have a valid sample.
+//            if(reservoir->weight > 0)
+//            {
+//                float3 contribution = (reservoir->sample.unshadowedPathContribution * (reservoir->weight / static_cast<float>(ReSTIRSettings::numReservoirsPerPixel)));
+//
+//                //Generate a ray for this particular reservoir.
+//                float3 toLightDir = reservoir->sample.position - pixel->m_Position;
+//                const float l = length(toLightDir);
+//                toLightDir /= l;
+//
+//                //TODO: add stride between these.
+//
+//                //TODO ensure no shadow acne.
+//                //TODO: Pass pixel index to shadow ray data.
+//                auto data =
+//                    WaveFront::ShadowRayData{
+//                        pixel->m_PixelIndex,
+//                        pixel->m_Position,
+//                        toLightDir, l - 0.005f,
+//                        contribution,
+//                        WaveFront::LightChannel::DIRECT };
+//                a_AtomicBuffer->Add(&data);
+//            }
+//        }
+//    }
+//}
 
-    //Separate invocations for each depth to add a stride.
-    for (int depth = 0; depth < ReSTIRSettings::numReservoirsPerPixel; ++depth)
-    {
-        GenerateWaveFrontShadowRaysInternal << <numBlocks, blockSize >> > (a_Reservoirs, a_PixelData, a_AtomicBuffer, a_NumPixels, depth);
-    }
+__host__ void CombineReservoirBuffers(Reservoir* a_Reservoirs1, Reservoir* a_Reservoirs2, const WaveFront::SurfaceData* a_SurfaceData, unsigned a_NumReservoirs, unsigned a_Seed)
+{
+    const int blockSize = CUDA_BLOCK_SIZE;
+    const int numBlocks = (a_NumReservoirs + blockSize - 1) / blockSize;
+    CombineReservoirBuffersInternal<< <numBlocks, blockSize >> > (a_Reservoirs1, a_Reservoirs2, a_SurfaceData, a_NumReservoirs, a_Seed);
     cudaDeviceSynchronize();
     CHECKLASTCUDAERROR;
+
 }
 
-__global__ void GenerateWaveFrontShadowRaysInternal(Reservoir* a_Reservoirs, const WaveFront::SurfaceData* a_PixelData, WaveFront::AtomicBuffer<WaveFront::ShadowRayData>* a_AtomicBuffer, unsigned a_NumPixels, unsigned a_Depth)
+__global__ void CombineReservoirBuffersInternal(Reservoir* a_Reservoirs1, Reservoir* a_Reservoirs2, const WaveFront::SurfaceData* a_SurfaceData, unsigned a_NumReservoirs, unsigned a_Seed)
 {
-    int index = blockIdx.x * blockDim.x + threadIdx.x;
-    int stride = blockDim.x * gridDim.x;
-
-    for (int i = index; i < a_NumPixels; i += stride)
+    const int index = blockIdx.x * blockDim.x + threadIdx.x;
+    const int stride = blockDim.x * gridDim.x;
+	
+    for (int i = index; i < a_NumReservoirs; i += stride)
     {
-        const WaveFront::SurfaceData* pixel = &a_PixelData[i];
-
-        //Only generate shadow rays for pixels that hit a surface that is not emissive.
-        if(pixel->m_IntersectionT > 0.f && !pixel->m_Emissive)
+        const auto pixelIndex = i / ReSTIRSettings::numReservoirsPerPixel;
+	    const WaveFront::SurfaceData* surface = &a_SurfaceData[pixelIndex];
+ 
+    	//Only shade surfaces that can be shaded.
+        if(!surface->m_SurfaceFlags)
         {
-            /*
-             * TODO
-             * Note: This currently divides the expected contribution per reservoir by the amount of reservoirs.
-             * It's essentially like scaling down so that the total adds up to 100% if all shadow rays pass.
-             * This does shoot one shadow ray per reservoir, but I think that's needed for accurate results.
-             * If we are really desperate we could average the reservoir results and then send a single shadow ray.
-             */
+            Reservoir toCombine[2];
+            toCombine[0] = a_Reservoirs1[i];
+            toCombine[1] = a_Reservoirs2[i];
 
-            //Get the contribution and scale it down based on the number of reservoirs.
-            Reservoir* reservoir = &a_Reservoirs[RESERVOIR_INDEX(i, a_Depth, ReSTIRSettings::numReservoirsPerPixel)];
-
-            //Only send shadow rays for reservoirs that have a valid sample.
-            if(reservoir->weight > 0)
-            {
-                float3 contribution = (reservoir->sample.unshadowedPathContribution * (reservoir->weight / static_cast<float>(ReSTIRSettings::numReservoirsPerPixel)));
-
-                //Generate a ray for this particular reservoir.
-                float3 toLightDir = reservoir->sample.position - pixel->m_Position;
-                const float l = length(toLightDir);
-                toLightDir /= l;
-
-                //TODO: add stride between these.
-
-                //TODO ensure no shadow acne.
-                //TODO: Pass pixel index to shadow ray data.
-                auto data = WaveFront::ShadowRayData{ pixel->m_Index, pixel->m_Position, toLightDir, l - 0.005f, contribution, WaveFront::LightChannel::DIRECT };
-                a_AtomicBuffer->Add(&data);
-            }
+        	//This function only calls combineBiased because at this point there's no information about the second reservoirs original surface.
+        	//Assume it is the same surface.
+        	//This is fine when combining neighbour samples, as those have already been re-weighed for the target pixel when unbiased mode is enabled.
+        	//Outputs to the input buffer.
+            CombineBiased(&a_Reservoirs1[i], 2, &toCombine[0], surface, WangHash(a_Seed + i));
         }
     }
 }

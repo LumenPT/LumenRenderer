@@ -11,7 +11,7 @@ namespace WaveFront
     struct VolumetricData
     {
 
-        unsigned m_PixelIndex;
+        PixelIndex m_PixelIndex;
 
         float3 m_PositionEntry;
 

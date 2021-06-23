@@ -30,7 +30,7 @@ namespace WaveFront
         AtomicBuffer<RestirShadowRayShading>* m_ReSTIRShadowRayShadingBatch;
 		SceneDataTableAccessor* m_SceneData;
         Reservoir* m_Reservoirs;
-        float3* m_ResultBuffer;
+        cudaSurfaceObject_t m_ResultBuffer;
         float2 m_MinMaxDistance;
         RayType m_TraceType;
     };
