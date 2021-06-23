@@ -1,5 +1,6 @@
 #include "CPUShadingKernels.cuh"
 #include "GPUShadingKernels.cuh"
+#include "../MotionVectors.cuh"
 #include "../../Framework/CudaUtilities.h"
 #include "../../Shaders/CppCommon/ReSTIRData.h"
 #include "../../Framework/ReSTIR.h"
@@ -7,27 +8,7 @@
 
 using namespace WaveFront;
 
-//CPU_GPU void HaltonSequence(
-//    int index,
-//    int base,
-//    float* result)
-//{
-//    ++index;
-//
-//    float f = 1.f;
-//    float r = 0.f;
-//
-//    while (index > 0)
-//    {
-//        f = f / base;
-//        r = r + f * (index % base);
-//        index = index / base;
-//    }
-//
-//    *result = r;
-//}
-
-CPU_ONLY void GeneratePrimaryRays(const PrimRayGenLaunchParameters& a_PrimaryRayGenParams)
+CPU_ONLY void GeneratePrimaryRays(const PrimRayGenLaunchParameters& a_PrimaryRayGenParams, cudaSurfaceObject_t a_JitterOutput)
 {
     const float3 u = a_PrimaryRayGenParams.m_Camera.m_Up;
     const float3 v = a_PrimaryRayGenParams.m_Camera.m_Right;
@@ -40,20 +21,34 @@ CPU_ONLY void GeneratePrimaryRays(const PrimRayGenLaunchParameters& a_PrimaryRay
     const int blockSize = 256;
     const int numBlocks = (numRays + blockSize - 1) / blockSize;
 
-    GeneratePrimaryRay<<<numBlocks, blockSize>>>(numRays, a_PrimaryRayGenParams.m_PrimaryRays, u, v, w, eye, dimensions, frameCount);
+    GeneratePrimaryRay<<<numBlocks, blockSize>>>(numRays, a_PrimaryRayGenParams.m_PrimaryRays, u, v, w, eye, dimensions, frameCount, a_JitterOutput);
 }
 
 CPU_ONLY void GenerateMotionVectors(MotionVectorsGenerationData& a_MotionVectorsData)
 {
-    const int numPixels = a_MotionVectorsData.m_ScreenResolution.x * a_MotionVectorsData.m_ScreenResolution.y;
-    const int blockSize = 256;
-    const int numBlocks = (numPixels + blockSize - 1) / blockSize;
+    
+    const dim3 blockSize{ 16, 16 ,1 };
 
-    GenerateMotionVector << <numBlocks, blockSize >> > (
+    const unsigned blockSizeWidth =
+        static_cast<unsigned>(std::ceil(static_cast<float>(a_MotionVectorsData.m_RenderResolution.x) / static_cast<float>(blockSize.x)));
+    const unsigned blockSizeHeight =
+        static_cast<unsigned>(std::ceil(static_cast<float>(a_MotionVectorsData.m_RenderResolution.y) / static_cast<float>(blockSize.y)));
+
+    const dim3 numBlocks{ blockSizeWidth, blockSizeHeight, 1 };
+
+    const sutil::Matrix<4,4> matrix = a_MotionVectorsData.m_ProjectionMatrix * a_MotionVectorsData.m_PrevViewMatrix;
+
+    sutil::Matrix<4,4>* matrixDevPtr = { nullptr };
+    cudaMalloc(&matrixDevPtr, sizeof(matrix));
+    cudaMemcpy(matrixDevPtr, &matrix, sizeof(matrix), cudaMemcpyHostToDevice);
+
+    GenerateMotionVector<<<numBlocks, blockSize>>>(
         a_MotionVectorsData.m_MotionVectorBuffer,
-        a_MotionVectorsData.a_CurrentSurfaceData,
-        a_MotionVectorsData.m_ScreenResolution,
-        a_MotionVectorsData.m_ProjectionMatrix * a_MotionVectorsData.m_PrevViewMatrix);
+        a_MotionVectorsData.m_CurrentSurfaceData,
+        a_MotionVectorsData.m_RenderResolution,
+        matrixDevPtr);
+
+    cudaFree(matrixDevPtr);
 
     cudaDeviceSynchronize();
 }
@@ -63,13 +58,32 @@ CPU_ONLY void ExtractSurfaceData(
     AtomicBuffer<IntersectionData>* a_IntersectionData, 
     AtomicBuffer<IntersectionRayData>* a_Rays, 
     SurfaceData* a_OutPut,
+    cudaSurfaceObject_t a_DepthOutPut,
     uint2 a_Resolution,
-    SceneDataTableAccessor* a_SceneDataTable)
+    SceneDataTableAccessor* a_SceneDataTable,
+    float2 a_MinMaxDepth,
+    unsigned int a_CurrentDepth)
 {
     const int blockSize = 512;
     const int numBlocks = (a_NumIntersections + blockSize - 1) / blockSize;
 
     ExtractSurfaceDataGpu<<<numBlocks, blockSize>>>(a_NumIntersections, a_IntersectionData, a_Rays, a_OutPut, a_Resolution, a_SceneDataTable);
+
+    cudaDeviceSynchronize();
+    if (a_CurrentDepth == 0)
+    {
+
+        const dim3 blockSize2d{ 16, 16 ,1 };
+        const unsigned blockSizeWidth =
+            static_cast<unsigned>(std::ceil(static_cast<float>(a_Resolution.x) / static_cast<float>(blockSize2d.x)));
+        const unsigned blockSizeHeight =
+            static_cast<unsigned>(std::ceil(static_cast<float>(a_Resolution.y) / static_cast<float>(blockSize2d.y)));
+
+        const dim3 numBlocks2d{ blockSizeWidth, blockSizeHeight, 1 };
+
+        ExtractDepthDataGpu <<<numBlocks2d, blockSize2d>>>(a_OutPut, a_DepthOutPut, a_Resolution, a_MinMaxDepth);
+    }
+
 }
 
 CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
@@ -114,7 +128,7 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
         ResolveDirectLightHits<<<numBlocks, blockSize>>>(
             a_ShadingParams.m_CurrentSurfaceData,
             uint2{a_ShadingParams.m_ResolutionAndDepth.x, a_ShadingParams.m_ResolutionAndDepth.y},
-            a_ShadingParams.m_Output
+            a_ShadingParams.m_OutputChannels[static_cast<unsigned>(LightChannel::DIRECT)]
         );
 
         /*
@@ -128,7 +142,7 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
             a_ShadingParams.m_OptixSceneHandle,
             a_ShadingParams.m_Seed,
             a_ShadingParams.m_TriangleLights,
-            a_ShadingParams.m_Output,
+            a_ShadingParams.m_OutputChannels,
             *a_ShadingParams.m_FrameStats,
             true);
     }
@@ -154,7 +168,7 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
             CDFPtr,
             a_ShadingParams.m_SolidShadowRayBuffer,
             a_ShadingParams.m_VolumetricShadowRayBuffer,
-            a_ShadingParams.m_Output);
+            a_ShadingParams.m_OutputChannels[static_cast<unsigned>(LightChannel::VOLUMETRIC)]);
     }
 
     cudaDeviceSynchronize();
@@ -233,5 +247,89 @@ CPU_ONLY void PostProcess(const PostProcessLaunchParameters& a_PostProcessParams
         a_PostProcessParams.m_OutputResolution,
         a_PostProcessParams.m_PixelBufferSingleChannel,
         a_PostProcessParams.m_FinalOutput
+        );
+}
+
+CPU_ONLY void MergeOutput(const PostProcessLaunchParameters& a_PostProcessParams)
+{
+    //The amount of pixels and threads/blocks needed to apply effects.
+    const dim3 blockSize{ 32, 32 ,1 };
+
+    const unsigned blockSizeWidth =
+        static_cast<unsigned>(std::ceil(static_cast<float>(a_PostProcessParams.m_RenderResolution.x) / static_cast<float>(blockSize.x)));
+    const unsigned blockSizeHeight =
+        static_cast<unsigned>(std::ceil(static_cast<float>(a_PostProcessParams.m_RenderResolution.y) / static_cast<float>(blockSize.y)));
+
+    const dim3 numBlocks{ blockSizeWidth, blockSizeHeight, 1 };
+
+    MergeOutputChannels << <numBlocks, blockSize >> > (
+        a_PostProcessParams.m_RenderResolution,
+        a_PostProcessParams.m_PixelBufferMultiChannel,
+        a_PostProcessParams.m_PixelBufferSingleChannel,
+        a_PostProcessParams.m_BlendOutput,
+        a_PostProcessParams.m_BlendCount
+        );
+}
+
+CPU_ONLY void WriteToOutput(const PostProcessLaunchParameters& a_PostProcessParams)
+{
+    //The amount of pixels and threads/blocks needed to apply effects.
+    const dim3 blockSize{ 32, 32 ,1 };
+
+    const unsigned blockSizeWidthUpscaled =
+        static_cast<unsigned>(std::ceil(static_cast<float>(a_PostProcessParams.m_OutputResolution.x) / static_cast<float>(blockSize.x)));
+    const unsigned blockSizeHeightUpscaled =
+        static_cast<unsigned>(std::ceil(static_cast<float>(a_PostProcessParams.m_OutputResolution.y) / static_cast<float>(blockSize.y)));
+
+    const dim3 numBlocksUpscaled{ blockSizeWidthUpscaled, blockSizeHeightUpscaled, 1 };
+
+    //TODO This is temporary till the post-processing is  in place. Let the last stage copy it directly to the output buffer.
+    WriteToOutput << <numBlocksUpscaled, blockSize >>> (
+        a_PostProcessParams.m_OutputResolution,
+        a_PostProcessParams.m_PixelBufferSingleChannel,
+        a_PostProcessParams.m_FinalOutput
+        );
+}
+
+CPU_ONLY void PrepareOptixDenoising(WaveFront::OptixDenoiserLaunchParameters& a_LaunchParams)
+{
+    //The amount of pixels and threads/blocks needed to apply effects.
+    const dim3 blockSize{ 32, 32 ,1 };
+
+    const unsigned blockSizeWidth =
+        static_cast<unsigned>(std::ceil(static_cast<float>(a_LaunchParams.m_RenderResolution.x) / static_cast<float>(blockSize.x)));
+    const unsigned blockSizeHeight =
+        static_cast<unsigned>(std::ceil(static_cast<float>(a_LaunchParams.m_RenderResolution.y) / static_cast<float>(blockSize.y)));
+
+    const dim3 numBlocks{ blockSizeWidth, blockSizeHeight, 1 };
+
+    PrepareOptixDenoisingGPU << <numBlocks, blockSize >> > (
+        a_LaunchParams.m_RenderResolution,
+        a_LaunchParams.m_CurrentSurfaceData,
+        a_LaunchParams.m_PixelBufferSingleChannel,
+        a_LaunchParams.m_IntermediaryInput,
+        a_LaunchParams.m_AlbedoInput,
+        a_LaunchParams.m_NormalInput,
+        a_LaunchParams.m_IntermediaryOutput
+        );
+}
+
+CPU_ONLY void FinishOptixDenoising(WaveFront::OptixDenoiserLaunchParameters& a_LaunchParams)
+{
+    //The amount of pixels and threads/blocks needed to apply effects.
+    const dim3 blockSize{ 32, 32 ,1 };
+
+    const unsigned blockSizeWidth =
+        static_cast<unsigned>(std::ceil(static_cast<float>(a_LaunchParams.m_RenderResolution.x) / static_cast<float>(blockSize.x)));
+    const unsigned blockSizeHeight =
+        static_cast<unsigned>(std::ceil(static_cast<float>(a_LaunchParams.m_RenderResolution.y) / static_cast<float>(blockSize.y)));
+
+    const dim3 numBlocks{ blockSizeWidth, blockSizeHeight, 1 };
+
+    FinishOptixDenoisingGPU << <numBlocks, blockSize >> > (
+        a_LaunchParams.m_RenderResolution,
+        a_LaunchParams.m_PixelBufferSingleChannel,
+        a_LaunchParams.m_IntermediaryInput,
+        a_LaunchParams.m_IntermediaryOutput
         );
 }

@@ -167,6 +167,9 @@ public:
 	// Create a volume from the provided file path
 	virtual std::shared_ptr<Lumen::ILumenVolume> CreateVolume(const std::string& a_FilePath) = 0;
 
+	//NGX test
+	virtual void InitNGX() = 0;
+
 	void CreateDefaultResources();
 
 	virtual unsigned int GetOutputTexture() = 0;	//scene argument may be redundant... or not
@@ -202,6 +205,7 @@ public:
 	//Debug GLuint texture accessible by application
 	GLuint m_DebugTexture;
 
+	unsigned int m_DlssMode = 2; //corresponds to dlssmodes enum in DLSS init params
 protected:
 
 	FrameStats m_LastFrameStats;

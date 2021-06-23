@@ -65,12 +65,12 @@ void ReSTIR::Initialize(const ReSTIRSettings& a_Settings)
 void ReSTIR::Run(
 	const WaveFront::SurfaceData* const a_CurrentPixelData,
 	const WaveFront::SurfaceData* const a_PreviousPixelData,
-	const WaveFront::MotionVectorBuffer* const a_MotionVectorBuffer,
+	const cudaSurfaceObject_t a_MotionVectorBuffer,
 	const WaveFront::OptixWrapper* const a_OptixWrapper,
 	const OptixTraversableHandle a_OptixSceneHandle,
 	const std::uint32_t a_Seed,
 	const MemoryBuffer* const a_Lights,
-	cudaSurfaceObject_t a_OutputBuffer,
+	std::array<cudaSurfaceObject_t, static_cast<unsigned>(WaveFront::LightChannel::NUM_CHANNELS)> a_OutputBuffer,
     FrameStats& a_FrameStats, bool a_DebugPrint
 )
 {
@@ -159,7 +159,7 @@ void ReSTIR::Run(
 	 */
 	timer.reset();
 	VisibilityCheck(&m_ShadowRays, reservoirPointers[currentIndex], a_CurrentPixelData, a_OptixWrapper, numPixels, a_OptixSceneHandle);
-	Shade(reservoirPointers[currentIndex], dimensions.x, dimensions.y, a_OutputBuffer);
+	Shade(reservoirPointers[currentIndex], dimensions.x, dimensions.y, a_OutputBuffer.at(static_cast<unsigned>(WaveFront::LightChannel::DIRECT)));
 	if (a_DebugPrint) printf("Primary visibility check and shading time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
 	CHECKLASTCUDAERROR;
 	
@@ -179,7 +179,7 @@ void ReSTIR::Run(
 			seed,
 			dimensions,
 			a_MotionVectorBuffer,
-			a_OutputBuffer
+			a_OutputBuffer.at(static_cast<unsigned>(WaveFront::LightChannel::DIRECT))
 		);
 		if (a_DebugPrint) printf("Temporal sampling time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
 		CHECKLASTCUDAERROR;
@@ -209,7 +209,7 @@ void ReSTIR::Run(
 		 */
 		timer.reset();
 		VisibilityCheck(&m_ShadowRays, reservoirPointers[currentIndex], a_CurrentPixelData, a_OptixWrapper, numPixels, a_OptixSceneHandle);
-		Shade(reservoirPointers[currentIndex], dimensions.x, dimensions.y, a_OutputBuffer);
+		Shade(reservoirPointers[currentIndex], dimensions.x, dimensions.y, a_OutputBuffer.at(static_cast<unsigned>(WaveFront::LightChannel::DIRECT)));
 		if (a_DebugPrint) printf("Spatial visibility check and shading time required: %f millis.\n", timer.measure(TimeUnit::MILLIS));
 		CHECKLASTCUDAERROR;
 		

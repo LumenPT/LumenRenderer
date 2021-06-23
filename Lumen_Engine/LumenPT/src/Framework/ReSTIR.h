@@ -33,12 +33,12 @@ public:
 	void Run(
 		const WaveFront::SurfaceData* const a_CurrentPixelData,
 		const WaveFront::SurfaceData* const a_PreviousPixelData,
-		const WaveFront::MotionVectorBuffer* const a_MotionVectorBuffer,
+		const cudaSurfaceObject_t a_MotionVectorBuffer,
 		const WaveFront::OptixWrapper* const a_OptixWrapper,
 		const OptixTraversableHandle a_OptixSceneHandle,
 		const std::uint32_t a_Seed,
 		const MemoryBuffer* const a_Lights,
-		cudaSurfaceObject_t a_OutputBuffer,
+		std::array<cudaSurfaceObject_t, static_cast<unsigned>(WaveFront::LightChannel::NUM_CHANNELS)> a_OutputBuffer,
         struct FrameStats& a_FrameStats, bool a_DebugPrint = false
     );
 

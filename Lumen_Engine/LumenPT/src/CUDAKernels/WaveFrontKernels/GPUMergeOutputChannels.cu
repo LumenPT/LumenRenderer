@@ -1,9 +1,10 @@
 #include "GPUShadingKernels.cuh"
+#include "../../Shaders/CppCommon/Half4.h"
 #include <device_launch_parameters.h>
 
 CPU_ON_GPU void MergeOutputChannels(
     const uint2 a_Resolution,
-    const cudaSurfaceObject_t a_Input,
+    ArrayParameter<cudaSurfaceObject_t, static_cast<unsigned>(LightChannel::NUM_CHANNELS)> a_Input,
     const cudaSurfaceObject_t a_Output,
     const bool a_BlendOutput,
     const unsigned a_BlendCount
@@ -18,42 +19,42 @@ CPU_ON_GPU void MergeOutputChannels(
     {
         
 
-        float4 mergedColor = { 0.f };
+        half4Ushort4 mergedColor = { 0.f };
 #pragma unroll 
         for(unsigned int channelIndex = 0; channelIndex < numChannels; ++channelIndex)
         {
 
-            float4 channelColor{ 0.f };
-            surf2DLayeredread<float4>(
-                &channelColor,
-                a_Input,
-                pixelX * sizeof(float4),
+            half4Ushort4 channelColor{ 0.f };
+
+            surf2Dread<ushort4>(
+                &channelColor.m_Ushort4,
+                a_Input[channelIndex],
+                pixelX * sizeof(ushort4),
                 pixelY,
-                channelIndex,
                 cudaBoundaryModeTrap);
 
-            mergedColor += channelColor;
+            mergedColor.m_Half4 += channelColor.m_Half4;
 
         }
 
         //If enabled, average between frames.
         if(a_BlendOutput)
         {
-            float4 oldValue = { 0.f };
+            half4Ushort4 oldValue = { 0.f };
 
-            surf2Dread<float4>(
-                &oldValue,
+            surf2Dread<ushort4>(
+                &oldValue.m_Ushort4,
                 a_Output,
-                pixelX * sizeof(float4),
+                pixelX * sizeof(ushort4),
                 pixelY,
                 cudaBoundaryModeTrap);
 
             //Average results over the total blended frame count (so every frame counts just as much).
-            float4 newValue = ((oldValue * static_cast<float>(a_BlendCount)) + mergedColor) / static_cast<float>(a_BlendCount + 1);
-            surf2Dwrite<float4>(
-                newValue,
+            half4Ushort4 newValue{ ((oldValue.m_Half4 * static_cast<float>(a_BlendCount)) + mergedColor.m_Half4) / static_cast<float>(a_BlendCount + 1) };
+            surf2Dwrite<ushort4>(
+                newValue.m_Ushort4,
                 a_Output,
-                pixelX * sizeof(float4),
+                pixelX * sizeof(ushort4),
                 pixelY,
                 cudaBoundaryModeTrap);
             
@@ -62,10 +63,10 @@ CPU_ON_GPU void MergeOutputChannels(
         else
         {
 
-            surf2Dwrite<float4>(
-                mergedColor,
+            surf2Dwrite<ushort4>(
+                mergedColor.m_Ushort4,
                 a_Output,
-                pixelX * sizeof(float4),
+                pixelX * sizeof(ushort4),
                 pixelY,
                 cudaBoundaryModeTrap);
 

@@ -1,5 +1,5 @@
 /*
-* Copyright (c) 2020 NVIDIA Corporation.  All rights reserved.
+* Copyright (c) 2021 NVIDIA Corporation.  All rights reserved.
 *
 * NVIDIA Corporation and its licensors retain all intellectual property and proprietary
 * rights in and to this software, related documentation and any modifications thereto.
@@ -242,11 +242,34 @@ namespace optix_impl {
             printf("(%4i,%4i,%4i) error: mismatch between builtin IS shader and build input\n"
                    "       call location:   %s\n", index.x,index.y,index.z, optixGetExceptionLineInfo() );
         }
+        else if( exceptionCode == OPTIX_EXCEPTION_CODE_CALLABLE_INVALID_SBT )
+        {
+            int sbtOffset = optixGetExceptionInvalidSbtOffset();
+            printf( "(%4i,%4i,%4i) error: invalid sbt offset of %i for callable program\n", index.x, index.y, index.z, sbtOffset );
+        }
+        else if( exceptionCode == OPTIX_EXCEPTION_CODE_CALLABLE_NO_DC_SBT_RECORD )
+        {
+            int sbtOffset = optixGetExceptionInvalidSbtOffset();
+            printf( "(%4i,%4i,%4i) error: invalid sbt offset of %i for direct callable program\n", index.x, index.y, index.z, sbtOffset );
+        }
+        else if( exceptionCode == OPTIX_EXCEPTION_CODE_CALLABLE_NO_CC_SBT_RECORD )
+        {
+            int sbtOffset = optixGetExceptionInvalidSbtOffset();
+            printf( "(%4i,%4i,%4i) error: invalid sbt offset of %i for continuation callable program\n", index.x, index.y, index.z, sbtOffset );
+        }
         else if( exceptionCode == OPTIX_EXCEPTION_CODE_UNSUPPORTED_SINGLE_LEVEL_GAS )
         {
             OptixTraversableHandle handle = optixGetExceptionInvalidTraversable();
             printf("(%4i,%4i,%4i) error: unsupported single GAS traversable graph %p\n", index.x,index.y,index.z, (void*)handle);
             dumpTlist = true;
+        }
+        else if( ( exceptionCode <= OPTIX_EXCEPTION_CODE_INVALID_VALUE_ARGUMENT_0 ) && ( exceptionCode >= OPTIX_EXCEPTION_CODE_INVALID_VALUE_ARGUMENT_2 ) )
+        {
+            printf("(%4i,%4i,%4i) error: invalid value for argument %i\n", index.x,index.y,index.z, -(exceptionCode - OPTIX_EXCEPTION_CODE_INVALID_VALUE_ARGUMENT_0) );
+        }
+        else if( exceptionCode == OPTIX_EXCEPTION_CODE_UNSUPPORTED_DATA_ACCESS )
+        {
+            printf("(%4i,%4i,%4i) error: unsupported random data access\n", index.x,index.y,index.z);
         }
         else if( exceptionCode >= 0 )
         {
