@@ -880,6 +880,7 @@ namespace WaveFront
             //PostProcess(postProcessLaunchParams);
 
             NRDWrapperEvaluateParams nrdParams = {};
+            nrdParams.m_Camera = m_Scene->m_Camera.get();
             m_NRD->Denoise(nrdParams);
 
             MergeOutput(postProcessLaunchParams);
@@ -908,7 +909,7 @@ namespace WaveFront
             m_OptixDenoiser->Denoise(optixDenoiserParams); 
             CHECKLASTCUDAERROR;
 
-            FinishOptixDenoising(optixDenoiserLaunchParams);
+            //FinishOptixDenoising(optixDenoiserLaunchParams);
             CHECKLASTCUDAERROR;
 
             //TODO: move to after DLSS and NRD runs... (Requires mapping to use in CUDA again).
