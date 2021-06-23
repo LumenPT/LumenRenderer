@@ -45,6 +45,7 @@ public:
 	MemoryBuffer ColorInput;
 	MemoryBuffer AlbedoInput;
 	MemoryBuffer NormalInput;
+	MemoryBuffer FlowInput;
 	MemoryBuffer ColorOutput;
 
 	FrameSnapshot::ImageBuffer m_OptixDenoiserInputTex;

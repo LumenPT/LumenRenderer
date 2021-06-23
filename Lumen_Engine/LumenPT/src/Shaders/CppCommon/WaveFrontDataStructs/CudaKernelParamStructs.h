@@ -164,6 +164,7 @@ namespace WaveFront
             float3* a_IntermediaryInput,
             float3* a_AlbedoInput,
             float3* a_NormalInput,
+            float2* a_FlowInput,
             float3* a_IntermediaryOutput
         )
             :
@@ -173,6 +174,7 @@ namespace WaveFront
             m_IntermediaryInput(a_IntermediaryInput),
             m_AlbedoInput(a_AlbedoInput),
             m_NormalInput(a_NormalInput),
+            m_FlowInput(a_FlowInput),
             m_IntermediaryOutput(a_IntermediaryOutput)
         {}
 
@@ -184,6 +186,7 @@ namespace WaveFront
         float3* m_IntermediaryInput;
         float3* m_AlbedoInput;
         float3* m_NormalInput;
+        float2* m_FlowInput;
         float3* m_IntermediaryOutput;
     };
 }

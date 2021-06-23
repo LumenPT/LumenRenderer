@@ -313,6 +313,7 @@ CPU_ONLY void PrepareOptixDenoising(WaveFront::OptixDenoiserLaunchParameters& a_
         a_LaunchParams.m_IntermediaryInput,
         a_LaunchParams.m_AlbedoInput,
         a_LaunchParams.m_NormalInput,
+        a_LaunchParams.m_FlowInput,
         a_LaunchParams.m_IntermediaryOutput
         );
 }

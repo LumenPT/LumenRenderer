@@ -135,6 +135,7 @@ CPU_ON_GPU void PrepareOptixDenoisingGPU(
     float3* a_IntermediaryInput,
     float3* a_AlbedoInput,
     float3* a_NormalInput,
+    float2* a_FlowInput,
     float3* a_IntermediaryOutput);
 
 CPU_ON_GPU void FinishOptixDenoisingGPU(

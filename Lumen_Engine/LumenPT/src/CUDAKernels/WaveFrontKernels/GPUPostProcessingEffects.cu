@@ -17,6 +17,7 @@ CPU_ON_GPU void PrepareOptixDenoisingGPU(
     float3* a_IntermediaryInput,
     float3* a_AlbedoInput,
     float3* a_NormalInput,
+    float2* a_FlowInput,
     float3* a_IntermediaryOutput)
 {
     const unsigned int pixelX = blockIdx.x * blockDim.x + threadIdx.x;
@@ -44,6 +45,7 @@ CPU_ON_GPU void PrepareOptixDenoisingGPU(
         float4 albedo = a_CurrentSurfaceData[pixelDataIndex].m_MaterialData.m_Color;
         a_AlbedoInput[pixelDataIndex] = make_float3(albedo.x, albedo.y, albedo.z);
         a_NormalInput[pixelDataIndex] = a_CurrentSurfaceData[pixelDataIndex].m_Normal;
+        a_FlowInput[pixelDataIndex] = make_float2(0.f, 0.f);
     }
 }
 

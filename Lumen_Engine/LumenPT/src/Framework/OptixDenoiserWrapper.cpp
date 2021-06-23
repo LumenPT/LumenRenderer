@@ -25,7 +25,8 @@ void OptixDenoiserWrapper::Initialize(const OptixDenoiserInitParams& a_InitParam
     options.guideNormal = 1;
     
     OptixDenoiserModelKind denoiserModelKind = {};
-    denoiserModelKind = OPTIX_DENOISER_MODEL_KIND_LDR;
+    //denoiserModelKind = OPTIX_DENOISER_MODEL_KIND_TEMPORAL/*OPTIX_DENOISER_MODEL_KIND_HDR*/;
+    denoiserModelKind = OPTIX_DENOISER_MODEL_KIND_HDR;
 
     CHECKOPTIXRESULT(optixDenoiserCreate(optixWrapper.GetDeviceContext(), denoiserModelKind, &options, &m_Denoiser));
 
@@ -49,7 +50,9 @@ void OptixDenoiserWrapper::Initialize(const OptixDenoiserInitParams& a_InitParam
     ColorInput.Resize(m_InitParams.m_InputWidth * m_InitParams.m_InputHeight * sizeof(float3));
     AlbedoInput.Resize(m_InitParams.m_InputWidth * m_InitParams.m_InputHeight * sizeof(float3));
     NormalInput.Resize(m_InitParams.m_InputWidth * m_InitParams.m_InputHeight * sizeof(float3));
+    FlowInput.Resize(m_InitParams.m_InputWidth * m_InitParams.m_InputHeight * sizeof(float2));
     ColorOutput.Resize(m_InitParams.m_InputWidth * m_InitParams.m_InputHeight * sizeof(float3));
+    //PreviousColorOutput.Resize(m_InitParams.m_InputWidth * m_InitParams.m_InputHeight * sizeof(float3));;
 
     m_OptixDenoiserInputTex.m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_InitParams.m_InputWidth,
         m_InitParams.m_InputHeight, 3 * sizeof(float));;
