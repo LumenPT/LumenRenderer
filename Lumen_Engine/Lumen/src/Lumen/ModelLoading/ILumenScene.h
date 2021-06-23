@@ -18,28 +18,22 @@ namespace Lumen
                 , m_VolumeInstancePtr(nullptr)
                 , m_Parent(nullptr)
                 , m_Name("Unnamed Node")
+                , m_ScenePtr(nullptr)
             {}
 
-            /*Node(Node&& a_Other)
-            {
-                m_MeshInstancePtr = a_Other.m_MeshInstancePtr;
-                m_VolumeInstancePtr = a_Other.m_VolumeInstancePtr;
-                m_Parent = a_Other.m_Parent;
-                m_Parent->m_ChildNodes.erase(std::find(m_Parent->m_ChildNodes.begin(), m_Parent->m_ChildNodes.end(),
-                    [&](std::unique_ptr<Node>& a_Child) {return a_Child.get() == &a_Other; }));
-            }*/
+            Node* AddChild();
 
-            Node* AddChild()
-            {
-                m_ChildNodes.push_back(std::make_unique<Node>());
-                m_Transform.AddChild(m_ChildNodes.back()->m_Transform);
-                m_ChildNodes.back()->m_Parent = this;
-                return m_ChildNodes.back().get();
-            }
+            void AddChild(std::unique_ptr<Lumen::ILumenScene::Node>& a_Node);
+            void RemoveChild(std::unique_ptr<Lumen::ILumenScene::Node>& a_Node);
+
+            Node* GetFirstIntermediateNode(const Node* a_ParentNode) const;
+
+            bool IsChildOf(const Node& a_Node) const;
 
             Transform m_Transform; 
             std::string m_Name;
             Node* m_Parent;
+            ILumenScene* m_ScenePtr; // Initialized to the scene pointer for the root node 
             std::vector<std::unique_ptr<Node>> m_ChildNodes;
             Lumen::MeshInstance* m_MeshInstancePtr;
             Lumen::VolumeInstance* m_VolumeInstancePtr;

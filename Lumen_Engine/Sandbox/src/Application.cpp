@@ -155,7 +155,7 @@ public:
 		std::string p_string3{ p3.string() };
 		std::replace(p_string3.begin(), p_string3.end(), '\\', '/');
 
-		const std::string meshPath = p_string.append("/Sandbox/assets/models/Sponza/");
+		const std::string meshPath = p_string.append("/Sandbox/assets/models/Tavern/");
 		//const std::string meshPath = p_string.append("/Sandbox/assets/gltfExternalAssets/Benchmark_Scenes/FlyingWorld_BattleOfTheTrashGod/");
 		const std::string meshPath2 = p_string2.append("/Sandbox/assets/models/EmissiveSphere/");
 		//const std::string meshPath3 = p_string3.append("/Sandbox/assets/models/knight/");
@@ -163,7 +163,7 @@ public:
 
 		//Mesh name
 		//const std::string meshName = "Bistro4.gltf";
-		const std::string meshName = "Sponza.gltf";
+		const std::string meshName = "scene.gltf";
 		const std::string meshName2 = "EmissiveSphere.gltf";
 		//const std::string meshName3 = "scene.gltf";
 
@@ -208,13 +208,13 @@ public:
 		lightsNode->m_Name = "Lights";
 
 		//lumenPT->m_Scene->m_RootNodes[0].m_Transform.AddChild(lightsNode.m_Transform);
-		for(int i = 0; i < 30; ++i)
-		{
-			mesh->m_Transform.SetScale(glm::vec3{ 1.f });
-			//mesh->m_Transform.SetScale(mesh->m_Transform.GetScale() * 10.f);
-			mesh->SetEmissiveness({ Lumen::EmissionMode::ENABLED, {1.f, 1.f, 1.f}, 6.f });
-			mesh->UpdateAccelRemoveThis();
-		}
+		//for(int i = 0; i < 30; ++i)
+		//{
+		//	mesh->m_Transform.SetScale(glm::vec3{ 1.f });
+		//	//mesh->m_Transform.SetScale(mesh->m_Transform.GetScale() * 10.f);
+		//	mesh->SetEmissiveness({ Lumen::EmissionMode::ENABLED, {1.f, 1.f, 1.f}, 6.f });
+		//	mesh->UpdateAccelRemoveThis();
+		//}
 		
 		for(int i = 0; i < 120; ++i)
 		{

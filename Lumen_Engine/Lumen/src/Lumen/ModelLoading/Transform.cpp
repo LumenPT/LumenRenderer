@@ -14,6 +14,7 @@ Lumen::Transform::Transform()
     , m_LocalMatrixDirty(true)
     , m_LocalMatrix(0.0f)
     , m_Parent(nullptr)
+    , m_ID(m_IdCount++)
 {
 
 }
@@ -24,6 +25,7 @@ Lumen::Transform::Transform(const glm::mat4& a_TransformationMatrix)
     , m_WorldMatrix(a_TransformationMatrix)
     , m_WorldMatrixDirty(false)
     , m_Parent(nullptr)
+    , m_ID(m_IdCount++)
 {
     Decompose();
 }
@@ -60,6 +62,7 @@ Lumen::Transform& Lumen::Transform::operator=(const Transform& a_Other)
     m_Scale = a_Other.m_Scale;
     m_LocalMatrix = a_Other.m_LocalMatrix;
     m_WorldMatrixDirty = a_Other.m_WorldMatrixDirty;
+    m_ID = m_IdCount++;
 
     m_Parent = a_Other.m_Parent;
     if (m_Parent)
@@ -72,6 +75,7 @@ Lumen::Transform& Lumen::Transform::operator=(const Transform& a_Other)
 
 Lumen::Transform& Lumen::Transform::operator=(const glm::mat4& a_TransformationMatrix)
 {
+    m_ID = m_IdCount++;
     m_Parent = nullptr;
     m_LocalMatrix = a_TransformationMatrix;
     Decompose();
@@ -192,23 +196,20 @@ Lumen::Transform& Lumen::Transform::operator*=(const Lumen::Transform& a_Other)
 
 void Lumen::Transform::SetParent(Transform* a_ParentTransform)
 {
-    if (m_Parent)
-        m_Parent->RemoveChild(*this);
-
-    m_Parent = a_ParentTransform;
+    SetParentInternal(a_ParentTransform);
     m_Parent->AddChildInternal(*this);
     MakeWorldDirty();
 }
 
 void Lumen::Transform::AddChild(Transform& a_ChildTransform)
 {
-    m_Children.push_back(&a_ChildTransform);
+    AddChildInternal(a_ChildTransform);
     a_ChildTransform.SetParentInternal(this);
 }
 
 void Lumen::Transform::RemoveChild(Transform& a_ChildTransform)
 {
-    m_Children.erase(std::find(m_Children.begin(), m_Children.end(), &a_ChildTransform));
+    RemoveChildInternal(a_ChildTransform);
     a_ChildTransform.SetParentInternal(nullptr);
 
     //TODO: Do we WANT to keep the child in its current world transform?
@@ -217,13 +218,23 @@ void Lumen::Transform::RemoveChild(Transform& a_ChildTransform)
 
 void Lumen::Transform::SetParentInternal(Transform* a_ParentTransform)
 {
+    auto prevParent = m_Parent;
     m_Parent = a_ParentTransform;
+    if (prevParent)
+        prevParent->RemoveChildInternal(*this);
     MakeWorldDirty();
 }
 
 void Lumen::Transform::AddChildInternal(Transform& a_ChildTransform)
 {
     m_Children.push_back(&a_ChildTransform);
+}
+
+void Lumen::Transform::RemoveChildInternal(Transform& a_ChildTransform)
+{
+    auto fIter = std::find(m_Children.begin(), m_Children.end(), &a_ChildTransform);
+    if (fIter != m_Children.end())
+        m_Children.erase(fIter);
 }
 
 

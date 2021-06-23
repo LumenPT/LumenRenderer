@@ -262,6 +262,7 @@ Lumen::SceneManager::GLTFResource LumenPTModelConverter::LoadFile(std::string a_
 			for (size_t j = 0; j < sceneHeader.m_NumRootNodes; j++)
 			{
 				scene->m_RootNodes.push_back(LoadNode(ifs, res, *scene, nullptr));
+				scene->m_RootNodes.back()->m_ScenePtr = scene.get();
 			}
 		}
 	}
@@ -968,9 +969,12 @@ void LumenPTModelConverter::LoadNode(const fx::gltf::Document& a_FxDoc, uint32_t
 	hNode->m_Name = node.name;
 	hNode->m_Header.m_MeshId = node.mesh;	    
 
+	int index = 0;
     for (auto& ch : node.children)
     {
+		printf("[File Conversion] Now loading child node %i of %i.\n", index, static_cast<int>(node.children.size()) - 1);
 		LoadNode(a_FxDoc, ch, a_Scene, hNode);
+		++index;
     }
 
 	auto mat = localTransform.GetLocalTransformationMatrix();
@@ -979,14 +983,11 @@ void LumenPTModelConverter::LoadNode(const fx::gltf::Document& a_FxDoc, uint32_t
 
 	hNode->m_Header.m_NumChildren = hNode->m_ChildNodes.size();
 	hNode->m_Header.m_NameLength = hNode->m_Name.size();
-	int index = 0;
 
-    for (auto& ch : node.children)
-    {
-		printf("[File Conversion] Now loading child node %i of %i.\n", index, static_cast<int>(node.children.size()) - 1);
-		LoadNode(a_FxDoc, ch, a_Scene, worldTransform);
-		++index;
-    }
+  //  for (auto& ch : node.children)
+  //  {
+		//LoadNode(a_FxDoc, ch, a_Scene, worldTransform);
+  //  }
 }
 
 Lumen::Transform LumenPTModelConverter::LoadNodeTransform(const fx::gltf::Node& a_Node)

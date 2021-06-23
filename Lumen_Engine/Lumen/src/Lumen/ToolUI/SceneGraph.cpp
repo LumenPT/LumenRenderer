@@ -298,6 +298,11 @@ void Lumen::SceneGraph::InstanceSelection(Lumen::ILumenScene& a_Scene)
 
     auto trimmed = std::string(m_SearchString.begin(), m_SearchString.begin() + m_SearchString.find(char(0)));
 
+    for (auto& c : trimmed)
+    {
+        c = std::tolower(c);
+    }
+
     if (ImGui::ListBoxHeader("", ImVec2(m_GraphSize.x, m_GraphSize.y)))
     {
         std::map<std::string, uint32_t> names;
@@ -310,7 +315,15 @@ void Lumen::SceneGraph::InstanceSelection(Lumen::ILumenScene& a_Scene)
             else
                 instanceName += std::to_string(names[meshInstance->m_Name]);
 
-            if (trimmed.empty() || instanceName.find(trimmed) != std::string::npos)
+            std::string lowerCase;
+            lowerCase.reserve(instanceName.size());
+
+            for (char& c : instanceName)
+            {
+                lowerCase.push_back(std::tolower(c));
+            }
+
+            if (trimmed.empty() || lowerCase.find(trimmed) != std::string::npos)
                 if (ImGui::Selectable(instanceName.c_str(), m_SelectedMeshInstance == meshInstance.get()))
                 {
                     m_SelectedMeshInstance = meshInstance.get();
@@ -422,19 +435,32 @@ void Lumen::SceneGraph::DisplayNode(Lumen::ILumenScene::Node& a_Node, std::map<s
     if (dd.m_Dest && dd.m_Target)
     {
         auto trg = dd.m_Target;
-        size_t index = 0;
-        for (size_t i = 0; i < dd.m_Source->m_ChildNodes.size(); i++)
+        ILumenScene::Node* toMove = nullptr;
+        if (dd.m_Source)
         {
-            if (dd.m_Source->m_ChildNodes[i].get() == trg)
+            for (size_t i = 0; i < dd.m_Source->m_ChildNodes.size(); i++)
             {
-                index = i;
-                break;
+                if (dd.m_Source->m_ChildNodes[i].get() == trg)
+                {
+                    toMove = dd.m_Source->m_ChildNodes[i].release(); // Manually move the pointer if it exists
+                    dd.m_Source->m_ChildNodes.erase(dd.m_Source->m_ChildNodes.begin() + i);
+                    break;
+                }
             }
         }
-        dd.m_Dest->m_ChildNodes.push_back(std::make_unique<ILumenScene::Node>(std::move(*dd.m_Source->m_ChildNodes[index])));
-        dd.m_Dest->m_Transform.AddChild(dd.m_Target->m_Transform);
-        dd.m_Source->m_ChildNodes.erase(dd.m_Source->m_ChildNodes.begin() + index);
-        dd.m_Target->m_Parent = dd.m_Dest;
+        else
+            toMove = dd.m_Target;
+
+        auto destIsChildOfSrc = dd.m_Dest->IsChildOf(*dd.m_Target);
+        if (!destIsChildOfSrc)
+        {
+            dd.m_Dest->m_ChildNodes.push_back(std::unique_ptr<ILumenScene::Node>(toMove));
+            dd.m_Dest->m_Transform.AddChild(dd.m_Target->m_Transform);
+            dd.m_Target->m_Parent = dd.m_Dest;
+
+            printf("Parent node changed\n");            
+        }
+
         // TODO: Brokie
     }
 
@@ -447,8 +473,9 @@ void Lumen::SceneGraph::DisplayNode(Lumen::ILumenScene::Node& a_Node, std::map<s
     if (!collapsed)
     {
         ImGui::Indent();
-        for (auto& child : a_Node.m_ChildNodes)
+        for (size_t i = 0; i < a_Node.m_ChildNodes.size(); i++)
         {
+            auto& child = a_Node.m_ChildNodes[i];
             DisplayNode(*child, a_NameMap, a_Depth + 1);
         }
         ImGui::Unindent();

@@ -109,11 +109,12 @@ namespace Lumen // BYOUTIFUL KARTOSHKA
         void RemoveChild(Transform& a_ChildTransform);
 
         static uint64_t m_IdCount;
-        const uint64_t m_ID = m_IdCount++;
+        uint64_t m_ID;
     private:
 
-        void AddChildInternal(Transform& a_ChildTransform);
         void SetParentInternal(Transform* a_ParentTransform);
+        void AddChildInternal(Transform& a_ChildTransform);
+        void RemoveChildInternal(Transform& a_ChildTransform);
 
         void MakeWorldDirty();
         void MakeLocalDirty();
