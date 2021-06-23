@@ -844,6 +844,9 @@ namespace WaveFront
             //Post processing using CUDA kernel.
             //PostProcess(postProcessLaunchParams);
 
+            NRDWrapperEvaluateParams nrdParams = {};
+            m_NRD->Denoise(nrdParams);
+
             MergeOutput(postProcessLaunchParams);
             cudaDeviceSynchronize();
             CHECKLASTCUDAERROR;
