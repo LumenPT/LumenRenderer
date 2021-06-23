@@ -1,9 +1,12 @@
 #include "GPUShadingKernels.cuh"
 #include "../VolumetricKernels/GPUVolumetricShadingKernels.cuh"
 #include "../../Shaders/CppCommon/RenderingUtility.h"
+#include "../../Shaders/CppCommon/Half4.h"
 #include <device_launch_parameters.h>
 #include <sutil/vec_math.h>
 #include "../disney.cuh"
+
+
 
 CPU_ON_GPU void ResolveDirectLightHits(
     const SurfaceData* a_SurfaceDataBuffer,
@@ -17,25 +20,23 @@ CPU_ON_GPU void ResolveDirectLightHits(
 
     if(pixelX < a_Resolution.x && pixelY < a_Resolution.y)
     {
-
         const unsigned int pixelDataIndex = PIXEL_DATA_INDEX(pixelX, pixelY, a_Resolution.x);
 
         auto& pixelData = a_SurfaceDataBuffer[pixelDataIndex];
         //If the surface is emissive, store its light directly in the output buffer.
         if (pixelData.m_SurfaceFlags & SURFACE_FLAG_EMISSIVE)
         {
-            surf2DLayeredwrite<float4>(
-                pixelData.m_MaterialData.m_Color,
+
+            half4Ushort4 color{ (pixelData.m_MaterialData.m_Color, 1.f) };
+            surf2Dwrite<ushort4>(
+                color.m_Ushort4,
                 a_Output,
-                pixelX * sizeof(float4),
+                pixelX * sizeof(ushort4),
                 pixelY,
-                static_cast<unsigned int>(LightChannel::DIRECT),
                 cudaBoundaryModeTrap);
         }
 
     }
-
-    
 }
 
 CPU_ON_GPU void ShadeDirect(
@@ -47,7 +48,7 @@ CPU_ON_GPU void ShadeDirect(
     const CDF* const a_CDF,
     AtomicBuffer<ShadowRayData>* const a_ShadowRays,
     AtomicBuffer<ShadowRayData>* const a_VolumetricShadowRays,
-	cudaSurfaceObject_t a_Output
+	cudaSurfaceObject_t a_VolumetricOutput
 )
 {
 
@@ -62,7 +63,15 @@ CPU_ON_GPU void ShadeDirect(
     {
 
         //TODO: return some form of light transform factor after resolving the distances in the volume.
-        VolumetricShadeDirect({ pixelX, pixelY }, a_ResolutionAndDepth, a_VolumetricDataBuffer, a_VolumetricShadowRays, a_Lights, seed, a_CDF, a_Output);
+        VolumetricShadeDirect(
+            { pixelX, pixelY }, 
+            a_ResolutionAndDepth, 
+            a_VolumetricDataBuffer, 
+            a_VolumetricShadowRays, 
+            a_Lights,
+            seed,
+            a_CDF, 
+            a_VolumetricOutput);
 
         // Get intersection.
         

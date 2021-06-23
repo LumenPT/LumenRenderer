@@ -126,6 +126,9 @@ private:
         {"2160p", glm::uvec2(3840, 2160)}
     };
 
+    int m_Dlss_SelectedMode = 2;    // 2 translates to "BALANCED" dlss mode 
+    bool m_BlendMode = false;
+
     std::vector<std::unique_ptr<FrameSnapshot>> m_FrameSnapshots;
     int m_CurrentSnapShotIndex;
     const std::pair<const std::string, FrameSnapshot::ImageBuffer>* m_CurrentImageBuffer;

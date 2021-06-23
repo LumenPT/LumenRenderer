@@ -90,8 +90,6 @@ std::unique_ptr<AccelerationStructure> OptixWrapper::BuildInstanceAccelerationSt
     buildInput.type = OPTIX_BUILD_INPUT_TYPE_INSTANCES;
     buildInput.instanceArray.instances = *instanceBuffer;
     buildInput.instanceArray.numInstances = static_cast<uint32_t>(a_Instances.size());
-    buildInput.instanceArray.aabbs = 0;
-    buildInput.instanceArray.numAabbs = 0;
 
     OptixAccelBuildOptions buildOptions = {};
     // Based on research, it is more efficient to continuously be rebuilding most instance acceleration structures rather than to update them
@@ -335,7 +333,7 @@ OptixModule OptixWrapper::CreateModule(const std::filesystem::path& a_PtxPath, c
 {
 
     OptixModuleCompileOptions moduleOptions = {};
-    moduleOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_LINEINFO;
+    moduleOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_FULL;
     moduleOptions.maxRegisterCount = OPTIX_COMPILE_DEFAULT_MAX_REGISTER_COUNT;
     moduleOptions.optLevel = OPTIX_COMPILE_OPTIMIZATION_LEVEL_0;
 
@@ -356,7 +354,7 @@ OptixModule OptixWrapper::CreateModule(const std::filesystem::path& a_PtxPath, c
 
     OptixResult error{};
 
-    CHECKOPTIXRESULT(error = optixModuleCreateFromPTX(
+    error = optixModuleCreateFromPTX(
         m_DeviceContext,
         &moduleOptions,
         &a_PipelineOptions,
@@ -364,11 +362,12 @@ OptixModule OptixWrapper::CreateModule(const std::filesystem::path& a_PtxPath, c
         source.size(),
         log,
         &logSize,
-        &module));
+        &module);
 
     if (error)
     {
         puts(log);
+        CHECKOPTIXRESULT(error);
         abort();
     }
 

@@ -1,6 +1,7 @@
 #pragma once
 #include "../../Shaders/CppCommon/CudaDefines.h"
 #include "../../Shaders/CppCommon/WaveFrontDataStructs.h"
+#include "../../Shaders/CppCommon/ArrayParameter.h"
 
 using namespace WaveFront;
 
@@ -22,7 +23,8 @@ CPU_ON_GPU void GeneratePrimaryRay(
     float3 a_W,
     float3 a_Eye,
     uint2 a_Dimensions,
-    unsigned int a_FrameCount);
+    unsigned int a_FrameCount,
+    cudaSurfaceObject_t a_JitterOutput);
 
 CPU_ON_GPU void ExtractSurfaceDataGpu(unsigned a_NumIntersections,
     AtomicBuffer<IntersectionData>* a_IntersectionData,
@@ -30,6 +32,13 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(unsigned a_NumIntersections,
     SurfaceData* a_OutPut,
     uint2 a_Resolution,
     SceneDataTableAccessor* a_SceneDataTable);
+
+    
+CPU_ON_GPU void ExtractDepthDataGpu(
+    const SurfaceData* a_SurfaceData,
+    cudaSurfaceObject_t a_DepthOutPut,
+    uint2 a_Resolution,
+    float2 a_MinMaxDistance);
 
 //Called during shading
 
@@ -47,7 +56,7 @@ CPU_ON_GPU void ShadeDirect(
     const CDF* const a_CDF,
     AtomicBuffer<ShadowRayData>* const a_ShadowRays,
     AtomicBuffer<ShadowRayData>* const a_VolumetricShadowRays,
-    cudaSurfaceObject_t a_Output		//TODO: remove a_Output
+    cudaSurfaceObject_t a_VolumetricOutput		//TODO: remove a_Output
     );
 
 /*
@@ -95,7 +104,7 @@ CPU_ON_GPU void Denoise();
  */
 CPU_ON_GPU void MergeOutputChannels(
     const uint2 a_Resolution,
-    const cudaSurfaceObject_t a_Input,
+    const ArrayParameter<cudaSurfaceObject_t, static_cast<unsigned>(LightChannel::NUM_CHANNELS)> a_Input,
     const cudaSurfaceObject_t a_Output,
     const bool a_BlendOutput,
     const unsigned a_BlendCount
@@ -118,8 +127,17 @@ CPU_ON_GPU void WriteToOutput(
     uchar4* a_Output
 );
 
-CPU_ON_GPU void GenerateMotionVector(
-    MotionVectorBuffer* a_Buffer,
+CPU_ON_GPU void PrepareOptixDenoisingGPU(
+    const uint2 a_RenderResolution,
     const SurfaceData* a_CurrentSurfaceData,
-    uint2 a_Resolution,
-    sutil::Matrix4x4 a_PrevViewProjMatrix);
+    const cudaSurfaceObject_t a_PixelBufferSingleChannel,
+    float3* a_IntermediaryInput,
+    float3* a_AlbedoInput,
+    float3* a_NormalInput,
+    float3* a_IntermediaryOutput);
+
+CPU_ON_GPU void FinishOptixDenoisingGPU(
+    const uint2 a_RenderResolution,
+    const cudaSurfaceObject_t a_PixelBufferSingleChannel,
+    float3* a_IntermediaryInput,
+    float3* a_IntermediaryOutput);

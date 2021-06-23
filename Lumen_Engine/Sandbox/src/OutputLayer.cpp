@@ -275,7 +275,7 @@ void OutputLayer::OnImGuiRender()
 	{
 		ImGui::Begin("Debug viewport");
 
-		ImGuiUtil::DisplayImage(m_Renderer->m_DebugTexture, glm::ivec2(400, 300));
+		ImGuiUtil::DisplayImage(m_Renderer->m_DebugTexture, glm::ivec2(600, 450));
 
 		ImGui::End();
     }
@@ -437,15 +437,36 @@ void OutputLayer::HandleCameraInput(Camera& a_Camera)
 		return;
 	}
 
-    if (!ImGui::IsAnyItemHovered() && !ImGui::IsAnyItemActive() && Lumen::Input::IsMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT))
+	if (m_Renderer->GetBlendMode() != m_BlendMode)
 	{
-		auto delta = Lumen::Input::GetMouseDelta();
-
-		a_Camera.IncrementYaw(-glm::radians(delta.first * m_CameraMouseSensitivity));
-		a_Camera.IncrementPitch(glm::radians(delta.second * m_CameraMouseSensitivity));
-
+		m_Renderer->SetBlendMode(m_BlendMode);
 	}
 
+	//Toggle between merging and not merging output.
+	static std::chrono::time_point<std::chrono::steady_clock> lastToggle = std::chrono::high_resolution_clock::now();
+	if (Lumen::Input::IsKeyPressed(LMN_KEY_P))
+	{
+		//Don't spam it, just toggle once every 500 millis.
+		auto now = std::chrono::high_resolution_clock::now();
+		if (std::chrono::duration_cast<std::chrono::milliseconds>(now - lastToggle).count() > 500)
+		{
+			lastToggle = now;
+			m_Renderer->SetBlendMode(!m_Renderer->GetBlendMode());
+			printf("Output append mode is now %s.\n", (m_Renderer->GetBlendMode() ? "on" : "off"));
+			m_BlendMode = m_Renderer->GetBlendMode();
+		}
+	}
+
+    if (!ImGui::IsAnyItemActive() && Lumen::Input::IsMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT))
+	{
+		auto delta = Lumen::Input::GetMouseDelta();
+		if (delta.first != 0 || delta.second != 0)
+		{
+			a_Camera.IncrementYaw(-glm::radians(delta.first * m_CameraMouseSensitivity));
+			a_Camera.IncrementPitch(glm::radians(delta.second * m_CameraMouseSensitivity));
+			m_Renderer->SetBlendMode(false);
+		}
+	}
 
 	float movementSpeed = m_CameraMovementSpeed / 60.f;
 	
@@ -478,23 +499,12 @@ void OutputLayer::HandleCameraInput(Camera& a_Camera)
 		movementDirection += glm::normalize(V) * movementSpeed;
 	}
 
-	//Toggle between merging and not merging output.
-	static std::chrono::time_point<std::chrono::steady_clock> lastToggle = std::chrono::high_resolution_clock::now();
-	if (Lumen::Input::IsKeyPressed(LMN_KEY_P))
-	{
-		//Don't spam it, just toggle once every 500 millis.
-		auto now = std::chrono::high_resolution_clock::now();
-		if (std::chrono::duration_cast<std::chrono::milliseconds>(now - lastToggle).count() > 500)
-		{
-		    lastToggle = now;
-		    m_Renderer->SetBlendMode(!m_Renderer->GetBlendMode());
-			printf("Output append mode is now %s.\n", (m_Renderer->GetBlendMode() ? "on" : "off"));
-		}
-	}
+	
 
 	if(glm::length(movementDirection))
 	{
 		a_Camera.SetPosition(eye + glm::normalize(movementDirection) * movementSpeed);
+		m_Renderer->SetBlendMode(false);
 	}
 
 	constexpr float rotationSpeed = 100.f * (1.0f / 60.f);
@@ -535,6 +545,9 @@ void OutputLayer::ImGuiCameraSettings()
 	ImGui::DragFloat("Camera Movement Speed", &m_CameraMovementSpeed, 0.1f, 0.0f);
 
 	ImGui::SliderFloat("Gamma strength/Brightness", &m_Gamma, 1.0f, 4.0f);
+
+	ImGui::Combo("DLSS setting", &m_Dlss_SelectedMode, "Off\0Max performance\0Balanced\0Max quality\0Ultra performance\0Ultra quality\0");
+	m_Renderer->m_DlssMode = m_Dlss_SelectedMode;
 
 	ImGui::End();
 }

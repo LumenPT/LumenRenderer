@@ -1,6 +1,6 @@
 
 /*
- * Copyright (c) 2020 NVIDIA Corporation.  All rights reserved.
+ * Copyright (c) 2021 NVIDIA Corporation.  All rights reserved.
  *
  * NVIDIA Corporation and its licensors retain all intellectual property and proprietary
  * rights in and to this software, related documentation and any modifications thereto.
@@ -86,7 +86,7 @@ typedef unsigned int OptixVisibilityMask;
 /// Alignment requirement for OptixBuildInputInstanceArray::instances.
 #define OPTIX_INSTANCE_BYTE_ALIGNMENT 16ull
 
-/// Alignment requirement for OptixBuildInputCustomPrimitiveArray::aabbBuffers and OptixBuildInputInstanceArray::aabbs.
+/// Alignment requirement for OptixBuildInputCustomPrimitiveArray::aabbBuffers
 #define OPTIX_AABB_BUFFER_BYTE_ALIGNMENT 8ull
 
 /// Alignment requirement for OptixBuildInputTriangleArray::preTransform
@@ -97,6 +97,9 @@ typedef unsigned int OptixVisibilityMask;
 
 /// Maximum number of registers allowed. Defaults to no explicit limit.
 #define OPTIX_COMPILE_DEFAULT_MAX_REGISTER_COUNT 0
+
+/// Maximum number of payload values allowed.
+#define OPTIX_COMPILE_DEFAULT_MAX_PAYLOAD_VALUE_COUNT 8
 
 
 /// Result codes returned from API functions
@@ -121,6 +124,7 @@ typedef enum OptixResult
     OPTIX_ERROR_LAUNCH_FAILURE                  = 7050,
     OPTIX_ERROR_INVALID_DEVICE_CONTEXT          = 7051,
     OPTIX_ERROR_CUDA_NOT_INITIALIZED            = 7052,
+    OPTIX_ERROR_VALIDATION_FAILURE              = 7053,
     OPTIX_ERROR_INVALID_PTX                     = 7200,
     OPTIX_ERROR_INVALID_LAUNCH_PARAMETER        = 7201,
     OPTIX_ERROR_INVALID_PAYLOAD_ACCESS          = 7202,
@@ -129,6 +133,7 @@ typedef enum OptixResult
     OPTIX_ERROR_INVALID_FUNCTION_ARGUMENTS      = 7205,
     OPTIX_ERROR_PIPELINE_OUT_OF_CONSTANT_MEMORY = 7250,
     OPTIX_ERROR_PIPELINE_LINK_ERROR             = 7251,
+    OPTIX_ERROR_ILLEGAL_DURING_TASK_EXECUTE     = 7270,
     OPTIX_ERROR_INTERNAL_COMPILER_ERROR         = 7299,
     OPTIX_ERROR_DENOISER_MODEL_NOT_SET          = 7300,
     OPTIX_ERROR_DENOISER_NOT_INITIALIZED        = 7301,
@@ -139,6 +144,7 @@ typedef enum OptixResult
     OPTIX_ERROR_INVALID_ENTRY_FUNCTION_OPTIONS  = 7803,
     OPTIX_ERROR_LIBRARY_NOT_FOUND               = 7804,
     OPTIX_ERROR_ENTRY_SYMBOL_NOT_FOUND          = 7805,
+    OPTIX_ERROR_LIBRARY_UNLOAD_FAILURE          = 7806,
     OPTIX_ERROR_CUDA_ERROR                      = 7900,
     OPTIX_ERROR_INTERNAL_ERROR                  = 7990,
     OPTIX_ERROR_UNKNOWN                         = 7999,
@@ -209,6 +215,19 @@ typedef enum OptixDeviceProperty
 /// \see #optixDeviceContextSetLogCallback(), #OptixDeviceContextOptions
 typedef void ( *OptixLogCallback )( unsigned int level, const char* tag, const char* message, void* cbdata );
 
+/// Validation mode settings.
+///
+/// When enabled, certain device code utilities will be enabled to provide as good debug and
+/// error checking facilities as possible.
+///
+///
+/// \see #optixDeviceContextCreate()
+typedef enum OptixDeviceContextValidationMode
+{
+    OPTIX_DEVICE_CONTEXT_VALIDATION_MODE_OFF = 0,
+    OPTIX_DEVICE_CONTEXT_VALIDATION_MODE_ALL = 0xFFFFFFFF
+} OptixDeviceContextValidationMode;
+
 /// Parameters used for #optixDeviceContextCreate()
 ///
 /// \see #optixDeviceContextCreate()
@@ -220,10 +239,12 @@ typedef struct OptixDeviceContextOptions
     void* logCallbackData;
     /// Maximum callback level to generate message for (see #OptixLogCallback)
     int logCallbackLevel;
+    /// Validation mode of context.
+    OptixDeviceContextValidationMode validationMode;
 } OptixDeviceContextOptions;
 
 /// Flags used by #OptixBuildInputTriangleArray::flags
-/// and #OptixBuildInputCurveArray::flags
+/// and #OptixBuildInputCurveArray::flag
 /// and #OptixBuildInputCustomPrimitiveArray::flags
 typedef enum OptixGeometryFlags
 {
@@ -527,57 +548,6 @@ typedef struct OptixBuildInputInstanceArray
 
     /// Number of elements in #OptixBuildInputInstanceArray::instances.
     unsigned int numInstances;
-
-    /// Optional AABBs.  In OptixAabb format.
-    ///
-    /// Required for traversables (OptixMatrixMotionTransform, OptixSRTMotionTransform,
-    /// OptixStaticTransform) and certain configurations of motion AS as instance.
-    /// Will be ignored for non-motion AS, since no AABBs are required. May be NULL in that case.
-    ///
-    /// The following table illustrates this (IAS is Instance Acceleration Structure)
-    /// instance type          |  traversable | motion AS | static AS
-    /// building a motion  IAS |   required   | required  | ignored
-    /// building a static  IAS |   required   | ignored   | ignored
-    ///
-    /// The AABBs must enclose the space spanned by the referenced handle of the instance.
-    /// I.e., the AABBs are in 'object space' and must NOT include the transformation of the
-    /// instance itself. If the instance's handle references a traversable the AABBs must
-    /// contain the transformation of the traversable.
-    ///
-    /// If OptixBuildInput::type is OPTIX_BUILD_INPUT_TYPE_INSTANCE_POINTERS the unused
-    /// pointers for unused aabbs may be set to NULL.
-    ///
-    /// If OptixBuildInput::type is OPTIX_BUILD_INPUT_TYPE_INSTANCES this pointer must be a
-    /// multiple of OPTIX_AABB_BUFFER_BYTE_ALIGNMENT.  If OptixBuildInput::type is
-    /// OPTIX_BUILD_INPUT_TYPE_INSTANCE_POINTERS the array elements must be a multiple of
-    /// OPTIX_AABB_BUFFER_BYTE_ALIGNMENT.
-    ///
-    /// Motion:
-    ///
-    /// In case of motion (OptixMotionOptions::numKeys>=2), OptixMotionOptions::numKeys
-    /// aabbs are expected per instance, e.g., for N instances and M motion keys:
-    /// aabb[inst0][t0], aabb[inst0][t1], ..., aabb[inst0][tM-1], ..., aabb[instN-1][t0],
-    /// aabb[instN-1][t1],..., aabb[instN-1][tM-1].
-    ///
-    /// If OptixBuildInput::type is OPTIX_BUILD_INPUT_TYPE_INSTANCES aabbs must be a device
-    /// pointer to an array of N * M * 6 floats.
-    ///
-    /// If OptixBuildInput::type is OPTIX_BUILD_INPUT_TYPE_INSTANCE_POINTERS aabbs must be
-    /// a device pointer to an array of N device pointers, each pointing to an array of M *
-    /// 6 floats in OptixAabb format.  Pointers may be NULL if the aabbs are not required.
-    /// Hence, if the second instance (inst1) points to a static GAS, aabbs are not
-    /// required for that instance.  While being ignored, aabbs must still be a device
-    /// pointer to an array of N elements.
-    ///
-    /// In case of OPTIX_BUILD_INPUT_TYPE_INSTANCES, the second element (with a size of M *
-    /// 6 floats) will be ignored.  In case of OPTIX_BUILD_INPUT_TYPE_INSTANCE_POINTERS,
-    /// the second element (with a size of pointer to M * 6 floats) can be NULL.
-    CUdeviceptr aabbs;
-
-    /// number of aabbs, in case of motion, this needs to match
-    /// numInstances multiplied with OptixMotionOptions::numKeys
-    unsigned int numAabbs;
-
 } OptixBuildInputInstanceArray;
 
 /// Enum to distinguish the different build input types.
@@ -710,8 +680,16 @@ typedef enum OptixBuildFlags
 
     OPTIX_BUILD_FLAG_PREFER_FAST_BUILD = 1u << 3,
 
-    /// Allow access to random baked vertex in closesthit
+    /// Allow random access to build input vertices
+    /// See optixGetTriangleVertexData
+    ///     optixGetLinearCurveVertexData
+    ///     optixGetQuadraticBSplineVertexData
+    ///     optixGetCubicBSplineVertexData
     OPTIX_BUILD_FLAG_ALLOW_RANDOM_VERTEX_ACCESS = 1u << 4,
+
+    /// Allow random access to instances
+    /// See optixGetInstanceTraversableFromIAS
+    OPTIX_BUILD_FLAG_ALLOW_RANDOM_INSTANCE_ACCESS = 1u << 5,
 } OptixBuildFlags;
 
 /// Enum to specify the acceleration build operation.
@@ -901,20 +879,24 @@ typedef struct OptixMatrixMotionTransform
 /// An SRT transformation can represent a smooth rotation with fewer motion keys than a matrix transformation. Each
 /// motion key is constructed from elements taken from a matrix S, a quaternion R, and a translation T.
 ///
-///                        [  sx   a   b  pvx ]
-/// The scaling matrix S = [   0  sy   c  pvy ] defines an affine transformation that can include scale, shear, and a
-///                        [   0   0  sz  pvz ]
-///
-/// translation. The translation allows to define the pivot point for the subsequent rotation.
+/// The scaling matrix
+/// \f$S = \begin{bmatrix} sx & a & b & pvx \\ 0 & sy & c & pvy \\ 0 & 0  & sz & pvz \end{bmatrix}\f$
+//      [ sx   a   b  pvx ]
+//  S = [  0  sy   c  pvy ]
+//      [  0   0  sz  pvz ]
+/// defines an affine transformation that can include scale, shear, and a translation.
+/// The translation allows to define the pivot point for the subsequent rotation.
 ///
 /// The quaternion R = [ qx, qy, qz, qw ] describes a rotation  with angular component qw = cos(theta/2) and other
 /// components [ qx, qy, qz ] = sin(theta/2) * [ ax, ay, az ] where the axis [ ax, ay, az ] is normalized.
 ///
-///                     [  1  0  0 tx ]
-/// The translation T = [  0  1  0 ty ] defines another translation that is applied after the rotation. Typically, this
-///                     [  0  0  1 tz ]
-///
-/// translation includes the inverse translation from the matrix S to reverse its effect.
+/// The translation matrix
+/// \f$T = \begin{bmatrix} 1 & 0 & 0 & tx \\ 0 & 1 & 0 & ty \\ 0 & 0 & 1 & tz \end{bmatrix}\f$
+//      [  1  0  0 tx ]
+//  T = [  0  1  0 ty ]
+//      [  0  0  1 tz ]
+/// defines another translation that is applied after the rotation. Typically, this translation includes
+/// the inverse translation from the matrix S to reverse the translation for the pivot point for R.
 ///
 /// To obtain the effective transformation at time t, the elements of the components of S, R, and T will be interpolated
 /// linearly. The components are then multiplied to obtain the combined transformation C = T * R * S. The transformation
@@ -997,8 +979,10 @@ typedef enum OptixTraversableType
 /// \see #OptixImage2D::format
 typedef enum OptixPixelFormat
 {
+    OPTIX_PIXEL_FORMAT_HALF2  = 0x2207,  ///< two halfs, XY
     OPTIX_PIXEL_FORMAT_HALF3  = 0x2201,  ///< three halfs, RGB
     OPTIX_PIXEL_FORMAT_HALF4  = 0x2202,  ///< four halfs, RGBA
+    OPTIX_PIXEL_FORMAT_FLOAT2 = 0x2208,  ///< two floats, XY
     OPTIX_PIXEL_FORMAT_FLOAT3 = 0x2203,  ///< three floats, RGB
     OPTIX_PIXEL_FORMAT_FLOAT4 = 0x2204,  ///< four floats, RGBA
     OPTIX_PIXEL_FORMAT_UCHAR3 = 0x2205,  ///< three unsigned chars, RGB
@@ -1025,33 +1009,23 @@ typedef struct OptixImage2D
     OptixPixelFormat format;
 } OptixImage2D;
 
-/// Input kinds used by the denoiser.
-///
-/// RGB(A) values less than zero will be clamped to zero.
-/// Albedo values must be in the range [0..1] (values less than zero will be clamped to zero).
-/// The normals must be transformed into screen space. The z component is not used.
-/// \see #OptixDenoiserOptions::inputKind
-typedef enum OptixDenoiserInputKind
-{
-    OPTIX_DENOISER_INPUT_RGB               = 0x2301,
-    OPTIX_DENOISER_INPUT_RGB_ALBEDO        = 0x2302,
-    OPTIX_DENOISER_INPUT_RGB_ALBEDO_NORMAL = 0x2303,
-} OptixDenoiserInputKind;
-
 /// Model kind used by the denoiser.
 ///
-/// \see #optixDenoiserSetModel()
+/// \see #optixDenoiserCreate
 typedef enum OptixDenoiserModelKind
 {
-    /// Use the model provided by the associated pointer.  See the programming guide for a
-    /// description of how to format the data.
-    OPTIX_DENOISER_MODEL_KIND_USER = 0x2321,
-
     /// Use the built-in model appropriate for low dynamic range input.
     OPTIX_DENOISER_MODEL_KIND_LDR = 0x2322,
 
     /// Use the built-in model appropriate for high dynamic range input.
     OPTIX_DENOISER_MODEL_KIND_HDR = 0x2323,
+
+    /// Use the built-in model appropriate for high dynamic range input and support for AOVs
+    OPTIX_DENOISER_MODEL_KIND_AOV = 0x2324,
+
+    /// Use the built-in model appropriate for high dynamic range input, temporally stable
+    OPTIX_DENOISER_MODEL_KIND_TEMPORAL = 0x2325,
+
 } OptixDenoiserModelKind;
 
 /// Options used by the denoiser
@@ -1059,18 +1033,69 @@ typedef enum OptixDenoiserModelKind
 /// \see #optixDenoiserCreate()
 typedef struct OptixDenoiserOptions
 {
-    /// The kind of denoiser input.
-    OptixDenoiserInputKind inputKind;
+    // if nonzero, albedo image must be given in OptixDenoiserGuideLayer
+    unsigned int guideAlbedo;
+
+    // if nonzero, normal image must be given in OptixDenoiserGuideLayer
+    unsigned int guideNormal;
 } OptixDenoiserOptions;
+
+/// Guide layer for the denoiser
+///
+/// \see #optixDenoiserInvoke()
+typedef struct OptixDenoiserGuideLayer
+{
+    // albedo/bsdf image
+    OptixImage2D  albedo;
+
+    // normal vector image (2d or 3d pixel format)
+    OptixImage2D  normal;
+
+    // 2d flow image, pixel flow from previous to current frame for each pixel
+    OptixImage2D  flow;
+} OptixDenoiserGuideLayer;
+
+/// Input/Output layers for the denoiser
+///
+/// \see #optixDenoiserInvoke()
+typedef struct OptixDenoiserLayer
+{
+    // input image (beauty or AOV)
+    OptixImage2D  input;
+
+    // denoised output image from previous frame if temporal model kind selected
+    OptixImage2D  previousOutput;
+
+    // denoised output for given input
+    OptixImage2D  output;
+} OptixDenoiserLayer;
 
 /// Various parameters used by the denoiser
 ///
 /// \see #optixDenoiserInvoke()
+/// \see #optixDenoiserComputeIntensity()
+/// \see #optixDenoiserComputeAverageColor()
 typedef struct OptixDenoiserParams
 {
+    /// if set to nonzero value, denoise alpha channel (if present) in first inputLayer image
     unsigned int denoiseAlpha;
+
+    /// average log intensity of input image (default null pointer). points to a single float.
+    /// with the default (null pointer) denoised results will not be optimal for very dark or
+    /// bright input images.
     CUdeviceptr  hdrIntensity;
+
+    /// blend factor.
+    /// If set to 0 the output is 100% of the denoised input. If set to 1, the output is 100% of
+    /// the unmodified input. Values between 0 and 1 will linearly interpolate between the denoised
+    /// and unmodified input.
     float        blendFactor;
+
+    /// this parameter is used when the OPTIX_DENOISER_MODEL_KIND_AOV model kind is set.
+    /// average log color of input image, separate for RGB channels (default null pointer).
+    /// points to three floats. with the default (null pointer) denoised results will not be
+    /// optimal.
+    CUdeviceptr  hdrAverageColor;
 } OptixDenoiserParams;
 
 /// Various sizes related to the denoiser.
@@ -1205,6 +1230,50 @@ typedef enum OptixCompileDebugLevel
     OPTIX_COMPILE_DEBUG_LEVEL_FULL     = 0x2352,
 } OptixCompileDebugLevel;
 
+
+
+
+/// Struct for specifying specializations for pipelineParams as specified in
+/// OptixPipelineCompileOptions::pipelineLaunchParamsVariableName.
+///
+/// The bound values are supposed to represent a constant value in the
+/// pipelineParams. OptiX will attempt to locate all loads from the pipelineParams and
+/// correlate them to the appropriate bound value, but there are cases where OptiX cannot
+/// safely or reliably do this. For example if the pointer to the pipelineParams is passed
+/// as an argument to a non-inline function or the offset of the load to the
+/// pipelineParams cannot be statically determined (e.g. accessed in a loop). No module
+/// should rely on the value being specialized in order to work correctly.  The values in
+/// the pipelineParams specified on optixLaunch should match the bound value. If
+/// validation mode is enabled on the context, OptiX will verify that the bound values
+/// specified matches the values in pipelineParams specified to optixLaunch.
+///
+/// These values are compiled in to the module as constants. Once the constants are
+/// inserted into the code, an optimization pass will be run that will attempt to
+/// propagate the consants and remove unreachable code.
+///
+/// If caching is enabled, changes in these values will result in newly compiled modules.
+///
+/// The pipelineParamOffset and sizeInBytes must be within the bounds of the
+/// pipelineParams variable. OPTIX_ERROR_INVALID_VALUE will be returned from
+/// optixModuleCreateFromPTX otherwise.
+///
+/// If more than one bound value overlaps or the size of a bound value is equal to 0,
+/// an OPTIX_ERROR_INVALID_VALUE will be returned from optixModuleCreateFromPTX.
+///
+/// The same set of bound values do not need to be used for all modules in a pipeline, but
+/// overlapping values between modules must have the same value.
+/// OPTIX_ERROR_INVALID_VALUE will be returned from optixPipelineCreate otherwise.
+///
+/// \see #OptixModuleCompileOptions
+typedef struct OptixModuleCompileBoundValueEntry {
+    size_t pipelineParamOffsetInBytes;
+    size_t sizeInBytes;
+    const void* boundValuePtr;
+    const char* annotation; // optional string to display, set to 0 if unused.  If unused,
+                            // OptiX will report the annotation as "No annotation"
+} OptixModuleCompileBoundValueEntry;
+
+
 /// Compilation options for module
 ///
 /// \see #optixModuleCreateFromPTX()
@@ -1219,7 +1288,15 @@ typedef struct OptixModuleCompileOptions
 
     /// Generate debug information.
     OptixCompileDebugLevel debugLevel;
+
+    /// Ingored if numBoundValues is set to 0
+    const OptixModuleCompileBoundValueEntry* boundValues;
+
+    /// set to 0 if unused
+    unsigned int numBoundValues;
+
 } OptixModuleCompileOptions;
+
 
 /// Distinguishes different kinds of program groups.
 typedef enum OptixProgramGroupKind
@@ -1333,8 +1410,8 @@ typedef struct OptixProgramGroupDesc
 /// \see #optixProgramGroupCreate()
 typedef struct OptixProgramGroupOptions
 {
-    /// Currently no options, so include a placeholder
-    int placeholder;
+    /// reserved value for future use. must be 0.
+    int reserved;
 } OptixProgramGroupOptions;
 
 /// The following values are used to indicate which exception was thrown.
@@ -1405,13 +1482,37 @@ typedef enum OptixExceptionCodes
     /// The invoked builtin IS does not match the current GAS
     OPTIX_EXCEPTION_CODE_BUILTIN_IS_MISMATCH = -11,
 
+    /// Tried to call a callable program using an SBT offset that is larger
+    /// than the number of passed in callable SBT records.
+    /// Exception details:
+    ///     optixGetExceptionInvalidSbtOffset()
+    OPTIX_EXCEPTION_CODE_CALLABLE_INVALID_SBT = -12,
+
+    /// Tried to call a direct callable using an SBT offset of a record that
+    /// was built from a program group that did not include a direct callable.
+    OPTIX_EXCEPTION_CODE_CALLABLE_NO_DC_SBT_RECORD = -13,
+
+    /// Tried to call a continuation callable using an SBT offset of a record
+    /// that was built from a program group that did not include a continuation callable.
+    OPTIX_EXCEPTION_CODE_CALLABLE_NO_CC_SBT_RECORD = -14,
+
     /// Tried to directly traverse a single gas while single gas traversable graphs are not enabled
-    //   (see OptixTraversableGraphFlags::OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_SINGLE_GAS). 
+    ///   (see OptixTraversableGraphFlags::OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_SINGLE_GAS).
     /// Exception details:
     ///     optixGetTransformListSize()
     ///     optixGetTransformListHandle()
     ///     optixGetExceptionInvalidTraversable()
     OPTIX_EXCEPTION_CODE_UNSUPPORTED_SINGLE_LEVEL_GAS = -15,
+
+    /// argument passed to an optix call is
+    /// not within an acceptable range of values.
+    OPTIX_EXCEPTION_CODE_INVALID_VALUE_ARGUMENT_0 = -16,
+    OPTIX_EXCEPTION_CODE_INVALID_VALUE_ARGUMENT_1 = -17,
+    OPTIX_EXCEPTION_CODE_INVALID_VALUE_ARGUMENT_2 = -18,
+
+    /// Tried to access data on an AS without random data access support (See OptixBuildFlags).
+    OPTIX_EXCEPTION_CODE_UNSUPPORTED_DATA_ACCESS = -32,
+
 } OptixExceptionCodes;
 
 /// Exception flags.
@@ -1449,7 +1550,7 @@ typedef struct OptixPipelineCompileOptions
     /// Traversable graph bitfield. See OptixTraversableGraphFlags
     unsigned int traversableGraphFlags;
 
-    /// How much storage, in 32b words, to make available for the payload, [0..8]
+    /// How much storage, in 32b words, to make available for the payload, [0..32]
     int numPayloadValues;
 
     /// How much storage, in 32b words, to make available for the attributes. The
@@ -1467,6 +1568,11 @@ typedef struct OptixPipelineCompileOptions
     /// Bit field enabling primitive types. See OptixPrimitiveTypeFlags.
     /// Setting to zero corresponds to enabling OPTIX_PRIMITIVE_TYPE_FLAGS_CUSTOM and OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE.
     unsigned int usesPrimitiveTypeFlags;
+
+    // Reserved for future use.These values must be set to zero.
+    unsigned int reserved;
+    size_t reserved2;
+
 } OptixPipelineCompileOptions;
 
 /// Link options for a pipeline
@@ -1567,6 +1673,7 @@ typedef OptixResult( OptixQueryFunctionTable_t )( int          abiId,
 typedef struct OptixBuiltinISOptions
 {
     OptixPrimitiveType        builtinISModuleType;
+    /// Boolean value indicating whether vertex motion blur is used (but not motion transform blur).
     int                       usesMotionBlur;
 } OptixBuiltinISOptions;
 

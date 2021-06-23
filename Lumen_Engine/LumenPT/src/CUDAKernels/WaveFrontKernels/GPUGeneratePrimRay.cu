@@ -1,6 +1,7 @@
 #include "GPUShadingKernels.cuh"
 #include "../../Shaders/CppCommon/SceneDataTableAccessor.h"
 #include <device_launch_parameters.h>
+#include "../../Shaders/CppCommon/Half4.h"
 
 
 
@@ -32,7 +33,8 @@ CPU_ON_GPU void GeneratePrimaryRay(
     float3 a_W,
     float3 a_Eye,
     uint2 a_Dimensions,
-    unsigned int a_FrameCount)
+    unsigned int a_FrameCount,
+    cudaSurfaceObject_t a_JitterOutput)
 {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     int stride = blockDim.x * gridDim.x;
@@ -43,10 +45,29 @@ CPU_ON_GPU void GeneratePrimaryRay(
         const int screenY = i / a_Dimensions.x;
         const int screenX = i - (screenY * a_Dimensions.x);
 
+        const unsigned int pixelDataIndex = PIXEL_DATA_INDEX(screenX, screenY, a_Dimensions.x);
+
     	float2 jitter;
     	HaltonSequence(a_FrameCount + static_cast<unsigned int>(i), 2, &jitter.x);
-    	HaltonSequence(a_FrameCount + static_cast<unsigned int>(i), 3, &jitter.y);
-    	
+        HaltonSequence(a_FrameCount + static_cast<unsigned int>(i), 3, &jitter.y);
+
+        //surf2Dwrite<float2>(
+        //    jitter,
+        //    a_JitterOutput,
+        //    screenX * sizeof(float2),
+        //    screenY,
+        //    cudaBoundaryModeTrap
+        //    );
+
+        //half4Ushort4 jitter4 = {make_float4(jitter.x, jitter.y, 0.f, 0.f)};
+        //surf2Dwrite<ushort4>(
+        //    jitter4.m_Ushort4,
+        //    a_JitterOutput,
+        //    screenX * sizeof(ushort4),
+        //    screenY,
+        //    cudaBoundaryModeTrap
+        //    );
+
         float3 direction = make_float3(static_cast<float>(screenX + jitter.x) / a_Dimensions.x,
                                        static_cast<float>(screenY + jitter.y) / a_Dimensions.y, 0.f);
         float3 origin = a_Eye;
