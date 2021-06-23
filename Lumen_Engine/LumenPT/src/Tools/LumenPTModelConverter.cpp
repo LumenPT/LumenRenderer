@@ -259,10 +259,23 @@ Lumen::SceneManager::GLTFResource LumenPTModelConverter::LoadFile(std::string a_
 
 			uint32_t unnamedCounter = 0;
 
-			for (size_t j = 0; j < sceneHeader.m_NumRootNodes; j++)
+			for (size_t j = 0; j < sceneHeader.m_NumMeshes; j++)
 			{
-				scene->m_RootNodes.push_back(LoadNode(ifs, res, *scene, nullptr));
-				scene->m_RootNodes.back()->m_ScenePtr = scene.get();
+				
+				decltype(HeaderMeshInstance::m_Header) instanceHeader;
+				ifs.read(reinterpret_cast<char*>(&instanceHeader), sizeof(instanceHeader));
+				
+				auto m = scene->AddMesh();
+				m->SetMesh(res.m_MeshPool[instanceHeader.m_MeshId]);
+				m->m_Transform = glm::make_mat4(instanceHeader.m_Transform);
+				m->m_Name.resize(instanceHeader.m_NameLength);
+				ifs.read(m->m_Name.data(), m->m_Name.size());
+
+                if (m->m_Name.empty())
+                {
+					m->m_Name = std::string("Mesh ") + std::to_string(unnamedCounter++);
+                }
+
 			}
 		}
 	}
@@ -271,50 +284,6 @@ Lumen::SceneManager::GLTFResource LumenPTModelConverter::LoadFile(std::string a_
 
 	return res;
 }
-
-std::unique_ptr<Lumen::ILumenScene::Node> LumenPTModelConverter::LoadNode(
-    std::ifstream& a_FileStream, Lumen::SceneManager::GLTFResource& a_Resource, Lumen::ILumenScene& a_Scene,
-    Lumen::ILumenScene::Node* a_ParentNode)
-{
-	decltype(HeaderNode::m_Header) header;
-	a_FileStream.read(reinterpret_cast<char*>(&header), sizeof(header));
-	std::string name;
-	name.resize(header.m_NameLength);
-
-	a_FileStream.read(name.data(), name.size());
-
-	auto node = std::make_unique<Lumen::ILumenScene::Node>();
-	node->m_Name = name;
-	node->m_Transform = glm::make_mat4<float>(header.m_Transform);
-
-    if (header.m_MeshId != -1)
-    {
-		auto m = a_Scene.AddMesh();
-		m->m_Name = name;
-		m->SetMesh(a_Resource.m_MeshPool[header.m_MeshId]);
-		m->m_Transform = node->m_Transform;
-
-		node->m_MeshInstancePtr = m;
-
-		if (a_ParentNode != nullptr)
-		a_ParentNode->m_Transform.AddChild(m->m_Transform);
-    }
-	else if (a_ParentNode != nullptr)
-	{
-		a_ParentNode->m_Transform.AddChild(node->m_Transform);
-	}
-
-	for (size_t i = 0; i < header.m_NumChildren; i++)
-	{
-		node->m_ChildNodes.push_back(LoadNode(a_FileStream, a_Resource, a_Scene, node.get()));
-		node->m_ChildNodes.back()->m_Parent = node.get();
-	}
-
-
-	
-	return node;
-}
-
 
 void LumenPTModelConverter::SetRendererRef(LumenRenderer& a_Renderer)
 {
@@ -587,9 +556,10 @@ LumenPTModelConverter::Header LumenPTModelConverter::GenerateHeader(const FileCo
     {
 		h.m_Binary.Write(&headerScene.m_Header, sizeof(headerScene.m_Header));
 		h.m_Binary.Write(headerScene.m_Name.data(), headerScene.m_Name.size());
-        for (auto& node : headerScene.m_RootNodes)
+        for (auto& mesh : headerScene.m_Meshes)
         {
-			AddNodeToHeader(node, h);
+			h.m_Binary.Write(&mesh.m_Header, sizeof(mesh.m_Header));
+			h.m_Binary.Write(mesh.m_Name.data(), mesh.m_Name.size());
 		    //h.m_Binary.Write(headerScene.m_Meshes.data(), headerScene.m_Meshes.size() * sizeof(HeaderMeshInstance));            
         }
     }
@@ -597,16 +567,6 @@ LumenPTModelConverter::Header LumenPTModelConverter::GenerateHeader(const FileCo
 	h.m_Binary.Trim();
 	h.m_Size = h.m_Binary.m_Size;
 	return h;
-}
-
-void LumenPTModelConverter::AddNodeToHeader(const HeaderNode& a_Node, Header& a_Header)
-{
-	a_Header.m_Binary.Write(&a_Node.m_Header, sizeof(a_Node.m_Header));
-	a_Header.m_Binary.Write(a_Node.m_Name.data(), a_Node.m_Name.size());
-    for (auto& childNode : a_Node.m_ChildNodes)
-    {
-		AddNodeToHeader(childNode, a_Header);
-    }
 }
 
 void LumenPTModelConverter::OutputToFile(const Header& a_Header, const Blob& a_Binary, const std::string& a_DestPath)
@@ -944,57 +904,47 @@ LumenPTModelConverter::HeaderScene LumenPTModelConverter::MakeScene(const fx::gl
     }
 
 	hscene.m_Name = a_Scene.name;
-	hscene.m_Header.m_NumRootNodes = hscene.m_RootNodes.size();
+	hscene.m_Header.m_NumMeshes = hscene.m_Meshes.size();
 	hscene.m_Header.m_NameLength = hscene.m_Name.size();
 
 	return hscene;
 }
 
 void LumenPTModelConverter::LoadNode(const fx::gltf::Document& a_FxDoc, uint32_t a_NodeId, HeaderScene& a_Scene,
-                                     LumenPTModelConverter::HeaderNode* a_ParentNode)
+    glm::mat4 a_ParentTransform)
 {
 	const auto& node = a_FxDoc.nodes[a_NodeId];
-	HeaderNode* hNode;
-    if (!a_ParentNode)
-    {
-	    hNode = &a_Scene.m_RootNodes.emplace_back();        
-    }
-	else
-	{
-		hNode = &a_ParentNode->m_ChildNodes.emplace_back();
-	}
 
 	auto localTransform = LoadNodeTransform(node);
+	auto worldTransform = a_ParentTransform * localTransform;
 
-	hNode->m_Name = node.name;
-	hNode->m_Header.m_MeshId = node.mesh;	    
+	auto mat = worldTransform.GetTransformationMatrix();
+
+    if (node.mesh != -1)
+    {
+		auto& m = a_Scene.m_Meshes.emplace_back();
+		m.m_Header.m_MeshId = node.mesh;
+
+		memcpy(m.m_Header.m_Transform, &mat[0], sizeof(glm::mat4));
+		m.m_Name = node.name;
+		m.m_Header.m_NameLength = node.name.size();
+    }
 
 	int index = 0;
+
     for (auto& ch : node.children)
     {
 		printf("[File Conversion] Now loading child node %i of %i.\n", index, static_cast<int>(node.children.size()) - 1);
-		LoadNode(a_FxDoc, ch, a_Scene, hNode);
+		LoadNode(a_FxDoc, ch, a_Scene, worldTransform);
 		++index;
     }
-
-	auto mat = localTransform.GetLocalTransformationMatrix();
-
-	memcpy(&hNode->m_Header.m_Transform[0], &mat[0], sizeof(float) * 16);
-
-	hNode->m_Header.m_NumChildren = hNode->m_ChildNodes.size();
-	hNode->m_Header.m_NameLength = hNode->m_Name.size();
-
-  //  for (auto& ch : node.children)
-  //  {
-		//LoadNode(a_FxDoc, ch, a_Scene, worldTransform);
-  //  }
 }
 
 Lumen::Transform LumenPTModelConverter::LoadNodeTransform(const fx::gltf::Node& a_Node)
 {
     Lumen::Transform transform = glm::make_mat4(&a_Node.matrix[0]);
 
-    if (transform.GetWorldTransformationMatrix() == glm::identity<glm::mat4>())
+    if (transform.GetTransformationMatrix() == glm::identity<glm::mat4>())
     {
 		auto translation = glm::vec3(
 			a_Node.translation[0],

@@ -4,7 +4,6 @@
 
 //#include "../vendor/fx/gltf.h"
 
-#include "ILumenScene.h"
 #include "Lumen/ModelLoading/SceneManager.h"
 
 class LumenPTModelConverter
@@ -161,35 +160,22 @@ private:
         struct
         {
             int32_t m_MeshId;
-            uint32_t m_NameLength;
-        } m_Header;
-        std::string m_Name;
-    };
-
-    struct HeaderNode 
-    {
-        struct
-        {
-            uint32_t m_NameLength;
-            uint32_t m_NumChildren;
             float m_Transform[16];
-            int32_t m_MeshId;
+            uint32_t m_NameLength;
         } m_Header;
-
         std::string m_Name;
-        std::vector<HeaderNode> m_ChildNodes;
     };
 
     struct HeaderScene
     {
         struct
         {
-            uint32_t m_NumRootNodes;
+            uint32_t m_NumMeshes;
             uint32_t m_NameLength;
         } m_Header;
 
         std::string m_Name;
-        std::vector<HeaderNode> m_RootNodes;
+        std::vector<HeaderMeshInstance> m_Meshes;
     };
 
     struct FileContent
@@ -210,7 +196,6 @@ private:
 
     static FileContent GenerateContent(const fx::gltf::Document& a_FxDoc, const std::string& a_SourcePath);
     static Header GenerateHeader(const FileContent& a_Content);
-    static void AddNodeToHeader(const HeaderNode& a_Node, Header& a_Header);
     static void OutputToFile(const Header& a_Header, const Blob& a_Binary, const std::string& a_DestPath);
 
     static HeaderTexture TextureToBlob(const fx::gltf::Document& a_FxDoc, uint32_t a_ImageId, Blob& a_Blob, const std::string& a_SourcePath);
@@ -230,11 +215,7 @@ private:
     static std::vector<char> InterleaveVertexBuffers(InterleaveInput& a_Input);
 
     static HeaderScene MakeScene(const fx::gltf::Document& a_FxDoc, const fx::gltf::Scene& a_Scene);
-    static void LoadNode(const fx::gltf::Document& a_FxDoc, uint32_t a_NodeId, HeaderScene& a_Scene, HeaderNode* a_ParentNode = nullptr);
-    static std::unique_ptr<Lumen::ILumenScene::Node> LoadNode(std::ifstream& a_FileStream,
-                                                              Lumen::SceneManager::GLTFResource& a_Resource,
-                                                              Lumen::ILumenScene& a_Scene, Lumen::
-                                                              ILumenScene::Node* a_ParentNode);
+    static void LoadNode(const fx::gltf::Document& a_FxDoc, uint32_t a_NodeId, HeaderScene& a_Scene, glm::mat4 a_ParentTransform = glm::identity<glm::mat4>());
     static Lumen::Transform LoadNodeTransform(const fx::gltf::Node& a_Node);
 
     template<typename T>

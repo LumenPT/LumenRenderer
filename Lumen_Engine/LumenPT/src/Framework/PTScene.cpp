@@ -111,7 +111,7 @@ void PTScene::UpdateSceneAccelerationStructure()
             // Get the transformation matrix from the transform of the instance
             // We need to transpose it, because GLM and Optix use different matrix types
             // If we do not transpose the matrix, the translation would be lost completely
-            auto transformMat = glm::transpose(ptmi.m_Transform.GetWorldTransformationMatrix());
+            auto transformMat = glm::transpose(ptmi.m_Transform.GetTransformationMatrix());
             // Copy the transformation matrix into the OptixInstance struct
             memcpy(inst.transform, &transformMat, sizeof(inst.transform));
         }
@@ -136,7 +136,7 @@ void PTScene::UpdateSceneAccelerationStructure()
             // Get the transformation matrix from the transform of the instance
             // We need to transpose it, because GLM and Optix use different matrix types
             // If we do not transpose the matrix, the translation would be lost completely
-            auto transformMat = glm::transpose(ptvi.m_Transform.GetWorldTransformationMatrix());
+            auto transformMat = glm::transpose(ptvi.m_Transform.GetTransformationMatrix());
             // Copy the transformation matrix into the OptixInstance struct
             memcpy(inst.transform, &transformMat, sizeof(inst.transform));
         }

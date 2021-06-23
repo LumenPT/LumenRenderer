@@ -11,34 +11,6 @@ namespace Lumen
     class ILumenScene
     {
     public:
-        struct Node
-        {
-            Node()
-                : m_MeshInstancePtr(nullptr)
-                , m_VolumeInstancePtr(nullptr)
-                , m_Parent(nullptr)
-                , m_Name("Unnamed Node")
-                , m_ScenePtr(nullptr)
-            {}
-
-            Node* AddChild();
-
-            void AddChild(std::unique_ptr<Lumen::ILumenScene::Node>& a_Node);
-            void RemoveChild(std::unique_ptr<Lumen::ILumenScene::Node>& a_Node);
-
-            Node* GetFirstIntermediateNode(const Node* a_ParentNode) const;
-
-            bool IsChildOf(const Node& a_Node) const;
-
-            Transform m_Transform; 
-            std::string m_Name;
-            Node* m_Parent;
-            ILumenScene* m_ScenePtr; // Initialized to the scene pointer for the root node 
-            std::vector<std::unique_ptr<Node>> m_ChildNodes;
-            Lumen::MeshInstance* m_MeshInstancePtr;
-            Lumen::VolumeInstance* m_VolumeInstancePtr;
-        };
-
         /// <summary>
         /// Takes in camera data on initialization
         /// </summary>
@@ -63,7 +35,6 @@ namespace Lumen
         std::vector<unsigned int> m_MeshLightIndices;
         std::vector<std::unique_ptr<Lumen::VolumeInstance>> m_VolumeInstances;
         const std::unique_ptr<Camera> m_Camera;
-        std::vector<std::unique_ptr<Node>> m_RootNodes; // GLTF allows for multiple root nodes in the same scene, so support that
     	//accelleration structure
 
     private:

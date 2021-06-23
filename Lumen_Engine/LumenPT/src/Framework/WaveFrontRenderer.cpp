@@ -369,7 +369,6 @@ namespace WaveFront
     void WaveFrontRenderer::TraceFrame()
     {
     	//Track frame time.
-        static Timer totalFrameTimeTimer;
         Timer timer;
     	
         CHECKLASTCUDAERROR;
@@ -377,21 +376,26 @@ namespace WaveFront
         //Retrieve the acceleration structure and scene data table once.
         m_OptixSystem->UpdateSBT();
         CHECKLASTCUDAERROR;
+        auto begin = std::chrono::high_resolution_clock::now();
 
         auto* sceneDataTableAccessor = static_cast<PTScene*>(m_Scene.get())->GetSceneDataTableAccessor();
+
+        auto end = std::chrono::high_resolution_clock::now();
+
+        auto micro = std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count();
+        m_CurrentFrameStats.m_Times["Scene data table generation"] = micro;
+
         CHECKLASTCUDAERROR;
 
         auto accelerationStructure = std::static_pointer_cast<PTScene>(m_Scene)->GetSceneAccelerationStructure();
         cudaDeviceSynchronize();
         CHECKLASTCUDAERROR;
 
-    	//Reset the timer to measure light extraction.
-        m_CurrentFrameStats.m_Times["SDT Update"] = timer.measure(TimeUnit::MICROS);
-        timer.reset();
-    	
         //Timer to measure how long each frame takes.
         ResetAtomicBuffer<WaveFront::TriangleLight>(&m_TriangleLights);
         auto lightBuffer = m_TriangleLights.GetDevicePtr<AtomicBuffer<WaveFront::TriangleLight>>();
+
+        Timer lightExtractionTimer;
 
         for (auto& meshInstance : m_Scene->m_MeshInstances)
         {
@@ -428,6 +432,8 @@ namespace WaveFront
                 continue;
             }
         }
+
+        printf("Time to extract all emissives in scene: %f millis.\n", lightExtractionTimer.measure(TimeUnit::MILLIS));
     	
         //Don't render if there is no light in the scene as everything will be black anyway.
         const unsigned int numLightsInScene = GetAtomicCounter<WaveFront::TriangleLight>(&m_TriangleLights);
@@ -438,9 +444,6 @@ namespace WaveFront
             return;
         }
 
-        m_CurrentFrameStats.m_Times["Uploading Lights"] = timer.measure(TimeUnit::MICROS);
-        timer.reset();
-    	
         bool recordingSnapshot = m_StartSnapshot;
         if (m_StartSnapshot)
         {
@@ -448,9 +451,6 @@ namespace WaveFront
             m_FrameSnapshot = std::make_unique<FrameSnapshot>();
             m_StartSnapshot = false;
         }
-
-        m_CurrentFrameStats.m_Times["Snapshot Creation"] = timer.measure(TimeUnit::MICROS);
-        timer.reset();
 
         bool resizeBuffers = false, resizeOutputBuffer = false;
         {
@@ -494,9 +494,6 @@ namespace WaveFront
         }
         CHECKLASTCUDAERROR;
 
-        m_CurrentFrameStats.m_Times["Buffer Resize"] = timer.measure(TimeUnit::MICROS);
-        timer.reset();
-
         //Index of the current and last frame to access buffers.
         const auto currentIndex = m_FrameIndex;
         const auto temporalIndex = m_FrameIndex == 1 ? 0 : 1;
@@ -510,8 +507,7 @@ namespace WaveFront
         WaitForDeferredCalls();
         CHECKLASTCUDAERROR;
 
-        m_CurrentFrameStats.m_Times["Deferred Call Wait"] = timer.measure(TimeUnit::MICROS);
-        timer.reset();
+
 
         //Prepare separate pixel buffer(s) for CUDA operations.
         //Get the surface objects to use for the different light channels into a single variable.
@@ -521,7 +517,7 @@ namespace WaveFront
             m_PixelBufferSeparate[lightChannelIndex]->Map(lightChannelIndex);
             pixelBuffers[lightChannelIndex] = m_PixelBufferSeparate[lightChannelIndex]->GetSurfaceObject();
         }
-    	
+
         //Prepare combined pixel buffer for CUDA operations.
         m_PixelBufferCombined->Map();
 
@@ -544,9 +540,6 @@ namespace WaveFront
 
         cudaDeviceSynchronize();
         CHECKLASTCUDAERROR;
-
-        m_CurrentFrameStats.m_Times["Prepare Buffers"] = timer.measure(TimeUnit::MICROS);
-        timer.reset();
 
         //Generate camera rays.
         glm::vec3 eye, u, v, w;
@@ -585,8 +578,6 @@ namespace WaveFront
         //Set the atomic counter for primary rays to the amount of pixels.
         SetAtomicCounter<IntersectionRayData>(&m_Rays, numPixels);
 
-        m_CurrentFrameStats.m_Times["Camera Preparation"] = timer.measure(TimeUnit::MICROS);
-        timer.reset();
         
 
         // TODO: render resolution used in snapshot->AddBuffer
@@ -627,8 +618,6 @@ namespace WaveFront
                 return resBuffers;
             });
 
-
-
         //Clear the surface data that contains information from the second last frame so that it can be reused by this frame.
         cudaMemset(m_SurfaceData[currentIndex].GetDevicePtr(), 0, sizeof(SurfaceData) * numPixels);
         cudaDeviceSynchronize();
@@ -642,9 +631,8 @@ namespace WaveFront
 		SetAtomicCounter<VolumetricIntersectionData>(&m_VolumetricIntersectionData, counterDefault);
         CHECKLASTCUDAERROR;
 
-        m_CurrentFrameStats.m_Times["Frame Snapshot & Clear Buffers"] = timer.measure(TimeUnit::MICROS);
-        timer.reset();
-    	
+
+
         //Pass the buffers to the optix shader for shading.
         OptixLaunchParameters rayLaunchParameters {};
 
@@ -664,17 +652,17 @@ namespace WaveFront
         auto seed = WangHash(frameCount);
 
         float2 minMaxDepth = make_float2(m_Settings.minIntersectionT, m_Settings.maxIntersectionT);
-    	
+
         /*
          * Resolve rays and shade at every depth.
          */
         for (unsigned depth = 0; depth < m_Settings.depth && numIntersectionRays > 0; ++depth)
-        {        	
+        {
             //Tell Optix to resolve the primary rays that have been generated.
             m_OptixSystem->TraceRays(numIntersectionRays, rayLaunchParameters);
             cudaDeviceSynchronize();
             CHECKLASTCUDAERROR;
-        	
+
             /*
              * Calculate the surface data for this depth.
              */
@@ -711,7 +699,7 @@ namespace WaveFront
                 CHECKLASTCUDAERROR;
 
         	}
-        	
+
             unsigned numVolumeIntersections = 0;
             m_VolumetricIntersectionData.Read(&numVolumeIntersections, sizeof(numVolumeIntersections), 0);
 
@@ -758,7 +746,8 @@ namespace WaveFront
 
             /*
              * Call the shading kernels.
-             */        	
+             */
+
             ShadingLaunchParameters shadingLaunchParams(
                 uint3{ m_Settings.renderResolution.x, m_Settings.renderResolution.y, m_Settings.depth },
                 m_SurfaceData[surfaceDataBufferIndex].GetDevicePtr<SurfaceData>(),
@@ -797,7 +786,7 @@ namespace WaveFront
             //Reset the intersection data so that the next frame can re-fill it.
             ResetAtomicBuffer<IntersectionData>(&m_IntersectionData);
 			ResetAtomicBuffer<VolumetricIntersectionData>(&m_VolumetricIntersectionData);
-        	
+
             //Swap the ReSTIR buffers around.
             m_ReSTIR->SwapBuffers();
 
@@ -805,9 +794,7 @@ namespace WaveFront
             seed = WangHash(seed);
         }
 
-    	//How long does the core wavefront loop take?
-        m_CurrentFrameStats.m_Times["Wavefront Iteration"] = timer.measure(TimeUnit::MICROS);
-        timer.reset();
+
 
         //The amount of shadow rays to trace.
         unsigned numShadowRays = GetAtomicCounter<ShadowRayData>(&m_ShadowRays);
@@ -827,10 +814,6 @@ namespace WaveFront
             CHECKLASTCUDAERROR;
         }
 
-        m_CurrentFrameStats.m_Times["Shadow Rays"] = timer.measure(TimeUnit::MICROS);
-        m_CurrentFrameStats.m_Times["Num Shadow Rays"] = numShadowRays;
-        timer.reset();
-
 		//The amount of shadow rays to trace.
 		unsigned numVolumetricShadowRays = GetAtomicCounter<ShadowRayData>(&m_VolumetricShadowRays);
 
@@ -846,11 +829,6 @@ namespace WaveFront
 			cudaDeviceSynchronize();
 			CHECKLASTCUDAERROR;
 		}
-
-        m_CurrentFrameStats.m_Times["Volumetric Shadow Rays"] = timer.measure(TimeUnit::MICROS);
-        m_CurrentFrameStats.m_Times["Num Volumetric Shadow Rays"] = numVolumetricShadowRays;
-        timer.reset();
-    	
         //Post-processing
         {
             // TODO: render and output resolution used in post processing
@@ -931,8 +909,6 @@ namespace WaveFront
                 //m_DLSS->EvaluateDLSS(dlssInitParams, m_D3D11PixelBufferCombined, m_MotionVectors.GetMotionVectorDirectionsTex());
             }
 
-            m_CurrentFrameStats.m_Times["Post-Processing"] = timer.measure(TimeUnit::MICROS);
-            timer.reset();
         }
 
         // Critical scope for updating the output texture
@@ -950,9 +926,6 @@ namespace WaveFront
             // Once the memcpy is complete, the lock guard releases the mutex
         }
         CHECKLASTCUDAERROR;
-
-        m_CurrentFrameStats.m_Times["Updating output texture"] = timer.measure(TimeUnit::MICROS);
-        timer.reset();
 
         // The display thread might wait on the memcpy that was just performed.
         // We bump the thread by calling notify all on the same condition_variable it uses
@@ -974,30 +947,38 @@ namespace WaveFront
         m_Scene->m_Camera->UpdatePreviousFrameMatrix();
         ++frameCount;
 
-        m_CurrentFrameStats.m_Times["Camera Matrix Update & notify output"] = timer.measure(TimeUnit::MICROS);
-        timer.reset();
-
-#ifndef NDEBUG
         m_OptixDenoiser->UpdateDebugTextures();
         m_DeferredOpenGLCalls.push([&]() {
+            //m_DebugTexture = m_OptixDenoiser->m_OptixDenoiserInputTex.m_Memory->GetTexture();
+            //m_DebugTexture = m_OptixDenoiser->m_OptixDenoiserAlbedoInputTex.m_Memory->GetTexture();
+            //m_DebugTexture = m_OptixDenoiser->m_OptixDenoiserNormalInputTex.m_Memory->GetTexture();
             m_DebugTexture = m_OptixDenoiser->m_OptixDenoiserOutputTex.m_Memory->GetTexture();
             });
         WaitForDeferredCalls();
-#endif
-    	
-    	//Set total frame time in the performance visualization tool.
-        m_CurrentFrameStats.m_Times["Total Wavefront Time"] = totalFrameTimeTimer.measure(TimeUnit::MICROS);
-    	
+
+
+        // TODO: Weird debug code. Yeet?
+        //m_DebugTexture = m_OutputBuffer->GetTexture();
+        //#if defined(_DEBUG)
+        //m_MotionVectors.GenerateDebugTextures();
+        ////m_DebugTexture = m_MotionVectors.GetMotionVectorDirectionsTex();
+        //m_DebugTexture = m_MotionVectors.GetMotionVectorMagnitudeTex();
+
+        /*m_OptixDenoiser->UpdateDebugTextures();
+        m_DebugTexture = m_OptixDenoiser->m_OptixDenoiserInputTex.m_Memory->GetTexture();*/
+
         m_SnapshotReady = recordingSnapshot;
 
         FinalizeFrameStats();
 
         CHECKLASTCUDAERROR;
 
+        printf("Total frame time: %f milliseconds.\n", timer.measure(TimeUnit::MILLIS));
+
         //tonemapping should be done before DLSS
         //DLSS performs better on LDR data as opposed to HDR
 
-        totalFrameTimeTimer.reset();
+        
     }
 
     std::unique_ptr<MemoryBuffer> WaveFrontRenderer::InterleaveVertexData(const PrimitiveData& a_MeshData) const
@@ -1297,6 +1278,8 @@ namespace WaveFront
 
     void WaveFrontRenderer::ResizeBuffers()
     {
+        printf("\n\nRESIZING WAVEFRONT BUFFERS!!\n\n");
+    	
         CHECKLASTCUDAERROR;
 
         ////Set up the OpenGL output buffer.
