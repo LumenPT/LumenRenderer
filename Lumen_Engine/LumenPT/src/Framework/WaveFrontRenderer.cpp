@@ -108,12 +108,12 @@ namespace WaveFront
         //Set the service locator's pointer to the OptixWrapper.
         m_ServiceLocator.m_OptixWrapper = m_OptixSystem.get();
 
-        //m_NRD = std::make_unique<NrdWrapper>();
-        //NRDWrapperInitParams nrdInitParams;
-        //nrdInitParams.m_InputImageWidth = m_Settings.renderResolution.x;
-        //nrdInitParams.m_InputImageHeight = m_Settings.renderResolution.y;
-        //nrdInitParams.m_pServiceLocator = &m_ServiceLocator;
-        //m_NRD->Initialize(nrdInitParams);
+        m_NRD = std::make_unique<NrdWrapper>();
+        NRDWrapperInitParams nrdInitParams;
+        nrdInitParams.m_InputImageWidth = m_Settings.renderResolution.x;
+        nrdInitParams.m_InputImageHeight = m_Settings.renderResolution.y;
+        nrdInitParams.m_pServiceLocator = &m_ServiceLocator;
+        m_NRD->Initialize(nrdInitParams);
 
         m_OptixDenoiser = std::make_unique<OptixDenoiserWrapper>();
         OptixDenoiserInitParams optixDenoiserInitParams;
