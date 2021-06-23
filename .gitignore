@@ -27,6 +27,7 @@
 **/Lumen/vendor/imgui/ImGui.dir/**
 **/LumenPT/vendor/RayTracingDenoiser
 **/LumenPT/vendor/DLSS_Private
+**/LumenPT/vendor/TestProject
 
 G:\RandomCode\LumenRenderer\Lumen_Engine\Sandbox\assets\models\Sponza
 
@@ -483,3 +484,7 @@ Lumen_Engine/Config.json
 *.ollad
 
 Lumen_Engine/Screenshots/
+
+Lumen_Engine/Sandbox/assets/models/Astronaut/
+
+Lumen_Engine/Sandbox/assets/gltfExternalAssets

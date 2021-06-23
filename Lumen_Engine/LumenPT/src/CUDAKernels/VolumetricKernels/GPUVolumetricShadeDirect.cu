@@ -10,7 +10,7 @@ GPU_ONLY void VolumetricShadeDirect(
     const WaveFront::VolumetricData* a_VolumetricDataBuffer,
     WaveFront::AtomicBuffer<WaveFront::ShadowRayData>* const a_ShadowRays,
 	const AtomicBuffer<TriangleLight>* const a_Lights,
-	unsigned int& a_Seed,
+	unsigned int a_Seed,
     const CDF* const a_CDF,
 	cudaSurfaceObject_t a_Output)
 {

@@ -14,13 +14,11 @@
 #include "CudaGLTexture.h"
 #include "SceneDataTable.h"
 #include "../CUDAKernels/WaveFrontKernels.cuh"
-#include "../CUDAKernels/WaveFrontKernels/EmissiveLookup.cuh"
 #include "../Shaders/CppCommon/WaveFrontDataStructs.h"
 #include "CudaUtilities.h"
 #include "ReSTIR.h"
 #include "../Tools/FrameSnapshot.h"
 #include "../Tools/SnapShotProcessing.cuh"
-#include "MotionVectors.h"
 //#include "Lumen/Window.h"
 #include "Lumen/LumenApp.h"
 #include "DX11Wrapper.h"
@@ -75,8 +73,6 @@ namespace WaveFront
         m_ServiceLocator.m_DX11Wrapper = m_DX11Wrapper.get();
         m_DX11Wrapper->Init();
 
-        m_DX11Wrapper->GetDevice();
-
         m_BlendCounter = 0;
         m_FrameIndex = 0;
         m_Settings = a_Settings;
@@ -105,29 +101,23 @@ namespace WaveFront
         optixInitData.m_PipelineMaxNumHitResultAttributes = 2;
         optixInitData.m_PipelineMaxNumPayloads = 5;
 
+        
+
         m_OptixSystem = std::make_unique<OptixWrapper>(optixInitData);
 
         //Set the service locator's pointer to the OptixWrapper.
         m_ServiceLocator.m_OptixWrapper = m_OptixSystem.get();
 
-        m_NRD = std::make_unique<NrdWrapper>();
-        NRDWrapperInitParams nrdInitParams;
-        nrdInitParams.m_InputImageWidth = m_Settings.renderResolution.x;
-        nrdInitParams.m_InputImageHeight = m_Settings.renderResolution.y;
-        nrdInitParams.m_pServiceLocator = &m_ServiceLocator;
-        m_NRD->Initialize(nrdInitParams);
-
-        m_DLSS = std::make_unique<DlssWrapper>();
-        DLSSWrapperInitParams dlssInitParams;
-        dlssInitParams.m_InputImageWidth = m_Settings.renderResolution.x;
-        dlssInitParams.m_InputImageHeight = m_Settings.renderResolution.y;
-        dlssInitParams.m_OutputImageWidth = m_Settings.outputResolution.x;
-        dlssInitParams.m_OutputImageHeight = m_Settings.outputResolution.y;
-        dlssInitParams.m_pServiceLocator = &m_ServiceLocator;
-        m_DLSS->Initialize(dlssInitParams);
+        //m_NRD = std::make_unique<NrdWrapper>();
+        //NRDWrapperInitParams nrdInitParams;
+        //nrdInitParams.m_InputImageWidth = m_Settings.renderResolution.x;
+        //nrdInitParams.m_InputImageHeight = m_Settings.renderResolution.y;
+        //nrdInitParams.m_pServiceLocator = &m_ServiceLocator;
+        //m_NRD->Initialize(nrdInitParams);
 
         m_OptixDenoiser = std::make_unique<OptixDenoiserWrapper>();
         OptixDenoiserInitParams optixDenoiserInitParams;
+        // TODO: Optix Denoiers render resolution input
         optixDenoiserInitParams.m_InputWidth = m_Settings.renderResolution.x;
         optixDenoiserInitParams.m_InputHeight = m_Settings.renderResolution.y;
         optixDenoiserInitParams.m_ServiceLocator = &m_ServiceLocator;
@@ -135,36 +125,108 @@ namespace WaveFront
 
         //Set up the OpenGL output buffer.
         m_OutputBuffer = std::make_unique<CudaGLTexture>(GL_RGBA8, m_Settings.outputResolution.x, m_Settings.outputResolution.y, 4);
-        SetRenderResolution(glm::uvec2(m_Settings.outputResolution.x, m_Settings.outputResolution.y));
+        SetRenderResolution(glm::uvec2(m_Settings.renderResolution.x, m_Settings.renderResolution.y));
+        SetOutputResolutionInternal(glm::uvec2(m_Settings.outputResolution.x, m_Settings.outputResolution.y));
 
-        //Set up bufferS.
+        //Set up buffers.
 
-        const auto numOutputChannels = static_cast<unsigned>(LightChannel::NUM_CHANNELS);
+        //Set up pixel output buffers.
 
-        const cudaExtent pixelBufferSizeSeparate = cudaExtent{ m_Settings.renderResolution.x, m_Settings.renderResolution.y, numOutputChannels };
-        const cudaExtent pixelBufferSizeCombined = cudaExtent{ m_Settings.renderResolution.x, m_Settings.renderResolution.y, 0 };
+        //Create d3d11 texture2D which will be used for the pixel-buffer-separate containing the different light channels.
+        m_D3D11PixelBufferSeparate = m_DX11Wrapper->CreateTexture2D({ m_Settings.renderResolution.x, m_Settings.renderResolution.y, s_numLightChannels});
 
+        //Create d3d11 texture2D which will be used for the pixel-buffer-combined containing the merged light channels.
+        m_D3D11PixelBufferCombined = m_DX11Wrapper->CreateTexture2D({ m_Settings.renderResolution.x, m_Settings.renderResolution.y, 1 }, DXGI_FORMAT_R16G16B16A16_FLOAT, D3D11_BIND_FLAG::D3D11_BIND_UNORDERED_ACCESS);
+        
+        //Create d3d11 texture2D which will be an upscaled version of the m_D3D11PixelBufferCombined done by DLSS
+        m_D3D11PixelBufferUpscaled = m_DX11Wrapper->CreateTexture2D({ m_Settings.outputResolution.x, m_Settings.outputResolution.y, 1 }, DXGI_FORMAT_R16G16B16A16_FLOAT, D3D11_BIND_FLAG::D3D11_BIND_UNORDERED_ACCESS);
+
+        // Create Unordered Access Views for Pixelbuffer Combined and Upscaled for use by DLSS 
+        D3D11_UNORDERED_ACCESS_VIEW_DESC desc = {};
+        desc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+        desc.ViewDimension = D3D11_UAV_DIMENSION_TEXTURE2D;
+        m_DX11Wrapper->CreateUAV(m_D3D11PixelBufferCombined, &desc, m_D3D11PixelBufferCombinedUAV);
+        m_DX11Wrapper->CreateUAV(m_D3D11PixelBufferUpscaled, &desc, m_D3D11PixelBufferUpscaledUAV);
+
+        //Create d3d11 texture2D which will be used for the depth buffer containing the depth values for each pixel.
+        m_D3D11DepthBuffer = m_DX11Wrapper->CreateTexture2D({m_Settings.renderResolution.x, m_Settings.renderResolution.y, 1}, DXGI_FORMAT_R32_FLOAT);
+
+        //Create d3d11 texture2D which will be used for the motion vector buffer containing the motion vectors for each pixel.
+        m_D3D11MotionVectorBuffer = m_DX11Wrapper->CreateTexture2D({ m_Settings.renderResolution.x, m_Settings.renderResolution.y, 1 }, DXGI_FORMAT_R16G16_FLOAT);
+
+        m_D3D11JitterBuffer = m_DX11Wrapper->CreateTexture2D({ m_Settings.renderResolution.x, m_Settings.renderResolution.y, 1 }, DXGI_FORMAT_R16G16_FLOAT);
+
+        //Description of the cuda texture created with an interop-texture for each pixel buffer.
         cudaTextureDesc pixelBufferDesc {};
         memset(&pixelBufferDesc, 0, sizeof(pixelBufferDesc));
 
         pixelBufferDesc.addressMode[0] = cudaAddressModeClamp;
-        pixelBufferDesc.addressMode[0] = cudaAddressModeClamp;
+        pixelBufferDesc.addressMode[1] = cudaAddressModeClamp;
         pixelBufferDesc.filterMode = cudaFilterModePoint;
         pixelBufferDesc.readMode = cudaReadModeElementType;
 
-        m_PixelBufferSeparate = std::make_unique<GpuTexture<float4>>(
-            pixelBufferSizeSeparate,
-            cudaArrayLayered | cudaArraySurfaceLoadStore,
-            pixelBufferDesc);
+        //Create interop-textures for each light channel contained in the pixel-buffer-separate.
+        for(unsigned int channelIndex = 0; channelIndex < s_numLightChannels; ++channelIndex)
+        {
+            m_PixelBufferSeparate[channelIndex] = 
+                std::make_unique<InteropGPUTexture>(
+                    m_D3D11PixelBufferSeparate, 
+                    pixelBufferDesc, 
+                    cudaGraphicsRegisterFlagsSurfaceLoadStore);
 
-        m_PixelBufferSeparate->Clear();
+            //Make sure to initialize the buffer with 0s
+            m_PixelBufferSeparate[channelIndex]->Map(channelIndex);
+            m_PixelBufferSeparate[channelIndex]->Clear();
+            m_PixelBufferSeparate[channelIndex]->Unmap();
+        }
 
-        m_PixelBufferCombined = std::make_unique<GpuTexture<float4>>(
-            pixelBufferSizeCombined,
-            cudaArraySurfaceLoadStore,
-            pixelBufferDesc);
+        //Create interop-texture for the single light channel contained in the pixel-buffer-combined.
+        m_PixelBufferCombined =
+            std::make_unique<InteropGPUTexture>(
+                m_D3D11PixelBufferCombined,
+                pixelBufferDesc,
+                cudaGraphicsRegisterFlagsSurfaceLoadStore);
 
+        //Make sure to initialize the buffer with 0s
+        m_PixelBufferCombined->Map();
         m_PixelBufferCombined->Clear();
+        m_PixelBufferCombined->Unmap();
+
+        //Create interop-texture for the depth buffer.
+        cudaTextureDesc depthBufferDesc{};
+        memset(&depthBufferDesc, 0, sizeof(depthBufferDesc));
+
+        depthBufferDesc.addressMode[0] = cudaAddressModeClamp;
+        depthBufferDesc.addressMode[1] = cudaAddressModeClamp;
+        depthBufferDesc.filterMode = cudaFilterModeLinear;
+        depthBufferDesc.readMode = cudaReadModeElementType;
+
+        m_DepthBuffer = std::make_unique<InteropGPUTexture>(m_D3D11DepthBuffer, depthBufferDesc);
+
+        //Make sure the depth-buffer is initialized with 0s
+        m_DepthBuffer->Map();
+        m_DepthBuffer->Clear();
+        m_DepthBuffer->Unmap();
+
+        cudaTextureDesc motionVectorBufferDesc{};
+        memset(&motionVectorBufferDesc, 0, sizeof(motionVectorBufferDesc));
+
+        motionVectorBufferDesc.addressMode[0] = cudaAddressModeClamp;
+        motionVectorBufferDesc.addressMode[1] = cudaAddressModeClamp;
+        motionVectorBufferDesc.filterMode = cudaFilterModePoint;
+        motionVectorBufferDesc.readMode = cudaReadModeElementType;
+
+        m_MotionVectorBuffer = std::make_unique<InteropGPUTexture>(m_D3D11MotionVectorBuffer, motionVectorBufferDesc);
+
+        m_MotionVectorBuffer->Map();
+        m_MotionVectorBuffer->Clear();
+        m_MotionVectorBuffer->Unmap();
+
+        // see how it goes with depth buffer description 
+        m_JitterBuffer = std::make_unique<InteropGPUTexture>(m_D3D11JitterBuffer, depthBufferDesc);
+        m_JitterBuffer->Map();
+        m_JitterBuffer->Clear();
+        m_JitterBuffer->Unmap();
 
         ResizeBuffers();
 
@@ -179,6 +241,18 @@ namespace WaveFront
         m_FrameSnapshot = std::make_unique<NullFrameSnapshot>();
 
         m_ModelConverter.SetRendererRef(*this);
+
+        /*m_DLSS = std::make_unique<DlssWrapper>();
+        DLSSWrapperInitParams dlssInitParams;
+        dlssInitParams.m_InputImageWidth = m_Settings.renderResolution.x;
+        dlssInitParams.m_InputImageHeight = m_Settings.renderResolution.y;
+        dlssInitParams.m_OutputImageWidth = m_Settings.outputResolution.x;
+        dlssInitParams.m_OutputImageHeight = m_Settings.outputResolution.y;
+        dlssInitParams.m_pServiceLocator = &m_ServiceLocator;
+        m_DLSS->Initialize(dlssInitParams);*/
+
+
+        m_CurrentFrameStats.m_Id = 0;
     }
 
     void WaveFrontRenderer::BeginSnapshot()
@@ -209,7 +283,7 @@ namespace WaveFront
         m_IntermediateSettings.renderResolution.y = a_NewResolution.y;
 
         // Call the internal version of this function which does not involve mutex locking
-        SetOutputResolutionInternal(a_NewResolution);
+        //SetOutputResolutionInternal(a_NewResolution); //Separate output res, or tie it to render res based on DLSS 
     }
 
 
@@ -308,8 +382,8 @@ namespace WaveFront
 
         auto end = std::chrono::high_resolution_clock::now();
 
-        auto milli = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
-        printf("\n\nTime elapsed to build scene data table: %li milliseconds\n\n", milli);
+        auto micro = std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count();
+        m_CurrentFrameStats.m_Times["Scene data table generation"] = micro;
 
         CHECKLASTCUDAERROR;
 
@@ -387,6 +461,8 @@ namespace WaveFront
 
             // Also check if the render resolution or output resolution have changed,
             // since those would require resizing buffers in this frame
+
+            // TODO: Render and output resolution comparisons
             if (m_Settings.renderResolution.x != m_IntermediateSettings.renderResolution.x ||
                 m_Settings.renderResolution.y != m_IntermediateSettings.renderResolution.y)
             {
@@ -409,6 +485,7 @@ namespace WaveFront
 
         if (resizeOutputBuffer)
         {
+            // TODO: Resizing openGL output buffer using output resolution
             //Set up the OpenGL output buffer.
             m_DeferredOpenGLCalls.push([this]()
                 {
@@ -417,11 +494,11 @@ namespace WaveFront
         }
         CHECKLASTCUDAERROR;
 
-
         //Index of the current and last frame to access buffers.
         const auto currentIndex = m_FrameIndex;
         const auto temporalIndex = m_FrameIndex == 1 ? 0 : 1;
 
+        // TODO: Set number of pixels using render resolution
         //Data needed in the algorithms.
         const uint32_t numPixels = m_Settings.renderResolution.x * m_Settings.renderResolution.y;
         CHECKLASTCUDAERROR;
@@ -431,9 +508,25 @@ namespace WaveFront
         CHECKLASTCUDAERROR;
 
 
+
+        //Prepare separate pixel buffer(s) for CUDA operations.
+        //Get the surface objects to use for the different light channels into a single variable.
+        std::array<cudaSurfaceObject_t, s_numLightChannels> pixelBuffers{};
+        for (unsigned int lightChannelIndex = 0; lightChannelIndex < s_numLightChannels; ++lightChannelIndex)
+        {
+            m_PixelBufferSeparate[lightChannelIndex]->Map(lightChannelIndex);
+            pixelBuffers[lightChannelIndex] = m_PixelBufferSeparate[lightChannelIndex]->GetSurfaceObject();
+        }
+
+        //Prepare combined pixel buffer for CUDA operations.
+        m_PixelBufferCombined->Map();
+
         //Start by clearing the data from the previous frame.
-        //ResetLightChannels(m_PixelBufferSeparate.GetDevicePtr<float3>(), numPixels, static_cast<unsigned>(LightChannel::NUM_CHANNELS));
-        m_PixelBufferSeparate->Clear();
+
+        for(auto& buffer : m_PixelBufferSeparate)
+        {
+            buffer->Clear();   
+        }
 
         //Only clean the merged buffer if no blending is enabled.
         if (!m_Settings.blendOutput)
@@ -441,11 +534,16 @@ namespace WaveFront
             m_PixelBufferCombined->Clear();
         }
 
+        m_DepthBuffer->Map();
+        m_MotionVectorBuffer->Map();
+        m_JitterBuffer->Map();
+
         cudaDeviceSynchronize();
         CHECKLASTCUDAERROR;
 
         //Generate camera rays.
         glm::vec3 eye, u, v, w;
+        // TODO: Aspect ratio set with render resolution
         m_Scene->m_Camera->SetAspectRatio(static_cast<float>(m_Settings.renderResolution.x) / static_cast<float>(m_Settings.renderResolution.y));
         m_Scene->m_Camera->GetVectorData(eye, u, v, w);
 
@@ -468,68 +566,53 @@ namespace WaveFront
         const WaveFront::PrimRayGenLaunchParameters::DeviceCameraData cameraData(eyeCuda, uCuda, vCuda, wCuda);
         auto rayPtr = m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>();
         const PrimRayGenLaunchParameters primaryRayGenParams(
-            m_Settings.renderResolution,
+            m_Settings.renderResolution,        // TODO: Raygen executed with render resolution
             cameraData,
             rayPtr, frameCount);
-        GeneratePrimaryRays(primaryRayGenParams);
-        cudaDeviceSynchronize();
+        //GeneratePrimaryRays(primaryRayGenParams, m_PixelBufferCombined->GetSurfaceObject());
+        m_JitterBuffer->Map();
+        GeneratePrimaryRays(primaryRayGenParams, m_JitterBuffer->GetSurfaceObject());
+        cudaDeviceSynchronize();    //explode
         CHECKLASTCUDAERROR;
 
         //Set the atomic counter for primary rays to the amount of pixels.
         SetAtomicCounter<IntersectionRayData>(&m_Rays, numPixels);
 
-        //##ToolsBookmark
-        //Example of defining how to add buffers to the pixel debugger tool
-        //This lambda is NOT ran every frame, it is only ran when the output layer requests a snapshot
+        
+
+        // TODO: render resolution used in snapshot->AddBuffer
         m_FrameSnapshot->AddBuffer([&]()
             {
-                // The buffers that need to be given to the tool are provided via a map as shown below
-                // Notice that CudaGLTextures are used, as opposed to memory buffers. This is to enable the data to be used with OpenGL
-                // and thus displayed via ImGui
-                std::map<std::string, FrameSnapshot::ImageBuffer> resBuffers;
-
-                m_DeferredOpenGLCalls.push([&]() {
-                    resBuffers["Origins"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
-                        m_Settings.renderResolution.y, 3 * sizeof(float));
-
-                    resBuffers["Directions"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
-                        m_Settings.renderResolution.y, 3 * sizeof(float));
-
-                    resBuffers["Contributions"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
-                        m_Settings.renderResolution.y, 3 * sizeof(float));
-                    });
-
-                WaitForDeferredCalls();
-                // A CUDA kernel used to separate the interleave primary ray buffer into 3 different buffers
-                // This is the main reason we use a lambda, as it needs to be defined how to interpret the data
-                SeparateIntersectionRayBufferCPU((m_Rays.GetSize() - sizeof(uint32_t)) / sizeof(IntersectionRayData),
-                    m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>(),
-                    m_Settings.renderResolution,
-                    resBuffers.at("Origins").m_Memory->GetDevicePtr<float3>(),
-                    resBuffers.at("Directions").m_Memory->GetDevicePtr<float3>(),
-                    resBuffers.at("Contributions").m_Memory->GetDevicePtr<float3>());
-
-                return resBuffers;
-            });
-
-        m_FrameSnapshot->AddBuffer([&]()
-            {
-                auto motionVectorBuffer = m_MotionVectors.GetMotionVectorBuffer();
+                auto optixDenoiserInput = &(m_OptixDenoiser->ColorInput);
+                auto OptixDenoiserAlbedoInput = &(m_OptixDenoiser->AlbedoInput);
+                auto OptixDenoiserNormalInput = &(m_OptixDenoiser->NormalInput);
+                auto optixDenoiszerOutput = &(m_OptixDenoiser->ColorOutput);
 
                 std::map<std::string, FrameSnapshot::ImageBuffer> resBuffers;
                 m_DeferredOpenGLCalls.push([&]() {
-                    resBuffers["Motion vector direction"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
+                    resBuffers["Optix denoiser color input"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
                         m_Settings.renderResolution.y, 3 * sizeof(float));
 
-                    resBuffers["Motion vector magnitude"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
+                    resBuffers["Optix denoiser albedo input"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
+                        m_Settings.renderResolution.y, 3 * sizeof(float));
+
+                    resBuffers["Optix denoiser normal input"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
+                        m_Settings.renderResolution.y, 3 * sizeof(float));
+
+                    resBuffers["Optix denoiser color output"].m_Memory = std::make_unique<CudaGLTexture>(GL_RGB32F, m_Settings.renderResolution.x,
                         m_Settings.renderResolution.y, 3 * sizeof(float));
                     });
                 WaitForDeferredCalls();
 
-                SeparateMotionVectorBufferCPU(m_Settings.renderResolution.x * m_Settings.renderResolution.y,
-                    motionVectorBuffer->GetDevicePtr<MotionVectorBuffer>(),
-                    resBuffers.at("Motion vector direction").m_Memory->GetDevicePtr<float3>(),
-                    resBuffers.at("Motion vector magnitude").m_Memory->GetDevicePtr<float3>()
+                SeparateOptixDenoiserBufferCPU(m_Settings.renderResolution.x * m_Settings.renderResolution.y,
+                    optixDenoiserInput->GetDevicePtr<float3>(),
+                    OptixDenoiserAlbedoInput->GetDevicePtr<float3>(),
+                    OptixDenoiserNormalInput->GetDevicePtr<float3>(),
+                    optixDenoiszerOutput->GetDevicePtr<float3>(),
+                    resBuffers.at("Optix denoiser color input").m_Memory->GetDevicePtr<float3>(),
+                    resBuffers.at("Optix denoiser albedo input").m_Memory->GetDevicePtr<float3>(),
+                    resBuffers.at("Optix denoiser normal input").m_Memory->GetDevicePtr<float3>(),
+                    resBuffers.at("Optix denoiser color output").m_Memory->GetDevicePtr<float3>()
                 );
 
                 return resBuffers;
@@ -548,21 +631,27 @@ namespace WaveFront
 		SetAtomicCounter<VolumetricIntersectionData>(&m_VolumetricIntersectionData, counterDefault);
         CHECKLASTCUDAERROR;
 
+
+
         //Pass the buffers to the optix shader for shading.
         OptixLaunchParameters rayLaunchParameters {};
-        rayLaunchParameters.m_TraceType = RayType::INTERSECTION_RAY;
-        rayLaunchParameters.m_MinMaxDistance = { 0.01f, 5000.f };
-        rayLaunchParameters.m_IntersectionBuffer = m_IntersectionData.GetDevicePtr<AtomicBuffer<IntersectionData>>();
-		rayLaunchParameters.m_VolumetricIntersectionBuffer = m_VolumetricIntersectionData.GetDevicePtr<AtomicBuffer<VolumetricIntersectionData>>();
-        rayLaunchParameters.m_IntersectionRayBatch = m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>();
-        rayLaunchParameters.m_SceneData = sceneDataTableAccessor;
+
         rayLaunchParameters.m_TraversableHandle = accelerationStructure;
         rayLaunchParameters.m_ResolutionAndDepth = uint3{ m_Settings.renderResolution.x, m_Settings.renderResolution.y, m_Settings.depth };
+        rayLaunchParameters.m_IntersectionRayBatch = m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>();
+        rayLaunchParameters.m_IntersectionBuffer = m_IntersectionData.GetDevicePtr<AtomicBuffer<IntersectionData>>();
+        rayLaunchParameters.m_VolumetricIntersectionBuffer = m_VolumetricIntersectionData.GetDevicePtr<AtomicBuffer<VolumetricIntersectionData>>();
+        rayLaunchParameters.m_SceneData = sceneDataTableAccessor;
+        rayLaunchParameters.m_MinMaxDistance = { 0.01f, 5000.f };
+        rayLaunchParameters.m_TraceType = RayType::INTERSECTION_RAY;
+        // TODO: render resolution used in ray launch params
 
         //Set the amount of rays to trace. Initially same as screen size.
         auto numIntersectionRays = numPixels;
 
         auto seed = WangHash(frameCount);
+
+        float2 minMaxDepth = make_float2(m_Settings.minIntersectionT, m_Settings.maxIntersectionT);
 
         /*
          * Resolve rays and shade at every depth.
@@ -585,16 +674,30 @@ namespace WaveFront
 
         	if(numIntersections > 0)
         	{
+
+                //pass depth buffer into extract surface data
                 ExtractSurfaceData(
                     numIntersections,
                     m_IntersectionData.GetDevicePtr<AtomicBuffer<IntersectionData>>(),
                     m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>(),
                     m_SurfaceData[surfaceDataBufferIndex].GetDevicePtr<SurfaceData>(),
+                    m_DepthBuffer->GetSurfaceObject(),
+                    //m_PixelBufferCombined->GetSurfaceObject(), //To debug the depth buffer.
                     m_Settings.renderResolution,
-                    sceneDataTableAccessor);
+                    sceneDataTableAccessor,
+                    minMaxDepth,
+                    depth);
+
+
+                //extract depth data
+                //But loop is ran per intersection on ray(depth/surfaceDataBufferIndex)(?)
+                //so only calculate depth at 
+
+                //may also need to take into account that this only runs when intersected. maybe just initialize to null
 
                 cudaDeviceSynchronize();
                 CHECKLASTCUDAERROR;
+
         	}
 
             unsigned numVolumeIntersections = 0;
@@ -620,6 +723,7 @@ namespace WaveFront
             //motion vector generation
             if (depth == 0)
             {
+
                 glm::mat4 previousFrameMatrix, currentFrameMatrix;
                 m_Scene->m_Camera->GetMatrixData(previousFrameMatrix, currentFrameMatrix);
                 sutil::Matrix4x4 prevFrameMatrixArg = ConvertGLMtoSutilMat4(previousFrameMatrix);
@@ -628,12 +732,16 @@ namespace WaveFront
                 sutil::Matrix4x4 projectionMatrixArg = ConvertGLMtoSutilMat4(projectionMatrix);
 
                 MotionVectorsGenerationData motionVectorsGenerationData;
-                motionVectorsGenerationData.m_MotionVectorBuffer = nullptr;
-                motionVectorsGenerationData.a_CurrentSurfaceData = m_SurfaceData[currentIndex].GetDevicePtr<SurfaceData>();
-                motionVectorsGenerationData.m_ScreenResolution = make_uint2(m_Settings.renderResolution.x, m_Settings.renderResolution.y);
+                motionVectorsGenerationData.m_MotionVectorBuffer = m_MotionVectorBuffer->GetSurfaceObject();
+                motionVectorsGenerationData.m_CurrentSurfaceData = m_SurfaceData[currentIndex].GetDevicePtr<SurfaceData>();
+                // TODO: Render resolution used in motion vector generation data
+                motionVectorsGenerationData.m_RenderResolution = make_uint2(m_Settings.renderResolution.x, m_Settings.renderResolution.y);
                 motionVectorsGenerationData.m_PrevViewMatrix = prevFrameMatrixArg.inverse();
                 motionVectorsGenerationData.m_ProjectionMatrix = projectionMatrixArg;
-                m_MotionVectors.Update(motionVectorsGenerationData);
+
+                GenerateMotionVectors(motionVectorsGenerationData);
+                CHECKLASTCUDAERROR
+
             }
 
             /*
@@ -645,7 +753,7 @@ namespace WaveFront
                 m_SurfaceData[surfaceDataBufferIndex].GetDevicePtr<SurfaceData>(),
                 m_SurfaceData[temporalIndex].GetDevicePtr<SurfaceData>(),
                 m_VolumetricData[volumetricDataBufferIndex].GetDevicePtr<VolumetricData>(),
-                m_MotionVectors.GetMotionVectorBuffer()->GetDevicePtr<MotionVectorBuffer>(),
+                m_MotionVectorBuffer->GetSurfaceObject(),
                 &m_TriangleLights,
                 accelerationStructure,
                 m_OptixSystem.get(),
@@ -655,8 +763,9 @@ namespace WaveFront
                 m_ShadowRays.GetDevicePtr<AtomicBuffer<ShadowRayData>>(),
                 m_VolumetricShadowRays.GetDevicePtr<AtomicBuffer<ShadowRayData>>(),
                 m_ReSTIR.get(),
-                m_PixelBufferSeparate->GetSurfaceObject());
+                pixelBuffers);
 
+            shadingLaunchParams.m_FrameStats = &m_CurrentFrameStats;
             //Reset the ray buffer so that indirect shading can fill it again.
             ResetAtomicBuffer<IntersectionRayData>(&m_Rays);
             cudaDeviceSynchronize();
@@ -685,6 +794,8 @@ namespace WaveFront
             seed = WangHash(seed);
         }
 
+
+
         //The amount of shadow rays to trace.
         unsigned numShadowRays = GetAtomicCounter<ShadowRayData>(&m_ShadowRays);
 
@@ -692,11 +803,10 @@ namespace WaveFront
         {
 
             //The settings for shadow ray resolving.
-            OptixLaunchParameters shadowRayLaunchParameters;
-            shadowRayLaunchParameters = rayLaunchParameters; //Copy settings from the intersection rays.
-            shadowRayLaunchParameters.m_TraceType = RayType::SHADOW_RAY;
-            shadowRayLaunchParameters.m_ResultBuffer = m_PixelBufferSeparate->GetSurfaceObject();
+            OptixLaunchParameters shadowRayLaunchParameters = rayLaunchParameters; //Copy settings from the intersection rays.
             shadowRayLaunchParameters.m_ShadowRayBatch = m_ShadowRays.GetDevicePtr<AtomicBuffer<ShadowRayData>>();
+            shadowRayLaunchParameters.m_OutputChannels = pixelBuffers;
+            shadowRayLaunchParameters.m_TraceType = RayType::SHADOW_RAY;
 
             //Tell optix to resolve the shadow rays.
             m_OptixSystem->TraceRays(numShadowRays, shadowRayLaunchParameters);
@@ -710,50 +820,108 @@ namespace WaveFront
 		if (numVolumetricShadowRays > 0)
 		{
 			//The settings for shadow ray resolving.
-			OptixLaunchParameters shadowRayLaunchParameters;
-			shadowRayLaunchParameters = rayLaunchParameters;
-			shadowRayLaunchParameters.m_ResultBuffer = m_PixelBufferSeparate->GetSurfaceObject();
+			OptixLaunchParameters shadowRayLaunchParameters = rayLaunchParameters;
 			shadowRayLaunchParameters.m_ShadowRayBatch = m_VolumetricShadowRays.GetDevicePtr<AtomicBuffer<ShadowRayData>>();
+            shadowRayLaunchParameters.m_OutputChannels = pixelBuffers;
 			shadowRayLaunchParameters.m_TraceType = RayType::SHADOW_RAY;
 
-			//Tell optix to resolve the shadow rays.
 			m_OptixSystem->TraceRays(numVolumetricShadowRays, shadowRayLaunchParameters);
 			cudaDeviceSynchronize();
 			CHECKLASTCUDAERROR;
 		}
+        //Post-processing
+        {
+            // TODO: render and output resolution used in post processing
+            PostProcessLaunchParameters postProcessLaunchParams(
+                m_Settings.renderResolution,
+                m_Settings.outputResolution,
+                pixelBuffers,
+                m_PixelBufferCombined->GetSurfaceObject(),
+                m_IntermediateOutputBuffer.GetDevicePtr<uchar4>(),  //might be uneccesary
+                m_Settings.blendOutput,
+                m_BlendCounter
+            );
+            //Post processing using CUDA kernel.
+            //PostProcess(postProcessLaunchParams);
 
-        PostProcessLaunchParameters postProcessLaunchParams(
-            m_Settings.renderResolution,
-            m_Settings.outputResolution,
-            m_PixelBufferSeparate->GetSurfaceObject(),
-            m_PixelBufferCombined->GetSurfaceObject(),
-            m_IntermediateOutputBuffer.GetDevicePtr<uchar4>(),
-            m_Settings.blendOutput,
-            m_BlendCounter
-        );
+            MergeOutput(postProcessLaunchParams);
+            cudaDeviceSynchronize();
+            CHECKLASTCUDAERROR;
 
-        //Post processing using CUDA kernel.
-        PostProcess(postProcessLaunchParams);
-        cudaDeviceSynchronize();
-        CHECKLASTCUDAERROR;
+            OptixDenoiserLaunchParameters optixDenoiserLaunchParams(
+                m_Settings.renderResolution,
+                m_SurfaceData[currentIndex].GetDevicePtr<SurfaceData>(),
+                m_PixelBufferCombined->GetSurfaceObject(),
+                m_OptixDenoiser->ColorInput.GetDevicePtr<float3>(),
+                m_OptixDenoiser->AlbedoInput.GetDevicePtr<float3>(),
+                m_OptixDenoiser->NormalInput.GetDevicePtr<float3>(),
+                m_OptixDenoiser->ColorOutput.GetDevicePtr<float3>()
+            );
 
-        OptixDenoiserDenoiseParams optixDenoiserParams = {};
-        optixDenoiserParams.m_PostProcessLaunchParams = &postProcessLaunchParams;
-        //optixDenoiserParams.m_ColorInput = m_PixelBufferCombined.GetCUDAPtr();
-        //optixDenoiserParams.m_Output = m_IntermediateOutputBuffer.GetCUDAPtr();
-        m_OptixDenoiser->Denoise(optixDenoiserParams);
+            PrepareOptixDenoising(optixDenoiserLaunchParams);
+            CHECKLASTCUDAERROR;
+
+            OptixDenoiserDenoiseParams optixDenoiserParams = {}; 
+            optixDenoiserParams.m_PostProcessLaunchParams = &postProcessLaunchParams; 
+            optixDenoiserParams.m_ColorInput = m_OptixDenoiser->ColorInput.GetCUDAPtr();
+            optixDenoiserParams.m_AlbedoInput = m_OptixDenoiser->AlbedoInput.GetCUDAPtr();
+            optixDenoiserParams.m_NormalInput = m_OptixDenoiser->NormalInput.GetCUDAPtr();
+            optixDenoiserParams.m_Output = m_OptixDenoiser->ColorOutput.GetCUDAPtr();
+            m_OptixDenoiser->Denoise(optixDenoiserParams); 
+            CHECKLASTCUDAERROR;
+
+            //FinishOptixDenoising(optixDenoiserLaunchParams);
+            CHECKLASTCUDAERROR;
+
+            //TODO: move to after DLSS and NRD runs... (Requires mapping to use in CUDA again).
+            WriteToOutput(postProcessLaunchParams);     //Breaks here when render and output resolution dont match
+            cudaDeviceSynchronize();
+            CHECKLASTCUDAERROR;
+
+            //Cuda should no longer be operating on the pixel-buffers.
+            //Unmap separate channel pixel-buffer
+            for (auto& buffer : m_PixelBufferSeparate)
+            {
+                buffer->Unmap();
+            }
+
+            //Unmap other buffers for use in DLSS
+            m_PixelBufferCombined->Unmap();
+            m_DepthBuffer->Unmap();
+            m_MotionVectorBuffer->Unmap();
+            m_JitterBuffer->Unmap();
+
+            // TODO: Render and output resolutions used in DLSS init params
+            if (m_DLSS)    // Should really do this differently, DLSS not initialized properly yet
+            {
+                std::shared_ptr<DLSSWrapperInitParams> params = m_DLSS->GetDLSSParams();
+                params->m_InputImageWidth = m_Settings.renderResolution.x;
+                params->m_InputImageHeight = m_Settings.renderResolution.y;
+                params->m_OutputImageWidth = m_Settings.outputResolution.x;
+                params->m_OutputImageHeight = m_Settings.outputResolution.y;
+                params->m_DLSSMode = static_cast<DLSSWrapperInitParams::DLSSMode>(m_DlssMode);
+
+                CHECKLASTCUDAERROR;
+
+                //m_DX11Wrapper->GetContext()->CopyResource(m_DX11Wrapper->m_D3D11PixelBufferCombined, m_D3D11PixelBufferCombined.Get());
+
+                m_DLSS->EvaluateDLSS(m_D3D11PixelBufferCombined, m_D3D11PixelBufferCombined, m_D3D11DepthBuffer, m_D3D11MotionVectorBuffer, m_D3D11JitterBuffer);
+                //m_DLSS->EvaluateDLSS(dlssInitParams, m_D3D11PixelBufferCombined, m_MotionVectors.GetMotionVectorDirectionsTex());
+            }
+
+        }
 
         // Critical scope for updating the output texture
         {
             std::unique_lock guard(m_OutputBufferMutex); // Take ownership of the mutex, locking it
 
-            auto err = cudaGetLastError();
+            CHECKLASTCUDAERROR;
 
             // Perform a GPU to GPU copy, from the intermediate output buffer to the real output buffer
-            auto err1 = cudaMemcpy(m_OutputBuffer->GetDevicePtr<void>(), m_IntermediateOutputBuffer.GetDevicePtr(),
-                m_IntermediateOutputBuffer.GetSize(), cudaMemcpyKind::cudaMemcpyDeviceToDevice);
+            CHECKCUDAERROR(cudaMemcpy(m_OutputBuffer->GetDevicePtr<void>(), m_IntermediateOutputBuffer.GetDevicePtr(),
+                m_IntermediateOutputBuffer.GetSize(), cudaMemcpyKind::cudaMemcpyDeviceToDevice));
 
-            cudaDeviceSynchronize();
+            CHECKCUDAERROR(cudaDeviceSynchronize());
 
             // Once the memcpy is complete, the lock guard releases the mutex
         }
@@ -779,17 +947,38 @@ namespace WaveFront
         m_Scene->m_Camera->UpdatePreviousFrameMatrix();
         ++frameCount;
 
+        m_OptixDenoiser->UpdateDebugTextures();
+        m_DeferredOpenGLCalls.push([&]() {
+            //m_DebugTexture = m_OptixDenoiser->m_OptixDenoiserInputTex.m_Memory->GetTexture();
+            //m_DebugTexture = m_OptixDenoiser->m_OptixDenoiserAlbedoInputTex.m_Memory->GetTexture();
+            //m_DebugTexture = m_OptixDenoiser->m_OptixDenoiserNormalInputTex.m_Memory->GetTexture();
+            m_DebugTexture = m_OptixDenoiser->m_OptixDenoiserOutputTex.m_Memory->GetTexture();
+            });
+        WaitForDeferredCalls();
+
 
         // TODO: Weird debug code. Yeet?
-        //m_DebugTexture = m_OutputTexture;
+        //m_DebugTexture = m_OutputBuffer->GetTexture();
         //#if defined(_DEBUG)
-        m_MotionVectors.GenerateDebugTextures();
+        //m_MotionVectors.GenerateDebugTextures();
+        ////m_DebugTexture = m_MotionVectors.GetMotionVectorDirectionsTex();
         //m_DebugTexture = m_MotionVectors.GetMotionVectorMagnitudeTex();
 
+        /*m_OptixDenoiser->UpdateDebugTextures();
+        m_DebugTexture = m_OptixDenoiser->m_OptixDenoiserInputTex.m_Memory->GetTexture();*/
+
         m_SnapshotReady = recordingSnapshot;
+
+        FinalizeFrameStats();
+
         CHECKLASTCUDAERROR;
 
         printf("Total frame time: %f milliseconds.\n", timer.measure(TimeUnit::MILLIS));
+
+        //tonemapping should be done before DLSS
+        //DLSS performs better on LDR data as opposed to HDR
+
+        
     }
 
     std::unique_ptr<MemoryBuffer> WaveFrontRenderer::InterleaveVertexData(const PrimitiveData& a_MeshData) const
@@ -1025,6 +1214,21 @@ namespace WaveFront
     {
         return std::make_shared<PTScene>(a_SceneData, m_ServiceLocator);
     }
+    
+    void WaveFrontRenderer::InitNGX()
+    {
+
+        // TODO: render and output resolutions used in DLSS init
+        m_DLSS = std::make_unique<DlssWrapper>();
+        DLSSWrapperInitParams dlssInitParams;
+        dlssInitParams.m_InputImageWidth = m_Settings.renderResolution.x;
+        dlssInitParams.m_InputImageHeight = m_Settings.renderResolution.y;
+        dlssInitParams.m_OutputImageWidth = m_Settings.outputResolution.x;
+        dlssInitParams.m_OutputImageHeight = m_Settings.outputResolution.y;
+        dlssInitParams.m_pServiceLocator = &m_ServiceLocator;
+        m_DLSS->Initialize(dlssInitParams);
+
+    }
 
     WaveFrontRenderer::WaveFrontRenderer() : m_BlendCounter(0)
         , m_FrameIndex(0)
@@ -1081,21 +1285,76 @@ namespace WaveFront
         ////Set up the OpenGL output buffer.
         //m_OutputBuffer->Resize(m_Settings.outputResolution.x, m_Settings.outputResolution.y);
 
+        // TODO: num pixels using render resolution
         //Set up buffers.
-        const unsigned numPixels = m_Settings.renderResolution.x * m_Settings.renderResolution.y;
-        const unsigned numOutputChannels = static_cast<unsigned>(LightChannel::NUM_CHANNELS);
+        const unsigned numPixels = m_Settings.outputResolution.x * m_Settings.outputResolution.y;
 
         //CheckCudaLastErr();
         m_IntermediateOutputBuffer.Resize(sizeof(uchar4) * numPixels);
 
         
 
-        //Allocate pixel buffer.
-        m_PixelBufferSeparate->Resize({ m_Settings.renderResolution.x, m_Settings.renderResolution.y, numOutputChannels });
+        //Allocate pixel buffers.
+        //Multiple channel pixel buffer.
+        //Unmap the resources to be sure they aren't being used anymore.
+        for(auto& channel : m_PixelBufferSeparate)
+        {
+            channel->Unmap();
+        }
+
+        //First unregister all resources as the original d3d11 resource will get deleted and re-created.
+        InteropGPUTexture::UnRegisterResource(m_D3D11PixelBufferSeparate);
+
+        m_DX11Wrapper->ResizeTexture2D(m_D3D11PixelBufferSeparate, {m_Settings.renderResolution.x, m_Settings.renderResolution.y, s_numLightChannels});
+
+        for(unsigned int channelIndex = 0; channelIndex < s_numLightChannels; ++channelIndex)
+        {
+
+            m_PixelBufferSeparate[channelIndex]->RegisterResource(m_D3D11PixelBufferSeparate);
+
+            //Make sure to initialize the buffer with 0s
+            m_PixelBufferSeparate[channelIndex]->Map(channelIndex);
+            m_PixelBufferSeparate[channelIndex]->Clear();
+            m_PixelBufferSeparate[channelIndex]->Unmap();
+            
+        }
 
         //Single channel pixel buffer.
-        m_PixelBufferCombined->Resize({m_Settings.renderResolution.x, m_Settings.renderResolution.y, 0});
+        m_PixelBufferCombined->Unmap();
 
+        InteropGPUTexture::UnRegisterResource(m_D3D11PixelBufferCombined);
+
+        m_DX11Wrapper->ResizeTexture2D(m_D3D11PixelBufferCombined, { m_Settings.renderResolution.x, m_Settings.renderResolution.y, 1 });
+
+        m_PixelBufferCombined->RegisterResource(m_D3D11PixelBufferCombined);
+        m_PixelBufferCombined->Map();
+        m_PixelBufferCombined->Clear();
+        m_PixelBufferCombined->Unmap();
+
+        //Depth buffer.
+        m_DepthBuffer->Unmap();
+
+        InteropGPUTexture::UnRegisterResource(m_D3D11DepthBuffer);
+
+        m_DX11Wrapper->ResizeTexture2D(m_D3D11DepthBuffer, { m_Settings.renderResolution.x, m_Settings.renderResolution.y, 1 });
+
+        m_DepthBuffer->RegisterResource(m_D3D11DepthBuffer);
+        m_DepthBuffer->Map();
+        m_DepthBuffer->Clear();
+        m_DepthBuffer->Unmap();
+
+        //Motion vector buffer.
+        m_MotionVectorBuffer->Unmap();
+
+        InteropGPUTexture::UnRegisterResource(m_D3D11MotionVectorBuffer);
+
+        m_DX11Wrapper->ResizeTexture2D(m_D3D11MotionVectorBuffer, { m_Settings.renderResolution.x, m_Settings.renderResolution.y, 1 });
+
+        m_MotionVectorBuffer->RegisterResource(m_D3D11MotionVectorBuffer);
+        m_MotionVectorBuffer->Map();
+        m_MotionVectorBuffer->Clear();
+        m_MotionVectorBuffer->Unmap();
+        
         //Initialize the ray buffers. Note: These are not initialized but Reset() is called when the waves start.
         const auto numPrimaryRays = numPixels;
         const auto numShadowRays = numPixels * m_Settings.depth;// +(numPixels * ReSTIRSettings::numReservoirsPerPixel); //TODO: change to 2x num pixels and add safety check to resolve when full.
@@ -1106,7 +1365,6 @@ namespace WaveFront
 		CreateAtomicBuffer<ShadowRayData>(&m_VolumetricShadowRays, numShadowRays * 5);	//TODO: replace hardcoded number of samples (5)
 		CreateAtomicBuffer<IntersectionData>(&m_IntersectionData, numPixels);
 		CreateAtomicBuffer<VolumetricIntersectionData>(&m_VolumetricIntersectionData, numPixels);
-
 
 		//Initialize each surface data buffer.
 		for (auto& surfaceDataBuffer : m_SurfaceData)
@@ -1119,8 +1377,6 @@ namespace WaveFront
 		{
 			volumetricDataBuffer.Resize(numPixels * sizeof(VolumetricData));
 		}
-
-        m_MotionVectors.Init(make_uint2(m_Settings.renderResolution.x, m_Settings.renderResolution.y));
 
         //Use mostly the default values.
         ReSTIRSettings rSettings;
@@ -1163,5 +1419,14 @@ namespace WaveFront
         }
     }
 
+    void WaveFrontRenderer::FinalizeFrameStats()
+    {
+        std::lock_guard lk(m_FrameStatsMutex);
+
+        m_LastFrameStats = m_CurrentFrameStats;
+        m_LastFrameStats.m_Id++;
+        m_CurrentFrameStats = {};
+        m_CurrentFrameStats.m_Id = m_LastFrameStats.m_Id;
+    }
 }
 #endif

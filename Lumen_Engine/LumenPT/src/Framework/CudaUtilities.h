@@ -13,7 +13,8 @@ inline void CheckOptixRes(const OptixResult& a_res, const char* a_File, int a_Li
         std::fprintf(
             stderr,
             "Optix error occured: %s \n"
-            "\tFile: %s, Line:%i \n"
+            "\tFile: %s \n"
+            "\tLine: %i \n"
             "\tDescription: %s",
             errorName.c_str(),
             a_File,
@@ -40,8 +41,9 @@ inline void CheckCudaErr(const cudaError& a_err, const char* a_File, int a_Line)
 
         std::fprintf(
             stderr,
-            "CUDA error occured: %s \n"\
-            "\tFile: %s, Line: %i \n"
+            "CUDA error occured: %s \n"
+            "\tFile: %s \n"
+            "\tLine: %i \n"
             "\tDescription: %s",
             errorName.c_str(),
             a_File,

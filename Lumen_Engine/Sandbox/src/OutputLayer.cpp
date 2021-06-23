@@ -21,11 +21,13 @@
 
 #include "Lumen/ToolUI/ModelLoaderWidget.h"
 #include "Lumen/ToolUI/SceneGraph.h"
+#include "Lumen/ToolUI/Profiler.h"
 #include "../vendor/stb/stb_image_write.h"
 
 #include "Glad/glad.h"
 
 #include "imgui/imgui.h"
+#include "imgui/implot.h"
 
 #include "GLFW/glfw3.h"
 
@@ -111,6 +113,7 @@ void OutputLayer::OnAttach()
 	m_ModelLoaderWidget = std::make_unique<ModelLoaderWidget>(*m_LayerServices->m_SceneManager, m_Renderer->m_Scene);
 	m_SceneGraph = std::make_unique<Lumen::SceneGraph>();
 	m_SceneGraph->SetRendererRef(*m_Renderer);
+	m_Profiler = std::make_unique<Profiler>();
 }
 
 void OutputLayer::OnUpdate()
@@ -173,37 +176,66 @@ void OutputLayer::OnImGuiRender()
 		return;
 	}
 
-	ImGuiCameraSettings();
-	if (!m_Renderer->m_Scene->m_MeshInstances.empty())
+	auto tooltip = [](std::string a_Tip)
 	{
-		auto& tarTransform = m_Renderer->m_Scene->m_MeshInstances[0]->m_Transform;
-
-		glm::vec3 pos, scale, rot;
-		pos = tarTransform.GetPosition();
-		scale = tarTransform.GetScale();
-		rot = tarTransform.GetRotationEuler();
-
-		ImGui::Begin("ModelBoi 3000");
-		ImGui::DragFloat3("Position", &pos[0]);
-		ImGui::DragFloat3("Scale", &scale[0]);
-		ImGui::DragFloat3("Rotation", &rot[0]);
-		tarTransform.SetPosition(pos);
-		tarTransform.SetScale(scale);
-
-		auto deltaRotation = rot - tarTransform.GetRotationEuler();
-
-		glm::quat deltaQuat = glm::quat(glm::radians(deltaRotation));
-		if (ImGui::Button("Reset Rotation"))
+		if (ImGui::IsItemHovered())
 		{
-			tarTransform.SetRotation(glm::vec3(0.0f));
+			ImGui::BeginTooltip();
+			ImGui::Text(a_Tip.c_str());
+			ImGui::EndTooltip();
 		}
-		else
-		{
-			tarTransform.Rotate(deltaQuat);
-		}
-		ImGui::End();
+	};
 
+	if (ImGui::BeginMainMenuBar())
+	{
+		
+	    if (ImGui::BeginMenu("Tools and Debugging"))
+	    {
+			if (ImGui::Selectable("Scene Graph", m_EnabledTools.m_SceneGraph))
+				m_EnabledTools.m_SceneGraph = !m_EnabledTools.m_SceneGraph;
+
+			if (ImGui::Selectable("File Loader", m_EnabledTools.m_FileLoader))
+				m_EnabledTools.m_FileLoader = !m_EnabledTools.m_FileLoader;
+
+			if (ImGui::Selectable("Camera Settings", m_EnabledTools.m_CameraSettings))
+				m_EnabledTools.m_CameraSettings = !m_EnabledTools.m_CameraSettings;
+
+			if (ImGui::Selectable("Output Image Size settings", m_EnabledTools.m_ImageResizer))
+				m_EnabledTools.m_ImageResizer = !m_EnabledTools.m_ImageResizer;
+
+			if (ImGui::Selectable("Pixel Debugger", m_EnabledTools.m_PixelDebugger))
+				m_EnabledTools.m_PixelDebugger = !m_EnabledTools.m_PixelDebugger;
+			tooltip("Enable a tool that can be used to debug snapshotted pixel buffers");
+
+			if (ImGui::Selectable("Debug Viewport", m_EnabledTools.m_DebugViewport))
+				m_EnabledTools.m_DebugViewport = !m_EnabledTools.m_DebugViewport;
+			tooltip("Enable a viewport used for debugging off-screen resources");
+
+			if (ImGui::Selectable("Profiler", m_EnabledTools.m_Profiler))
+				m_EnabledTools.m_Profiler = !m_EnabledTools.m_Profiler;
+
+			ImGui::EndMenu();
+	    }
+
+		ImGui::Separator();
+
+		if (ImGui::Button("Screenshot"))
+			MakeScreenshot(DefaultScreenshotName());
+
+        if (ImGui::IsItemHovered())
+        {
+			ImGui::BeginTooltip();
+			ImGui::Text("Take a screenshot of the current renderer output. File can be found in the Screenshots folder.");
+			ImGui::EndTooltip();
+        }
+
+		ImGui::EndMainMenuBar();
 	}
+
+    if (m_EnabledTools.m_CameraSettings)
+    {
+	    ImGuiCameraSettings();        
+    }
 
 	if (!m_Renderer->m_Scene->m_VolumeInstances.empty())
 	{
@@ -239,185 +271,78 @@ void OutputLayer::OnImGuiRender()
 
     // ##ToolBookmark
 	// Example of creating a window with an image from a CudaGLTexture object
+	if (m_EnabledTools.m_DebugViewport)
 	{
-		ImGui::Begin("Extra Viewport for bonus swegpoints");
+		ImGui::Begin("Debug viewport");
 
-		ImGuiUtil::DisplayImage(m_Renderer->m_DebugTexture, glm::ivec2(400, 300));
+		ImGuiUtil::DisplayImage(m_Renderer->m_DebugTexture, glm::ivec2(600, 450));
 
 		ImGui::End();
     }
 
 	// Beginning of the pixel debugger tool, assuming any snapshots have been taken
-    if (!m_FrameSnapshots.empty())
+
+    if (m_EnabledTools.m_PixelDebugger)
     {
-		ImGui::Begin("Frame Snapshots and other trinkets and baubles");
-
-		// Button to clear all snapshots
-        if (ImGui::Button("Clear Snapshots"))
-			m_FrameSnapshots.clear();
-
-		// Dropdown for all taken snapshots
-		if (ImGui::BeginCombo("Snapshots", 
-			(m_CurrentSnapShotIndex != -1) ? (std::string("Snapshot ") + std::to_string(m_CurrentSnapShotIndex)).c_str() : "No Snapshot selected"))
-		{
-			for (size_t i = 0; i < m_FrameSnapshots.size(); i++)
-			{
-				std::string name = "Snapshot " + std::to_string(i);
-                if (ImGui::Selectable(name.c_str()))
-                {
-					m_CurrentSnapShotIndex = i;
-					m_CurrentImageBuffer = nullptr;
-                }
-			}
-			ImGui::EndCombo();
-		}
-
-		// If a snapshot has been selected
-        if (m_CurrentSnapShotIndex != -1)
-        {
-			// Button to delete the currently selected snapshot
-			if (ImGui::Button("Delete Snapshot"))
-			{
-				m_FrameSnapshots.erase(m_FrameSnapshots.begin() + m_CurrentSnapShotIndex);
-				m_CurrentSnapShotIndex = -1;
-				m_CurrentImageBuffer = nullptr;
-			}
-
-			// Dropdown to select an image buffer to use the tool on
-			auto preview = m_CurrentImageBuffer ? m_CurrentImageBuffer->first : "No image buffer selected";
-			if (ImGui::BeginCombo("Snapshot buffers", preview.c_str()))
-			{
-                for (auto& frameSnapshot : m_FrameSnapshots[m_CurrentSnapShotIndex]->GetImageBuffers())
-                {
-                    if (ImGui::Selectable(frameSnapshot.first.c_str()))
-                    {
-						m_CurrentImageBuffer = &frameSnapshot;
-                    }
-                }
-				ImGui::EndCombo();
-			}
-        }
-
-		// If an Image buffer has been selected
-        if (m_CurrentImageBuffer)
-        {
-			// Calc to make the image scale with the window size while keeping its ratio
-			auto windowSize = ImGui::GetWindowSize();
-			windowSize.x -= 25.0f; // around -25 makes the image look nicely aligned in the middle of the window
-			auto imageSize = m_CurrentImageBuffer->second.m_Memory->GetSize();
-			auto imageRatio = static_cast<float>(imageSize.x) / static_cast<float>(imageSize.y);
-           
-		    imageSize = glm::ivec2(windowSize.x, windowSize.x / imageRatio);			
-
-			ImGuiUtil::DisplayImage(*m_CurrentImageBuffer->second.m_Memory, imageSize, m_SnapshotUV1, m_SnapshotUV2);
-
-			// Find if the mouse cursor is hovering the image and what its UV coordinates would be
-			auto minRect = ImGui::GetItemRectMin();
-			auto maxRect = ImGui::GetItemRectMax();
-			auto itemSize = ImGui::GetItemRectSize();
-			auto mPos = ImGui::GetMousePos();
-			auto mouseUV = glm::vec2((mPos.x - minRect.x) / itemSize.x, (mPos.y - minRect.y) / itemSize.y);
-
-			bool mouseOnImage = mPos.x > minRect.x && mPos.x < maxRect.x&& mPos.y > minRect.y && mPos.y < maxRect.y;
-
-            if (mouseOnImage)
-            {
-			    const float scrollSensitivity = 0.02f;
-				const float mouseSensitivity = 0.002f;
-				auto mouseWheel = -Lumen::Input::GetMouseWheel().y;
-
-				// Zoom in on the mouse cursor with math.
-				// Scales the effect of the scroll based on how close to the corners the mouse is to make it work.
-				m_SnapshotUV1 -= scrollSensitivity * mouseWheel * mouseUV;
-				m_SnapshotUV2 += scrollSensitivity * mouseWheel * (1.0f - mouseUV);
-
-				m_SnapshotUV1 = glm::clamp(m_SnapshotUV1, 0.0f, 1.0f);
-				m_SnapshotUV2 = glm::clamp(m_SnapshotUV2, 0.0f, 1.0f);
-
-				glm::vec2 uvSize = m_SnapshotUV2 - m_SnapshotUV1;
-				glm::vec2 mouseDelta = glm::vec2(0.0f);
-				if (Lumen::Input::IsMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT))
-				{
-					auto d = Lumen::Input::GetMouseDelta();
-					mouseDelta = glm::vec2(d.first, d.second);
-					// Move the UVs based on mouse movement
-					m_SnapshotUV1 += mouseSensitivity * mouseDelta * uvSize.x;
-					m_SnapshotUV2 += mouseSensitivity * mouseDelta * uvSize.x;
-
-					// Make sure that the movement of the UVs does not leave the [0.0, 1.0] range while keeping the zoom consistent
-					if (m_SnapshotUV1.x < 0.0f)
-					{
-						m_SnapshotUV1.x = 0.0f;
-						m_SnapshotUV2.x = uvSize.x;
-					}
-					else if (m_SnapshotUV2.x > 1.0f)
-					{
-						m_SnapshotUV2.x = 1.0f;
-						m_SnapshotUV1.x = 1.0f - uvSize.x;
-					}
-					if (m_SnapshotUV1.y < 0.0f)
-					{
-						m_SnapshotUV1.y = 0.0f;
-						m_SnapshotUV2.y = uvSize.y;
-					}
-					else if (m_SnapshotUV2.y > 1.0f)
-					{
-						m_SnapshotUV2.y = 1.0f;
-						m_SnapshotUV1.y = 1.0f - uvSize.y;
-					}
-				}
-
-            }
-
-			// Dropdown to select how the texture data is displayed in the tool
-			if (ImGui::BeginCombo("Content View Mode", m_ContentViewNames[m_CurrContentView].c_str()))
-			{
-				ContentViewDropDown();
-
-				ImGui::EndCombo();
-			}
-
-			// Display the mouse cursor location and its contents.
-            if (mouseOnImage)
-            {
-				glm::vec2 imageSize = m_CurrentImageBuffer->second.m_Memory->GetSize();
-				auto pxlID = glm::ivec2(imageSize * mouseUV);
-
-				ImGui::Text("PixelID: [%i; %i] | UV: [%0.3f, %0.3f]", pxlID.x, pxlID.y, mouseUV.x, mouseUV.y);
-
-				m_ContentViewFunc(mouseUV);
-            }
-
-        }
-		ImGui::End();
+		ImGuiPixelDebugger();
     }
 
+    if (m_EnabledTools.m_ImageResizer)
+    {
+		auto newRes = m_Renderer->GetRenderResolution();
+		ImGui::Begin("Image size settings");
+		if (ImGui::BeginMenu("Preset Sizes"))
+		{
+            for (auto& preset : ms_PresetSizes)
+            {
+                if (ImGui::Selectable(preset.first.c_str()))
+                {
+					newRes = preset.second;
+                }
 
-	ImGui::Begin("Output doodle Shrink-inator");
+				tooltip(std::to_string(preset.second.x) + "x" + std::to_string(preset.second.y));
+            }
+			ImGui::EndMenu();
+		}
 
-	auto newRes = m_Renderer->GetRenderResolution();
 
-	ImGui::DragInt2("Output image dimensions", reinterpret_cast<int*>(&newRes[0]), 0.25f, 0);
+		ImGui::DragInt2("Output image dimensions", reinterpret_cast<int*>(&newRes[0]), 0.25f, 0);
 
-	if (newRes != m_Renderer->GetRenderResolution())
-	{
-		newRes = glm::min(newRes, 4000u);
-		m_Renderer->SetRenderResolution(newRes);
-	}
+		if (newRes != m_Renderer->GetRenderResolution())
+		{
+			newRes = glm::min(newRes, 4000u);
+			m_Renderer->SetRenderResolution(newRes);
+		}
 
-	if (ImGui::Button("Screenshot"))
-	{
-		MakeScreenshot(std::filesystem::current_path().string() + "\\Screenshots\\" + DefaultScreenshotName());
-	}
+		if (ImGui::Button("Screenshot"))
+		{
+			MakeScreenshot(std::filesystem::current_path().string() + "\\Screenshots\\" + DefaultScreenshotName());
+		}
+		ImGui::End();
 
-	ImGui::End();
+    }
+
+	auto lastFrame = m_Renderer->GetLastFrameStats();
+	m_Profiler->AddUniqueStats(lastFrame);
+    if (m_EnabledTools.m_Profiler)
+    {
+    	m_Profiler->Display();
+    }
+
 
 	/////////////////////////////////////////////////
 	// Model loading shenanigans
 	/////////////////////////////////////////////////
 
-	m_ModelLoaderWidget->Display();
-	m_SceneGraph->Display(*m_Renderer->m_Scene);
+    if (m_EnabledTools.m_FileLoader)
+    {
+	    m_ModelLoaderWidget->Display();        
+    }
+
+    if (m_EnabledTools.m_SceneGraph)
+    {
+	    m_SceneGraph->Display(*m_Renderer->m_Scene);        
+    }
 }
 
 void OutputLayer::OnEvent(Lumen::Event& a_Event)
@@ -512,15 +437,36 @@ void OutputLayer::HandleCameraInput(Camera& a_Camera)
 		return;
 	}
 
+	if (m_Renderer->GetBlendMode() != m_BlendMode)
+	{
+		m_Renderer->SetBlendMode(m_BlendMode);
+	}
+
+	//Toggle between merging and not merging output.
+	static std::chrono::time_point<std::chrono::steady_clock> lastToggle = std::chrono::high_resolution_clock::now();
+	if (Lumen::Input::IsKeyPressed(LMN_KEY_P))
+	{
+		//Don't spam it, just toggle once every 500 millis.
+		auto now = std::chrono::high_resolution_clock::now();
+		if (std::chrono::duration_cast<std::chrono::milliseconds>(now - lastToggle).count() > 500)
+		{
+			lastToggle = now;
+			m_Renderer->SetBlendMode(!m_Renderer->GetBlendMode());
+			printf("Output append mode is now %s.\n", (m_Renderer->GetBlendMode() ? "on" : "off"));
+			m_BlendMode = m_Renderer->GetBlendMode();
+		}
+	}
+
     if (!ImGui::IsAnyItemActive() && Lumen::Input::IsMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT))
 	{
 		auto delta = Lumen::Input::GetMouseDelta();
-
-		a_Camera.IncrementYaw(-glm::radians(delta.first * m_CameraMouseSensitivity));
-		a_Camera.IncrementPitch(glm::radians(delta.second * m_CameraMouseSensitivity));
-
+		if (delta.first != 0 || delta.second != 0)
+		{
+			a_Camera.IncrementYaw(-glm::radians(delta.first * m_CameraMouseSensitivity));
+			a_Camera.IncrementPitch(glm::radians(delta.second * m_CameraMouseSensitivity));
+			m_Renderer->SetBlendMode(false);
+		}
 	}
-
 
 	float movementSpeed = m_CameraMovementSpeed / 60.f;
 	
@@ -553,23 +499,12 @@ void OutputLayer::HandleCameraInput(Camera& a_Camera)
 		movementDirection += glm::normalize(V) * movementSpeed;
 	}
 
-	//Toggle between merging and not merging output.
-	static std::chrono::time_point<std::chrono::steady_clock> lastToggle = std::chrono::high_resolution_clock::now();
-	if (Lumen::Input::IsKeyPressed(LMN_KEY_P))
-	{
-		//Don't spam it, just toggle once every 500 millis.
-		auto now = std::chrono::high_resolution_clock::now();
-		if (std::chrono::duration_cast<std::chrono::milliseconds>(now - lastToggle).count() > 500)
-		{
-		    lastToggle = now;
-		    m_Renderer->SetBlendMode(!m_Renderer->GetBlendMode());
-			printf("Output append mode is now %s.\n", (m_Renderer->GetBlendMode() ? "on" : "off"));
-		}
-	}
+	
 
 	if(glm::length(movementDirection))
 	{
 		a_Camera.SetPosition(eye + glm::normalize(movementDirection) * movementSpeed);
+		m_Renderer->SetBlendMode(false);
 	}
 
 	constexpr float rotationSpeed = 100.f * (1.0f / 60.f);
@@ -611,7 +546,161 @@ void OutputLayer::ImGuiCameraSettings()
 
 	ImGui::SliderFloat("Gamma strength/Brightness", &m_Gamma, 1.0f, 4.0f);
 
+	ImGui::Combo("DLSS setting", &m_Dlss_SelectedMode, "Off\0Max performance\0Balanced\0Max quality\0Ultra performance\0Ultra quality\0");
+	m_Renderer->m_DlssMode = m_Dlss_SelectedMode;
+
 	ImGui::End();
+}
+
+void OutputLayer::ImGuiPixelDebugger()
+{
+	ImGui::Begin("Pixel debugger and frame snapshots");
+	if (!m_FrameSnapshots.empty())
+	{
+
+		// Button to clear all snapshots
+		if (ImGui::Button("Clear Snapshots"))
+			m_FrameSnapshots.clear();
+
+		// Dropdown for all taken snapshots
+		if (ImGui::BeginCombo("Snapshots",
+			(m_CurrentSnapShotIndex != -1) ? (std::string("Snapshot ") + std::to_string(m_CurrentSnapShotIndex)).c_str() : "No Snapshot selected"))
+		{
+			for (size_t i = 0; i < m_FrameSnapshots.size(); i++)
+			{
+				std::string name = "Snapshot " + std::to_string(i);
+				if (ImGui::Selectable(name.c_str()))
+				{
+					m_CurrentSnapShotIndex = i;
+					m_CurrentImageBuffer = nullptr;
+				}
+			}
+			ImGui::EndCombo();
+		}
+
+		// If a snapshot has been selected
+		if (m_CurrentSnapShotIndex != -1)
+		{
+			// Button to delete the currently selected snapshot
+			if (ImGui::Button("Delete Snapshot"))
+			{
+				m_FrameSnapshots.erase(m_FrameSnapshots.begin() + m_CurrentSnapShotIndex);
+				m_CurrentSnapShotIndex = -1;
+				m_CurrentImageBuffer = nullptr;
+			}
+
+			// Dropdown to select an image buffer to use the tool on
+			auto preview = m_CurrentImageBuffer ? m_CurrentImageBuffer->first : "No image buffer selected";
+			if (ImGui::BeginCombo("Snapshot buffers", preview.c_str()))
+			{
+				for (auto& frameSnapshot : m_FrameSnapshots[m_CurrentSnapShotIndex]->GetImageBuffers())
+				{
+					if (ImGui::Selectable(frameSnapshot.first.c_str()))
+					{
+						m_CurrentImageBuffer = &frameSnapshot;
+					}
+				}
+				ImGui::EndCombo();
+			}
+		}
+
+		// If an Image buffer has been selected
+		if (m_CurrentImageBuffer)
+		{
+			// Calc to make the image scale with the window size while keeping its ratio
+			auto windowSize = ImGui::GetWindowSize();
+			windowSize.x -= 25.0f; // around -25 makes the image look nicely aligned in the middle of the window
+			auto imageSize = m_CurrentImageBuffer->second.m_Memory->GetSize();
+			auto imageRatio = static_cast<float>(imageSize.x) / static_cast<float>(imageSize.y);
+
+			imageSize = glm::ivec2(windowSize.x, windowSize.x / imageRatio);
+
+			ImGuiUtil::DisplayImage(*m_CurrentImageBuffer->second.m_Memory, imageSize, m_SnapshotUV1, m_SnapshotUV2);
+
+			// Find if the mouse cursor is hovering the image and what its UV coordinates would be
+			auto minRect = ImGui::GetItemRectMin();
+			auto maxRect = ImGui::GetItemRectMax();
+			auto itemSize = ImGui::GetItemRectSize();
+			auto mPos = ImGui::GetMousePos();
+			auto mouseUV = glm::vec2((mPos.x - minRect.x) / itemSize.x, (mPos.y - minRect.y) / itemSize.y);
+
+			bool mouseOnImage = mPos.x > minRect.x && mPos.x < maxRect.x&& mPos.y > minRect.y && mPos.y < maxRect.y;
+
+			if (mouseOnImage)
+			{
+				const float scrollSensitivity = 0.02f;
+				const float mouseSensitivity = 0.002f;
+				auto mouseWheel = -Lumen::Input::GetMouseWheel().y;
+
+				// Zoom in on the mouse cursor with math.
+				// Scales the effect of the scroll based on how close to the corners the mouse is to make it work.
+				m_SnapshotUV1 -= scrollSensitivity * mouseWheel * mouseUV;
+				m_SnapshotUV2 += scrollSensitivity * mouseWheel * (1.0f - mouseUV);
+
+				m_SnapshotUV1 = glm::clamp(m_SnapshotUV1, 0.0f, 1.0f);
+				m_SnapshotUV2 = glm::clamp(m_SnapshotUV2, 0.0f, 1.0f);
+
+				glm::vec2 uvSize = m_SnapshotUV2 - m_SnapshotUV1;
+				glm::vec2 mouseDelta = glm::vec2(0.0f);
+				if (Lumen::Input::IsMouseButtonPressed(GLFW_MOUSE_BUTTON_LEFT))
+				{
+					auto d = Lumen::Input::GetMouseDelta();
+					mouseDelta = glm::vec2(d.first, d.second);
+					// Move the UVs based on mouse movement
+					m_SnapshotUV1 += mouseSensitivity * mouseDelta * uvSize.x;
+					m_SnapshotUV2 += mouseSensitivity * mouseDelta * uvSize.x;
+
+					// Make sure that the movement of the UVs does not leave the [0.0, 1.0] range while keeping the zoom consistent
+					if (m_SnapshotUV1.x < 0.0f)
+					{
+						m_SnapshotUV1.x = 0.0f;
+						m_SnapshotUV2.x = uvSize.x;
+					}
+					else if (m_SnapshotUV2.x > 1.0f)
+					{
+						m_SnapshotUV2.x = 1.0f;
+						m_SnapshotUV1.x = 1.0f - uvSize.x;
+					}
+					if (m_SnapshotUV1.y < 0.0f)
+					{
+						m_SnapshotUV1.y = 0.0f;
+						m_SnapshotUV2.y = uvSize.y;
+					}
+					else if (m_SnapshotUV2.y > 1.0f)
+					{
+						m_SnapshotUV2.y = 1.0f;
+						m_SnapshotUV1.y = 1.0f - uvSize.y;
+					}
+				}
+
+			}
+
+			// Dropdown to select how the texture data is displayed in the tool
+			if (ImGui::BeginCombo("Content View Mode", m_ContentViewNames[m_CurrContentView].c_str()))
+			{
+				ContentViewDropDown();
+
+				ImGui::EndCombo();
+			}
+
+			// Display the mouse cursor location and its contents.
+			if (mouseOnImage)
+			{
+				glm::vec2 imageSize = m_CurrentImageBuffer->second.m_Memory->GetSize();
+				auto pxlID = glm::ivec2(imageSize * mouseUV);
+
+				ImGui::Text("PixelID: [%i; %i] | UV: [%0.3f, %0.3f]", pxlID.x, pxlID.y, mouseUV.x, mouseUV.y);
+
+				m_ContentViewFunc(mouseUV);
+			}
+
+		}
+	}
+	else
+	{
+	    ImGui::Text("To begin using this tool, take a snapshot by pressing the 'K' key.");
+	}
+    ImGui::End();
 }
 
 void OutputLayer::InitContentViewNameTable()
@@ -730,6 +819,12 @@ void OutputLayer::MakeScreenshot(std::string a_ScreenshotFileName)
 {
 	uint32_t w, h;
 	auto pixels = m_Renderer->GetOutputTexturePixels(w, h);
+	for (size_t i = 0; i < pixels.size(); i += 4)
+	{
+		pixels[i + 0] = std::powf(static_cast<float>(pixels[i + 0]) / static_cast<float>(255), 1.0f / m_Gamma) * 255;
+		pixels[i + 1] = std::powf(static_cast<float>(pixels[i + 1]) / static_cast<float>(255), 1.0f / m_Gamma) * 255;
+		pixels[i + 2] = std::powf(static_cast<float>(pixels[i + 2]) / static_cast<float>(255), 1.0f / m_Gamma) * 255;
+	}
 	std::filesystem::path p = a_ScreenshotFileName;
 	std::filesystem::create_directories(p.parent_path());
 	auto err = stbi_write_png(a_ScreenshotFileName.c_str(), w, h, 4, pixels.data(), 0);
@@ -740,7 +835,7 @@ std::string OutputLayer::DefaultScreenshotName()
 {
 	time_t now = time(0);
 	tm* time = gmtime(&now);
-	std::string name = "Screenshot" + std::to_string(time->tm_mday) + std::to_string(time->tm_mon) + '-'
-		+ std::to_string(time->tm_hour) + std::to_string(time->tm_min) + std::to_string(time->tm_sec) + ".png";
+	std::string name = "Screenshot" + std::to_string(time->tm_mday) + std::to_string(time->tm_mon + 1) + '-'
+		+ std::to_string(time->tm_hour + 2) + std::to_string(time->tm_min) + std::to_string(time->tm_sec) + ".png";
 	return name;
 }

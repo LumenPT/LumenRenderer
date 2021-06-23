@@ -1,6 +1,7 @@
 #pragma once
 #include "GPUDataBuffers.h"
 #include "AtomicBuffer.h"
+#include "../ArrayParameter.h"
 
 #include <Optix/optix.h>
 #include <Cuda/cuda/helpers.h>
@@ -30,7 +31,7 @@ namespace WaveFront
         AtomicBuffer<RestirShadowRayShading>* m_ReSTIRShadowRayShadingBatch;
 		SceneDataTableAccessor* m_SceneData;
         Reservoir* m_Reservoirs;
-        cudaSurfaceObject_t m_ResultBuffer;
+        ArrayParameter<cudaSurfaceObject_t, static_cast<unsigned>(LightChannel::NUM_CHANNELS)> m_OutputChannels;
         float2 m_MinMaxDistance;
         RayType m_TraceType;
     };

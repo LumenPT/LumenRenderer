@@ -3,8 +3,7 @@
 #include "OptixWrapper.h"
 #include "CudaGLTexture.h"
 #include "MemoryBuffer.h"
-#include "GpuTexture.h"
-#include "MotionVectors.h"
+#include "InteropGPUTexture.h"
 #include "../Shaders/CppCommon/WaveFrontDataStructs.h"
 #include "PTServiceLocator.h"
 #include "Nvidia/INRDWrapper.h"
@@ -69,6 +68,8 @@ namespace WaveFront
         std::shared_ptr<Lumen::ILumenVolume> CreateVolume(const std::string& a_FilePath) override;
         std::shared_ptr<Lumen::ILumenScene> CreateScene(SceneData a_SceneData) override;
 
+        void InitNGX() override;
+
         //Public functionality
     public:
         WaveFrontRenderer();
@@ -121,6 +122,8 @@ namespace WaveFront
         void SetOutputResolutionInternal(glm::uvec2 a_NewResolution);
         void WaitForDeferredCalls(); // Stalls the thread until all calls that are deferred to other treads are performed
 
+        void FinalizeFrameStats();
+
         //OpenGL buffer to write output to.
         std::unique_ptr<CudaGLTexture> m_OutputBuffer;
 
@@ -148,17 +151,38 @@ namespace WaveFront
         //Buffer containing volumetric shadow rays.
         MemoryBuffer m_VolumetricShadowRays;
 
+        static const unsigned s_numLightChannels = static_cast<unsigned>(LightChannel::NUM_CHANNELS);
         //Buffer used for output of separate channels of light.
-        std::unique_ptr<GpuTexture<float4>> m_PixelBufferSeparate;
+        std::unique_ptr<InteropGPUTexture> m_PixelBufferSeparate[s_numLightChannels];
 
         //Buffer used to combine light channels after denoising.
-        std::unique_ptr<GpuTexture<float4>> m_PixelBufferCombined;
+        std::unique_ptr<InteropGPUTexture> m_PixelBufferCombined;
+
+        std::unique_ptr<InteropGPUTexture> m_DepthBuffer;
+        
+        std::unique_ptr<InteropGPUTexture> m_JitterBuffer;
+
+        //Buffer containing motion vectors
+        std::unique_ptr<InteropGPUTexture> m_MotionVectorBuffer;
+        
+        Microsoft::WRL::ComPtr<ID3D11Texture2D> m_D3D11JitterBuffer;
+
+        Microsoft::WRL::ComPtr<ID3D11Texture2D> m_D3D11PixelBufferSeparate;
+
+        Microsoft::WRL::ComPtr<ID3D11Texture2D> m_D3D11PixelBufferCombined;
+        
+        Microsoft::WRL::ComPtr<ID3D11Texture2D> m_D3D11PixelBufferUpscaled;
+
+        Microsoft::WRL::ComPtr<ID3D11Texture2D> m_D3D11DepthBuffer;
+
+        Microsoft::WRL::ComPtr<ID3D11Texture2D> m_D3D11MotionVectorBuffer;
+
+        Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView> m_D3D11PixelBufferCombinedUAV;
+        Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView> m_D3D11PixelBufferUpscaledUAV;
 
         //Triangle lights.
         MemoryBuffer m_TriangleLights;
 
-    	//Buffer containing motion vectors
-        MotionVectors m_MotionVectors;
 
         //Optix system
         std::unique_ptr<OptixWrapper> m_OptixSystem;
@@ -213,6 +237,8 @@ namespace WaveFront
         bool m_StartSnapshot;
 
         LumenPTModelConverter m_ModelConverter;
+
+        FrameStats m_CurrentFrameStats;
     };
 }
 #endif

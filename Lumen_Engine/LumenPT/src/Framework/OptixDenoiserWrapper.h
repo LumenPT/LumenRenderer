@@ -6,6 +6,8 @@
 
 #include "MemoryBuffer.h"
 #include "Shaders/CppCommon/WaveFrontDataStructs/CudaKernelParamStructs.h"
+#include "../Tools/FrameSnapshot.h"
+#include "CudaGLTexture.h"
 
 #include <cstdint>
 
@@ -22,6 +24,8 @@ struct OptixDenoiserDenoiseParams
 {
 	WaveFront::PostProcessLaunchParameters* m_PostProcessLaunchParams;
 	CUdeviceptr m_ColorInput;
+	CUdeviceptr m_AlbedoInput;
+	CUdeviceptr m_NormalInput;
 	CUdeviceptr m_Output;
 };
 
@@ -36,6 +40,18 @@ public:
 
 	void Denoise(const OptixDenoiserDenoiseParams& a_DenoiseParams);
 
+	void UpdateDebugTextures();
+
+	MemoryBuffer ColorInput;
+	MemoryBuffer AlbedoInput;
+	MemoryBuffer NormalInput;
+	MemoryBuffer ColorOutput;
+
+	FrameSnapshot::ImageBuffer m_OptixDenoiserInputTex;
+	FrameSnapshot::ImageBuffer m_OptixDenoiserAlbedoInputTex;
+	FrameSnapshot::ImageBuffer m_OptixDenoiserNormalInputTex;
+	FrameSnapshot::ImageBuffer m_OptixDenoiserOutputTex;
+
 protected:
 
 	OptixDenoiser         m_Denoiser = nullptr;
@@ -44,5 +60,6 @@ protected:
 	MemoryBuffer m_state;
 	MemoryBuffer m_scratch;
 
-	OptixDenoiserInitParams m_InitParams;
+	OptixDenoiserInitParams m_InitParams;	
+
 };

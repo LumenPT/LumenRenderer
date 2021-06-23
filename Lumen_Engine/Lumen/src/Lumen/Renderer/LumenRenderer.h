@@ -11,6 +11,7 @@
 #include <glm/vec4.hpp>
 
 #include <memory>
+#include <mutex>
 #include <string>
 #include <filesystem>
 #include "Glad/glad.h"
@@ -25,10 +26,19 @@ namespace Lumen
 	class ILumenMaterial;
 }
 
+struct FrameStats
+{
+	uint64_t m_Id = 0;
+	std::map<std::string, uint64_t> m_Times;
+	// Expand if necessary
+};
+
 // Base class for the renderer which is used to abstract away API implementation details
 class LumenRenderer
 {
 public:
+
+	
 
 	// Structu used to initialize a primitive
 	struct PrimitiveData
@@ -157,6 +167,9 @@ public:
 	// Create a volume from the provided file path
 	virtual std::shared_ptr<Lumen::ILumenVolume> CreateVolume(const std::string& a_FilePath) = 0;
 
+	//NGX test
+	virtual void InitNGX() = 0;
+
 	void CreateDefaultResources();
 
 	virtual unsigned int GetOutputTexture() = 0;	//scene argument may be redundant... or not
@@ -187,13 +200,20 @@ public:
 	virtual std::unique_ptr<FrameSnapshot> EndSnapshot() = 0;
 	std::shared_ptr<Lumen::ILumenScene> m_Scene;
 
+	FrameStats GetLastFrameStats();
+
 	//Debug GLuint texture accessible by application
 	GLuint m_DebugTexture;
 
+	unsigned int m_DlssMode = 2; //corresponds to dlssmodes enum in DLSS init params
+protected:
+
+	FrameStats m_LastFrameStats;
+	std::mutex m_FrameStatsMutex;
 
 private:
 	std::shared_ptr<Lumen::ILumenTexture> m_DefaultWhiteTexture;
 	std::shared_ptr<Lumen::ILumenTexture> m_DefaultNormalTexture;
 	std::shared_ptr<Lumen::ILumenTexture> m_DefaultDiffuseTexture;
-		
+
 };

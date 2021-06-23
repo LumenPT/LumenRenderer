@@ -15,6 +15,7 @@ set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 option(USE_WAVEFRONT "Use the Wavefront rendering pipeline?" ON)
 option(USE_DENOISER "Use Nvidia denoiser (if available)?" OFF)
 option(USE_UPSCALING "Use Nvidia denoiser (if available)?" OFF)
+option(INCLUDE_TESTPROJECT "Include test project" OFF)
 
 SET(USE_NVIDIA_DENOISER FALSE)
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/LumenPT/vendor/RayTracingDenoiser" AND USE_DENOISER)
@@ -84,7 +85,6 @@ endif()
 
 #Add config name variable as compile definition.
 add_compile_definitions(CONFIG_NAME=\"${CONFIG_NAME}\")
-
 	#OpenVDB
 add_subdirectory ("LumenPT/vendor/openvdb")
 	#NanoVDB
@@ -93,6 +93,9 @@ add_subdirectory ("LumenPT/vendor/openvdb/nanovdb")
 add_subdirectory ("Lumen")
 	#LumenPT
 add_subdirectory ("LumenPT")
+if(INCLUDE_TESTPROJECT)
+	add_subdirectory ("TestProject")
+endif()
 	#Sandbox
 add_subdirectory ("Sandbox")
 

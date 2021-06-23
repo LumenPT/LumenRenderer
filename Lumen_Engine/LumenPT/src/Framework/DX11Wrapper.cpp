@@ -1,4 +1,9 @@
 #include "DX11Wrapper.h"
+#include "DX11Utilties.h"
+
+#include <cuda_d3d11_interop.h>
+#include <cuda_runtime_api.h>
+
 namespace WaveFront 
 {
     void DX11Wrapper::Init()
@@ -30,32 +35,54 @@ namespace WaveFront
 
     }
 
-    Microsoft::WRL::ComPtr<ID3D11Texture2D> DX11Wrapper::CreateTexture2D(const uint3 a_ResDepth)
+    Microsoft::WRL::ComPtr<ID3D11Texture2D> DX11Wrapper::CreateTexture2D(const uint3& a_ResDepth, DXGI_FORMAT a_Format, UINT a_BindFlag)
     {
-        D3D11_TEXTURE2D_DESC desc;
-        desc.BindFlags = 0;
-        desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ | D3D11_CPU_ACCESS_WRITE;
+        
+        DXGI_SAMPLE_DESC textureSampleDesc{};
+        textureSampleDesc.Count = 1;
+        textureSampleDesc.Quality = 0;
+
+        D3D11_TEXTURE2D_DESC desc{};
         desc.Width = a_ResDepth.x;
         desc.Height = a_ResDepth.y;
+        desc.MipLevels = 1;
         desc.ArraySize = a_ResDepth.z;
-        //RGBA16f
-        desc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+        desc.Format = a_Format;
+        desc.SampleDesc = textureSampleDesc;
         desc.Usage = D3D11_USAGE_DEFAULT;
+        desc.BindFlags = a_BindFlag;
+        desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ | D3D11_CPU_ACCESS_WRITE;
+        desc.MiscFlags = 0;
         // just create comptr to texture2D from (pixel) any buffer (?)
-        Microsoft::WRL::ComPtr<ID3D11Texture2D> tex;
-        m_D3dDevice->CreateTexture2D(&desc, nullptr, tex.GetAddressOf());
+        Microsoft::WRL::ComPtr<ID3D11Texture2D> tex {nullptr};
+        CHECKDX11RESULT(m_D3dDevice->CreateTexture2D(&desc, nullptr, &tex));
         return tex;
 
     }
 
-    Microsoft::WRL::ComPtr<ID3D11Texture2D> DX11Wrapper::ResizeTexture2D(Microsoft::WRL::ComPtr<ID3D11Texture2D> a_Tex, const uint2 a_NewSize)
+    Microsoft::WRL::ComPtr<ID3D11Texture2D> DX11Wrapper::ResizeTexture2D(Microsoft::WRL::ComPtr<ID3D11Texture2D>& a_Tex, const uint3& a_NewSize)
     {
         D3D11_TEXTURE2D_DESC desc;
         a_Tex->GetDesc(&desc);
-        desc.Width = a_NewSize.x;
-        desc.Height = a_NewSize.y;
-        m_D3dDevice->CreateTexture2D(&desc, nullptr, a_Tex.GetAddressOf()); //Data is lost now
+
+        if( a_NewSize.x != desc.Width   ||
+            a_NewSize.y != desc.Height  ||
+            a_NewSize.z != desc.ArraySize)
+        {
+
+            desc.Width = a_NewSize.x;
+            desc.Height = a_NewSize.y;
+            desc.ArraySize = a_NewSize.z;
+            CHECKDX11RESULT(m_D3dDevice->CreateTexture2D(&desc, nullptr, a_Tex.ReleaseAndGetAddressOf())); //Data is lost 
+            
+        }
+
         return a_Tex;
+        
     }
 
+    void DX11Wrapper::CreateUAV(Microsoft::WRL::ComPtr<ID3D11Resource> a_Res, const D3D11_UNORDERED_ACCESS_VIEW_DESC* a_UAVDesc, Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView> a_UAVPtr)
+    {
+        CHECKDX11RESULT(m_D3dDevice->CreateUnorderedAccessView(a_Res.Get(), a_UAVDesc, a_UAVPtr.GetAddressOf()));
+    }
 }
