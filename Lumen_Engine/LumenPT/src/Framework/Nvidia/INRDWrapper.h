@@ -1,6 +1,10 @@
 #pragma once
 
+//#include <wrl.h> //TODO: add this back
+
 class PTServiceLocator;
+class ID3D11Resource;
+class Camera;
 
 struct NRDWrapperInitParams
 {
@@ -11,7 +15,15 @@ struct NRDWrapperInitParams
 
 struct NRDWrapperEvaluateParams
 {
-
+	int m_InputImageWidth = -1;
+	int m_InputImageHeight = -1;
+	Camera* m_Camera;
+	ID3D11Resource* m_InputDiffTex;
+	ID3D11Resource* m_InputSpecTex;
+	ID3D11Resource* m_NormalRoughnessTex;;
+	ID3D11Resource* m_MotionVectorTex;
+	ID3D11Resource* m_ViewZTex;
+	ID3D11Resource* m_OutputTex;
 };
 
 class INRDWrapper
