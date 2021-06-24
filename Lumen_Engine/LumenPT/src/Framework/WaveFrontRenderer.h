@@ -110,6 +110,24 @@ namespace WaveFront
          * When true, output is blended and not overwritten.
          */
         bool GetBlendMode() const override;
+
+
+        struct DenoiserSettings
+        {
+            DenoiserSettings()
+                : m_UseOptix(false)
+                , m_UseNRD(false)
+                , m_OptixAlbedo(true)
+                , m_OptixNormal(true)
+                , m_OptixTemporal(false)
+            {}
+            bool m_UseOptix;
+            bool m_UseNRD;
+
+            bool m_OptixAlbedo;
+            bool m_OptixNormal;
+            bool m_OptixTemporal;
+        } m_DenoiserSettings;
     	
     private:
 

@@ -214,6 +214,9 @@ void OutputLayer::OnImGuiRender()
 			if (ImGui::Selectable("Profiler", m_EnabledTools.m_Profiler))
 				m_EnabledTools.m_Profiler = !m_EnabledTools.m_Profiler;
 
+			if (ImGui::Selectable("General Settings", m_EnabledTools.m_GeneralSettings))
+				m_EnabledTools.m_GeneralSettings = !m_EnabledTools.m_GeneralSettings;
+
 			ImGui::EndMenu();
 	    }
 
@@ -231,6 +234,55 @@ void OutputLayer::OnImGuiRender()
 
 		ImGui::EndMainMenuBar();
 	}
+
+    if (m_EnabledTools.m_GeneralSettings)
+    {
+		ImGui::Begin("General Settings");
+		auto wvfr = dynamic_cast<WaveFront::WaveFrontRenderer*>(m_Renderer.get());
+		if (wvfr)
+		{
+
+
+			auto& denoiserSettings = wvfr->m_DenoiserSettings;
+
+			auto s = "None";
+			if (denoiserSettings.m_UseNRD)
+				s = "NRD denoising";
+			else if (denoiserSettings.m_UseOptix)
+				s = "Optix denoising";
+
+			if (ImGui::BeginMenu(s))
+			{
+				if (ImGui::MenuItem("Optix", 0, denoiserSettings.m_UseOptix))
+				{
+					denoiserSettings.m_UseOptix = true;
+					denoiserSettings.m_UseNRD = false;
+				}
+
+                if (ImGui::MenuItem("NRD", 0, denoiserSettings.m_UseNRD))
+                {
+					denoiserSettings.m_UseOptix = false;
+					denoiserSettings.m_UseNRD = true;
+                }
+
+				if (ImGui::MenuItem("None", 0, !(denoiserSettings.m_UseOptix || denoiserSettings.m_UseNRD)))
+				{
+					denoiserSettings.m_UseOptix = false;
+					denoiserSettings.m_UseNRD = false;
+				}
+
+				ImGui::EndMenu();
+			}
+
+            if (denoiserSettings.m_UseOptix)
+            {
+				ImGui::Checkbox("Albedo", &denoiserSettings.m_OptixAlbedo);
+				ImGui::Checkbox("Normal", &denoiserSettings.m_OptixNormal);
+				ImGui::Checkbox("Temporal Data",  &denoiserSettings.m_OptixTemporal);
+            }
+		}
+		ImGui::End();
+    }
 
     if (m_EnabledTools.m_CameraSettings)
     {

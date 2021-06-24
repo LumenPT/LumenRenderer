@@ -101,7 +101,8 @@ private:
         bool m_PixelDebugger = false;
         bool m_CameraSettings = false;
         bool m_DebugViewport = false;
-        bool m_Profiler = true;
+        bool m_Profiler = false;
+        bool m_GeneralSettings = true;
     } m_EnabledTools;
 
     struct CmpNoChange
