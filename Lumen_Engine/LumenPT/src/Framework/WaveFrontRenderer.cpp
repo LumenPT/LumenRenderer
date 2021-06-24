@@ -303,11 +303,6 @@ namespace WaveFront
         nrdInitParams.m_OutputSpecTex = m_D3D11PixelBufferSeparate.Get();
         m_NRD->Initialize(nrdInitParams);
 
-        Microsoft::WRL::ComPtr<ID3D11Resource> res;
-
-        Microsoft::WRL::ComPtr<ID3D11Texture2D> tex;
-        tex.As(&res);
-
         m_CurrentFrameStats.m_Id = 0;
     }
 
