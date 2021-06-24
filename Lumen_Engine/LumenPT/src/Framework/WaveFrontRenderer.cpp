@@ -108,12 +108,12 @@ namespace WaveFront
         //Set the service locator's pointer to the OptixWrapper.
         m_ServiceLocator.m_OptixWrapper = m_OptixSystem.get();
 
-        m_NRD = std::make_unique<NrdWrapper>();
+        /*m_NRD = std::make_unique<NrdWrapper>();
         NRDWrapperInitParams nrdInitParams;
         nrdInitParams.m_InputImageWidth = m_Settings.renderResolution.x;
         nrdInitParams.m_InputImageHeight = m_Settings.renderResolution.y;
         nrdInitParams.m_pServiceLocator = &m_ServiceLocator;
-        m_NRD->Initialize(nrdInitParams);
+        m_NRD->Initialize(nrdInitParams);*/
 
         m_OptixDenoiser = std::make_unique<OptixDenoiserWrapper>();
         OptixDenoiserInitParams optixDenoiserInitParams;
@@ -289,15 +289,24 @@ namespace WaveFront
 
         m_ModelConverter.SetRendererRef(*this);
 
-        /*m_DLSS = std::make_unique<DlssWrapper>();
-        DLSSWrapperInitParams dlssInitParams;
-        dlssInitParams.m_InputImageWidth = m_Settings.renderResolution.x;
-        dlssInitParams.m_InputImageHeight = m_Settings.renderResolution.y;
-        dlssInitParams.m_OutputImageWidth = m_Settings.outputResolution.x;
-        dlssInitParams.m_OutputImageHeight = m_Settings.outputResolution.y;
-        dlssInitParams.m_pServiceLocator = &m_ServiceLocator;
-        m_DLSS->Initialize(dlssInitParams);*/
+        m_NRD = std::make_unique<NrdWrapper>();
+        NRDWrapperInitParams nrdInitParams;
+        nrdInitParams.m_InputImageWidth = m_Settings.renderResolution.x;
+        nrdInitParams.m_InputImageHeight = m_Settings.renderResolution.y;
+        nrdInitParams.m_pServiceLocator = &m_ServiceLocator;
+        nrdInitParams.m_InputDiffTex = m_D3D11PixelBufferSeparate.Get();
+        nrdInitParams.m_InputSpecTex = m_D3D11PixelBufferSeparate.Get();
+        nrdInitParams.m_NormalRoughnessTex = m_D3D11NormalRoughnessBuffer.Get();
+        nrdInitParams.m_MotionVectorTex = m_D3D11MotionVectorBuffer.Get();
+        nrdInitParams.m_ViewZTex = m_D3D11DepthBuffer.Get();
+        nrdInitParams.m_OutputDiffTex = m_D3D11PixelBufferSeparate.Get();
+        nrdInitParams.m_OutputSpecTex = m_D3D11PixelBufferSeparate.Get();
+        m_NRD->Initialize(nrdInitParams);
 
+        Microsoft::WRL::ComPtr<ID3D11Resource> res;
+
+        Microsoft::WRL::ComPtr<ID3D11Texture2D> tex;
+        tex.As(&res);
 
         m_CurrentFrameStats.m_Id = 0;
     }
