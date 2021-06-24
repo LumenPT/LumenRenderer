@@ -870,7 +870,7 @@ namespace WaveFront
             cudaDeviceSynchronize();
             CHECKLASTCUDAERROR;
 
-            OptixDenoiserLaunchParameters optixDenoiserLaunchParams(
+           /* OptixDenoiserLaunchParameters optixDenoiserLaunchParams(
                 m_Settings.renderResolution,
                 m_SurfaceData[currentIndex].GetDevicePtr<SurfaceData>(),
                 m_PixelBufferCombined->GetSurfaceObject(),
@@ -890,7 +890,7 @@ namespace WaveFront
             optixDenoiserParams.m_NormalInput = m_OptixDenoiser->NormalInput.GetCUDAPtr();
             optixDenoiserParams.m_Output = m_OptixDenoiser->ColorOutput.GetCUDAPtr();
             m_OptixDenoiser->Denoise(optixDenoiserParams); 
-            CHECKLASTCUDAERROR;
+            CHECKLASTCUDAERROR;*/
 
             //FinishOptixDenoising(optixDenoiserLaunchParams);
             CHECKLASTCUDAERROR;
