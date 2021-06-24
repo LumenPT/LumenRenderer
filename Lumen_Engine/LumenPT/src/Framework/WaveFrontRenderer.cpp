@@ -638,7 +638,7 @@ namespace WaveFront
         const unsigned counterDefault = 0;
         SetAtomicCounter<ShadowRayData>(&m_ShadowRays, counterDefault);
 		SetAtomicCounter<ShadowRayData>(&m_VolumetricShadowRays, counterDefault);
-        SetAtomicCounter<IntersectionData>(&m_IntersectionData, counterDefault);
+        //SetAtomicCounter<IntersectionData>(&m_IntersectionData, counterDefault);  //No need to reset as this buffer is not used as an atomic buffer for now.
 		SetAtomicCounter<VolumetricIntersectionData>(&m_VolumetricIntersectionData, counterDefault);
         CHECKLASTCUDAERROR;
 
@@ -678,18 +678,18 @@ namespace WaveFront
             /*
              * Calculate the surface data for this depth.
              */
-            unsigned numIntersections = 0;
-            numIntersections = GetAtomicCounter<IntersectionData>(&m_IntersectionData);
+            //unsigned numIntersections = 0;        //Note; Not currently used as atomic buffer. One intersection per ray.
+            //numIntersections = GetAtomicCounter<IntersectionData>(&m_IntersectionData);
 
             //1 and 2 are used for the first intersection and remembered for temporal use.
             const auto surfaceDataBufferIndex = (depth == 0 ? currentIndex : 2);   
 
-        	if(numIntersections > 0)
-        	{
+        	//if(numIntersections > 0)  //Note: This is always true because the loop already does it.
+        	//{
 
                 //pass depth buffer into extract surface data
                 ExtractSurfaceData(
-                    numIntersections,
+                    numIntersectionRays,    //Note: rays is always equal to num intersections. Even missed rays return an intersection that is empty.
                     m_IntersectionData.GetDevicePtr<AtomicBuffer<IntersectionData>>(),
                     m_Rays.GetDevicePtr<AtomicBuffer<IntersectionRayData>>(),
                     m_SurfaceData[surfaceDataBufferIndex].GetDevicePtr<SurfaceData>(),
@@ -710,7 +710,7 @@ namespace WaveFront
                 cudaDeviceSynchronize();
                 CHECKLASTCUDAERROR;
 
-        	}
+        	//}
         	
             unsigned numVolumeIntersections = 0;
             m_VolumetricIntersectionData.Read(&numVolumeIntersections, sizeof(numVolumeIntersections), 0);
