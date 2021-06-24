@@ -41,7 +41,7 @@ inline void CheckCudaErr(const cudaError& a_err, const char* a_File, int a_Line)
 
         std::fprintf(
             stderr,
-            "CUDA error occured: %s \n"
+            "\nCUDA error occured: %s \n"
             "\tFile: %s \n"
             "\tLine: %i \n"
             "\tDescription: %s",

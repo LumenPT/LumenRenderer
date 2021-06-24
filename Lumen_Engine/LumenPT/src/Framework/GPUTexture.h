@@ -3,7 +3,7 @@
 #include <initializer_list> 
 
 template<typename T>
-class GpuTexture
+class GPUTexture
 {
 
 public:
@@ -15,13 +15,13 @@ public:
     /// <param name="a_Flags">Flags to use to create the texture. Can be used to make a layered texture/array or/and a cube-map.</param> 
     /// <param name="a_TextureDesc"></param> 
     /// <param name="a_Data">Optional. Allows data to be passed for uploading when creating the texture.</param> 
-    GpuTexture(
+    GPUTexture(
         cudaExtent a_Extent = { 0, 0, 0 },
         unsigned a_Flags = cudaArrayDefault,
         const cudaTextureDesc& a_TextureDesc = {},
         T* a_Data = nullptr);
 
-    ~GpuTexture();
+    ~GPUTexture();
 
     void Write(
         cudaPitchedPtr a_Src,
@@ -60,4 +60,4 @@ private:
 
 };
 
-#include "GpuTexture.cpp"
+#include "GPUTexture.cpp"

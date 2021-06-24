@@ -1,13 +1,13 @@
 #ifndef __GPUTEXTURE_CPP__ 
 #define __GPUTEXTURE_CPP__ 
-#include "GpuTexture.h" 
+#include "GPUTexture.h" 
 #include "CudaUtilities.h" 
 
 #include <memory> 
 #include <cassert> 
 
 template <typename T>
-GpuTexture<T>::GpuTexture(
+GPUTexture<T>::GPUTexture(
     cudaExtent a_Extent,
     unsigned a_Flags,
     const cudaTextureDesc& a_TextureDesc,
@@ -33,7 +33,7 @@ GpuTexture<T>::GpuTexture(
 }
 
 template <typename T>
-GpuTexture<T>::~GpuTexture()
+GPUTexture<T>::~GPUTexture()
 {
 
     cudaFreeArray(m_TextureMemory);
@@ -44,7 +44,7 @@ GpuTexture<T>::~GpuTexture()
 
 
 template <typename T>
-void GpuTexture<T>::CreateTexture(
+void GPUTexture<T>::CreateTexture(
     const cudaTextureDesc& a_TextureDesc,
     T* a_Data)
 {
@@ -83,7 +83,7 @@ void GpuTexture<T>::CreateTexture(
 }
 
 template <typename T>
-void GpuTexture<T>::Write(
+void GPUTexture<T>::Write(
     cudaPitchedPtr a_Src,
     cudaPos a_SrcPos,
     cudaPos a_DesPos,
@@ -105,7 +105,7 @@ void GpuTexture<T>::Write(
 }
 
 template <typename T>
-void GpuTexture<T>::Read(
+void GPUTexture<T>::Read(
     cudaPitchedPtr a_Des,
     cudaPos a_SrcPos,
     cudaPos a_DesPos,
@@ -127,7 +127,7 @@ void GpuTexture<T>::Read(
 }
 
 template <typename T>
-void GpuTexture<T>::Clear() const
+void GPUTexture<T>::Clear() const
 {
 
     const unsigned int size =
@@ -163,7 +163,7 @@ void GpuTexture<T>::Clear() const
 }
 
 template <typename T>
-void GpuTexture<T>::Resize(cudaExtent a_Extent)
+void GPUTexture<T>::Resize(cudaExtent a_Extent)
 {
 
     cudaTextureDesc textureDescription{};
@@ -195,7 +195,7 @@ void GpuTexture<T>::Resize(cudaExtent a_Extent)
 
 
 template <typename T>
-const cudaTextureObject_t& GpuTexture<T>::GetTextureObject() const
+const cudaTextureObject_t& GPUTexture<T>::GetTextureObject() const
 {
 
     assert(m_TextureObject != 0 && "Texture object is null");
@@ -205,7 +205,7 @@ const cudaTextureObject_t& GpuTexture<T>::GetTextureObject() const
 }
 
 template <typename T>
-const cudaSurfaceObject_t& GpuTexture<T>::GetSurfaceObject() const
+const cudaSurfaceObject_t& GPUTexture<T>::GetSurfaceObject() const
 {
 
     assert(m_SurfaceObject != 0 && "Surface object is null");
