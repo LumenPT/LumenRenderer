@@ -370,20 +370,14 @@ namespace WaveFront
     {
     	//Track frame time.
         Timer timer;
+        //m_CurrentFrameStats.m_Times["Test"] = timer.measure(TimeUnit::MICROS);
     	
         CHECKLASTCUDAERROR;
 
         //Retrieve the acceleration structure and scene data table once.
         m_OptixSystem->UpdateSBT();
         CHECKLASTCUDAERROR;
-        auto begin = std::chrono::high_resolution_clock::now();
-
         auto* sceneDataTableAccessor = std::static_pointer_cast<PTScene>(m_Scene)->GetSceneDataTableAccessor();
-
-        auto end = std::chrono::high_resolution_clock::now();
-
-        auto micro = std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count();
-        m_CurrentFrameStats.m_Times["Scene data table generation"] = micro;
 
         CHECKLASTCUDAERROR;
 
@@ -391,13 +385,7 @@ namespace WaveFront
         cudaDeviceSynchronize();
         CHECKLASTCUDAERROR;
 
-        //Timer to measure how long each frame takes.
-
-        Timer lightExtractionTimer;
-
         const unsigned int numLightsInScene = m_LightDataBuffer->BuildLightDataBuffer(std::static_pointer_cast<PTScene>(m_Scene), sceneDataTableAccessor);
-
-        printf("Time to extract all emissives in scene: %f millis.\n", lightExtractionTimer.measure(TimeUnit::MILLIS));
     	
         //Don't render if there is no light in the scene as everything will be black anyway.
         if (numLightsInScene == 0)
@@ -913,6 +901,7 @@ namespace WaveFront
         m_Scene->m_Camera->UpdatePreviousFrameMatrix();
         ++frameCount;
 
+#ifndef NDEBUG
         m_OptixDenoiser->UpdateDebugTextures();
         m_DeferredOpenGLCalls.push([&]() {
             //m_DebugTexture = m_OptixDenoiser->m_OptixDenoiserInputTex.m_Memory->GetTexture();
@@ -921,6 +910,7 @@ namespace WaveFront
             m_DebugTexture = m_OptixDenoiser->m_OptixDenoiserOutputTex.m_Memory->GetTexture();
             });
         WaitForDeferredCalls();
+#endif
 
 
         // TODO: Weird debug code. Yeet?
