@@ -1,4 +1,5 @@
 #include "MemoryBuffer.h"
+#include "CudaUtilities.h"
 
 #include "Cuda/cuda.h"
 #include "Cuda/cuda_runtime.h"
@@ -32,7 +33,7 @@ MemoryBuffer::MemoryBuffer(size_t a_Size)
 MemoryBuffer::~MemoryBuffer()
 {
     // Simply free the previously allocated GPU memory
-    CudaCheck(cudaFree(m_DevPtr));
+    CHECKCUDAERROR(cudaFree(m_DevPtr));
 }
 
 MemoryBuffer::MemoryBuffer(MemoryBuffer&& a_Other)

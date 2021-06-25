@@ -28,6 +28,19 @@ namespace WaveFront
             data[index] = *a_Data;
         }
 
+        GPU_ONLY void Add(const T& a_Data)
+        {
+            const uint32_t index = atomicAdd(&counter, 1);
+            assert(index < maxSize);
+            data[index] = a_Data;
+        }
+
+        GPU_ONLY uint32_t ReserveIndices(uint32_t a_NumIndices)
+        {
+            const uint32_t currentIndex = atomicAdd(&counter, a_NumIndices);
+            return currentIndex;
+        }
+
         /*
          * Set data in the buffer, bypassing the atomic operation.
          */
@@ -35,6 +48,16 @@ namespace WaveFront
         {
             assert(a_Index < maxSize);
             data[a_Index] = *a_Data;
+        }
+
+        GPU_ONLY void Set(int a_Index, const T& a_Data)
+        {
+            if(!(a_Index < maxSize && a_Index < counter))
+            {
+                printf("Index: %i, MaxSize: %i, Counter: %i \n", a_Index, maxSize, counter);
+            }
+            assert(a_Index < maxSize && a_Index < counter);
+            data[a_Index] = a_Data;
         }
 
         /*

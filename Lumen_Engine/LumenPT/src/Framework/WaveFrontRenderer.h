@@ -1,15 +1,17 @@
 #pragma once
 #if defined(WAVEFRONT)
+#include "LightDataBuffer.h"
 #include "OptixWrapper.h"
 #include "CudaGLTexture.h"
 #include "MemoryBuffer.h"
+#include "GPUTexture.h"
 #include "InteropGPUTexture.h"
 #include "../Shaders/CppCommon/WaveFrontDataStructs.h"
 #include "PTServiceLocator.h"
 #include "Nvidia/INRDWrapper.h"
 #include "Nvidia/IDLSSWrapper.h"
 #include "../Tools/LumenPTModelConverter.h"
-#include "OptixDenoiserWrapper.h" 
+#include "OptixDenoiserWrapper.h" x
 
 #include "Renderer/LumenRenderer.h"
 
@@ -181,8 +183,7 @@ namespace WaveFront
         Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView> m_D3D11PixelBufferUpscaledUAV;
 
         //Triangle lights.
-        MemoryBuffer m_TriangleLights;
-
+        std::unique_ptr<LightDataBuffer> m_LightDataBuffer;
 
         //Optix system
         std::unique_ptr<OptixWrapper> m_OptixSystem;

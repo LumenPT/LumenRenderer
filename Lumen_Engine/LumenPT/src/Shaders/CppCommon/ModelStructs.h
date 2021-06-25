@@ -63,8 +63,8 @@ struct DevicePrimitive
 {
     Vertex*         m_VertexBuffer;
     unsigned int*   m_IndexBuffer;
+    bool* m_EmissiveBuffer;
     DeviceMaterial* m_Material;
-    bool*           m_IsEmissive;
 };
 
 struct DevicePrimitiveInstance
