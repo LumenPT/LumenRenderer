@@ -27,7 +27,7 @@ CPU_ON_GPU void ResolveDirectLightHits(
         if (pixelData.m_SurfaceFlags & SURFACE_FLAG_EMISSIVE)
         {
 
-            half4Ushort4 color{ (pixelData.m_MaterialData.m_Color, 1.f) };
+            half4Ushort4 color{pixelData.m_MaterialData.m_Color};
             surf2Dwrite<ushort4>(
                 color.m_Ushort4,
                 a_Output,
