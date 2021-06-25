@@ -669,7 +669,10 @@ namespace WaveFront
          * Resolve rays and shade at every depth.
          */
         for (unsigned depth = 0; depth < m_Settings.depth && numIntersectionRays > 0; ++depth)
-        {        	
+        {
+            //Set the atomic intersection buffer to also have the right counter.
+            SetAtomicCounter<IntersectionData>(&m_IntersectionData, numIntersectionRays);
+        	
             //Tell Optix to resolve the primary rays that have been generated.
             m_OptixSystem->TraceRays(numIntersectionRays, rayLaunchParameters);
             cudaDeviceSynchronize();

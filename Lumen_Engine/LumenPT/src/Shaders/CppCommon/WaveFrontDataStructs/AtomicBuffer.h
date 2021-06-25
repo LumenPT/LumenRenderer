@@ -19,7 +19,7 @@ namespace WaveFront
         /*
          * Append data to the buffer.
          */
-        GPU_ONLY void Add(T* a_Data)
+        GPU_ONLY INLINE void Add(T* a_Data)
         {
             //IMPORTANT: atomicAdd returns old value. https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#arithmetic-functions
             
@@ -31,7 +31,7 @@ namespace WaveFront
         /*
          * Set data in the buffer, bypassing the atomic operation.
          */
-        GPU_ONLY void Set(int a_Index, T* a_Data)
+        GPU_ONLY INLINE void Set(int a_Index, T* a_Data)
         {
             assert(a_Index < maxSize);
             data[a_Index] = *a_Data;
@@ -41,7 +41,7 @@ namespace WaveFront
          * Set the value of the counter.
          * This bypasses atomic operations and should only be used when data is added by setting at specific indices.
          */
-        GPU_ONLY void SetCounter(int a_Value)
+        GPU_ONLY INLINE void SetCounter(int a_Value)
         {
             assert(a_Value < maxSize);
             counter = a_Value;
@@ -50,23 +50,23 @@ namespace WaveFront
         /*
          * Reset the counter back to 0.
          */
-        GPU_ONLY void Reset()
+        GPU_ONLY INLINE void Reset()
         {
             counter = 0;
         }
 
-        GPU_ONLY unsigned GetSize() const
+        GPU_ONLY INLINE unsigned GetSize() const
         {
             return counter;
         }
 
-        GPU_ONLY T* GetData(int a_Index)
+        GPU_ONLY INLINE T* GetData(int a_Index)
         {
             assert(a_Index <= counter);
             return &data[a_Index];
         }
 
-        GPU_ONLY const T* GetData(int a_Index) const
+        GPU_ONLY INLINE const T* GetData(int a_Index) const
         {
             assert(a_Index <= counter);
             return &data[a_Index];
