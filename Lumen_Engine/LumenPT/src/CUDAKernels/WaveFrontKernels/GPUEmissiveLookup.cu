@@ -1,4 +1,4 @@
-#include "EmissiveLookup.cuh"
+#include "GPUEmissiveLookup.cuh"
 #include "../../Framework/CudaUtilities.h"
 #include "../../Framework/PTMaterial.h"
 #include <sutil/vec_math.h>
@@ -10,23 +10,7 @@
 #include <Lumen/ModelLoading/MeshInstance.h>
 
 
-CPU_ONLY void FindEmissivesWrap(
-    const Vertex* a_Vertices,
-    const uint32_t* a_Indices,
-    bool* a_Emissives,
-    const DeviceMaterial* a_Mat,
-    const uint32_t a_IndexBufferSize,
-    unsigned int& a_NumLights)
-{
-    unsigned int* numLightsPtr;
-    cudaMalloc(&numLightsPtr, sizeof(unsigned int));
-
-    FindEmissives <<<1, 1>>> (a_Vertices, a_Indices, a_Emissives, a_Mat, a_IndexBufferSize, numLightsPtr);
-    cudaDeviceSynchronize();
-    cudaMemcpy(&a_NumLights, numLightsPtr, sizeof(unsigned int), cudaMemcpyDeviceToHost);
-}
-
-CPU_ON_GPU void FindEmissives(
+CPU_ON_GPU void FindEmissivesGpu(
     const Vertex* a_Vertices,
     const uint32_t* a_Indices,
     bool* a_Emissives,
@@ -124,26 +108,9 @@ CPU_ON_GPU void FindEmissives(
     }
 }
 
-CPU_ONLY void AddToLightBufferWrap(
-    const Vertex* a_Vertices,
-    const uint32_t* a_Indices,
-    const bool* a_Emissives,
-    const uint32_t a_IndexBufferSize,
-    WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights,
-    SceneDataTableAccessor* a_SceneDataTable,
-    unsigned a_InstanceId)
-{
-    const unsigned int numTriangles = a_IndexBufferSize / 3;
-    const int blockSize = 256;
-    const int numBlocks = (numTriangles + blockSize - 1) / blockSize;
 
-    AddToLightBuffer <<<numBlocks, blockSize>>> (a_Vertices, a_Indices, a_Emissives, a_IndexBufferSize, a_Lights, a_SceneDataTable, a_InstanceId);
-}
 
-CPU_ON_GPU void AddToLightBuffer(
-    const Vertex* a_Vertices,
-    const uint32_t* a_Indices,
-    const bool* a_Emissives,
+CPU_ON_GPU void AddToLightBufferGpu(
     const uint32_t a_IndexBufferSize,
     WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights,
     SceneDataTableAccessor* a_SceneDataTable,
@@ -159,22 +126,25 @@ CPU_ON_GPU void AddToLightBuffer(
     {
         const unsigned baseIndex = triangleIndex * 3; //We run this function for each triangle, triangle has 3 vertices.
 
-        assert(a_SceneDataTable->GetTableEntry<DevicePrimitive>(a_InstanceId) != nullptr);
+        assert(a_SceneDataTable->GetTableEntry<DevicePrimitiveInstance>(a_InstanceId) != nullptr);
         const auto devicePrimitiveInstance = a_SceneDataTable->GetTableEntry<DevicePrimitiveInstance>(a_InstanceId);
         const auto devicePrimitive = devicePrimitiveInstance->m_Primitive;
-    	
+        const auto indices = devicePrimitive.m_IndexBuffer;
+        const auto vertices = devicePrimitive.m_VertexBuffer;
+        const auto emissiveMarks = devicePrimitive.m_EmissiveBuffer;
+
         //TODO this can be optimized in case of override.
         //check first vertex of triangle to see if its in emissive buffer
-        if ((devicePrimitiveInstance->m_EmissionMode == Lumen::EmissionMode::ENABLED && a_Emissives[triangleIndex] == true) || devicePrimitiveInstance->m_EmissionMode == Lumen::EmissionMode::OVERRIDE)
+        if ((devicePrimitiveInstance->m_EmissionMode == Lumen::EmissionMode::ENABLED && emissiveMarks[triangleIndex] == true) || devicePrimitiveInstance->m_EmissionMode == Lumen::EmissionMode::OVERRIDE)
         {
         	
-            const unsigned index0 = a_Indices[baseIndex + 0];
-            const unsigned index1 = a_Indices[baseIndex + 1];
-            const unsigned index2 = a_Indices[baseIndex + 2];
+            const unsigned index0 = indices[baseIndex + 0];
+            const unsigned index1 = indices[baseIndex + 1];
+            const unsigned index2 = indices[baseIndex + 2];
 
-            const Vertex& vert0 = a_Vertices[index0];
-            const Vertex& vert1 = a_Vertices[index1];
-            const Vertex& vert2 = a_Vertices[index2];
+            const Vertex& vert0 = vertices[index0];
+            const Vertex& vert1 = vertices[index1];
+            const Vertex& vert2 = vertices[index2];
 
             //check if normal is here
             float4 tempWorldPos;

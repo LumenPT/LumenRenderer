@@ -120,10 +120,10 @@ void PTMeshInstance::SetAdditionalColor(glm::vec4 a_AdditionalColor)
     //UpdateRaytracingData(); // I hate this so much but IDK how to do it better
 }
 
-void PTMeshInstance::UpdateRaytracingData()
+bool PTMeshInstance::UpdateRaytracingData()
 {
     if (!m_SceneDataDirty || !m_MeshRef || !m_SceneRef)
-        return;
+        return false; //not updated.
 
     m_SceneDataDirty = false;
 
@@ -170,5 +170,8 @@ void PTMeshInstance::UpdateRaytracingData()
 
         // It is however necessary to initialize the last used id for this primitive to a value which is almost certain to be invalid 
         m_LastUsedPrimitiveIDs[prim.get()] = -1;
-    }    
+    }
+
+    return true; //Updated.
+
 }

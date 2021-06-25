@@ -8,16 +8,7 @@
 class SceneDataTableAccessor;
 class PTMaterial;
 
-CPU_ONLY void FindEmissivesWrap(
-	const Vertex* a_Vertices,
-	const uint32_t* a_Indices,
-	bool* a_Emissives,
-	const DeviceMaterial* a_Mat,
-	const uint32_t a_IndexBufferSize,
-	unsigned int& a_NumLights
-);
-
-CPU_ON_GPU void FindEmissives(
+CPU_ON_GPU void FindEmissivesGpu(
 	const Vertex* a_Vertices, 
 	const uint32_t* a_Indices,
 	bool* a_Emissives,
@@ -26,20 +17,7 @@ CPU_ON_GPU void FindEmissives(
 	unsigned int* a_NumLights
 );
 
-CPU_ONLY void AddToLightBufferWrap(
-	const Vertex* a_Vertices,
-	const uint32_t* a_Indices,
-	const bool* a_Emissives,
-	const uint32_t a_IndexBufferSize,
-	WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights,
-	SceneDataTableAccessor* a_SceneDataTable,
-	unsigned a_InstanceId
-);
-
-CPU_ON_GPU void AddToLightBuffer(
-	const Vertex* a_Vertices,
-	const uint32_t* a_Indices,
-	const bool* a_Emissives,
+CPU_ON_GPU void AddToLightBufferGpu(
 	const uint32_t a_IndexBufferSize, 
 	WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights,
 	SceneDataTableAccessor* a_SceneDataTable,
