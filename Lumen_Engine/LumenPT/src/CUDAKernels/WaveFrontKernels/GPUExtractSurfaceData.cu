@@ -18,14 +18,14 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
     for (int i = index; i < a_NumIntersections; i += stride)
     {
         const IntersectionData currIntersection = *a_IntersectionData->GetData(i);
-        const IntersectionRayData currRay = *a_Rays->GetData(currIntersection.m_RayArrayIndex);
-        unsigned int surfaceDataIndex = PIXEL_DATA_INDEX(currIntersection.m_PixelIndex.m_X, currIntersection.m_PixelIndex.m_Y, a_Resolution.x);
+        const IntersectionRayData currRay = *a_Rays->GetData(i);
+        const auto pixelIndex = currRay.m_PixelIndex;
+        unsigned int surfaceDataIndex = PIXEL_DATA_INDEX(pixelIndex.m_X, pixelIndex.m_Y, a_Resolution.x);
     	
         if (currIntersection.IsIntersection())
         {
             // Get ray used to calculate intersection.
             const unsigned int instanceId = currIntersection.m_InstanceId;
-            const unsigned int rayArrayIndex = currIntersection.m_RayArrayIndex;
             const unsigned int vertexIndex = 3 * currIntersection.m_PrimitiveIndex;
 
             assert(a_SceneDataTable->GetTableEntry<DevicePrimitive>(instanceId) != nullptr);
@@ -123,11 +123,11 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
                 output.m_MaterialData.m_Color = emissive;
                 float maximum = fmaxf(output.m_MaterialData.m_Color.x, fmaxf(output.m_MaterialData.m_Color.y, output.m_MaterialData.m_Color.z));
                 output.m_MaterialData.m_Color /= maximum;
-
+            	
                 //Set the output flag. Because this surface is emissive, it will never be shaded and paths are always terminated.
                 //NOTE: Surface data position is not set, neither is normal. This means that it is not safe to do anything on an emissive surface that is randomly hit.
                 output.m_SurfaceFlags |= SURFACE_FLAG_EMISSIVE;
-                output.m_PixelIndex = currIntersection.m_PixelIndex;
+                output.m_PixelIndex = pixelIndex;
                 output.m_IntersectionT = currIntersection.m_IntersectionT;
                 output.m_Normal = normalMapNormal;
                 a_OutPut[surfaceDataIndex] = output;
@@ -143,7 +143,7 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
                 output.m_Position = currRay.m_Origin + currRay.m_Direction * currIntersection.m_IntersectionT;
                 output.m_IncomingRayDirection = currRay.m_Direction;
                 output.m_TransportFactor = currRay.m_Contribution;
-                output.m_PixelIndex = currIntersection.m_PixelIndex;
+                output.m_PixelIndex = pixelIndex;
                 output.m_IntersectionT = currIntersection.m_IntersectionT;
                 output.m_Normal = normalMapNormal;
                 a_OutPut[surfaceDataIndex] = output;
@@ -153,7 +153,7 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(
             //ETA is air to surface.
             float eta = 1.f / material->m_MaterialData.GetRefractiveIndex();
 
-            output.m_PixelIndex = currIntersection.m_PixelIndex;
+            output.m_PixelIndex = pixelIndex;
             output.m_IntersectionT = currIntersection.m_IntersectionT;
             output.m_Normal = normalMapNormal;
             output.m_GeometricNormal = normalWorld;
