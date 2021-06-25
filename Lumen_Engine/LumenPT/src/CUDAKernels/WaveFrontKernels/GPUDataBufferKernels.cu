@@ -17,16 +17,20 @@ void BuildLightDataBufferGPU(
 
     //X-axis handles the number of instances.
     const unsigned instanceIndex = blockIdx.x * blockDim.x + threadIdx.x;
+    //Y-axis handles the triangles of each instance, so that there is not just one thread looping over all the triangles in an instance.
     const unsigned instanceThreadIndex = blockIdx.y * blockDim.y + threadIdx.y;
+    //The number of threads to handle the triangles of an instance.
     const unsigned numThreadsPerInstance = gridDim.y * blockDim.y;
 
-    if(instanceIndex < a_NumInstances)
+    //Dont try to build more instances than there are, which could happen if there is more threads than instances due to threads launching in blocks.
+    if(instanceIndex < a_NumInstances) 
     {
 
         const LightInstanceData& instanceData = a_InstanceData[instanceIndex];
-
+        
+        //Y-axis handles the number of triangles per instance, how many triangles per thead for this instance?
         const unsigned numTrianglesPerThread = 
-            static_cast<unsigned>(ceilf(static_cast<float>(numThreadsPerInstance) / static_cast<float>(instanceData.m_NumTriangles)));
+            static_cast<unsigned>(ceilf(static_cast<float>(instanceData.m_NumTriangles) /static_cast<float>(numThreadsPerInstance)));
 
         const unsigned startTriangleIndex = instanceThreadIndex * numTrianglesPerThread;
 
