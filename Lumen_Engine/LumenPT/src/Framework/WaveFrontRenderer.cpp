@@ -877,9 +877,12 @@ namespace WaveFront
             //Post processing using CUDA kernel.
             //PostProcess(postProcessLaunchParams);
 
-            NRDWrapperEvaluateParams nrdParams = {};
-            nrdParams.m_Camera = m_Scene->m_Camera.get();
-            m_NRD->Denoise(nrdParams);
+            if (/*m_DenoiserSettings.m_UseNRD*/true)
+            {
+                NRDWrapperEvaluateParams nrdParams = {};
+                nrdParams.m_Camera = m_Scene->m_Camera.get();
+                m_NRD->Denoise(nrdParams);
+            }
 
             MergeOutput(postProcessLaunchParams);
             cudaDeviceSynchronize();
@@ -897,10 +900,6 @@ namespace WaveFront
                     m_OptixDenoiser->FlowInput.GetDevicePtr<float2>(),
                     m_OptixDenoiser->GetColorOutput().GetDevicePtr<float3>()
                 );
-
-                /*PrepareOptixDenoising(optixDenoiserLaunchParams);
-                CHECKLASTCUDAERROR;*/
-
                 OptixDenoiserInitParams optixDenoiserInitParams;
                 optixDenoiserInitParams.m_InputWidth = m_Settings.renderResolution.x;
                 optixDenoiserInitParams.m_InputHeight = m_Settings.renderResolution.y;
@@ -908,7 +907,6 @@ namespace WaveFront
                 optixDenoiserInitParams.m_UseAlbedo = m_DenoiserSettings.m_OptixAlbedo;
                 optixDenoiserInitParams.m_UseNormal = m_DenoiserSettings.m_OptixNormal;
                 optixDenoiserInitParams.m_UseTemporalData = m_DenoiserSettings.m_OptixTemporal;
-
                 OptixDenoiserDenoiseParams optixDenoiserParams = {};
                 optixDenoiserParams.m_InitParams = optixDenoiserInitParams;
                 optixDenoiserParams.m_PostProcessLaunchParams = &postProcessLaunchParams;
@@ -920,10 +918,6 @@ namespace WaveFront
                 optixDenoiserParams.m_PrevColorOutput = m_OptixDenoiser->GetPrevColorOutput().GetCUDAPtr();
                 optixDenoiserParams.m_ColorOutput = m_OptixDenoiser->GetColorOutput().GetCUDAPtr();
                 m_OptixDenoiser->Denoise(optixDenoiserParams);
-                CHECKLASTCUDAERROR;
-
-                /*FinishOptixDenoising(optixDenoiserLaunchParams);
-                CHECKLASTCUDAERROR;*/
             }
 
             //TODO: move to after DLSS and NRD runs... (Requires mapping to use in CUDA again).
