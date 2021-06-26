@@ -891,33 +891,36 @@ namespace WaveFront
             cudaDeviceSynchronize();
             CHECKLASTCUDAERROR;
 
-            OptixDenoiserLaunchParameters optixDenoiserLaunchParams(
-                m_Settings.renderResolution,
-                m_SurfaceData[currentIndex].GetDevicePtr<SurfaceData>(),
-                m_PixelBufferCombined->GetSurfaceObject(),
-                m_OptixDenoiser->ColorInput.GetDevicePtr<float3>(),
-                m_OptixDenoiser->AlbedoInput.GetDevicePtr<float3>(),
-                m_OptixDenoiser->NormalInput.GetDevicePtr<float3>(),
-                m_OptixDenoiser->FlowInput.GetDevicePtr<float2>(),
-                m_OptixDenoiser->GetColorOutput().GetDevicePtr<float3>()
-            );
+            if (m_DenoiserSettings.m_UseOptix)
+            {
+                OptixDenoiserLaunchParameters optixDenoiserLaunchParams(
+                    m_Settings.renderResolution,
+                    m_SurfaceData[currentIndex].GetDevicePtr<SurfaceData>(),
+                    m_PixelBufferCombined->GetSurfaceObject(),
+                    m_OptixDenoiser->ColorInput.GetDevicePtr<float3>(),
+                    m_OptixDenoiser->AlbedoInput.GetDevicePtr<float3>(),
+                    m_OptixDenoiser->NormalInput.GetDevicePtr<float3>(),
+                    m_OptixDenoiser->FlowInput.GetDevicePtr<float2>(),
+                    m_OptixDenoiser->GetColorOutput().GetDevicePtr<float3>()
+                );
 
-            PrepareOptixDenoising(optixDenoiserLaunchParams);
-            CHECKLASTCUDAERROR;
+                PrepareOptixDenoising(optixDenoiserLaunchParams);
+                CHECKLASTCUDAERROR;
 
-            OptixDenoiserDenoiseParams optixDenoiserParams = {}; 
-            optixDenoiserParams.m_PostProcessLaunchParams = &postProcessLaunchParams; 
-            optixDenoiserParams.m_ColorInput = m_OptixDenoiser->ColorInput.GetCUDAPtr();
-            optixDenoiserParams.m_AlbedoInput = m_OptixDenoiser->AlbedoInput.GetCUDAPtr();
-            optixDenoiserParams.m_NormalInput = m_OptixDenoiser->NormalInput.GetCUDAPtr();
-            optixDenoiserParams.m_FlowInput = m_OptixDenoiser->FlowInput.GetCUDAPtr();
-            optixDenoiserParams.m_PrevColorOutput = m_OptixDenoiser->GetPrevColorOutput().GetCUDAPtr();
-            optixDenoiserParams.m_ColorOutput = m_OptixDenoiser->GetColorOutput().GetCUDAPtr();
-            m_OptixDenoiser->Denoise(optixDenoiserParams); 
-            CHECKLASTCUDAERROR;
+                OptixDenoiserDenoiseParams optixDenoiserParams = {};
+                optixDenoiserParams.m_PostProcessLaunchParams = &postProcessLaunchParams;
+                optixDenoiserParams.m_ColorInput = m_OptixDenoiser->ColorInput.GetCUDAPtr();
+                optixDenoiserParams.m_AlbedoInput = m_OptixDenoiser->AlbedoInput.GetCUDAPtr();
+                optixDenoiserParams.m_NormalInput = m_OptixDenoiser->NormalInput.GetCUDAPtr();
+                optixDenoiserParams.m_FlowInput = m_OptixDenoiser->FlowInput.GetCUDAPtr();
+                optixDenoiserParams.m_PrevColorOutput = m_OptixDenoiser->GetPrevColorOutput().GetCUDAPtr();
+                optixDenoiserParams.m_ColorOutput = m_OptixDenoiser->GetColorOutput().GetCUDAPtr();
+                m_OptixDenoiser->Denoise(optixDenoiserParams);
+                CHECKLASTCUDAERROR;
 
-            //FinishOptixDenoising(optixDenoiserLaunchParams);
-            CHECKLASTCUDAERROR;
+                FinishOptixDenoising(optixDenoiserLaunchParams);
+                CHECKLASTCUDAERROR;
+            }
 
             //TODO: move to after DLSS and NRD runs... (Requires mapping to use in CUDA again).
             WriteToOutput(postProcessLaunchParams);     //Breaks here when render and output resolution dont match
