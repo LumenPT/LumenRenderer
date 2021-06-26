@@ -22,12 +22,18 @@ void OptixDenoiserWrapper::Initialize(const OptixDenoiserInitParams& a_InitParam
     WaveFront::OptixWrapper& optixWrapper = *(m_InitParams.m_ServiceLocator->m_OptixWrapper);
 
     OptixDenoiserOptions options = {};
-    options.guideAlbedo = 1;
-    options.guideNormal = 1;
+    options.guideAlbedo = a_InitParams.m_UseAlbedo;
+    options.guideNormal = a_InitParams.m_UseNormal;
     
     OptixDenoiserModelKind denoiserModelKind = {};
-    //denoiserModelKind = OPTIX_DENOISER_MODEL_KIND_TEMPORAL/*OPTIX_DENOISER_MODEL_KIND_HDR*/;
-    denoiserModelKind = OPTIX_DENOISER_MODEL_KIND_LDR;
+    if (a_InitParams.m_UseTemporalData)
+    {
+        denoiserModelKind = OPTIX_DENOISER_MODEL_KIND_TEMPORAL;
+    }
+    else
+    {
+        denoiserModelKind = OPTIX_DENOISER_MODEL_KIND_LDR;
+    }
 
     CHECKOPTIXRESULT(optixDenoiserCreate(optixWrapper.GetDeviceContext(), denoiserModelKind, &options, &m_Denoiser));
 
