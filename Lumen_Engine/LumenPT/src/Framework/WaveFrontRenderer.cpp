@@ -116,12 +116,6 @@ namespace WaveFront
         m_NRD->Initialize(nrdInitParams);*/
 
         m_OptixDenoiser = std::make_unique<OptixDenoiserWrapper>();
-        OptixDenoiserInitParams optixDenoiserInitParams;
-        // TODO: Optix Denoiers render resolution input
-        optixDenoiserInitParams.m_InputWidth = m_Settings.renderResolution.x;
-        optixDenoiserInitParams.m_InputHeight = m_Settings.renderResolution.y;
-        optixDenoiserInitParams.m_ServiceLocator = &m_ServiceLocator;
-        m_OptixDenoiser->Initialize(optixDenoiserInitParams);
 
         //Set up the OpenGL output buffer.
         m_OutputBuffer = std::make_unique<CudaGLTexture>(GL_RGBA8, m_Settings.outputResolution.x, m_Settings.outputResolution.y, 4);
@@ -904,11 +898,21 @@ namespace WaveFront
                     m_OptixDenoiser->GetColorOutput().GetDevicePtr<float3>()
                 );
 
-                PrepareOptixDenoising(optixDenoiserLaunchParams);
-                CHECKLASTCUDAERROR;
+                /*PrepareOptixDenoising(optixDenoiserLaunchParams);
+                CHECKLASTCUDAERROR;*/
+
+                OptixDenoiserInitParams optixDenoiserInitParams;
+                optixDenoiserInitParams.m_InputWidth = m_Settings.renderResolution.x;
+                optixDenoiserInitParams.m_InputHeight = m_Settings.renderResolution.y;
+                optixDenoiserInitParams.m_ServiceLocator = &m_ServiceLocator;
+                optixDenoiserInitParams.m_UseAlbedo = m_DenoiserSettings.m_OptixAlbedo;
+                optixDenoiserInitParams.m_UseNormal = m_DenoiserSettings.m_OptixNormal;
+                optixDenoiserInitParams.m_UseTemporalData = m_DenoiserSettings.m_OptixTemporal;
 
                 OptixDenoiserDenoiseParams optixDenoiserParams = {};
+                optixDenoiserParams.m_InitParams = optixDenoiserInitParams;
                 optixDenoiserParams.m_PostProcessLaunchParams = &postProcessLaunchParams;
+                optixDenoiserParams.m_OptixDenoiserLaunchParams = &optixDenoiserLaunchParams;
                 optixDenoiserParams.m_ColorInput = m_OptixDenoiser->ColorInput.GetCUDAPtr();
                 optixDenoiserParams.m_AlbedoInput = m_OptixDenoiser->AlbedoInput.GetCUDAPtr();
                 optixDenoiserParams.m_NormalInput = m_OptixDenoiser->NormalInput.GetCUDAPtr();
@@ -918,8 +922,8 @@ namespace WaveFront
                 m_OptixDenoiser->Denoise(optixDenoiserParams);
                 CHECKLASTCUDAERROR;
 
-                FinishOptixDenoising(optixDenoiserLaunchParams);
-                CHECKLASTCUDAERROR;
+                /*FinishOptixDenoising(optixDenoiserLaunchParams);
+                CHECKLASTCUDAERROR;*/
             }
 
             //TODO: move to after DLSS and NRD runs... (Requires mapping to use in CUDA again).
@@ -994,14 +998,14 @@ namespace WaveFront
         m_Scene->m_Camera->UpdatePreviousFrameMatrix();
         ++frameCount;
 
-        m_OptixDenoiser->UpdateDebugTextures();
-        m_DeferredOpenGLCalls.push([&]() {
-            //m_DebugTexture = m_OptixDenoiser->m_OptixDenoiserInputTex.m_Memory->GetTexture();
-            //m_DebugTexture = m_OptixDenoiser->m_OptixDenoiserAlbedoInputTex.m_Memory->GetTexture();
-            //m_DebugTexture = m_OptixDenoiser->m_OptixDenoiserNormalInputTex.m_Memory->GetTexture();
-            m_DebugTexture = m_OptixDenoiser->m_OptixDenoiserOutputTex.m_Memory->GetTexture();
-            });
-        WaitForDeferredCalls();
+        //m_OptixDenoiser->UpdateDebugTextures();
+        //m_DeferredOpenGLCalls.push([&]() {
+        //    //m_DebugTexture = m_OptixDenoiser->m_OptixDenoiserInputTex.m_Memory->GetTexture();
+        //    //m_DebugTexture = m_OptixDenoiser->m_OptixDenoiserAlbedoInputTex.m_Memory->GetTexture();
+        //    //m_DebugTexture = m_OptixDenoiser->m_OptixDenoiserNormalInputTex.m_Memory->GetTexture();
+        //    m_DebugTexture = m_OptixDenoiser->m_OptixDenoiserOutputTex.m_Memory->GetTexture();
+        //    });
+        //WaitForDeferredCalls();
 
 
         // TODO: Weird debug code. Yeet?
