@@ -9,9 +9,9 @@ namespace WaveFront
     void DX11Wrapper::Init()
     {
         UINT deviceFlags = 0;
-    #if _DEBUG
+
         deviceFlags = D3D11_CREATE_DEVICE_DEBUG;
-    #endif
+
         D3D_FEATURE_LEVEL featureLevels[] =
         {
             D3D_FEATURE_LEVEL_11_1,
@@ -50,7 +50,7 @@ namespace WaveFront
         desc.Format = a_Format;
         desc.SampleDesc = textureSampleDesc;
         desc.Usage = D3D11_USAGE_DEFAULT;
-        desc.BindFlags = a_BindFlag;
+        desc.BindFlags = a_BindFlag /*| D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS*/;
         desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ | D3D11_CPU_ACCESS_WRITE;
         desc.MiscFlags = 0;
         // just create comptr to texture2D from (pixel) any buffer (?)

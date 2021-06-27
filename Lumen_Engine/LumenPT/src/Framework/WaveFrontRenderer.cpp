@@ -128,7 +128,10 @@ namespace WaveFront
 
         //Create d3d11 texture2D which will be used for the pixel-buffer-separate containing the different light channels.
         m_D3D11PixelBufferSeparate = m_DX11Wrapper->CreateTexture2D(
-            { m_Settings.renderResolution.x, m_Settings.renderResolution.y, s_numLightChannels});
+            { m_Settings.renderResolution.x, m_Settings.renderResolution.y, s_numLightChannels},
+            DXGI_FORMAT_R16G16B16A16_FLOAT,
+            D3D11_BIND_FLAG::D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_FLAG::D3D11_BIND_SHADER_RESOURCE
+            );
 
         //Create d3d11 texture2D which will be used for the pixel-buffer-combined containing the merged light channels.
         m_D3D11PixelBufferCombined = m_DX11Wrapper->CreateTexture2D(
@@ -152,7 +155,8 @@ namespace WaveFront
         //Create d3d11 texture2D which will be used for the depth buffer containing the depth values for each pixel.
         m_D3D11DepthBuffer = m_DX11Wrapper->CreateTexture2D(
             {m_Settings.renderResolution.x, m_Settings.renderResolution.y, 1}, 
-            DXGI_FORMAT_R32_FLOAT);
+            DXGI_FORMAT_R32_FLOAT,
+            D3D11_BIND_FLAG::D3D11_BIND_SHADER_RESOURCE);
 
         m_D3D11JitterBuffer = m_DX11Wrapper->CreateTexture2D(
             { m_Settings.renderResolution.x, m_Settings.renderResolution.y, 1 }, 
@@ -161,12 +165,14 @@ namespace WaveFront
         //Create d3d11 texture2D which will be used for the motion vector buffer containing the motion vectors for each pixel.
         m_D3D11MotionVectorBuffer = m_DX11Wrapper->CreateTexture2D(
             { m_Settings.renderResolution.x, m_Settings.renderResolution.y, 1 },
-            DXGI_FORMAT_R16G16_FLOAT);
+            DXGI_FORMAT_R16G16_FLOAT,
+            D3D11_BIND_FLAG::D3D11_BIND_SHADER_RESOURCE);
 
         //Create d3d11 texture2D which will be used for the normal-roughness buffer containing the normal and rougness for each pixel.
         m_D3D11NormalRoughnessBuffer = m_DX11Wrapper->CreateTexture2D(
             { m_Settings.renderResolution.x, m_Settings.renderResolution.y, 1 }, 
-            DXGI_FORMAT_R16G16B16A16_FLOAT);
+            DXGI_FORMAT_R16G16B16A16_FLOAT,
+            D3D11_BIND_FLAG::D3D11_BIND_SHADER_RESOURCE);
 
         {//Create interop-texture for pixel-buffers.
             //Description of the cuda texture created with an interop-texture for each pixel buffer.
@@ -876,6 +882,15 @@ namespace WaveFront
             );
             //Post processing using CUDA kernel.
             //PostProcess(postProcessLaunchParams);
+
+            //Unmap other buffers for use in DLSS
+            /*m_PixelBufferSeparate[0]->Unmap();
+            m_PixelBufferSeparate[1]->Unmap();
+            m_PixelBufferCombined->Unmap();
+            m_DepthBuffer->Unmap();
+            m_JitterBuffer->Unmap();
+            m_MotionVectorBuffer->Unmap();
+            m_NormalRoughnessBuffer->Unmap();*/
 
             if (/*m_DenoiserSettings.m_UseNRD*/true)
             {
