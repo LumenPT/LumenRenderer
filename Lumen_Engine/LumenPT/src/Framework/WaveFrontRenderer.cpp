@@ -623,7 +623,9 @@ namespace WaveFront
 
         auto seed = WangHash(frameCount);
 
-        float2 minMaxDepth = make_float2(m_Settings.minIntersectionT, m_Settings.maxIntersectionT);
+        const glm::vec2 renderDistanceMinMax = m_Scene->m_Camera->GetMinMaxRenderDistance();
+
+        float2 minMaxDepth = make_float2(renderDistanceMinMax.x, renderDistanceMinMax.y);
 
         m_CurrentFrameStats.m_Times["Reset Counters"] = timer.measure(TimeUnit::MICROS);
         timer.reset();

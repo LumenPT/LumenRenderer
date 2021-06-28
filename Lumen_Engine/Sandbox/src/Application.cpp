@@ -88,12 +88,10 @@ public:
 		renderer = std::make_shared<WaveFront::WaveFrontRenderer>();
 		WaveFront::WaveFrontSettings settings{};
 
-		settings.m_ShadersFilePathSolids = config.GetFileShaderSolids();
-		settings.m_ShadersFilePathVolumetrics = config.GetFileShaderVolumetrics();
+		settings.m_ShadersFilePathSolids = config.GetDirectoryShaders().string() +  config.GetFileShaderSolids().string();
+		settings.m_ShadersFilePathVolumetrics = config.GetDirectoryShaders().string() + config.GetFileShaderVolumetrics().string();
 
 		settings.depth = 5;
-		settings.minIntersectionT = 0.1f;
-		settings.maxIntersectionT = 5000.f;
 		settings.renderResolution = uint2{ 1280, 720 };
 		//settings.outputResolution = { 2560, 1440 };
 		settings.outputResolution = uint2{ 1280, 720 };
@@ -125,277 +123,34 @@ public:
 		contextLayer->SetPipeline(renderer);
 		PushLayer(contextLayer);
 
-		//temporary stuff to avoid absolute paths to gltf cube
-		std::filesystem::path p = std::filesystem::current_path();
-
-		while (p.has_parent_path())
+		if (config.HasDefaultModel())
 		{
-			bool found = false;
-			for (auto child : std::filesystem::directory_iterator(p))
-			{
-				if (child.is_directory() && child.path().filename() == "Sandbox")
-				{
-					found = true;
-					p = child.path().parent_path();
-				}
-			}
 
-			if (found) break;
+			const std::filesystem::path& modelDirectory = config.GetDirectoryModels();
+			const std::string modelDirectoryPath = modelDirectory.string();
+			const std::filesystem::path& defaultModel = config.GetDefaultModel();
+			const std::string defaultModelFileName = defaultModel.filename().string();
+			
 
-			p = p.parent_path();
+			LMN_TRACE(modelDirectory.string() + defaultModel.string());
+
+			m_SceneManager->SetPipeline(*contextLayer->GetPipeline());
+
+			auto begin = std::chrono::high_resolution_clock::now();
+
+			auto res = m_SceneManager->LoadGLTF(defaultModelFileName, modelDirectoryPath + defaultModel.parent_path().string().append("/"));
+
+			auto end = std::chrono::high_resolution_clock::now();
+
+			auto milli = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
+
+			printf("\n\nTime elapsed to load model: %lli milliseconds\n\n", milli);
+
+			auto lumenPT = contextLayer->GetPipeline();
+
+			lumenPT->m_Scene = res->m_Scenes[0];
+
 		}
-
-		std::filesystem::current_path(p);
-		std::string p_string{ p.string() };
-		std::replace(p_string.begin(), p_string.end(), '\\', '/');
-
-		std::filesystem::path p2 = std::filesystem::current_path();
-		std::string p_string2{ p2.string() };
-		std::replace(p_string2.begin(), p_string2.end(), '\\', '/');
-
-		std::filesystem::path p3 = std::filesystem::current_path();
-		std::string p_string3{ p3.string() };
-		std::replace(p_string3.begin(), p_string3.end(), '\\', '/');
-
-		const std::string meshPath = p_string.append("/Sandbox/assets/models/Sponza/");
-		//const std::string meshPath = p_string.append("/Sandbox/assets/gltfExternalAssets/Benchmark_Scenes/FlyingWorld_BattleOfTheTrashGod/");
-		const std::string meshPath2 = p_string2.append("/Sandbox/assets/models/EmissiveSphere/");
-		//const std::string meshPath3 = p_string3.append("/Sandbox/assets/models/knight/");
-		//Base path for meshes.
-
-		//Mesh name
-		//const std::string meshName = "Bistro4.gltf";
-		const std::string meshName = "Sponza.gltf";
-		//const std::string meshName = "Bistro3BinaryNoParenting.glb";
-		const std::string meshName2 = "EmissiveSphere.gltf";
-		//const std::string meshName3 = "scene.gltf";
-
-		//p_string.append("/Sandbox/assets/models/Sponza/Sponza.gltf");
-		LMN_TRACE(p_string);
-
-		m_SceneManager->SetPipeline(*contextLayer->GetPipeline());
-
-		auto begin = std::chrono::high_resolution_clock::now();
-
-		auto res = m_SceneManager->LoadGLTF(meshName, meshPath);
-
-		auto end = std::chrono::high_resolution_clock::now();
-
-		auto milli = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
-
-		printf("\n\nTime elapsed to load model: %li milliseconds\n\n", milli);
-
-		//__debugbreak();
-
-		auto res2 = m_SceneManager->LoadGLTF(meshName2, meshPath2);
-		//auto res3 = m_SceneManager->LoadGLTF(meshName3, meshPath3);
-
-		auto lumenPT = contextLayer->GetPipeline();
-
-		LumenRenderer::SceneData scData = {};
-
-		//lumenPT->m_Scene = lumenPT->CreateScene(scData);
-
-		//Loop over the nodes in the scene, and add their meshes if they have one.
-
-		float xOffset = -1200.f;
-
-		uint32_t seed = 38947987;
-		seed = RandomInt(seed);
-
-		//Scale the mesh up.
-		lumenPT->m_Scene = res->m_Scenes[0];
-		for(auto& mesh : lumenPT->m_Scene->m_MeshInstances)
-		{
-			mesh->m_Transform.SetScale(glm::vec3{ 1.f });
-			//mesh->m_Transform.SetScale(mesh->m_Transform.GetScale() * 10.f);
-			mesh->SetEmissiveness({ Lumen::EmissionMode::ENABLED, {1.f, 1.f, 1.f}, 6.f });
-			mesh->UpdateAccelRemoveThis();
-		}
-		
-		for(int i = 0; i < 120; ++i)
-		{
-			for (auto& node : res2->m_NodePool)
-			{
-				auto meshId = node->m_MeshID;
-				if (meshId >= 0)
-				{
-					//auto mesh = lumenPT->m_Scene->AddMesh();
-					//mesh->SetMesh(res2->m_MeshPool[meshId]);
-					////mesh->m_Transform.CopyTransform(*node->m_LocalTransform);
-					//float p = i;
-					//mesh->m_Transform.SetPosition(glm::vec3(xOffset, 100.f + (p*p), 0.f));
-					//mesh->m_Transform.SetScale(glm::vec3(2.0f * (static_cast<float>((i + 1) * 2) / 4.f)));
-					//glm::vec3 rgb = glm::vec3(RandomFloat(seed), RandomFloat(seed), RandomFloat(seed));
-					//mesh->SetEmissiveness(Lumen::EmissionMode::OVERRIDE, rgb, 50.f);
-					//mesh->UpdateAccelRemoveThis();
-				}
-			}
-			auto mesh = lumenPT->m_Scene->AddMesh();
-			mesh->SetMesh(res2->m_MeshPool[0]);
-			//mesh->m_Transform.CopyTransform(*node->m_LocalTransform);
-			float p = i;
-			mesh->m_Transform.SetPosition(glm::vec3(xOffset, 100.f + (p * p), 0.f));
-			const auto scale = glm::vec3(2.0f * (static_cast<float>((i + 1) * 2) / 4.f)) + 1.f;
-			mesh->m_Transform.SetScale(scale);
-			Lumen::MeshInstance::Emissiveness emissiveness;
-			emissiveness.m_EmissionMode = Lumen::EmissionMode::OVERRIDE;
-			emissiveness.m_OverrideRadiance = glm::vec3(1.0f, 1.0f, 1.0f);
-			emissiveness.m_Scale = 25.f;
-			mesh->SetEmissiveness(emissiveness);
-			mesh->UpdateAccelRemoveThis();
-			xOffset += 50;
-			mesh->m_Name = std::string("Light ") + std::to_string(i);
-		}
-
-		////Separate light
-		//{
-		//	auto meshId = node->m_MeshID;
-		//	if(meshId >= 0)
-		//	{
-		//		auto mesh = lumenPT->m_Scene->AddMesh();
-		//		mesh->SetMesh(res->m_MeshPool[meshId]);
-		//		mesh->m_Transform.CopyTransform(*node->m_LocalTransform);
-		//		mesh->SetEmissiveness(Lumen::EmissionMode::ENABLED, glm::vec3(1.f, 1.f, 1.f), 3000.f);	//Make more bright
-		//		mesh->UpdateAccelRemoveThis();
-		//	    //mesh->m_Transform.SetPosition(glm::vec3(0.f, 0.f, 15.0f));
-		//		//mesh->m_Transform.SetScale(glm::vec3(1.0f));
-		//	}
-		//}
-
-		////Disney BSDF test
-		//for(auto& lumenMesh : res2->m_MeshPool)
-		//{
-		//	auto mesh = lumenPT->m_Scene->AddMesh();
-		//	mesh->SetMesh(lumenMesh);
-		//	mesh->m_Transform.SetPosition(glm::vec3(000.f, 160.f, -80.f));
-		//	mesh->m_Transform.SetRotation(glm::vec3(-90.f, 90.f, 0.f));
-		//	constexpr auto scale = 60.f;
-		//	mesh->m_Transform.SetScale(glm::vec3(scale, scale, scale));
-		//	uchar4 whitePixel = { 255,255,255,255 };
-		//	uchar4 diffusePixel{ 255, 255, 255, 0 };
-		//	uchar4 normal = { 128, 128, 255, 0 };
-		//	auto whiteTexture = lumenPT->CreateTexture(&whitePixel, 1, 1, false);
-		//	auto diffuseTexture = lumenPT->CreateTexture(&diffusePixel, 1, 1, true);
-		//	auto normalTexture = lumenPT->CreateTexture(&normal, 1, 1, false);
-		//	LumenRenderer::MaterialData matData;
-		//	matData.m_ClearCoatRoughnessTexture = whiteTexture;
-		//	matData.m_ClearCoatTexture = whiteTexture;
-		//	matData.m_DiffuseTexture = whiteTexture;
-		//	matData.m_EmissiveTexture = whiteTexture;
-		//	matData.m_MetallicRoughnessTexture = whiteTexture;
-		//	matData.m_NormalMap = normalTexture;
-		//	matData.m_TintTexture = whiteTexture;
-		//	matData.m_TransmissionTexture = whiteTexture;
-		//	auto mat = lumenPT->CreateMaterial(matData);
-
-	
-		//	//Transparency
-		//	mat->SetTransmissionFactor(0.f);	//Transparency scalar.
-		//	mat->SetTransmittanceFactor({ 0.f, 0.f, 0.f });		//Beers law stuff.
-		//	mat->SetIndexOfRefraction(1.0f);	//IOR
-	
-		//	//Color settings.
-		//	mat->SetDiffuseColor(glm::vec4(1.f, 1.f, 1.f, 1.f));
-		//	mat->SetTintFactor(glm::vec3{ 1.f, 1.f, 1.f });
-	
-		//	//Scalar for diffuse light bounces.
-		//	mat->SetLuminance(0.f);
-	
-		//	//Sub surface scattering scalar.
-		//	mat->SetSubSurfaceFactor(0.f);
-	
-		//	//Sheen and how much tint to add for sheen.
-		//	mat->SetSheenFactor(0.f);
-		//	mat->SetSheenTintFactor(0.0f);
-	
-		//	//Clearcoat and roughness. Uses tint for coloring.
-		//	mat->SetClearCoatFactor(0.01f);
-		//	mat->SetClearCoatRoughnessFactor(0.f);
-	
-		//	//MetallicRoughness model.
-		//	mat->SetRoughnessFactor(1.f);
-		//	mat->SetMetallicFactor(1.f);
-	
-		//	//Anisotropic scalar.
-		//	mat->SetAnisotropic(0.f);
-	
-		//	//Apply the material and update.
-		//	mesh->SetOverrideMaterial(mat);
-		//	mesh->UpdateAccelRemoveThis();
-		//}
-		
-		//for (auto& node : res3->m_NodePool)
-		//{x
-		//	auto meshId = node->m_MeshID;
-		//	if (meshId >= 0)
-		//	{
-		//		auto mesh = lumenPT->m_Scene->AddMesh();
-		//		mesh->SetMesh(res3->m_MeshPool[meshId]);
-		//		mesh->m_Transform.SetScale({ 10.f, 10.f, 10.f });
-		//		mesh->m_Transform.SetPosition({0.f, 50.f, 0.f});
-		//	}
-		//}
-		
-		//
-		//for(auto& node: res->m_NodePool)
-		//{
-		//	auto meshId = node->m_MeshID;
-		//	if(meshId >= 0)
-		//	{
-		//		auto mesh = lumenPT->m_Scene->AddMesh();
-		//		mesh->SetMesh(res->m_MeshPool[meshId]);
-		//		mesh->m_Transform.CopyTransform(*node->m_LocalTransform);
-		//		mesh->SetEmissiveness(Lumen::EmissionMode::ENABLED, glm::vec3(1.f, 1.f, 1.f), 3000.f);	//Make more bright
-		//		mesh->UpdateAccelRemoveThis();
-		//	    //mesh->m_Transform.SetPosition(glm::vec3(0.f, 0.f, 15.0f));
-		//		//mesh->m_Transform.SetScale(glm::vec3(1.0f));
-		//	}
-
-		//}
-
-		//auto mesh = lumenPT->m_Scene->AddMesh();
-		//mesh->SetMesh(res->m_MeshPool[0]);
-		////mesh->m_Transform.CopyTransform(*node->m_LocalTransform);
-		//mesh->m_Transform.SetPosition(glm::vec3(0.f, 0.f, 15.0f));
-		//mesh->m_Transform.SetScale(glm::vec3(1.0f));
-		//for (auto& node : res2->m_NodePool)
-		//{
-		//	auto meshId = node->m_MeshID;
-		//	//if (meshId >= 0)
-		//	{
-		//		auto mesh = lumenPT->m_Scene->AddMesh();
-		//		mesh->SetMesh(res2->m_MeshPool[meshId]);
-		//		//mesh->m_Transform.CopyTransform(*node->m_LocalTransform);
-		//		mesh->m_Transform.SetPosition(glm::vec3(100.f, 500.f, 0.0f));
-        //		mesh->m_Transform.SetScale(glm::vec3(3000.0f));
-		//	}
-		//}
-
-		//lumenPT->m_Scene = lumenPT->CreateScene(scData);
-		/*auto mesh = lumenPT->m_Scene->AddMesh();
-		mesh->SetMesh(res->m_MeshPool[0]);*/
-
-		//mesh->m_Transform.SetPosition(glm::vec3(0.f, 0.f, 15.0f));
-		//mesh->m_Transform.SetScale(glm::vec3(1.0f));
-
-		//auto mesh2 = lumenPT->m_Scene->AddMesh();
-		//mesh2->SetMesh(res2->m_MeshPool[0]);
-		//mesh2->m_Transform.SetPosition(glm::vec3(0.f, 30.f, 15.0f));
-		//mesh2->m_Transform.SetScale(glm::vec3(1.0f));
-		//
-		
-		//meshLight->m_Transform.SetPosition(glm::vec3(0.f, 0.f, 15.0f));
-		//meshLight->m_Transform.SetScale(glm::vec3(1.0f));
-
-		//TODO uncomment but also destroyu
-		std::string vndbFilePath = { p.string() };
-		//vndbFilePath.append("/Sandbox/assets/volume/Sphere.vndb");
-		vndbFilePath.append("/Sandbox/assets/volume/bunny.vdb");
-		auto volumeRes = m_SceneManager->m_VolumeManager.LoadVDB(vndbFilePath);
-
-		auto volume = lumenPT->m_Scene->AddVolume();
-		volume->SetVolume(volumeRes->m_Volume);
 
 		//renderer->InitNGX();
 

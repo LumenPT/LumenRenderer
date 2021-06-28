@@ -44,12 +44,6 @@ namespace WaveFront
         //The resolution to output at (up-scaling).
         uint2 outputResolution;
 
-        //The minimum distance a ray has to travel before intersecting a surface.
-        float minIntersectionT;
-
-        //The maximum distance a ray can travel before terminating.
-        float maxIntersectionT;
-
         bool blendOutput;
     };
 

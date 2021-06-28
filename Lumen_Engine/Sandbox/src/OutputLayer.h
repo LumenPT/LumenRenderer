@@ -71,6 +71,7 @@ private:
     float m_CameraMouseSensitivity;
     float m_CameraMovementSpeed;
     float m_Gamma = 2.2f;
+    float m_MinMaxRenderDistance[2] = { 0.1f, 1000.f };
 
     std::unique_ptr<class ModelLoaderWidget> m_ModelLoaderWidget;
     std::unique_ptr<Lumen::SceneGraph> m_SceneGraph;
