@@ -9,9 +9,9 @@ namespace WaveFront
     void DX11Wrapper::Init()
     {
         UINT deviceFlags = 0;
-    #if _DEBUG
+
         deviceFlags = D3D11_CREATE_DEVICE_DEBUG;
-    #endif
+
         D3D_FEATURE_LEVEL featureLevels[] =
         {
             D3D_FEATURE_LEVEL_11_1,

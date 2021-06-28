@@ -95,7 +95,7 @@ public:
 		settings.minIntersectionT = 0.1f;
 		settings.maxIntersectionT = 5000.f;
 		settings.renderResolution = { 1280, 720 };
-		settings.outputResolution = { 2560, 1440 };
+		settings.outputResolution = { 1280, 720 };
 		//settings.outputResolution = { 1280, 720 };
 		settings.blendOutput = false;	//When true will blend output instead of overwriting it (high res image over time if static scene).
 
@@ -389,13 +389,13 @@ public:
 		//meshLight->m_Transform.SetScale(glm::vec3(1.0f));
 
 		//TODO uncomment but also destroyu
-		std::string vndbFilePath = { p.string() };
-		//vndbFilePath.append("/Sandbox/assets/volume/Sphere.vndb");
-		vndbFilePath.append("/Sandbox/assets/volume/bunny.vdb");
-		auto volumeRes = m_SceneManager->m_VolumeManager.LoadVDB(vndbFilePath);
-
-		auto volume = lumenPT->m_Scene->AddVolume();
-		volume->SetVolume(volumeRes->m_Volume);
+		//std::string vndbFilePath = { p.string() };
+		////vndbFilePath.append("/Sandbox/assets/volume/Sphere.vndb");
+		//vndbFilePath.append("/Sandbox/assets/volume/bunny.vdb");
+		//auto volumeRes = m_SceneManager->m_VolumeManager.LoadVDB(vndbFilePath);
+		//
+		//auto volume = lumenPT->m_Scene->AddVolume();
+		//volume->SetVolume(volumeRes->m_Volume);
 
 		renderer->InitNGX();
 
