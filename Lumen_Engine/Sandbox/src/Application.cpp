@@ -127,9 +127,7 @@ public:
 		{
 
 			const std::filesystem::path& modelDirectory = config.GetDirectoryModels();
-			const std::string modelDirectoryPath = modelDirectory.string();
 			const std::filesystem::path& defaultModel = config.GetDefaultModel();
-			const std::string defaultModelFileName = defaultModel.filename().string();
 			
 
 			LMN_TRACE(modelDirectory.string() + defaultModel.string());
@@ -138,7 +136,7 @@ public:
 
 			auto begin = std::chrono::high_resolution_clock::now();
 
-			auto res = m_SceneManager->LoadGLTF(defaultModelFileName, modelDirectoryPath + defaultModel.parent_path().string().append("/"));
+			auto res = m_SceneManager->LoadGLTF(defaultModel.string(), modelDirectory.string());
 
 			auto end = std::chrono::high_resolution_clock::now();
 

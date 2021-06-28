@@ -8,4 +8,4 @@ const std::string DEFAULTS_ModelDir = DEFAULTS_AssetDir + "models/";
 
 const std::string DEFAULTS_ShaderProgramFile_Solids =  ConfigName + "/WaveFrontShaders.ptx";
 const std::string DEFAULTS_ShaderProgramFile_Volumetrics = ConfigName + "/volumetric_wavefront.ptx";
-const std::string DEFAULTS_DefaultModel = "LowpolyRoom/scene.gltf";
+const std::string DEFAULTS_DefaultModel = "LowpolyRoom/scene.glb";
