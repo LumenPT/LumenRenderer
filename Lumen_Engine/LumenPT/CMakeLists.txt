@@ -31,8 +31,8 @@ add_library(CUDAShaders OBJECT ${CUDA_HEADER_FILES} ${CUDA_SOURCE_FILES})
 set_property(TARGET CUDAShaders PROPERTY CUDA_PTX_COMPILATION ON)
 set_property(TARGET CUDAShaders PROPERTY CUDA_ARCHITECTURES 60-real)
 
-target_compile_options(CUDAShaders PRIVATE $<$<AND: $<COMPILE_LANGUAGE:CUDA>,  $<CONFIG:Debug>>: -G>)
-target_compile_options(CUDAShaders PRIVATE $<$<AND: $<COMPILE_LANGUAGE:CUDA>,  $<NOT:$<CONFIG:Debug>>>: -use_fast_math>)
+target_compile_options(CUDAShaders PRIVATE $<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<CONFIG:Debug>>: -G>)
+target_compile_options(CUDAShaders PRIVATE $<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<NOT:$<CONFIG:Debug>>>: -use_fast_math>)
 
 target_include_directories(CUDAShaders PUBLIC
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Include"
@@ -110,8 +110,8 @@ set_property(TARGET CUDAKernels PROPERTY CUDA_ARCHITECTURES 60-real)
 set_property(TARGET CUDAKernels PROPERTY CUDA_SEPARABLE_COMPILATION ON)
 set_property(TARGET CUDAKernels PROPERTY CUDA_RESOLVE_DEVICE_SYMBOLS ON)
 
-target_compile_options(CUDAKernels PRIVATE $<$<AND: $<COMPILE_LANGUAGE:CUDA>,  $<CONFIG:Debug>>: -G>)
-target_compile_options(CUDAKernels PRIVATE $<$<AND: $<COMPILE_LANGUAGE:CUDA>,  $<NOT:$<CONFIG:Debug>>>: -use_fast_math>)
+target_compile_options(CUDAKernels PRIVATE $<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<CONFIG:Debug>>: -G>)
+target_compile_options(CUDAKernels PRIVATE $<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<NOT:$<CONFIG:Debug>>>: -use_fast_math>)
 
 target_include_directories(CUDAKernels PUBLIC ${CUDAKernels_INCLUDES})
 
@@ -269,8 +269,8 @@ set_property(TARGET LumenPT PROPERTY CUDA_ARCHITECTURES 60-real)
 set_property(TARGET LumenPT APPEND PROPERTY COMPILE_DEFINITIONS LUMEN_PT)
 set_property(TARGET LumenPT APPEND PROPERTY COMPILE_DEFINITIONS $<$<CONFIG:Debug>:CUDA_CHECK OPTIX_CHECK OPTIX_DEBUG DX11_CHECK>)
 
-target_compile_options(LumenPT PRIVATE $<$<AND: $<COMPILE_LANGUAGE:CUDA>,  $<CONFIG:Debug>>: -G>)
-target_compile_options(LumenPT PRIVATE $<$<AND: $<COMPILE_LANGUAGE:CUDA>,  $<NOT:$<CONFIG:Debug>>>: -use_fast_math>)
+target_compile_options(LumenPT PRIVATE $<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<CONFIG:Debug>>: -G>)
+target_compile_options(LumenPT PRIVATE $<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<NOT:$<CONFIG:Debug>>>: -use_fast_math>)
 
 if(${USE_WAVEFRONT})
 	set_property(TARGET LumenPT APPEND PROPERTY COMPILE_DEFINITIONS WAVEFRONT)
