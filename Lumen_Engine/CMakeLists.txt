@@ -12,7 +12,8 @@ set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 
 #Add option to use wavefront
-option(USE_WAVEFRONT "Use the Wavefront rendering pipeline?" ON)
+#option(USE_WAVEFRONT "Use the Wavefront rendering pipeline?" ON)
+set(USE_WAVEFRONT ON)
 option(USE_DENOISER "Use Nvidia denoiser (if available)?" OFF)
 option(USE_UPSCALING "Use Nvidia denoiser (if available)?" OFF)
 option(INCLUDE_TESTPROJECT "Include test project" OFF)
