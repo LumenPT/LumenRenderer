@@ -26,4 +26,16 @@ namespace WaveFront
         float area;         //The area of the triangle. This is required to project the light onto a hemisphere.
     };
 
+
+    //Union used to store the data in a texture and read/write with easy conversions.
+    union TriangleLightUint4_4
+    {
+
+        TriangleLight m_TriangleLight;
+        uint4 m_Uint4[4];   //16 floats equal 16 uints in byte size. Requires 4 reads to be done.
+
+    };
+
+    const unsigned s = sizeof(TriangleLightUint4_4::m_Uint4);
+
 }

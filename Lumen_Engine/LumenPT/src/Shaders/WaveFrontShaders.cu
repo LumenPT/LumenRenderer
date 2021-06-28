@@ -50,9 +50,7 @@ __device__ __forceinline__ void IntersectionRaysRayGen()
     const WaveFront::IntersectionRayData& rayData = *launchParams.m_IntersectionRayBatch->GetData(idx);
 
     //2. Trace ray: optixTrace()
-    WaveFront::IntersectionData intersection{};
-    intersection.m_RayArrayIndex = idx;
-    intersection.m_PixelIndex = rayData.m_PixelIndex;
+    WaveFront::IntersectionDataUint4 intersection{};
 
     unsigned int intersectionPtr_Up = 0;
     unsigned int intersectionPtr_Low = 0;
@@ -78,7 +76,7 @@ __device__ __forceinline__ void IntersectionRaysRayGen()
         intersectionPtr_Low);
 
     //3. Store IntersectionData in buffer
-    launchParams.m_IntersectionBuffer->Add(&intersection);
+    launchParams.m_IntersectionBuffer->data[idx] = intersection.m_Data;
 
 
     //TODO: implement volumetric trace and storing of data.
@@ -97,7 +95,7 @@ __device__ __forceinline__ void IntersectionRaysRayGen()
         rayData.m_Origin,
         rayData.m_Direction,
         launchParams.m_MinMaxDistance.x,
-        min(launchParams.m_MinMaxDistance.y, intersection.m_IntersectionT),
+        min(launchParams.m_MinMaxDistance.y, intersection.m_Data.m_IntersectionT),
         0.f,
         TraceMaskType::VOLUMES,
         OPTIX_RAY_FLAG_NONE,
@@ -218,75 +216,6 @@ __device__ __forceinline__ void ReSTIRRayGen()
 }
 
 extern "C"
-__device__ __forceinline__ void ReSTIRRayGenShading()
-{
-
-    using namespace WaveFront;
-
-    //Launch as a 1D Array so that idx.x corresponds to the literal ray index.
-    unsigned int idx = optixGetLaunchIndex().x;
-
-    //Retrieve the data.
-    const RestirShadowRayShading& rayData = *launchParams.m_ReSTIRShadowRayShadingBatch->GetData(idx);
-    const OptixTraversableHandle scene = launchParams.m_TraversableHandle;
-    auto reservoirIndex = rayData.index;
-
-    unsigned int intersected = 0;
-
-    optixTrace(
-        scene,
-        rayData.origin,
-        rayData.direction,
-        launchParams.m_MinMaxDistance.x, //Prevent self shadowing so offset a little bit.
-        rayData.distance,   //Max distance already has a small offset to prevent self-shadowing.
-        0.f,
-        TraceMaskType::SOLIDS,
-        OPTIX_RAY_FLAG_NONE,
-        0,
-        0,
-        0,
-        intersected  //Pass the reservoir index so that it can be set to 0 when a hit is found.
-    );
-
-    //If occluded, set reservoir weight to 0 so it won't be reused next frame.
-    if (intersected != 0)
-    {
-        launchParams.m_Reservoirs[reservoirIndex].weight = 0.f;
-    }
-    //Not occluded, so add the contribution to the output buffer right away.
-    else
-    {
-        using namespace WaveFront;
-
-
-        half4Ushort4 color{ make_ushort4(0, 0, 0, 0) };
-
-        surf2Dread<ushort4>(
-            &color.m_Ushort4,
-            launchParams.m_OutputChannels[static_cast<unsigned int>(LightChannel::DIRECT)],
-            rayData.pixelIndex.m_X * sizeof(ushort4),
-            rayData.pixelIndex.m_Y,
-            cudaBoundaryModeTrap);
-
-        //color += half4(rayData.contribution, 0.f);
-        half4 radiance{ rayData.contribution, 0.f };
-
-        color.m_Half4.m_Elements[0].x = color.m_Half4.m_Elements[0].x + radiance.m_Elements[0].x;
-        color.m_Half4.m_Elements[0].y = color.m_Half4.m_Elements[0].y + radiance.m_Elements[0].y;
-        color.m_Half4.m_Elements[1].x = color.m_Half4.m_Elements[1].x + radiance.m_Elements[1].x;
-        color.m_Half4.m_Elements[1].y = color.m_Half4.m_Elements[1].y + radiance.m_Elements[1].y;
-
-        surf2Dwrite<ushort4>(
-            color.m_Ushort4,
-            launchParams.m_OutputChannels[static_cast<unsigned int>(LightChannel::DIRECT)],
-            rayData.pixelIndex.m_X * sizeof(ushort4),
-            rayData.pixelIndex.m_Y,
-            cudaBoundaryModeTrap);
-    }
-}
-
-
-extern "C"
 __global__ void __raygen__WaveFrontRG()
 {
 
@@ -307,12 +236,6 @@ __global__ void __raygen__WaveFrontRG()
             //ReSTIR Rays.
             ReSTIRRayGen();
         }
-        break;
-    case RayType::RESTIR_SHADING_RAY:
-    {
-        //ReSTIR Rays.
-        ReSTIRRayGenShading();
-    }
         break;
 	}
 
@@ -361,7 +284,6 @@ __global__ void __anyhit__WaveFrontAH()
             optixTerminateRay();
         }
         break;
-    case RayType::RESTIR_SHADING_RAY:
     case RayType::RESTIR_RAY:
         {
             //Any hit is enough.
@@ -389,20 +311,24 @@ __global__ void __closesthit__WaveFrontCH()
             //If closest hit found, return IntersectionData.
             const unsigned int intersectionPtr_Up = optixGetPayload_0();
             const unsigned int intersectionPtr_Low = optixGetPayload_1();
-            WaveFront::IntersectionData* intersection = UnpackPointer<WaveFront::IntersectionData>(intersectionPtr_Up, intersectionPtr_Low);
+            WaveFront::IntersectionDataUint4* intersection = UnpackPointer<WaveFront::IntersectionDataUint4>(intersectionPtr_Up, intersectionPtr_Low);
 
-            ////TODO: Try to fit this into 4 floats and one write.
-            intersection->m_IntersectionT = optixGetRayTmax();
-            intersection->m_Barycentrics = optixGetTriangleBarycentrics();
-            intersection->m_PrimitiveIndex = optixGetPrimitiveIndex();
-            intersection->m_InstanceId = optixGetInstanceId();
+    		//Pack the data into a uint 4 and locally.
+            WaveFront::IntersectionDataUint4 localData;
+            const auto barycentrics = optixGetTriangleBarycentrics();
+            localData.m_Data.m_IntersectionT = optixGetRayTmax();
+            localData.m_Data.m_Barycentrics.x = barycentrics.x;
+            localData.m_Data.m_Barycentrics.y = barycentrics.y;
+            localData.m_Data.m_PrimitiveIndex = optixGetPrimitiveIndex();
+            localData.m_Data.m_InstanceId = optixGetInstanceId();
 
+    		//Access external memory once by copying over the 128 bits.
+            intersection->m_DataAsUint4 = localData.m_DataAsUint4;
         }    
         break;
     case RayType::SHADOW_RAY:
         break;
     case RayType::RESTIR_RAY:
-    case RayType::RESTIR_SHADING_RAY:
         //Get the reservoir and set its weight to 0 so that it is no longer considered a valid candidate.
         //reSTIRParams.reservoirs[optixGetAttribute_0()].weight = 0.f;
         //optixTerminateRay();

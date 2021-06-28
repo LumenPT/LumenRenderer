@@ -141,7 +141,7 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
             a_ShadingParams.m_OptixWrapper,
             a_ShadingParams.m_OptixSceneHandle,
             a_ShadingParams.m_Seed,
-            a_ShadingParams.m_TriangleLights,
+            a_ShadingParams.m_LightDataBuffer,
             a_ShadingParams.m_OutputChannels,
             *a_ShadingParams.m_FrameStats,
             true);
@@ -163,7 +163,7 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
             a_ShadingParams.m_ResolutionAndDepth,
             a_ShadingParams.m_CurrentSurfaceData,
             a_ShadingParams.m_CurrentVolumetricData,
-            a_ShadingParams.m_TriangleLights->GetDevicePtr<AtomicBuffer<TriangleLight>>(),
+            a_ShadingParams.m_LightDataBuffer->GetDevicePtr<AtomicBuffer<TriangleLight>>(),
             a_ShadingParams.m_Seed,
             CDFPtr,
             a_ShadingParams.m_SolidShadowRayBuffer,

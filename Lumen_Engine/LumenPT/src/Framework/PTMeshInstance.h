@@ -64,7 +64,7 @@ public:
     PTScene* GetSceneRef() { return m_SceneRef; }
 
 
-    void UpdateRaytracingData();
+    bool UpdateRaytracingData();
 private:
     void MarkSceneDataAsDirty() { m_SceneDataDirty = true; }
 private:
