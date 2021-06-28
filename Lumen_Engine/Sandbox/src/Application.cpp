@@ -95,8 +95,8 @@ public:
 		settings.minIntersectionT = 0.1f;
 		settings.maxIntersectionT = 5000.f;
 		settings.renderResolution = { 1280, 720 };
-		//settings.outputResolution = { 2560, 1440 };
-		settings.outputResolution = { 1280, 720 };
+		settings.outputResolution = { 2560, 1440 };
+		//settings.outputResolution = { 1280, 720 };
 		settings.blendOutput = false;	//When true will blend output instead of overwriting it (high res image over time if static scene).
 
 		std::static_pointer_cast<WaveFront::WaveFrontRenderer>(renderer)->Init(settings);
@@ -397,7 +397,7 @@ public:
 		auto volume = lumenPT->m_Scene->AddVolume();
 		volume->SetVolume(volumeRes->m_Volume);
 
-		//renderer->InitNGX();
+		renderer->InitNGX();
 
 		contextLayer->GetPipeline()->StartRendering();
 

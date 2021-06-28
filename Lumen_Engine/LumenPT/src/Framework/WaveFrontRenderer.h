@@ -175,6 +175,8 @@ namespace WaveFront
 
         //Buffer used to combine light channels after denoising.
         std::unique_ptr<InteropGPUTexture> m_PixelBufferCombined;
+        
+        std::unique_ptr<InteropGPUTexture> m_PixelBufferUpscaled;
 
         std::unique_ptr<InteropGPUTexture> m_DepthBuffer;
         

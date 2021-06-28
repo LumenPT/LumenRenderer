@@ -140,7 +140,7 @@ namespace WaveFront
         m_D3D11PixelBufferCombined = m_DX11Wrapper->CreateTexture2D(
             { m_Settings.renderResolution.x, m_Settings.renderResolution.y, 1 }, 
             DXGI_FORMAT_R16G16B16A16_FLOAT, 
-            D3D11_BIND_FLAG::D3D11_BIND_UNORDERED_ACCESS);
+            D3D11_BIND_FLAG::D3D11_BIND_SHADER_RESOURCE);
         
         //Create d3d11 texture2D which will be an upscaled version of the m_D3D11PixelBufferCombined done by DLSS
         m_D3D11PixelBufferUpscaled = m_DX11Wrapper->CreateTexture2D(
@@ -152,22 +152,25 @@ namespace WaveFront
         D3D11_UNORDERED_ACCESS_VIEW_DESC desc = {};
         desc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
         desc.ViewDimension = D3D11_UAV_DIMENSION_TEXTURE2D;
-        m_DX11Wrapper->CreateUAV(m_D3D11PixelBufferCombined, &desc, m_D3D11PixelBufferCombinedUAV);
+        //m_DX11Wrapper->CreateUAV(m_D3D11PixelBufferCombined, &desc, m_D3D11PixelBufferCombinedUAV);
         m_DX11Wrapper->CreateUAV(m_D3D11PixelBufferUpscaled, &desc, m_D3D11PixelBufferUpscaledUAV);
 
         //Create d3d11 texture2D which will be used for the depth buffer containing the depth values for each pixel.
         m_D3D11DepthBuffer = m_DX11Wrapper->CreateTexture2D(
             {m_Settings.renderResolution.x, m_Settings.renderResolution.y, 1}, 
-            DXGI_FORMAT_R32_FLOAT);
+            DXGI_FORMAT_R32_FLOAT,
+            D3D11_BIND_FLAG::D3D11_BIND_SHADER_RESOURCE);
 
         m_D3D11JitterBuffer = m_DX11Wrapper->CreateTexture2D(
             { m_Settings.renderResolution.x, m_Settings.renderResolution.y, 1 }, 
-            DXGI_FORMAT_R16G16_FLOAT);
+            DXGI_FORMAT_R16G16_FLOAT,
+            D3D11_BIND_FLAG::D3D11_BIND_SHADER_RESOURCE);
 
         //Create d3d11 texture2D which will be used for the motion vector buffer containing the motion vectors for each pixel.
         m_D3D11MotionVectorBuffer = m_DX11Wrapper->CreateTexture2D(
             { m_Settings.renderResolution.x, m_Settings.renderResolution.y, 1 },
-            DXGI_FORMAT_R16G16_FLOAT);
+            DXGI_FORMAT_R16G16_FLOAT,
+            D3D11_BIND_FLAG::D3D11_BIND_SHADER_RESOURCE);
 
         //Create d3d11 texture2D which will be used for the normal-roughness buffer containing the normal and rougness for each pixel.
         m_D3D11NormalRoughnessBuffer = m_DX11Wrapper->CreateTexture2D(
@@ -208,6 +211,16 @@ namespace WaveFront
             m_PixelBufferCombined->Map();
             m_PixelBufferCombined->Clear();
             m_PixelBufferCombined->Unmap();
+
+            //This has to go in WriteToOutput
+            m_PixelBufferUpscaled = std::make_unique<InteropGPUTexture>(
+                m_D3D11PixelBufferUpscaled,
+                pixelBufferDesc,
+                cudaGraphicsRegisterFlagsSurfaceLoadStore);
+
+            m_PixelBufferUpscaled->Map();
+            m_PixelBufferUpscaled->Clear();
+            m_PixelBufferUpscaled->Unmap();
         }
 
         {//Create interop-texture for the depth buffer.
@@ -239,6 +252,10 @@ namespace WaveFront
             m_JitterBuffer->Clear();
             m_JitterBuffer->Unmap();
         }
+
+        //Create interop-texture for the depth buffer.
+        cudaTextureDesc depthBufferDesc{};
+        memset(&depthBufferDesc, 0, sizeof(depthBufferDesc));
 
         { //Create interop-texture for the motion vector buffer.
             cudaTextureDesc motionVectorBufferDesc{};
@@ -870,6 +887,7 @@ namespace WaveFront
 		}
         //Post-processing
         {
+            m_PixelBufferUpscaled->Map();
             // TODO: render and output resolution used in post processing
             PostProcessLaunchParameters postProcessLaunchParams(
                 m_Settings.renderResolution,
@@ -902,7 +920,7 @@ namespace WaveFront
                 m_OptixDenoiser->GetColorOutput().GetDevicePtr<float3>()
             );
 
-            PrepareOptixDenoising(optixDenoiserLaunchParams);
+            PrepareOptixDenoising(optixDenoiserLaunchParams);   //output resolution not used
             CHECKLASTCUDAERROR;
 
             OptixDenoiserDenoiseParams optixDenoiserParams = {}; 
@@ -919,10 +937,8 @@ namespace WaveFront
             //FinishOptixDenoising(optixDenoiserLaunchParams);
             CHECKLASTCUDAERROR;
 
-            //TODO: move to after DLSS and NRD runs... (Requires mapping to use in CUDA again).
-            WriteToOutput(postProcessLaunchParams);     //Breaks here when render and output resolution dont match
-            cudaDeviceSynchronize();
-            CHECKLASTCUDAERROR;
+            //Trim down post processing params
+            //Replace use of post process params in WriteToOutput with OutputWrite params
 
             //Cuda should no longer be operating on the pixel-buffers.
             //Unmap separate channel pixel-buffer
@@ -943,15 +959,32 @@ namespace WaveFront
                 params->m_InputImageHeight = m_Settings.renderResolution.y;
                 params->m_OutputImageWidth = m_Settings.outputResolution.x;
                 params->m_OutputImageHeight = m_Settings.outputResolution.y;
-                params->m_DLSSMode = static_cast<DLSSWrapperInitParams::DLSSMode>(m_DlssMode);
+                params->m_DLSSMode = static_cast<DLSSMode>(m_DlssMode);
 
                 CHECKLASTCUDAERROR;
 
-                //m_DX11Wrapper->GetContext()->CopyResource(m_DX11Wrapper->m_D3D11PixelBufferCombined, m_D3D11PixelBufferCombined.Get());
+                m_PixelBufferUpscaled->Unmap();
+                m_PixelBufferCombined->Unmap();
+                m_DepthBuffer->Unmap();
+                m_MotionVectorBuffer->Unmap();
+                m_JitterBuffer->Unmap();
 
-                m_DLSS->EvaluateDLSS(m_D3D11PixelBufferCombined, m_D3D11PixelBufferCombined, m_D3D11DepthBuffer, m_D3D11MotionVectorBuffer, m_D3D11JitterBuffer);
-                //m_DLSS->EvaluateDLSS(dlssInitParams, m_D3D11PixelBufferCombined, m_MotionVectors.GetMotionVectorDirectionsTex());
+                //m_DLSS->EvaluateDLSS(m_D3D11PixelBufferUpscaled, m_D3D11PixelBufferCombined, m_D3D11DepthBuffer, m_D3D11MotionVectorBuffer, m_D3D11JitterBuffer);
             }
+
+
+            m_PixelBufferUpscaled->Map();
+            WriteOutputParams writeParams(
+                m_Settings.outputResolution,
+                //m_PixelBufferCombined->GetSurfaceObject(),
+                m_PixelBufferUpscaled->GetSurfaceObject(),
+                m_IntermediateOutputBuffer.GetDevicePtr<uchar4>()
+            );
+
+            //TODO: move to after DLSS and NRD runs... (Requires mapping to use in CUDA again).
+            WriteToOutput(writeParams);     //Breaks here when render and output resolution dont match. Uses output resolution
+            cudaDeviceSynchronize();
+            CHECKLASTCUDAERROR;
 
         }
 
@@ -1269,9 +1302,17 @@ namespace WaveFront
         dlssInitParams.m_InputImageHeight = m_Settings.renderResolution.y;
         dlssInitParams.m_OutputImageWidth = m_Settings.outputResolution.x;
         dlssInitParams.m_OutputImageHeight = m_Settings.outputResolution.y;
+        dlssInitParams.m_DLSSMode = static_cast<DLSSMode>(m_DlssMode);   //Maybe add DLSS mode to m_Settings
         dlssInitParams.m_pServiceLocator = &m_ServiceLocator;
-        m_DLSS->Initialize(dlssInitParams);
+        if (!m_DLSS->InitializeNGX(dlssInitParams)) 
+        {
+            printf("DLSS could not be initialized!\n");
+        }
 
+        //auto recommendedSettings = m_DLSS->GetRecommendedSettings(Uint2_c(m_Settings.outputResolution.x, m_Settings.outputResolution.y), dlssInitParams.m_DLSSMode);
+        //SetRenderResolution({ recommendedSettings->m_OptimalRenderSize.m_X, recommendedSettings->m_OptimalRenderSize.m_Y });
+        //WaitForDeferredCalls();
+        //std::cout << "Render resolution after NGX init: " << recommendedSettings->m_OptimalRenderSize.m_X << " " << recommendedSettings->m_OptimalRenderSize.m_Y << std::endl;
     }
 
     WaveFrontRenderer::WaveFrontRenderer() : m_BlendCounter(0)
@@ -1392,8 +1433,23 @@ namespace WaveFront
             }
 
             //Single channel pixel buffer.
+            m_PixelBufferCombined->Unmap();
+            InteropGPUTexture::UnRegisterResource(m_D3D11PixelBufferCombined);
+            m_DX11Wrapper->ResizeTexture2D(m_D3D11PixelBufferCombined, { m_Settings.renderResolution.x, m_Settings.renderResolution.y, 1 });
+
+            //Single channel pixel buffer.
             ResizeInteropTexture(m_PixelBufferCombined, m_D3D11PixelBufferCombined, {m_Settings.renderResolution.x, m_Settings.renderResolution.y, 1});
         }
+
+        //Single channel upscaled output buffer
+        m_PixelBufferUpscaled->Unmap();
+        InteropGPUTexture::UnRegisterResource(m_D3D11PixelBufferUpscaled);
+        m_DX11Wrapper->ResizeTexture2D(m_D3D11PixelBufferUpscaled, { m_Settings.outputResolution.x, m_Settings.outputResolution.y, 1 });
+
+        m_PixelBufferUpscaled->RegisterResource(m_D3D11PixelBufferUpscaled);
+        m_PixelBufferUpscaled->Map();
+        m_PixelBufferUpscaled->Clear();
+        m_PixelBufferUpscaled->Unmap();
 
         //Depth buffer.
         ResizeInteropTexture(m_DepthBuffer, m_D3D11DepthBuffer, { m_Settings.renderResolution.x, m_Settings.renderResolution.y, 1 });

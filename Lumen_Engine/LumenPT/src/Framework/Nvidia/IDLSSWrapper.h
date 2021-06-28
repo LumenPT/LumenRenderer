@@ -6,17 +6,21 @@
 class PTServiceLocator;
 class LumenRenderer;
 
+/// <summary>
+///  DLSS Performance/Quality setting
+/// </summary>
+enum class DLSSMode
+{
+	OFF = 0,
+	MAXPERF,
+	BALANCED,
+	MAXQUALITY,
+	ULTRAPERF,
+	ULTRAQUALITY,
+};
+
 struct DLSSWrapperInitParams
 {
-	enum class DLSSMode 
-	{
-		OFF = 0,
-		MAXPERF,
-		BALANCED,
-		MAXQUALITY,
-		ULTRAPERF,
-		ULTRAQUALITY,
-	};
 	int m_InputImageWidth = -1;
 	int m_InputImageHeight = -1;
 	int m_OutputImageWidth = -1;
@@ -25,17 +29,21 @@ struct DLSSWrapperInitParams
 	PTServiceLocator* m_pServiceLocator = nullptr;
 };
 
-struct uint2_c {
+struct Uint2_c {
+	Uint2_c(unsigned int a_X, unsigned int a_Y) :
+		m_X(a_X), m_Y(a_Y) {}
 	unsigned int m_X;
 	unsigned int m_Y;
 };
 
 struct DLSSRecommendedSettings
 {
+	DLSSRecommendedSettings() = default;
+	~DLSSRecommendedSettings() = default;
 	float m_Sharpness = 0.01f;
-	uint2_c m_OptimalRenderSize;
-	uint2_c m_MaxDynamicRenderSize;
-	uint2_c m_MinDynamicRenderSize;
+	Uint2_c m_OptimalRenderSize = { 0,0 };
+	Uint2_c m_MaxDynamicRenderSize = { 0,0 };
+	Uint2_c m_MinDynamicRenderSize = { 0,0 };
 };
 
 class IDLSSWrapper
@@ -45,7 +53,8 @@ public:
 	IDLSSWrapper() = default;
 	virtual ~IDLSSWrapper() = default;
 
-	virtual bool Initialize(DLSSWrapperInitParams a_InitParams) = 0;
+	virtual bool InitializeNGX(DLSSWrapperInitParams a_InitParams) = 0;
+	virtual bool InitializeDLSS(std::shared_ptr<DLSSWrapperInitParams> a_InitParams) = 0;
 	virtual bool EvaluateDLSS(
 		Microsoft::WRL::ComPtr<ID3D11Resource> a_Outputbuffer = nullptr,
 		Microsoft::WRL::ComPtr<ID3D11Resource> a_Inputbuffer = nullptr,
@@ -54,11 +63,11 @@ public:
 		Microsoft::WRL::ComPtr<ID3D11Resource> a_JitterOffset = nullptr) = 0;
 
 	virtual std::shared_ptr<DLSSWrapperInitParams> GetDLSSParams() = 0;
-	virtual std::shared_ptr<DLSSRecommendedSettings> GetRecommendedSettings() = 0;
-	bool GetNGXInitialized() { return m_ngxInitialized; };
+	virtual std::shared_ptr<DLSSRecommendedSettings> GetRecommendedSettings(Uint2_c a_SelectedResolution, DLSSMode a_DLSSQualityVal) = 0;
+	bool GetNGXInitialized() { return m_NGXInitialized; };
 
 protected:
-	bool m_ngxInitialized = false;
+	bool m_NGXInitialized = false;
 	std::shared_ptr<DLSSWrapperInitParams> m_Params;
-	std::shared_ptr<DLSSRecommendedSettings> m_OptimalSettings;
+	std::shared_ptr<DLSSRecommendedSettings> m_OptimalSettings = std::make_shared<DLSSRecommendedSettings>();
 };

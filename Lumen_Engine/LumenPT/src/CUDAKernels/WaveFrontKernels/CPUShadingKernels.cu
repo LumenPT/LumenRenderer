@@ -274,23 +274,23 @@ CPU_ONLY void MergeOutput(const PostProcessLaunchParameters& a_PostProcessParams
         );
 }
 
-CPU_ONLY void WriteToOutput(const PostProcessLaunchParameters& a_PostProcessParams)
+CPU_ONLY void WriteToOutput(const WriteOutputParams& a_WriteOutputParams)
 {
     //The amount of pixels and threads/blocks needed to apply effects.
     const dim3 blockSize{ 32, 32 ,1 };
 
     const unsigned blockSizeWidthUpscaled =
-        static_cast<unsigned>(std::ceil(static_cast<float>(a_PostProcessParams.m_OutputResolution.x) / static_cast<float>(blockSize.x)));
+        static_cast<unsigned>(std::ceil(static_cast<float>(a_WriteOutputParams.m_OutputResolution.x) / static_cast<float>(blockSize.x)));
     const unsigned blockSizeHeightUpscaled =
-        static_cast<unsigned>(std::ceil(static_cast<float>(a_PostProcessParams.m_OutputResolution.y) / static_cast<float>(blockSize.y)));
+        static_cast<unsigned>(std::ceil(static_cast<float>(a_WriteOutputParams.m_OutputResolution.y) / static_cast<float>(blockSize.y)));
 
     const dim3 numBlocksUpscaled{ blockSizeWidthUpscaled, blockSizeHeightUpscaled, 1 };
 
     //TODO This is temporary till the post-processing is  in place. Let the last stage copy it directly to the output buffer.
     WriteToOutput << <numBlocksUpscaled, blockSize >>> (
-        a_PostProcessParams.m_OutputResolution,
-        a_PostProcessParams.m_PixelBufferSingleChannel,
-        a_PostProcessParams.m_FinalOutput
+        a_WriteOutputParams.m_OutputResolution,
+        a_WriteOutputParams.m_PixelBufferSingleChannel,
+        a_WriteOutputParams.m_FinalOutput
         );
 }
 

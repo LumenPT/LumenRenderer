@@ -246,6 +246,7 @@ if(${USE_NVIDIA_DLSS})
 	file(GLOB_RECURSE DLSS_LIBS 
 
 	#${CMAKE_CURRENT_SOURCE_DIR}/vendor/DLSS_Private/Lib/x64/*_d_dbg.lib #TODO: use release version in release mode
+	#${CMAKE_CURRENT_SOURCE_DIR}/vendor/DLSS_Private/Lib/x64/nvsdk_ngx_d_dbg.lib #TODO: use release version in release mode
 	${CMAKE_CURRENT_SOURCE_DIR}/vendor/DLSS_Private/Lib/x64/*_d.lib #TODO: use release version in release mode
 	)
 

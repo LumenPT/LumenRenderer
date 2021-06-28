@@ -120,6 +120,25 @@ namespace WaveFront
         FrameStats* m_FrameStats;
     };
 
+    struct WriteOutputParams {
+        CPU_ONLY WriteOutputParams(
+            const uint2& a_OutputResolution,
+            const cudaSurfaceObject_t a_PixelBufferSingleChannel,
+            uchar4* const a_FinalOutput)
+            :
+            m_OutputResolution(a_OutputResolution),
+            m_PixelBufferSingleChannel(a_PixelBufferSingleChannel),
+            m_FinalOutput(a_FinalOutput)
+        {}
+
+        CPU_ONLY ~WriteOutputParams() = default;
+
+        const uint2& m_OutputResolution;
+        const cudaSurfaceObject_t m_PixelBufferSingleChannel;
+        uchar4* const m_FinalOutput;
+    };
+
+
     struct PostProcessLaunchParameters
     {
 
