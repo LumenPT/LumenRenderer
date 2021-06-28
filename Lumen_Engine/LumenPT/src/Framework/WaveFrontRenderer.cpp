@@ -915,6 +915,11 @@ namespace WaveFront
                 m_NRD->Denoise(nrdParams);
             }
 
+            if (m_DenoiserSettings.m_UseOptix)
+            {
+                postProcessLaunchParams.m_BlendOutput = false;
+            }
+
             MergeOutput(postProcessLaunchParams);
             cudaDeviceSynchronize();
             CHECKLASTCUDAERROR;
@@ -942,16 +947,9 @@ namespace WaveFront
                 optixDenoiserParams.m_InitParams = optixDenoiserInitParams;
                 optixDenoiserParams.m_PostProcessLaunchParams = &postProcessLaunchParams;
                 optixDenoiserParams.m_OptixDenoiserLaunchParams = &optixDenoiserLaunchParams;
-                optixDenoiserParams.m_ColorInput = m_OptixDenoiser->ColorInput.GetCUDAPtr();
-                optixDenoiserParams.m_AlbedoInput = m_OptixDenoiser->AlbedoInput.GetCUDAPtr();
-                optixDenoiserParams.m_NormalInput = m_OptixDenoiser->NormalInput.GetCUDAPtr();
-                optixDenoiserParams.m_FlowInput = m_OptixDenoiser->FlowInput.GetCUDAPtr();
-                optixDenoiserParams.m_PrevColorOutput = m_OptixDenoiser->GetPrevColorOutput().GetCUDAPtr();
-                optixDenoiserParams.m_ColorOutput = m_OptixDenoiser->GetColorOutput().GetCUDAPtr();
+                optixDenoiserParams.m_BlendOutput = m_Settings.blendOutput;
+                optixDenoiserParams.m_BlendCount = m_BlendCounter;
                 m_OptixDenoiser->Denoise(optixDenoiserParams);
-
-                PrepareOptixDenoising(optixDenoiserLaunchParams);   //output resolution not used
-                CHECKLASTCUDAERROR;
             }
 
 

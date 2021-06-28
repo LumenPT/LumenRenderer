@@ -57,6 +57,8 @@ struct OptixDenoiserDenoiseParams
 	CUdeviceptr m_FlowInput;
 	CUdeviceptr m_PrevColorOutput;
 	CUdeviceptr m_ColorOutput;
+	bool m_BlendOutput;
+	unsigned int m_BlendCount;
 };
 
 class OptixDenoiserWrapper
@@ -76,6 +78,8 @@ public:
 	MemoryBuffer AlbedoInput;
 	MemoryBuffer NormalInput;
 	MemoryBuffer FlowInput;
+
+	MemoryBuffer BlendOutput;
 
 	MemoryBuffer& GetColorOutput() { return ColorOutput[m_currentColorOutputIndex]; }
 	MemoryBuffer& GetPrevColorOutput() { return ColorOutput[(m_currentColorOutputIndex + 1) % ms_colorOutputNum]; }

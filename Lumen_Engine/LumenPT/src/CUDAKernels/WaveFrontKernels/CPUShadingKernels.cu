@@ -334,6 +334,9 @@ CPU_ONLY void FinishOptixDenoising(WaveFront::OptixDenoiserLaunchParameters& a_L
         a_LaunchParams.m_RenderResolution,
         a_LaunchParams.m_PixelBufferSingleChannel,
         a_LaunchParams.m_IntermediaryInput,
-        a_LaunchParams.m_IntermediaryOutput
+        a_LaunchParams.m_IntermediaryOutput,
+        a_LaunchParams.m_BlendOutput,
+        a_LaunchParams.m_UseBlendOutput,
+        a_LaunchParams.m_BlendCount
         );
 }

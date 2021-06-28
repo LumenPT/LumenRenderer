@@ -142,4 +142,7 @@ CPU_ON_GPU void FinishOptixDenoisingGPU(
     const uint2 a_RenderResolution,
     const cudaSurfaceObject_t a_PixelBufferSingleChannel,
     float3* a_IntermediaryInput,
-    float3* a_IntermediaryOutput);
+    float3* a_IntermediaryOutput,
+    float3* a_BlendOutput,
+    bool a_UseBlendOutput,
+    unsigned int a_BlendCount);

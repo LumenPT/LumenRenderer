@@ -168,8 +168,8 @@ namespace WaveFront
         const std::array<cudaSurfaceObject_t, static_cast<unsigned>(LightChannel::NUM_CHANNELS)> m_PixelBufferMultiChannel;
         const cudaSurfaceObject_t m_PixelBufferSingleChannel;
         uchar4* const m_FinalOutput;
-        const bool m_BlendOutput;
-        const unsigned m_BlendCount;
+        bool m_BlendOutput;
+        unsigned m_BlendCount;
     };
 
 
@@ -207,5 +207,8 @@ namespace WaveFront
         float3* m_NormalInput;
         float2* m_FlowInput;
         float3* m_IntermediaryOutput;
+        float3* m_BlendOutput;
+        bool m_UseBlendOutput;
+        unsigned int m_BlendCount;
     };
 }

@@ -58,6 +58,7 @@ void OptixDenoiserWrapper::Initialize(const OptixDenoiserInitParams& a_InitParam
     AlbedoInput.Resize(m_InitParams.m_InputWidth * m_InitParams.m_InputHeight * sizeof(float3));
     NormalInput.Resize(m_InitParams.m_InputWidth * m_InitParams.m_InputHeight * sizeof(float3));
     FlowInput.Resize(m_InitParams.m_InputWidth * m_InitParams.m_InputHeight * sizeof(float2));
+    BlendOutput.Resize(m_InitParams.m_InputWidth * m_InitParams.m_InputHeight * sizeof(float3));
 
     for (size_t i = 0; i < ms_colorOutputNum; ++i)
     {
@@ -86,7 +87,9 @@ void OptixDenoiserWrapper::Denoise(OptixDenoiserDenoiseParams& a_DenoiseParams)
     a_DenoiseParams.m_OptixDenoiserLaunchParams->m_NormalInput = NormalInput.GetDevicePtr<float3>();
     a_DenoiseParams.m_OptixDenoiserLaunchParams->m_FlowInput = FlowInput.GetDevicePtr<float2>();
     a_DenoiseParams.m_OptixDenoiserLaunchParams->m_IntermediaryOutput = GetColorOutput().GetDevicePtr<float3>();
-
+    a_DenoiseParams.m_OptixDenoiserLaunchParams->m_BlendOutput = BlendOutput.GetDevicePtr<float3>();
+    a_DenoiseParams.m_OptixDenoiserLaunchParams->m_UseBlendOutput = a_DenoiseParams.m_BlendOutput;
+    a_DenoiseParams.m_OptixDenoiserLaunchParams->m_BlendCount = a_DenoiseParams.m_BlendCount;
 
     PrepareOptixDenoising(*a_DenoiseParams.m_OptixDenoiserLaunchParams);
     CHECKLASTCUDAERROR;

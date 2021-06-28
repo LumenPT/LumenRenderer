@@ -52,7 +52,10 @@ CPU_ON_GPU void PrepareOptixDenoisingGPU(
 CPU_ON_GPU void FinishOptixDenoisingGPU(const uint2 a_RenderResolution,
     const cudaSurfaceObject_t a_PixelBufferSingleChannel,
     float3* a_IntermediaryInput,
-    float3* a_IntermediaryOutput)
+    float3* a_IntermediaryOutput,
+    float3* a_BlendOutput,
+    bool a_UseBlendOutput,
+    unsigned int a_BlendCount)
 {
     const unsigned int pixelX = blockIdx.x * blockDim.x + threadIdx.x;
     const unsigned int pixelY = blockIdx.y * blockDim.y + threadIdx.y;
@@ -61,16 +64,36 @@ CPU_ON_GPU void FinishOptixDenoisingGPU(const uint2 a_RenderResolution,
 
     if (pixelX < a_RenderResolution.x && pixelY < a_RenderResolution.y)
     {
-        float4 value = make_float4(a_IntermediaryOutput[pixelDataIndex], 1.0f);
+        float4 denoisedValue = make_float4(a_IntermediaryOutput[pixelDataIndex], 1.0f);
 
-        //color = { value.x, value.y, value.z, 1.f };
-        half4Ushort4 color{ value };
+        half4Ushort4 denoisedColor{ denoisedValue };
 
-        surf2Dwrite<ushort4>(
-            color.m_Ushort4,
-            a_PixelBufferSingleChannel,
-            pixelX * sizeof(ushort4),
-            pixelY,
-            cudaBoundaryModeTrap);
+        if(a_UseBlendOutput)
+        {
+            float4 oldValue = make_float4(a_BlendOutput[pixelDataIndex], 1.0f);
+
+            float4 newValue = ((oldValue * static_cast<float>(a_BlendCount)) + denoisedValue) / static_cast<float>(a_BlendCount + 1);
+            half4Ushort4 newColor{ newValue };
+
+            a_BlendOutput[pixelDataIndex] = make_float3(newValue);
+
+            surf2Dwrite<ushort4>(
+                newColor.m_Ushort4,
+                a_PixelBufferSingleChannel,
+                pixelX * sizeof(ushort4),
+                pixelY,
+                cudaBoundaryModeTrap);
+        }
+        else
+        {
+            a_BlendOutput[pixelDataIndex] = a_IntermediaryOutput[pixelDataIndex];
+
+            surf2Dwrite<ushort4>(
+                denoisedColor.m_Ushort4,
+                a_PixelBufferSingleChannel,
+                pixelX * sizeof(ushort4),
+                pixelY,
+                cudaBoundaryModeTrap);
+        }
     }
 }
