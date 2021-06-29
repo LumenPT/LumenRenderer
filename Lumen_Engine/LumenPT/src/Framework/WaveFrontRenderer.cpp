@@ -426,6 +426,7 @@ namespace WaveFront
                 m_Settings.renderResolution.y != m_IntermediateSettings.renderResolution.y)
             {
                 resizeBuffers = true;
+                m_IntermediateSettings.outputResolution = m_IntermediateSettings.renderResolution;
             }
 
             if (m_Settings.outputResolution.x != m_IntermediateSettings.outputResolution.x ||
