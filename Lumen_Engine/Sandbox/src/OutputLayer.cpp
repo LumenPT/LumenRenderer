@@ -559,6 +559,8 @@ void OutputLayer::ImGuiCameraSettings()
 	ImGui::Combo("DLSS setting", &m_Dlss_SelectedMode, "Off\0Max performance\0Balanced\0Max quality\0Ultra performance\0Ultra quality\0");
 	m_Renderer->m_DlssMode = m_Dlss_SelectedMode;
 
+	ImGui::Checkbox("Converge output", &m_BlendMode);
+
 	ImGui::End();
 }
 

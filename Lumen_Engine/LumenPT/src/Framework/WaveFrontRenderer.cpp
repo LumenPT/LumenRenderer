@@ -283,7 +283,7 @@ namespace WaveFront
         m_IntermediateSettings.renderResolution.y = a_NewResolution.y;
 
         // Call the internal version of this function which does not involve mutex locking
-        //SetOutputResolutionInternal(a_NewResolution); //Separate output res, or tie it to render res based on DLSS 
+        SetOutputResolutionInternal(a_NewResolution); //Separate output res, or tie it to render res based on DLSS 
     }
 
 

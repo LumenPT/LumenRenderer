@@ -128,7 +128,7 @@ private:
     };
 
     int m_Dlss_SelectedMode = 2;    // 2 translates to "BALANCED" dlss mode 
-    bool m_BlendMode = false;
+    bool m_BlendMode = true;
 
     std::vector<std::unique_ptr<FrameSnapshot>> m_FrameSnapshots;
     int m_CurrentSnapShotIndex;

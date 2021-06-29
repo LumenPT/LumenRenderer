@@ -147,6 +147,8 @@ public:
 			auto lumenPT = contextLayer->GetPipeline();
 
 			lumenPT->m_Scene = res->m_Scenes[0];
+			lumenPT->m_Scene->m_Camera->SetPosition(glm::vec3{ -150.f, 300.f, 150.f });
+			lumenPT->m_Scene->m_Camera->SetRotation(glm::quatLookAtRH(glm::normalize(glm::vec3{ -1.f, 0.5f, 1.f }), glm::vec3{ 0.f, 1.f, 0.f }));
 
 		}
 
