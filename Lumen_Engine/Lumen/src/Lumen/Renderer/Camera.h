@@ -30,8 +30,11 @@ public:
 	
 	void GetVectorData(glm::vec3& a_Eye, glm::vec3& a_U, glm::vec3& a_V, glm::vec3& a_W);
 	void GetMatrixData(glm::mat4& a_PreviousFrameMatrix, glm::mat4& a_CurrentFrameMatrix);
-	glm::mat4 GeCurrentProjectionMatrixData() const;
+	glm::mat4 GetCurrentProjectionMatrixData() const;
 	glm::mat4 GetProjectionMatrix() const;
+
+	const glm::vec2& GetMinMaxRenderDistance() const;
+	void SetMinMaxRenderDistance(const glm::vec2& a_NewDistance);
 
 	void UpdatePreviousFrameMatrix();
 private:
@@ -53,6 +56,8 @@ private:
 
 	float m_FocalLength = 1.0f;
 	float m_AspectRatio = 1.0f;
+
+	glm::vec2 m_MinMaxRenderDistance = { 0.1f, 1000.f };
 
 	glm::vec2 m_ImagePlaneHalfSize = glm::vec2(1.0f, 1.0f);
 	float m_FovY = 90.f;

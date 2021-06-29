@@ -64,7 +64,7 @@ CPU_ONLY void ExtractSurfaceData(
     float2 a_MinMaxDepth,
     unsigned int a_CurrentDepth)
 {
-    const int blockSize = 512;
+    const int blockSize = 256;
     const int numBlocks = (a_NumIntersections + blockSize - 1) / blockSize;
 
     ExtractSurfaceDataGpu<<<numBlocks, blockSize>>>(a_NumIntersections, a_IntersectionData, a_Rays, a_OutPut, a_Resolution, a_SceneDataTable);

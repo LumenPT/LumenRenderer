@@ -216,7 +216,12 @@ OptixPipelineCompileOptions OptixWrapper::CreatePipelineOptions(
     pipelineOptions.traversableGraphFlags = OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_ANY;
     pipelineOptions.numPayloadValues = std::clamp(a_NumPayloadValues, 0u, 8u); //Move to initializationData.
     pipelineOptions.numAttributeValues = std::clamp(a_NumAttributes, 2u, 8u); //Move to initializationData.
+
+#if defined (_DEBUG) || defined(OPTIX_DEBUG)
     pipelineOptions.exceptionFlags = OPTIX_EXCEPTION_FLAG_DEBUG;
+#else
+    pipelineOptions.exceptionFlags = OPTIX_EXCEPTION_FLAG_NONE;
+#endif
     pipelineOptions.pipelineLaunchParamsVariableName = a_LaunchParamName.c_str(); //Move to initializationData.
     pipelineOptions.usesPrimitiveTypeFlags = OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE & OPTIX_PRIMITIVE_TYPE_FLAGS_CUSTOM;
 
@@ -285,7 +290,11 @@ bool OptixWrapper::CreatePipeline(
     }
 
     OptixPipelineLinkOptions pipelineLinkOptions = {};
+#if defined(_DEBUG) || defined(OPTIX_DEBUG)
     pipelineLinkOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_FULL;
+#else
+    pipelineLinkOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_NONE;
+#endif
     pipelineLinkOptions.maxTraceDepth = 1;
 
     OptixProgramGroup programGroups[] = { rayGenProgram, missProgram, solidHitProgram, volumetricHitProgram };
@@ -333,9 +342,14 @@ OptixModule OptixWrapper::CreateModule(const std::filesystem::path& a_PtxPath, c
 {
 
     OptixModuleCompileOptions moduleOptions = {};
+#if defined(_DEBUG) || defined(OPTIX_DEBUG)
     moduleOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_FULL;
-    moduleOptions.maxRegisterCount = OPTIX_COMPILE_DEFAULT_MAX_REGISTER_COUNT;
     moduleOptions.optLevel = OPTIX_COMPILE_OPTIMIZATION_LEVEL_0;
+#else
+    moduleOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_NONE;
+    moduleOptions.optLevel = OPTIX_COMPILE_OPTIMIZATION_LEVEL_3;
+#endif
+    moduleOptions.maxRegisterCount = OPTIX_COMPILE_DEFAULT_MAX_REGISTER_COUNT;
 
     std::ifstream stream;
     stream.open(a_PtxPath);
