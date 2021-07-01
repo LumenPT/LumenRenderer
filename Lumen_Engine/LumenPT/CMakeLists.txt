@@ -1,7 +1,7 @@
 cmake_minimum_required (VERSION 3.20)
 enable_language(CUDA)
 
-set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} -G")
+#set(CMAKE_CUDA_FLAGS_DEBUG "${CMAKE_CUDA_FLAGS_DEBUG} -G")
 
 # specify the C++ standard
 set(CMAKE_CXX_STANDARD 17)
@@ -30,6 +30,9 @@ file(GLOB_RECURSE CUDA_SOURCE_FILES
 add_library(CUDAShaders OBJECT ${CUDA_HEADER_FILES} ${CUDA_SOURCE_FILES})
 set_property(TARGET CUDAShaders PROPERTY CUDA_PTX_COMPILATION ON)
 set_property(TARGET CUDAShaders PROPERTY CUDA_ARCHITECTURES 60-real)
+
+target_compile_options(CUDAShaders PRIVATE $<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<CONFIG:Debug>>: -G>)
+target_compile_options(CUDAShaders PRIVATE $<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<NOT:$<CONFIG:Debug>>>: -use_fast_math>)
 
 target_include_directories(CUDAShaders PUBLIC
 	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/Include"
@@ -106,6 +109,9 @@ add_library(CUDAKernels STATIC ${CUDA_HEADER_FILES} ${CUDA_SOURCE_FILES})
 set_property(TARGET CUDAKernels PROPERTY CUDA_ARCHITECTURES 60-real)
 set_property(TARGET CUDAKernels PROPERTY CUDA_SEPARABLE_COMPILATION ON)
 set_property(TARGET CUDAKernels PROPERTY CUDA_RESOLVE_DEVICE_SYMBOLS ON)
+
+target_compile_options(CUDAKernels PRIVATE $<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<CONFIG:Debug>>: -G>)
+target_compile_options(CUDAKernels PRIVATE $<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<NOT:$<CONFIG:Debug>>>: -use_fast_math>)
 
 target_include_directories(CUDAKernels PUBLIC ${CUDAKernels_INCLUDES})
 
@@ -230,13 +236,13 @@ set(LUMENPT_LIBS
 if(${USE_NVIDIA_DENOISER})
 	list(APPEND LUMENPT_LIBS 
 	
-	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/_NRD_SDK/Lib/Release/NRD.lib"
-	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/_NRI_SDK/Lib/Release/NRI.lib"
-	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/_NRI_SDK/Lib/Release/NRI_Creation.lib"
-	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/_NRI_SDK/Lib/Release/NRI_Validation.lib"
-	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/_NRI_SDK/Lib/Release/NRI_D3D11.lib"
-	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/_NRI_SDK/Lib/Release/NRI_D3D12.lib"
-	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/_NRI_SDK/Lib/Release/NRI_VK.lib"
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/_NRD_SDK/Lib/Debug/NRD.lib"
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/_NRI_SDK/Lib/Debug/NRI.lib"
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/_NRI_SDK/Lib/Debug/NRI_Creation.lib"
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/_NRI_SDK/Lib/Debug/NRI_Validation.lib"
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/_NRI_SDK/Lib/Debug/NRI_D3D11.lib"
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/_NRI_SDK/Lib/Debug/NRI_D3D12.lib"
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/_NRI_SDK/Lib/Debug/NRI_VK.lib"
 
 	#NRD NRI NRI_D3D12 NRI_Validation
 	)
@@ -246,6 +252,7 @@ if(${USE_NVIDIA_DLSS})
 	file(GLOB_RECURSE DLSS_LIBS 
 
 	#${CMAKE_CURRENT_SOURCE_DIR}/vendor/DLSS_Private/Lib/x64/*_d_dbg.lib #TODO: use release version in release mode
+	#${CMAKE_CURRENT_SOURCE_DIR}/vendor/DLSS_Private/Lib/x64/nvsdk_ngx_d_dbg.lib #TODO: use release version in release mode
 	${CMAKE_CURRENT_SOURCE_DIR}/vendor/DLSS_Private/Lib/x64/*_d.lib #TODO: use release version in release mode
 	)
 
@@ -261,8 +268,10 @@ add_dependencies(LumenPT CUDAKernels)
 add_dependencies(LumenPT CopyCUDAShaders)
 set_property(TARGET LumenPT PROPERTY CUDA_ARCHITECTURES 60-real)
 set_property(TARGET LumenPT APPEND PROPERTY COMPILE_DEFINITIONS LUMEN_PT)
-set_property(TARGET LumenPT APPEND PROPERTY COMPILE_DEFINITIONS $<$<CONFIG:Debug>:CUDA_CHECK OPTIX_CHECK DX11_CHECK>)
+set_property(TARGET LumenPT APPEND PROPERTY COMPILE_DEFINITIONS $<$<CONFIG:Debug>:CUDA_CHECK OPTIX_CHECK OPTIX_DEBUG DX11_CHECK>)
 
+target_compile_options(LumenPT PRIVATE $<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<CONFIG:Debug>>: -G>)
+target_compile_options(LumenPT PRIVATE $<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<NOT:$<CONFIG:Debug>>>: -use_fast_math>)
 
 if(${USE_WAVEFRONT})
 	set_property(TARGET LumenPT APPEND PROPERTY COMPILE_DEFINITIONS WAVEFRONT)

@@ -53,7 +53,7 @@ CPU_ONLY void PostProcess(const WaveFront::PostProcessLaunchParameters& a_PostPr
 
 CPU_ONLY void MergeOutput(const WaveFront::PostProcessLaunchParameters& a_PostProcessParams);
 
-CPU_ONLY void WriteToOutput(const WaveFront::PostProcessLaunchParameters& a_PostProcessParams);
+CPU_ONLY void WriteToOutput(const WaveFront::WriteOutputParams& a_WriteOutputParams);
 
 CPU_ONLY void PrepareOptixDenoising(WaveFront::OptixDenoiserLaunchParameters& a_LaunchParams);
 

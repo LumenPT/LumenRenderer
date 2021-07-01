@@ -1,35 +1,32 @@
 # LumenRenderer
-Standalone distribution of the Lumen path tracer
+
+___
+**(The Lumen Renderer is not related to or affiliated with Unreal Engine 5's Lumen system.)**
+___
+
+Standalone distribution of the Lumen path tracer.
+This is a student project that is being made over the course of 1 year by 6 students of Breda University of Applied Sciences (BUAS).
+Our goal is a real-time (30fps+) path tracer with support for volumetric bodies.
+
+![MicrosoftTeams-image (12)](https://user-images.githubusercontent.com/9714482/120190774-591d5e80-c219-11eb-8d01-3d9b8d7599f8.png)
 
 ## Project description
-This project has been made by a group of university students.
+The project is made from the ground up using C++, CUDA 10 and OptiX 7.1. A DirectX11 layer is also used for interaction with external libraries that do not natively support CUDA. Libraries such as DLSS (Nvidia's Deep Learning Super Sampling) and NRD (Nvidia's Real-Time Denoiser). We are targetting 30fps+ at 1440p resolutions on RTX3090 GPU's.
 
-### Project Requirements
-The requirements for the project set by the teachers are:
-* Custom real-time fully ray-traced rendering aimed at next-gen AMD/NVDIA gpus such as the RTX 3080.
+### Project Requirements/Goals
+* Custom real-time fully path-traced rendering on RTX 3090.
 * HDR rendering.
-* Includes animation.
+* Support for volumetrics (OpenVDB/NanoVDB files).
 * An interactive camera.
-* Leveraging huge and fast SSDs.
-* Supports the USD format.
+* Features high-quality denoising (NRD).
 * Features a small high-quality photorealistic environment.
-* Uses a scene built with high-quality assets that appropriately showcase the rendering features.
-
-These requirements are not final and can be changed if we have good reasons to do so.
-The requirements can also be interpreted by us students.
-For example, animation could be interpreted as simply linear motion of an object in the scene or skeletal animations.
+* The Wavefront algorithm is implemented for our path-tracer.
+* The ReSTIR algorithm is implemented for our path-tracer.
 
 ### Goals for the project
 The project allows us students to set our own goals.
 Our goal for the project are:
 A real-time renderer that fully renders scenes by using path-tracing and supports volumetric rendering.
-
-### Duration of the project.
-This project is a year long project for third-year students.
-The project will be worked on throughout the year when there are enough students to work on this project.
-The year is divided up into 4 blocks of 8 working weeks.
-Each block there is chance for the students to switch between on-going projects.
-However, it is recommended and somewhat expected by the teachers to stay with your project for the entire year.
 
 ### Project features and systems
 #### • Wavefront algorithm
@@ -40,35 +37,18 @@ However, it is recommended and somewhat expected by the teachers to stay with yo
   We use the CUDA language to utilize the parallel computation capabilities.
     With CUDA we write kernels that run on the GPU and generate ray definitions and calculate shading values.
 
-## Contributions
-### Main contributors
-
-| Name | Concepting | Pre-production | Production | Release |
-| :--- | :---: | :---: | :---: | :---: |
-| **Person 1** | :heavy_check_mark: | :x: | :x: |  |
-| **Person 2** | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |  |
-| **Person 3** | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |  |
-| **Person 4** | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |  |
-| **Person 5** | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |  |
-| **Person 6** | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |  |
-| **Person 7** | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |  |
-
-#### Contributions per contributor
-* **Person 1**
-  * [**Wavefront algorithm**](./README.md#-wavefront-algorithm)
-
-### Additional contributors
-
-* **Person 1:**
-  - Contribution 1
- 
-
 ## Getting started with the project.
 ### Prerequisites:
-* [CMake (minimal required version: 3.16)](https://cmake.org/download/) 
+* [CMake (minimal required version: 3.20)](https://cmake.org/download/) 
+* [CUDA toolkit](https://developer.nvidia.com/cuda-downloads)
+* [OptiX 7 SDK](https://developer.nvidia.com/designworks/optix/download)
+### Optional
+* [Access to DLSS](https://developer.nvidia.com/dlss)
+* [Access to NRD](https://developer.nvidia.com/nvidia-rt-denoiser)
 
 ### Recommended tools:
-* [Visual Studio 2019](https://visualstudio.microsoft.com/)
+* [Visual Studio 2019 (version 16.6.3)](https://visualstudio.microsoft.com/)
+Note that Visual Studio versions above 16.6.3 are not guarranteed to work due to an unknown bug. If you followed all the build steps correctly and the project still does not compile check your VS version as you may need to downgrade. We are looking into the issue to fix it.
 
 ### Build Instructions using CMake
 * **Download the project.**
@@ -93,7 +73,8 @@ However, it is recommended and somewhat expected by the teachers to stay with yo
 #### Options
 | Option | Description |
 | :--- | :--- |
-| **USE_WAVEFRONT** | Whether to use the wavefront rendering pipeline or not. The wavefront rendering pipeline is a is the main rendering pipeline and probably has better support than the old rendering pipeline. This option adds the WAVEFRONT preprocessor defintions to the `Sandbox` and `LumenPT` projects. |
+| **WIP_USE_DLSS** | Whether to use DLSS or not. DLSS is closed-source, so building with DLSS will require you to have access to repository and to manually move the appropriate DLSS files in the correct vendor folder. |
+| **WIP_USE_NRD** | Whether to use NRD or not. NRD is closed-source, so building with NRD will require you to have access to repository and to manually move the appropriate DLSS files in the correct vendor folder. |
 
 #### Notes
 * The root folder is by default: `<Path to download folder>/Lumen_Engine`. It is the first directory containing a `CMakeLists.txt` file.
@@ -102,3 +83,13 @@ However, it is recommended and somewhat expected by the teachers to stay with yo
   CMake documentation refers to these methods as `in-source` and `out-of-source`.
 * The documentation for using the CMake command line can be found here: https://cmake.org/cmake/help/latest/manual/cmake.1.html
 * Tutorials for using CMake can be found here: https://cmake.org/cmake/help/latest/guide/tutorial/index.html
+
+## Gallery
+### Colored specular highlights
+![unknown](https://user-images.githubusercontent.com/9714482/120173799-b0fd9a80-c204-11eb-9c10-1e12e065890f.png)
+
+### Prototype for homogenous volumetrics
+![unknown (1)](https://user-images.githubusercontent.com/9714482/120174052-f4580900-c204-11eb-984b-1b6ba9a9e5e9.png)
+
+### Realistic soft shadows
+![MicrosoftTeams-image (12)](https://user-images.githubusercontent.com/9714482/120172177-105aab00-c203-11eb-81ef-0d3046d9bd9f.png)

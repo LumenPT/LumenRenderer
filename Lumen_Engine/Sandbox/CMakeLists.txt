@@ -61,12 +61,12 @@ add_custom_command(TARGET Sandbox POST_BUILD
 if(${USE_NVIDIA_DENOISER})
 	add_custom_command(TARGET Sandbox POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy
-        "${CMAKE_CURRENT_SOURCE_DIR}/../LumenPT/vendor/RayTracingDenoiser/_NRD_SDK/Lib/Release/NRD.dll"
-        $<TARGET_FILE_DIR:Sandbox>)
-
-	add_custom_command(TARGET Sandbox POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy
-        "${CMAKE_CURRENT_SOURCE_DIR}/../LumenPT/vendor/RayTracingDenoiser/_NRI_SDK/Lib/Release/NRI.dll"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../LumenPT/vendor/RayTracingDenoiser/_NRD_SDK/Lib/Debug/NRD.dll"
+        $<TARGET_FILE_DIR:Sandbox>)													   
+																					   
+	add_custom_command(TARGET Sandbox POST_BUILD									   
+    COMMAND ${CMAKE_COMMAND} -E copy												   
+        "${CMAKE_CURRENT_SOURCE_DIR}/../LumenPT/vendor/RayTracingDenoiser/_NRI_SDK/Lib/Debug/NRI.dll"
         $<TARGET_FILE_DIR:Sandbox>)
 endif()
 
