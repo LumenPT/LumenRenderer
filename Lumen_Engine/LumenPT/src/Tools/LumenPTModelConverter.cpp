@@ -57,8 +57,7 @@ Lumen::SceneManager::GLTFResource LumenPTModelConverter::ConvertGLTF(std::string
 
 	volatile auto dbgfc = &content;
 
-	p.erase(p.begin() + p.find('.'), p.end());
-	std::string destPath = p.append(ms_ExtensionName);
+	std::string destPath = std::filesystem::path(p).replace_extension(ms_ExtensionName).string();
 
 	OutputToFile(header, content.m_Blob, destPath);
 
@@ -429,13 +428,13 @@ LumenPTModelConverter::FileContent LumenPTModelConverter::GenerateContent(const 
 		if (extensions.contains(iorExtension))
 		{
 			auto json = extensions[iorExtension];
-			const float ior = JsonGetOrDefault<float>(json, "ior", 1.f);
+			const float ior = JsonGetOrDefault<float>(json, "ior", 1.5f);
 			m.m_IndexOfRefraction = ior;
 		}
 		//Not specified, default values.
 		else
 		{
-			m.m_IndexOfRefraction = 1.f;
+			m.m_IndexOfRefraction = 1.5f;
 		}
 
 		//Clearcoat

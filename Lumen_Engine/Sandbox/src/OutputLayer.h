@@ -71,6 +71,7 @@ private:
     float m_CameraMouseSensitivity;
     float m_CameraMovementSpeed;
     float m_Gamma = 2.2f;
+    float m_MinMaxRenderDistance[2] = { 0.1f, 1000.f };
 
     std::unique_ptr<class ModelLoaderWidget> m_ModelLoaderWidget;
     std::unique_ptr<Lumen::SceneGraph> m_SceneGraph;
@@ -127,9 +128,8 @@ private:
         {"2160p", glm::uvec2(3840, 2160)}
     };
 
-    //int m_Dlss_SelectedMode = 2;    // 2 translates to "BALANCED" dlss mode 
-    int m_Dlss_SelectedMode = 0;    // 0 translates to "NONE/OFF" dlss mode 
-    bool m_BlendMode = false;
+    int m_Dlss_SelectedMode = 2;    // 2 translates to "BALANCED" dlss mode 
+    bool m_BlendMode = true;
 
     std::vector<std::unique_ptr<FrameSnapshot>> m_FrameSnapshots;
     int m_CurrentSnapShotIndex;

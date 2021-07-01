@@ -87,14 +87,15 @@ bool AppConfiguration::Load(const std::filesystem::path& a_ConfigFile, bool a_Cr
     }
 
     auto directories = jsonConfig.at(KEYS_Directories);
-    auto filePaths = jsonConfig.at(KEYS_FilePaths);
+    auto files = jsonConfig.at(KEYS_Files);
 
     m_AssetsDirectory = directories.at(KEYS_AssetDir).get<std::string>();
     m_ShaderDirectory = directories.at(KEYS_ShaderDir).get<std::string>();
     m_ModelDirectory = directories.at(KEYS_ModelDir).get<std::string>();
 
-    m_ShadersSolids = filePaths.at(KEYS_ShaderSolids).get<std::string>();
-    m_ShadersVolumetrics = filePaths.at(KEYS_ShaderVolumetrics).get<std::string>();
+    m_ShadersSolids = files.at(KEYS_ShaderSolids).get<std::string>();
+    m_ShadersVolumetrics = files.at(KEYS_ShaderVolumetrics).get<std::string>();
+    m_DefaultModel = files.at(KEYS_DefaultModel).get<std::string>();
 
     return true;
 
@@ -106,19 +107,20 @@ bool AppConfiguration::VerifyComplete(Json a_ConfigFile)
     bool containsAllKeys = true;
 
     containsAllKeys &= a_ConfigFile.contains(KEYS_Directories);
-    containsAllKeys &= a_ConfigFile.contains(KEYS_FilePaths);
+    containsAllKeys &= a_ConfigFile.contains(KEYS_Files);
 
     if (containsAllKeys)
     {
         const auto directories = a_ConfigFile.at(KEYS_Directories);
-        const auto filePaths = a_ConfigFile.at(KEYS_FilePaths);
+        const auto files = a_ConfigFile.at(KEYS_Files);
 
         containsAllKeys &= directories.contains(KEYS_AssetDir);
         containsAllKeys &= directories.contains(KEYS_ShaderDir);
         containsAllKeys &= directories.contains(KEYS_ModelDir);
 
-        containsAllKeys &= filePaths.contains(KEYS_ShaderSolids);
-        containsAllKeys &= filePaths.contains(KEYS_ShaderVolumetrics);
+        containsAllKeys &= files.contains(KEYS_ShaderSolids);
+        containsAllKeys &= files.contains(KEYS_ShaderVolumetrics);
+        containsAllKeys &= files.contains(KEYS_DefaultModel);
 
         return containsAllKeys;
 
@@ -159,6 +161,22 @@ const std::filesystem::path& AppConfiguration::GetFileShaderVolumetrics() const
 {
 
     return m_ShadersVolumetrics;
+
+}
+
+const std::filesystem::path& AppConfiguration::GetDefaultModel() const
+{
+
+    return m_DefaultModel;
+
+}
+
+const bool AppConfiguration::HasDefaultModel() const
+{
+
+    return (!m_DefaultModel.empty() && 
+             m_DefaultModel.has_extension() && 
+            (m_DefaultModel.extension() == ".gltf" || m_DefaultModel.extension() == ".glb"));
 
 }
 
@@ -211,10 +229,11 @@ bool AppConfiguration::CreateDefault(const std::filesystem::path& a_ConfigFile, 
                 {KEYS_ModelDir, DEFAULTS_ModelDir}
             }
         },
-        { KEYS_FilePaths,
+        { KEYS_Files,
             {
                 {KEYS_ShaderSolids, DEFAULTS_ShaderProgramFile_Solids},
-                {KEYS_ShaderVolumetrics, DEFAULTS_ShaderProgramFile_Volumetrics}
+                {KEYS_ShaderVolumetrics, DEFAULTS_ShaderProgramFile_Volumetrics},
+                {KEYS_DefaultModel, DEFAULTS_DefaultModel}
             }
         }
     };

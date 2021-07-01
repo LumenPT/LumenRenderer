@@ -7,6 +7,8 @@
 #include <Cuda/cuda/helpers.h>
 #include <cassert>
 
+#include "Cuda_fp16.h"
+
 namespace WaveFront
 {
 
@@ -21,13 +23,11 @@ namespace WaveFront
 /// <b>• m_PrimitiveIndex</b> <em>(unsigned int): Index of the primitive of the mesh intersected by the ray.</em>: .\n
 /// </para>
 /// </summary>
-    struct IntersectionData
+    struct IntersectionData 
     {
 
         CPU_GPU IntersectionData()
             :
-            m_RayArrayIndex(0),
-            m_PixelIndex({ 0, 0 }),
             m_InstanceId(0),
             m_PrimitiveIndex(0),
             m_Barycentrics({0.f, 0.f}),
@@ -37,13 +37,11 @@ namespace WaveFront
         CPU_GPU IntersectionData(
             unsigned int a_RayArrayIndex,
             float a_IntersectionT,
-            float2 a_Barycentrics,
+            half2 a_Barycentrics,
             unsigned int a_PrimitiveIndex,
             unsigned int a_InstanceId,
             const PixelIndex& a_PixelIndex)
             :
-            m_RayArrayIndex(a_RayArrayIndex),
-            m_PixelIndex(a_PixelIndex),
             m_InstanceId(a_InstanceId),
             m_PrimitiveIndex(a_PrimitiveIndex),
             m_Barycentrics(a_Barycentrics),
@@ -72,21 +70,7 @@ namespace WaveFront
             }
             else return make_float3(0.f);
         }
-
-
-
-        /// <summary>
-        /// <b>Description</b> \n The index in the m_Rays array of a RayBatch of the ray the intersection belongs to. \n
-        /// <b>Default</b>: 0
-        /// </summary>
-        unsigned int m_RayArrayIndex;
-
-        /// <summary>
-        /// <b>Description</b> \n The pixel indices of the pixel that the ray affects. \n
-        /// <b>Default</b>: 0,0
-        /// </summary>
-        PixelIndex m_PixelIndex;
-
+    	
         /// <summary>
         /// <b>Description</b> \n The unique instance ID of the surface that has been intersected with. \n
         /// <b>Default</b>: 0
@@ -103,7 +87,7 @@ namespace WaveFront
         /// <b>Description</b> \n The U- & V-barycentric coordinates of the intersection point on the triangle that has been interested. \n
         /// <b>Default</b>: 0.f, 0.f
         /// </summary>
-        float2 m_Barycentrics;
+        half2 m_Barycentrics;
 
         /// <summary>
         /// <b>Description</b> \n Distance along the ray the intersection happened. \n
@@ -112,4 +96,14 @@ namespace WaveFront
         float m_IntersectionT;
     };
 
+	union IntersectionDataUint4
+	{
+        CPU_GPU IntersectionDataUint4()
+        {
+            m_Data.m_IntersectionT = -1.f;  //Important. If not manually set, junk values are used when not intersecting.
+        }
+		
+        uint4 m_DataAsUint4;
+        IntersectionData m_Data;
+	};
 }

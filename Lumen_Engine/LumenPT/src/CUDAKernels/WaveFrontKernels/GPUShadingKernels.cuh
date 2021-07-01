@@ -34,6 +34,12 @@ CPU_ON_GPU void ExtractSurfaceDataGpu(unsigned a_NumIntersections,
     SceneDataTableAccessor* a_SceneDataTable);
 
     
+CPU_ON_GPU void ExtractDepthDataGpu(
+    const SurfaceData* a_SurfaceData,
+    cudaSurfaceObject_t a_DepthOutPut,
+    uint2 a_Resolution,
+    float2 a_MinMaxDistance);
+
 CPU_ON_GPU void ExtractNRD_DLSSdataGpu(
     const SurfaceData* a_SurfaceData,
     cudaSurfaceObject_t a_DepthOutPut,

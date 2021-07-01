@@ -138,7 +138,7 @@ void OutputLayer::OnUpdate()
 
 	if (Lumen::Input::IsKeyPressed(LMN_KEY_EQUAL))
 	{
-		MakeScreenshot(std::filesystem::current_path().string() + "\\Screenshots\\" + DefaultScreenshotName());
+		MakeScreenshot(DefaultScreenshotName());
 	}
 
 	auto texture = m_Renderer->GetOutputTexture(); // TRACE SUM
@@ -368,7 +368,7 @@ void OutputLayer::OnImGuiRender()
 
 		if (ImGui::Button("Screenshot"))
 		{
-			MakeScreenshot(std::filesystem::current_path().string() + "\\Screenshots\\" + DefaultScreenshotName());
+			MakeScreenshot(DefaultScreenshotName());
 		}
 		ImGui::End();
 
@@ -579,6 +579,13 @@ void OutputLayer::HandleCameraInput(Camera& a_Camera)
 		pitchRotation += rotationSpeed;
 	}
 
+	const glm::vec2 currentMinMaxRenderDistance = a_Camera.GetMinMaxRenderDistance();
+	if( m_MinMaxRenderDistance[0] != currentMinMaxRenderDistance[0] || 
+		m_MinMaxRenderDistance[1] != currentMinMaxRenderDistance[1])
+	{
+		a_Camera.SetMinMaxRenderDistance(glm::vec2(m_MinMaxRenderDistance[0], m_MinMaxRenderDistance[1]));
+	}
+
 	//a_Camera.IncrementYaw(glm::radians(yawRotation));
 	//a_Camera.IncrementPitch(glm::radians(pitchRotation));
 	//a_Camera.SetYaw(a_Camera.GetYaw() + yawRotation);
@@ -598,8 +605,13 @@ void OutputLayer::ImGuiCameraSettings()
 
 	ImGui::SliderFloat("Gamma strength/Brightness", &m_Gamma, 1.0f, 4.0f);
 
+	ImGui::DragFloat("Min render distance", &m_MinMaxRenderDistance[0], 0.5f, 0.001f, m_MinMaxRenderDistance[1], "%.3f", ImGuiSliderFlags_AlwaysClamp);
+	ImGui::DragFloat("Max render distance", &m_MinMaxRenderDistance[1], 0.5f, m_MinMaxRenderDistance[0], 0, "%.3f", ImGuiSliderFlags_AlwaysClamp);
+
 	ImGui::Combo("DLSS setting", &m_Dlss_SelectedMode, "Off\0Max performance\0Balanced\0Max quality\0Ultra performance\0Ultra quality\0");
 	m_Renderer->m_DlssMode = m_Dlss_SelectedMode;
+
+	ImGui::Checkbox("Converge output", &m_BlendMode);
 
 	ImGui::End();
 }
@@ -889,5 +901,5 @@ std::string OutputLayer::DefaultScreenshotName()
 	tm* time = gmtime(&now);
 	std::string name = "Screenshot" + std::to_string(time->tm_mday) + std::to_string(time->tm_mon + 1) + '-'
 		+ std::to_string(time->tm_hour + 2) + std::to_string(time->tm_min) + std::to_string(time->tm_sec) + ".png";
-	return name;
+	return std::filesystem::current_path().string() + "\\Screenshots\\" + name;
 }

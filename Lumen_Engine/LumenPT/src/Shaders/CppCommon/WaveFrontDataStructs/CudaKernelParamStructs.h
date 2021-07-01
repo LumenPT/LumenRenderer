@@ -70,7 +70,7 @@ namespace WaveFront
             const SurfaceData* const a_TemporalSurfaceData,
             const VolumetricData* const a_CurrentVolumetricData,
             const cudaSurfaceObject_t const a_MotionVectorBuffer,
-            const MemoryBuffer* const a_TriangleLights,
+            const MemoryBuffer* const a_LightDataBuffer,
             const OptixTraversableHandle a_OptixSceneHandle,
             const OptixWrapper* const a_OptixWrapper,
             const unsigned a_CurrentDepth,
@@ -87,7 +87,7 @@ namespace WaveFront
         m_TemporalSurfaceData(a_TemporalSurfaceData),
         m_CurrentVolumetricData(a_CurrentVolumetricData),
         m_MotionVectorBuffer(a_MotionVectorBuffer),
-        m_TriangleLights(a_TriangleLights),
+        m_LightDataBuffer(a_LightDataBuffer),
         m_OptixSceneHandle(a_OptixSceneHandle),
         m_OptixWrapper(a_OptixWrapper),
         m_CurrentDepth(a_CurrentDepth),
@@ -107,7 +107,7 @@ namespace WaveFront
         const SurfaceData* const m_TemporalSurfaceData;
         const VolumetricData* const m_CurrentVolumetricData;
         const cudaSurfaceObject_t const m_MotionVectorBuffer;
-        const MemoryBuffer* const m_TriangleLights;
+        const MemoryBuffer* const m_LightDataBuffer;
         const OptixTraversableHandle m_OptixSceneHandle;
         const OptixWrapper* const m_OptixWrapper;
         const unsigned m_CurrentDepth;
