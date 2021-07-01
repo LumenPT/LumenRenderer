@@ -1,26 +1,31 @@
 #pragma once
 #include "../../Shaders/CppCommon/CudaDefines.h"
 #include "../../Shaders/CppCommon/WaveFrontDataStructs.h"
+#include "../../Framework/LightDataBuffer.h"
 
 using namespace WaveFront;
 
-CPU_ONLY void ResetIntersectionRayBatch(
-    IntersectionRayBatch* const a_RayBatchDevPtr,
-    unsigned int a_NumPixels,
-    unsigned int a_RaysPerPixel);
+CPU_ONLY void FindEmissives(
+    const Vertex* a_Vertices,
+    const uint32_t* a_Indices,
+    bool* a_Emissives,
+    const DeviceMaterial* a_Mat,
+    const uint32_t a_IndexBufferSize,
+    unsigned int& a_NumLights
+);
 
-CPU_ONLY void ResetShadowRayBatch(
-    ShadowRayBatch* a_ShadowRayBatchDevPtr,
-    unsigned int a_MaxDepth,
-    unsigned int a_NumPixels,
-    unsigned int a_RaysPerPixel);
+CPU_ONLY void AddToLightBuffer(
+    const uint32_t a_IndexBufferSize,
+    WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_Lights,
+    SceneDataTableAccessor* a_SceneDataTable,
+    unsigned a_InstanceId
+);
 
-CPU_ONLY void ResetPixelBuffer(
-    PixelBuffer* a_PixelBufferDevPtr,
-    unsigned int a_NumPixels,
-    unsigned int a_ChannelsPerPixel);
-
-CPU_ONLY void ResetLightChannels(
-    float3* a_Buffer,
-    unsigned int a_NumPixels,
-    unsigned int a_ChannelsPerPixel);
+CPU_ONLY void BuildLightDataBufferOnGPU(
+    LightInstanceData* a_InstanceData,
+    uint32_t a_NumInstances,
+    uint32_t a_AverageNumTriangles,
+    const SceneDataTableAccessor* a_SceneDataTable,
+    //GPULightDataBuffer a_DataBuffer
+    WaveFront::AtomicBuffer<WaveFront::TriangleLight>* a_DataBufferDevPtr
+);

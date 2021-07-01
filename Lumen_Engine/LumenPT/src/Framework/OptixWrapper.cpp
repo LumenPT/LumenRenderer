@@ -4,6 +4,7 @@
 #include "MemoryBuffer.h"
 #include "AccelerationStructure.h"
 #include "ShaderBindingTableGen.h"
+#include "Lumen/Renderer/LumenRenderer.h"
 
 #include <Optix/optix_stubs.h>
 #include <algorithm>
@@ -29,7 +30,8 @@ OptixWrapper::~OptixWrapper()
 {
 
     CHECKOPTIXRESULT(optixPipelineDestroy(m_Pipeline));
-    CHECKOPTIXRESULT(optixModuleDestroy(m_Module));
+    CHECKOPTIXRESULT(optixModuleDestroy(m_SolidModule));
+    CHECKOPTIXRESULT(optixModuleDestroy(m_VolumetricModule));
 
     DestroyProgramGroups();
 
@@ -88,8 +90,6 @@ std::unique_ptr<AccelerationStructure> OptixWrapper::BuildInstanceAccelerationSt
     buildInput.type = OPTIX_BUILD_INPUT_TYPE_INSTANCES;
     buildInput.instanceArray.instances = *instanceBuffer;
     buildInput.instanceArray.numInstances = static_cast<uint32_t>(a_Instances.size());
-    buildInput.instanceArray.aabbs = 0;
-    buildInput.instanceArray.numAabbs = 0;
 
     OptixAccelBuildOptions buildOptions = {};
     // Based on research, it is more efficient to continuously be rebuilding most instance acceleration structures rather than to update them
@@ -141,7 +141,11 @@ bool OptixWrapper::Initialize(const InitializationData& a_InitializationData)
     m_SBTGenerator = std::make_unique<ShaderBindingTableGenerator>();
 
     success &= InitializeContext(a_InitializationData.m_CUDAContext);
-    success &= CreatePipeline(a_InitializationData.m_ProgramData);
+    success &= CreatePipeline(
+        a_InitializationData.m_SolidProgramData, 
+        a_InitializationData.m_VolumetricProgramData, 
+        a_InitializationData.m_PipelineMaxNumPayloads,
+        a_InitializationData.m_PipelineMaxNumHitResultAttributes);
 
     SetupPipelineBuffer();
     SetupShaderBindingTable();
@@ -163,23 +167,40 @@ bool OptixWrapper::InitializeContext(CUcontext a_CUDAContext)
 
 }
 
-bool OptixWrapper::CreatePipeline(const InitializationData::ProgramData& a_ProgramData)
+bool OptixWrapper::CreatePipeline(
+    const InitializationData::ProgramData& a_SolidProgramData,
+    const InitializationData::ProgramData& a_VolumetricProgramData,
+    unsigned int a_NumPayloads,
+    unsigned int a_NumAttributes)
 {
 
     const OptixPipelineCompileOptions compileOptions = CreatePipelineOptions(
-        a_ProgramData.m_ProgramLaunchParamName,
-        a_ProgramData.m_MaxNumPayloads,
-        a_ProgramData.m_MaxNumHitResultAttributes);
+        a_SolidProgramData.m_ProgramLaunchParamName,
+        a_NumPayloads,
+        a_NumAttributes);
 
-    m_Module = CreateModule(a_ProgramData.m_ProgramPath, compileOptions);
+    m_SolidModule = CreateModule(a_SolidProgramData.m_ProgramPath, compileOptions);
+    m_VolumetricModule = CreateModule(a_VolumetricProgramData.m_ProgramPath, compileOptions);
+
+    if(m_SolidModule == nullptr || m_VolumetricModule == nullptr)
+    {
+        printf("Could not create module: \n\t Solid module: %p with path: %ls \n\t Volumetric module: %p with path: %ls \n",
+            m_SolidModule, a_SolidProgramData.m_ProgramPath.c_str(),
+            m_VolumetricModule, a_VolumetricProgramData.m_ProgramPath.c_str());
+        return false;
+    }
 
     return CreatePipeline(
-        m_Module,
+        m_SolidModule,
+        m_VolumetricModule,
         compileOptions,
-        a_ProgramData.m_ProgramRayGenFuncName,
-        a_ProgramData.m_ProgramMissFuncName,
-        a_ProgramData.m_ProgramAnyHitFuncName,
-        a_ProgramData.m_ProgramClosestHitFuncName,
+        a_SolidProgramData.m_ProgramRayGenFuncName,
+        a_SolidProgramData.m_ProgramMissFuncName,
+        a_SolidProgramData.m_ProgramAnyHitFuncName,
+        a_SolidProgramData.m_ProgramClosestHitFuncName,
+        a_VolumetricProgramData.m_ProgramIntersectionFuncName,
+        a_VolumetricProgramData.m_ProgramAnyHitFuncName,
+        a_VolumetricProgramData.m_ProgramClosestHitFuncName,
         m_Pipeline);
 
 }
@@ -195,7 +216,12 @@ OptixPipelineCompileOptions OptixWrapper::CreatePipelineOptions(
     pipelineOptions.traversableGraphFlags = OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_ANY;
     pipelineOptions.numPayloadValues = std::clamp(a_NumPayloadValues, 0u, 8u); //Move to initializationData.
     pipelineOptions.numAttributeValues = std::clamp(a_NumAttributes, 2u, 8u); //Move to initializationData.
+
+#if defined (_DEBUG) || defined(OPTIX_DEBUG)
     pipelineOptions.exceptionFlags = OPTIX_EXCEPTION_FLAG_DEBUG;
+#else
+    pipelineOptions.exceptionFlags = OPTIX_EXCEPTION_FLAG_NONE;
+#endif
     pipelineOptions.pipelineLaunchParamsVariableName = a_LaunchParamName.c_str(); //Move to initializationData.
     pipelineOptions.usesPrimitiveTypeFlags = OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE & OPTIX_PRIMITIVE_TYPE_FLAGS_CUSTOM;
 
@@ -204,54 +230,74 @@ OptixPipelineCompileOptions OptixWrapper::CreatePipelineOptions(
 }
 
 bool OptixWrapper::CreatePipeline(
-    const OptixModule& a_Module,
+    const OptixModule& a_SolidModule,
+    const OptixModule& a_VolumetricModule,
     const OptixPipelineCompileOptions& a_PipelineOptions,
     const std::string& a_RayGenFuncName,
     const std::string& a_MissFuncName,
-    const std::string& a_AnyHitFuncName,
-    const std::string& a_ClosestHitFuncName,
+    const std::string& a_SolidAnyHitFuncName,
+    const std::string& a_SolidClosestHitFuncName,
+    const std::string& a_VolumetricIntersectionFuncName,
+    const std::string& a_VolumetricAnyHitFuncName,
+    const std::string& a_VolumetricClosestHitFuncName,
     OptixPipeline& a_Pipeline)
 {
-
-    OptixProgramGroup rayGenProgram = nullptr;
-    OptixProgramGroup hitProgram = nullptr;
-    OptixProgramGroup missProgram = nullptr;
 
     OptixProgramGroupDesc rayGenGroupDesc = {};
     rayGenGroupDesc.kind = OPTIX_PROGRAM_GROUP_KIND_RAYGEN;
     rayGenGroupDesc.raygen.entryFunctionName = a_RayGenFuncName.c_str();
-    rayGenGroupDesc.raygen.module = a_Module;
+    rayGenGroupDesc.raygen.module = a_SolidModule;
 
-    OptixProgramGroupDesc hitGroupDesc = {};
-    hitGroupDesc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-    hitGroupDesc.hitgroup.entryFunctionNameAH = (a_AnyHitFuncName.length() > 0) ? a_AnyHitFuncName.c_str() : nullptr;
-    hitGroupDesc.hitgroup.entryFunctionNameCH = (a_ClosestHitFuncName.length() > 0) ? a_ClosestHitFuncName.c_str() : nullptr;
-    hitGroupDesc.hitgroup.moduleAH = a_Module;
-    hitGroupDesc.hitgroup.moduleCH = a_Module;
+    OptixProgramGroupDesc solidHitGroupDesc = {};
+    solidHitGroupDesc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
+    solidHitGroupDesc.hitgroup.entryFunctionNameAH = (a_SolidAnyHitFuncName.length() > 0) ? a_SolidAnyHitFuncName.c_str() : nullptr;
+    solidHitGroupDesc.hitgroup.entryFunctionNameCH = (a_SolidClosestHitFuncName.length() > 0) ? a_SolidClosestHitFuncName.c_str() : nullptr;
+    solidHitGroupDesc.hitgroup.moduleAH = a_SolidModule;
+    solidHitGroupDesc.hitgroup.moduleCH = a_SolidModule;
+
+    OptixProgramGroupDesc volumetricHitGroupDesc = {};
+    volumetricHitGroupDesc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
+    volumetricHitGroupDesc.hitgroup.entryFunctionNameIS = a_VolumetricIntersectionFuncName.c_str();
+    volumetricHitGroupDesc.hitgroup.entryFunctionNameAH = a_VolumetricAnyHitFuncName.c_str();
+    volumetricHitGroupDesc.hitgroup.entryFunctionNameCH = a_VolumetricClosestHitFuncName.c_str();
+    volumetricHitGroupDesc.hitgroup.moduleIS = a_VolumetricModule;
+    volumetricHitGroupDesc.hitgroup.moduleAH = a_VolumetricModule;
+    volumetricHitGroupDesc.hitgroup.moduleCH = a_VolumetricModule;
 
     OptixProgramGroupDesc missGroupDesc = {};
     missGroupDesc.kind = OPTIX_PROGRAM_GROUP_KIND_MISS;
     missGroupDesc.miss.entryFunctionName = a_MissFuncName.c_str();
-    missGroupDesc.miss.module = a_Module;
+    missGroupDesc.miss.module = a_SolidModule;
 
-    rayGenProgram = CreateProgramGroup(rayGenGroupDesc, s_RayGenPGName);
-    hitProgram    = CreateProgramGroup(hitGroupDesc,    s_HitPGName);
-    missProgram   = CreateProgramGroup(missGroupDesc,   s_MissPGName);
+    OptixProgramGroup rayGenProgram = nullptr;
+    OptixProgramGroup solidHitProgram = nullptr;
+    OptixProgramGroup volumetricHitProgram = nullptr;
+    OptixProgramGroup missProgram = nullptr;
 
-    if (rayGenProgram == nullptr || hitProgram == nullptr || missProgram == nullptr)
+    rayGenProgram           = CreateProgramGroup(rayGenGroupDesc,        s_RayGenPGName);
+    solidHitProgram         = CreateProgramGroup(solidHitGroupDesc,      s_SolidHitPGName);
+    volumetricHitProgram    = CreateProgramGroup(volumetricHitGroupDesc, s_VolumetricHitPGName);
+    missProgram             = CreateProgramGroup(missGroupDesc,          s_MissPGName);
+
+    if (rayGenProgram == nullptr || solidHitProgram == nullptr || volumetricHitProgram == nullptr || missProgram == nullptr)
     {
-        printf("Could not create program groups for pipeline: (RayGenProgram: %p , HitProgram: %p, MissProgram: %p) \n",
+        printf("Could not create program groups for pipeline: (RayGenProgram: %p , HitProgram (solids): %p, HitProgram (volumetrics): %p, MissProgram: %p) \n",
             rayGenProgram,
-            hitProgram,
+            solidHitProgram,
+            volumetricHitProgram,
             missProgram);
         return false;
     }
 
     OptixPipelineLinkOptions pipelineLinkOptions = {};
+#if defined(_DEBUG) || defined(OPTIX_DEBUG)
     pipelineLinkOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_FULL;
+#else
+    pipelineLinkOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_NONE;
+#endif
     pipelineLinkOptions.maxTraceDepth = 1;
 
-    OptixProgramGroup programGroups[] = { rayGenProgram, missProgram, hitProgram };
+    OptixProgramGroup programGroups[] = { rayGenProgram, missProgram, solidHitProgram, volumetricHitProgram };
 
     char log[2048];
     auto logSize = sizeof(log);
@@ -263,7 +309,7 @@ bool OptixWrapper::CreatePipeline(
         &a_PipelineOptions,
         &pipelineLinkOptions,
         programGroups,
-        sizeof(programGroups) / sizeof(OptixProgramGroup),
+        _countof(programGroups),
         log,
         &logSize,
         &a_Pipeline));
@@ -275,7 +321,7 @@ bool OptixWrapper::CreatePipeline(
     OptixStackSizes stackSizes = {};
 
     AccumulateStackSizes(rayGenProgram, stackSizes);
-    AccumulateStackSizes(hitProgram, stackSizes);
+    AccumulateStackSizes(solidHitProgram, stackSizes);
 
     auto finalSizes = ComputeStackSizes(stackSizes, 1, 0, 0);
 
@@ -296,9 +342,14 @@ OptixModule OptixWrapper::CreateModule(const std::filesystem::path& a_PtxPath, c
 {
 
     OptixModuleCompileOptions moduleOptions = {};
-    moduleOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_LINEINFO;
-    moduleOptions.maxRegisterCount = OPTIX_COMPILE_DEFAULT_MAX_REGISTER_COUNT;
+#if defined(_DEBUG) || defined(OPTIX_DEBUG)
+    moduleOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_FULL;
     moduleOptions.optLevel = OPTIX_COMPILE_OPTIMIZATION_LEVEL_0;
+#else
+    moduleOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_NONE;
+    moduleOptions.optLevel = OPTIX_COMPILE_OPTIMIZATION_LEVEL_3;
+#endif
+    moduleOptions.maxRegisterCount = OPTIX_COMPILE_DEFAULT_MAX_REGISTER_COUNT;
 
     std::ifstream stream;
     stream.open(a_PtxPath);
@@ -317,7 +368,7 @@ OptixModule OptixWrapper::CreateModule(const std::filesystem::path& a_PtxPath, c
 
     OptixResult error{};
 
-    CHECKOPTIXRESULT(error = optixModuleCreateFromPTX(
+    error = optixModuleCreateFromPTX(
         m_DeviceContext,
         &moduleOptions,
         &a_PipelineOptions,
@@ -325,11 +376,12 @@ OptixModule OptixWrapper::CreateModule(const std::filesystem::path& a_PtxPath, c
         source.size(),
         log,
         &logSize,
-        &module));
+        &module);
 
     if (error)
     {
         puts(log);
+        CHECKOPTIXRESULT(error);
         abort();
     }
 
@@ -449,25 +501,33 @@ void OptixWrapper::SetupPipelineBuffer()
 void OptixWrapper::SetupShaderBindingTable()
 {
 
+    //Initialize the ray generation and miss shader binding table records.
     m_RayGenRecord = m_SBTGenerator->SetRayGen<void>();
-    m_HitRecord = m_SBTGenerator->AddHitGroup<void>();
     m_MissRecord = m_SBTGenerator->AddMiss<void>();
 
     auto& rayGenRecord = m_RayGenRecord.GetRecord();
     rayGenRecord.m_Header = GetProgramGroupHeader(s_RayGenPGName);
 
-    auto& hitRecord = m_HitRecord.GetRecord();
-    hitRecord.m_Header = GetProgramGroupHeader(s_HitPGName);
-
     auto& raysMissRecord = m_MissRecord.GetRecord();
     raysMissRecord.m_Header = GetProgramGroupHeader(s_MissPGName);
+
+
+
+    m_SolidHitRecord = m_SBTGenerator->AddHitGroup<void>();
+    m_VolumetricHitRecord = m_SBTGenerator->AddHitGroup<void>();
+    
+    auto& solidHitRecord = m_SolidHitRecord.GetRecord();
+    solidHitRecord.m_Header = GetProgramGroupHeader(s_SolidHitPGName);
+
+    auto& volumetricHitRecord = m_VolumetricHitRecord.GetRecord();
+    volumetricHitRecord.m_Header = GetProgramGroupHeader(s_VolumetricHitPGName);
 
 }
 
 void OptixWrapper::OptixDebugCallback(unsigned a_Level, const char* a_Tag, const char* a_Message, void*)
 {
 
-    std::printf("%u::%s:: %s\n\n", a_Level, a_Tag, a_Message);
+    std::printf("[Optix Debug Callback]: (Level: %u) (Tag: %s) Message: %s\n\n", a_Level, a_Tag, a_Message);
 
 }
 
@@ -485,6 +545,8 @@ void OptixWrapper::TraceRays(
     const OptixLaunchParameters& a_LaunchParams,  
     CUstream a_CUDAStream) const
 {
+	cudaDeviceSynchronize();
+	CHECKLASTCUDAERROR;
 
     m_OptixLaunchParamBuffer->Write(a_LaunchParams);
 

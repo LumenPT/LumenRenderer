@@ -14,6 +14,8 @@ file(GLOB_RECURSE HEADER_FILES
     "imstb_rectpack.h"
     "imstb_textedit.h"
     "imstb_truetype.h"
+    "implot.h"
+    "implot_internal.h"
 )
 
 #Add source files
@@ -21,8 +23,12 @@ file(GLOB_RECURSE SOURCE_FILES
 
 	"imgui.cpp"
     "imgui_draw.cpp"
+    "imgui_tables.cpp"
     "imgui_widgets.cpp"
-    "imgui_demo.cpp"
+    "imgui_demo.cpp"    
+    "implot.cpp"
+    "implot_items.cpp"
+    "implot_demo.cpp"
 )
 
 # Add header and source files to library

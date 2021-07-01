@@ -25,6 +25,9 @@
 **/Sandbox/Sandbox.dir/**
 **/Lumen/vendor/Glad/Glad.dir/**
 **/Lumen/vendor/imgui/ImGui.dir/**
+**/LumenPT/vendor/RayTracingDenoiser
+**/LumenPT/vendor/DLSS_Private
+**/LumenPT/vendor/TestProject
 
 G:\RandomCode\LumenRenderer\Lumen_Engine\Sandbox\assets\models\Sponza
 
@@ -475,3 +478,15 @@ Lumen_Engine/LumenPT/Assets/PrecompiledShaders/
 Lumen_Engine/LumenPT/Assets/PrecompiledShaders/Debug/draw_solid_color.ptx
 *.bmp
 *.ptx
+
+Lumen_Engine/Config.json
+
+*.ollad
+
+Lumen_Engine/Screenshots/
+
+Lumen_Engine/Sandbox/assets/models/Astronaut/
+
+Lumen_Engine/Sandbox/assets/gltfExternalAssets
+
+Lumen_Engine/Sandbox/assets/models/ConferenceRoom/

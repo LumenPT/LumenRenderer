@@ -1,4 +1,5 @@
 #include "MemoryBuffer.h"
+#include "CudaUtilities.h"
 
 #include "Cuda/cuda.h"
 #include "Cuda/cuda_runtime.h"
@@ -11,7 +12,7 @@
 // This is because it makes extensive use of the CUDA toolkit.
 void CudaCheck(cudaError_t err)
 {
-#ifdef _DEBUG
+#if defined(_DEBUG) || !defined(_NDEBUG)
     if (err != 0)
     {
         printf("Cuda error %u", err);
@@ -32,7 +33,7 @@ MemoryBuffer::MemoryBuffer(size_t a_Size)
 MemoryBuffer::~MemoryBuffer()
 {
     // Simply free the previously allocated GPU memory
-    CudaCheck(cudaFree(m_DevPtr));
+    CHECKCUDAERROR(cudaFree(m_DevPtr));
 }
 
 MemoryBuffer::MemoryBuffer(MemoryBuffer&& a_Other)

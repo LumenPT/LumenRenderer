@@ -19,29 +19,52 @@ namespace WaveFront
         /*
          * Append data to the buffer.
          */
-        GPU_ONLY void Add(T* a_Data)
+        GPU_ONLY INLINE void Add(T* a_Data)
         {
-            //Add at index - 1 because the counter gives the total size, which starts at 1.
             //IMPORTANT: atomicAdd returns old value. https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#arithmetic-functions
+            
             const uint32_t index = atomicAdd(&counter, 1);
             assert(index < maxSize);
             data[index] = *a_Data;
         }
 
+        GPU_ONLY void Add(const T& a_Data)
+        {
+            const uint32_t index = atomicAdd(&counter, 1);
+            assert(index < maxSize);
+            data[index] = a_Data;
+        }
+
+        GPU_ONLY uint32_t ReserveIndices(uint32_t a_NumIndices)
+        {
+            const uint32_t currentIndex = atomicAdd(&counter, a_NumIndices);
+            return currentIndex;
+        }
+
         /*
          * Set data in the buffer, bypassing the atomic operation.
          */
-        GPU_ONLY void Set(int a_Index, T* a_Data)
+        GPU_ONLY INLINE void Set(int a_Index, T* a_Data)
         {
             assert(a_Index < maxSize);
             data[a_Index] = *a_Data;
+        }
+
+        GPU_ONLY void Set(int a_Index, const T& a_Data)
+        {
+            if(!(a_Index < maxSize && a_Index < counter))
+            {
+                printf("Index: %i, MaxSize: %i, Counter: %i \n", a_Index, maxSize, counter);
+            }
+            assert(a_Index < maxSize && a_Index < counter);
+            data[a_Index] = a_Data;
         }
 
         /*
          * Set the value of the counter.
          * This bypasses atomic operations and should only be used when data is added by setting at specific indices.
          */
-        GPU_ONLY void SetCounter(int a_Value)
+        GPU_ONLY INLINE void SetCounter(int a_Value)
         {
             assert(a_Value < maxSize);
             counter = a_Value;
@@ -50,23 +73,23 @@ namespace WaveFront
         /*
          * Reset the counter back to 0.
          */
-        GPU_ONLY void Reset()
+        GPU_ONLY INLINE void Reset()
         {
             counter = 0;
         }
 
-        GPU_ONLY unsigned GetSize() const
+        GPU_ONLY INLINE unsigned GetSize() const
         {
             return counter;
         }
 
-        GPU_ONLY T* GetData(int a_Index)
+        GPU_ONLY INLINE T* GetData(int a_Index)
         {
             assert(a_Index <= counter);
             return &data[a_Index];
         }
 
-        GPU_ONLY const T* GetData(int a_Index) const
+        GPU_ONLY INLINE const T* GetData(int a_Index) const
         {
             assert(a_Index <= counter);
             return &data[a_Index];
@@ -109,7 +132,7 @@ namespace WaveFront
     }
 
     template<typename T>
-    unsigned GetAtomicCounter(MemoryBuffer* a_Buffer)
+    unsigned GetAtomicCounter(const MemoryBuffer *const a_Buffer)
     {
         unsigned returned = 0;
         a_Buffer->Read(&returned, sizeof(unsigned), 0);

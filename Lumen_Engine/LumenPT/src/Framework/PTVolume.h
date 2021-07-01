@@ -28,9 +28,6 @@ public:
 	
 	PTServiceLocator& m_Services;
 
-	RecordHandle<DeviceVolume> m_RecordHandle;
-	SceneDataTableEntry<DeviceVolume> m_SceneEntry;
-
 	std::unique_ptr<AccelerationStructure> m_AccelerationStructure = nullptr;
 	
 	//TODO: make this a vector to support multiple grids

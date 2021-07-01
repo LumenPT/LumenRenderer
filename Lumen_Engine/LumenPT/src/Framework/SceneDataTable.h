@@ -3,10 +3,12 @@
 #include "SceneDataTableEntry.h"
 
 #include "MemoryBuffer.h"
-#include <unordered_map>
 
 #include "Cuda/cuda_runtime.h"
 #include "Optix/optix_types.h"
+
+#include <unordered_map>
+#include <set>
 
 class SceneDataTableAccessor;
 
@@ -21,6 +23,7 @@ public:
     SceneDataTable()
         : m_NextEntryKey(0)
         , m_EntryStride(0)
+        , m_MaxIndex(0)
     {
         m_GpuBuffer.Resize(2 * 1024 * 1024);
     }
@@ -35,6 +38,7 @@ public:
         SceneDataTableEntry<T> handle;
         // The handle needs the reference to the entry list so it can remove itself from it when destroyed
         handle.m_EntryListRef = &m_Entries;
+        handle.m_KeyListRef = &m_UnusedIndices;
         // It also needs the key to know which member of the list to delete
         handle.m_Key = m_NextEntryKey;
         m_Entries.emplace(m_NextEntryKey++, &handle);
@@ -62,7 +66,9 @@ private:
 
     // Keys are 64-bit so we can skip on tracking what keys are already in use and which not
     std::unordered_map<uint64_t, SceneDataTableEntryBase*> m_Entries;
+    uint64_t m_MaxIndex;
     uint64_t m_NextEntryKey;
+    std::set<uint64_t> m_UnusedIndices;
 
     // Memory buffer containing the table itself
     MemoryBuffer m_GpuBuffer;

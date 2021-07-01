@@ -5,7 +5,8 @@
  */
 
 #include "CudaDefines.h"
-#include "WaveFrontDataStructs/LightDataBuffer.h"
+#include "./WaveFrontDataStructs/PixelIndex.h"
+#include "WaveFrontDataStructs/LightData.h"
 
 #include <Optix/optix.h>
 #include <Cuda/cuda/helpers.h>
@@ -62,11 +63,6 @@ struct ReSTIRSettings
 
     //Enable temporal sampling.
     static constexpr bool enableTemporal = true;    //Default true
-
-    //Enable or disable certain parts of ReSTIR TODO
-#define RESTIR_BIASED 1
-#define RESTIR_SPATIAL 1
-#define RESTIR_TEMPORAL 1
 };
 
 /*
@@ -78,6 +74,20 @@ struct RestirShadowRay
     float3 direction;   //Ray direction, normalized.
     float distance;     //The distance of the light source from the origin along the ray direction.
     unsigned index;     //The index into the reservoir buffer at which to set weight to 0 when occluded.
+};
+
+/*
+ * Visibility ray with potential payload used in the final stage of ReSTIR where the final chosen samples are resolved.
+ */
+struct RestirShadowRayShading
+{
+
+    float3 origin;      //Ray origin.
+    float3 direction;   //Ray direction, normalized.
+    float distance;     //The distance of the light source from the origin along the ray direction.
+    unsigned index;     //The index into the reservoir buffer at which to set weight to 0 when occluded.
+    WaveFront::PixelIndex pixelIndex;
+    float3 contribution;    //The potential contribution if un-occluded.
 };
 
  /*
@@ -111,6 +121,8 @@ struct Reservoir
      */
     GPU_ONLY INLINE bool Update(const LightSample& a_Sample, float a_Weight, std::uint32_t a_Seed)
     {
+        assert(!isnan(a_Weight));
+        assert(!isinf(a_Weight));
         assert(a_Weight >= 0.f);
 
         //Append weight to total.
@@ -181,10 +193,35 @@ struct CDF
      */
     GPU_ONLY void Insert(float a_Weight)
     {
+        assert(a_Weight >= 0.f);//Light needs a value at least.
+    	
         //Important: This is not thread safe. Build from a single thread.
         sum += a_Weight;
-        data[size] = sum;
+        data[size] = sum;     
+    	
         ++size;
+    }
+
+	/*
+	 * Set the CDF size and total sum.
+	 * This is meant to be used with a parallel scan algorithm.
+	 */
+	GPU_ONLY void SetCDFSize(unsigned a_Size)
+    {
+        size = a_Size;
+        sum = data[size - 1];
+
+        assert(size > 0);
+        assert(sum > 0);
+    }
+
+	/*
+	 * Insert an element into the CDF at the given index with the given accumulated weight.
+	 * This is meant  to be used with a parallel scan algorithm.
+	 */
+	GPU_ONLY void Insert(unsigned a_Index, float a_Weight)
+    {
+        data[a_Index] = a_Weight;
     }
 
     /*
@@ -200,6 +237,8 @@ struct CDF
         //Binary search
         const int entry = BinarySearch(0, size - 1, requiredValue);
 
+        assert(size > 0);
+
         const float higher = data[entry];
 
         //TODO this if statement can be avoided by always making index  0 equal to 0. Then offset array indices by 1 and add 1 to the size req of the class.
@@ -210,8 +249,15 @@ struct CDF
         }
 
         //Pdf is proportional to all entries in the dataset.
-        a_LightIndex = entry;
+        a_LightIndex = entry;    	
         a_LightPdf = (higher - lower) / sum;
+
+    	if(a_LightPdf <= 0.f)
+    	{
+            printf("Invalid PDF: %f.  Entry: %i  Total size: %i  Rng: %f.  Higher: %f.  Lower: %f.\n", a_LightPdf, a_LightIndex, size, a_Value, higher, lower);
+    	}
+
+        assert(a_LightPdf > 0.f);
     }
 
     /*
@@ -219,12 +265,15 @@ struct CDF
      * This is a recursive function.
      */
     GPU_ONLY int BinarySearch(int a_First, int a_Last, float a_Value) const
-    {
+    {    	
         assert(a_Value >= 0.f && a_Value <= sum && "Binary search key must be within set bounds.");
-        assert(a_First >= 0 && a_First <= a_Last);
+        assert(a_First >= 0);    	
+        assert(a_First <= a_Last);
+        assert(a_Last < size);
+        assert(a_First < size);
 
         //Get the middle element.
-        const int center = a_First + (a_Last - a_First) / 2;
+        const int center = (a_Last + a_First) / 2;
 
         //Upper and lower bound.
         float higher = data[center];
@@ -244,6 +293,7 @@ struct CDF
         //Bigger, so search in the upper half of the data range.
         if (a_Value > higher)
         {
+            assert(center != size - 1); //At this point, if center is the last element, it should ALWAYS contain the value.
             return BinarySearch(center + 1, a_Last, a_Value);
         }
 

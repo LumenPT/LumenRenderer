@@ -72,7 +72,7 @@ public:
     std::unique_ptr<Lumen::ILumenPrimitive> CreatePrimitive(PrimitiveData& a_PrimitiveData) override;
     std::unique_ptr<MemoryBuffer> InterleaveVertexData(const PrimitiveData& a_MeshData);
 
-    std::shared_ptr<Lumen::ILumenMesh> CreateMesh(std::vector<std::unique_ptr<Lumen::ILumenPrimitive>>& a_Primitives) override;
+    std::shared_ptr<Lumen::ILumenMesh> CreateMesh(std::vector<std::shared_ptr<Lumen::ILumenPrimitive>>& a_Primitives) override;
 
     std::shared_ptr<Lumen::ILumenMaterial> CreateMaterial(const MaterialData& a_MaterialData) override;
 
@@ -82,7 +82,7 @@ public:
 	
     void CreateOutputBuffer();
 
-    unsigned int TraceFrame(std::shared_ptr<Lumen::ILumenScene>& a_Scene) override;
+    TraceFrame() override;
 
     //Camera m_Camera;
 
@@ -130,6 +130,9 @@ private:
 
 	//volumetric_bookmark
     AccelerationStructure* m_testVolumeGAS = nullptr;
+
+    InitializationData m_InitData;
+
 };
 
 template <typename VertexType, typename IndexType>

@@ -138,3 +138,18 @@ void Camera::UpdateCameraVectors()
 	
 	m_DirtyFlag = false;
 }
+
+const glm::vec2& Camera::GetMinMaxRenderDistance() const
+{
+
+	return m_MinMaxRenderDistance;
+
+}
+
+void Camera::SetMinMaxRenderDistance(const glm::vec2& a_NewDistance)
+{
+
+	m_MinMaxRenderDistance = a_NewDistance;
+
+}
+

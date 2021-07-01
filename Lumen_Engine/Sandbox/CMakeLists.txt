@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 3.16)
+cmake_minimum_required (VERSION 3.20)
 enable_language(CUDA)
 
 # specify the C++ standard
@@ -29,10 +29,6 @@ assign_source_group(${SOURCE_FILES})
 set_property(TARGET Sandbox PROPERTY VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 set_property(TARGET Sandbox APPEND PROPERTY COMPILE_DEFINITIONS GLFW_INCLUDE_NONE)
 
-if(${USE_WAVEFRONT})
-	set_property(TARGET Sandbox APPEND PROPERTY COMPILE_DEFINITIONS WAVEFRONT)
-endif()
-
 #Add header directory includes
 target_include_directories(Sandbox PUBLIC
 	"${CMAKE_CURRENT_SOURCE_DIR}/../Lumen/src"
@@ -54,3 +50,29 @@ add_custom_command(TARGET Sandbox POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_CURRENT_SOURCE_DIR}/../LumenPT/vendor/Dlls"
         $<TARGET_FILE_DIR:Sandbox>)
+
+get_property(WORKING_DIR TARGET Sandbox PROPERTY VS_DEBUGGER_WORKING_DIRECTORY)
+
+add_custom_command(TARGET Sandbox POST_BUILD
+	COMMAND if exist "${WORKING_DIR}/Config.json" 
+			${CMAKE_COMMAND} -E rm "${WORKING_DIR}/Config.json" &&
+			${CMAKE_COMMAND} -E echo "[INFO]: Cleaned up ${WORKING_DIR}/Config.json")
+
+if(${USE_NVIDIA_DENOISER})
+	add_custom_command(TARGET Sandbox POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy
+        "${CMAKE_CURRENT_SOURCE_DIR}/../LumenPT/vendor/RayTracingDenoiser/_NRD_SDK/Lib/Debug/NRD.dll"
+        $<TARGET_FILE_DIR:Sandbox>)													   
+																					   
+	add_custom_command(TARGET Sandbox POST_BUILD									   
+    COMMAND ${CMAKE_COMMAND} -E copy												   
+        "${CMAKE_CURRENT_SOURCE_DIR}/../LumenPT/vendor/RayTracingDenoiser/_NRI_SDK/Lib/Debug/NRI.dll"
+        $<TARGET_FILE_DIR:Sandbox>)
+endif()
+
+if(${USE_NVIDIA_DLSS})
+add_custom_command(TARGET Sandbox POST_BUILD
+	COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_CURRENT_SOURCE_DIR}/../LumenPT/vendor/DLSS_Private/bin"
+        $<TARGET_FILE_DIR:Sandbox>)
+endif()

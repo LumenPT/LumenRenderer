@@ -1,6 +1,6 @@
 #pragma once
 #ifdef WAVEFRONT
-#include <Lumen/Renderer/LumenRenderer.h>
+//#include "Lumen/Renderer/LumenRenderer.h"
 #include "../Shaders/CppCommon/WaveFrontDataStructs/OptixLaunchParams.h"
 #include "../Shaders/CppCommon/WaveFrontDataStructs/OptixShaderStructs.h"
 #include "ShaderBindingTableRecord.h"
@@ -32,20 +32,27 @@ namespace WaveFront
 
         struct InitializationData
         {
-            CUcontext m_CUDAContext;
 
             struct ProgramData
             {
                 std::filesystem::path m_ProgramPath;
                 std::string m_ProgramLaunchParamName;
                 std::string m_ProgramRayGenFuncName;
+                std::string m_ProgramIntersectionFuncName;
                 std::string m_ProgramMissFuncName;
                 std::string m_ProgramAnyHitFuncName;
                 std::string m_ProgramClosestHitFuncName;
-                uint8_t m_MaxNumPayloads = 2;
-                uint8_t m_MaxNumHitResultAttributes = 2;
-            }m_ProgramData;
+            };
 
+
+
+            CUcontext m_CUDAContext;
+
+            ProgramData m_SolidProgramData;
+            ProgramData m_VolumetricProgramData;
+
+            uint8_t m_PipelineMaxNumPayloads = 2;
+            uint8_t m_PipelineMaxNumHitResultAttributes = 2;
         };
 
         OptixWrapper(const InitializationData& a_InitializationData);
@@ -71,25 +78,36 @@ namespace WaveFront
             const OptixLaunchParameters& a_LaunchParams,
             CUstream a_CUDAStream = nullptr) const;
 
+        OptixDeviceContext GetDeviceContext() { return m_DeviceContext; }
+
     private:
 
         bool Initialize(const InitializationData& a_InitializationData);
 
         bool InitializeContext(CUcontext a_CUDAContext);
 
-        bool CreatePipeline(const InitializationData::ProgramData& a_ProgramData);
+        bool CreatePipeline(
+            const InitializationData::ProgramData& a_SolidProgramData, 
+            const InitializationData::ProgramData& a_VolumetricProgramData,
+            unsigned int a_NumPayloads,
+            unsigned int a_NumAttributes);
 
         OptixPipelineCompileOptions CreatePipelineOptions(
             const std::string& a_LaunchParamName,
             unsigned int a_NumPayloadValues,
             unsigned int a_NumAttributes) const;
 
-        bool CreatePipeline(const OptixModule& a_Module,
+        bool CreatePipeline(
+            const OptixModule& a_SolidModule,
+            const OptixModule& a_VolumetricModule,
             const OptixPipelineCompileOptions& a_PipelineOptions,
             const std::string& a_RayGenFuncName,
             const std::string& a_MissFuncName,
-            const std::string& a_AnyHitFuncName,
-            const std::string& a_ClosestHitFuncName,
+            const std::string& a_SolidAnyHitFuncName,
+            const std::string& a_SolidClosestHitFuncName,
+            const std::string& a_VolumetricIntersectionFuncName,
+            const std::string& a_VolumetricAnyHitFuncName,
+            const std::string& a_VolumetricClosestHitFuncName,
             OptixPipeline& a_Pipeline);
 
         OptixModule CreateModule(const std::filesystem::path& a_PtxPath, const OptixPipelineCompileOptions& a_PipelineOptions) const;
@@ -118,13 +136,15 @@ namespace WaveFront
 
         OptixPipeline m_Pipeline;
 
-        OptixModule m_Module;
+        OptixModule m_SolidModule;
+        OptixModule m_VolumetricModule;
 
         std::unique_ptr<ShaderBindingTableGenerator> m_SBTGenerator;
 
         RecordHandle<void> m_RayGenRecord;
-        RecordHandle<void> m_HitRecord;
         RecordHandle<void> m_MissRecord;
+        RecordHandle<void> m_SolidHitRecord;
+        RecordHandle<void> m_VolumetricHitRecord;
 
         std::unique_ptr<MemoryBuffer> m_SBTRecordBuffer;
 
@@ -135,7 +155,8 @@ namespace WaveFront
         bool m_Initialized;
 
         static constexpr char s_RayGenPGName[] = "RayGenPG";
-        static constexpr char s_HitPGName[] = "HitPG";
+        static constexpr char s_SolidHitPGName[] = "SolidHitPG";
+        static constexpr char s_VolumetricHitPGName[] = "VolumetricHitPG";
         static constexpr char s_MissPGName[] = "MissPG";
 
     };

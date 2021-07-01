@@ -1,32 +1,14 @@
 #include "CPUShadingKernels.cuh"
 #include "GPUShadingKernels.cuh"
+#include "../MotionVectors.cuh"
 #include "../../Framework/CudaUtilities.h"
 #include "../../Shaders/CppCommon/ReSTIRData.h"
-#include "../../LumenPT/src/Framework/ReSTIR.h"
+#include "../../Framework/ReSTIR.h"
+#include <cmath>
 
 using namespace WaveFront;
 
-//CPU_GPU void HaltonSequence(
-//    int index,
-//    int base,
-//    float* result)
-//{
-//    ++index;
-//
-//    float f = 1.f;
-//    float r = 0.f;
-//
-//    while (index > 0)
-//    {
-//        f = f / base;
-//        r = r + f * (index % base);
-//        index = index / base;
-//    }
-//
-//    *result = r;
-//}
-
-CPU_ONLY void GeneratePrimaryRays(const PrimRayGenLaunchParameters& a_PrimaryRayGenParams)
+CPU_ONLY void GeneratePrimaryRays(const PrimRayGenLaunchParameters& a_PrimaryRayGenParams, cudaSurfaceObject_t a_JitterOutput)
 {
     const float3 u = a_PrimaryRayGenParams.m_Camera.m_Up;
     const float3 v = a_PrimaryRayGenParams.m_Camera.m_Right;
@@ -39,39 +21,82 @@ CPU_ONLY void GeneratePrimaryRays(const PrimRayGenLaunchParameters& a_PrimaryRay
     const int blockSize = 256;
     const int numBlocks = (numRays + blockSize - 1) / blockSize;
 
-    GeneratePrimaryRay<<<numBlocks, blockSize>>>(numRays, a_PrimaryRayGenParams.m_PrimaryRays, u, v, w, eye, dimensions, frameCount);
+    GeneratePrimaryRay << <numBlocks, blockSize >> > (numRays, a_PrimaryRayGenParams.m_PrimaryRays, u, v, w, eye, dimensions, frameCount, a_JitterOutput);
 }
 
 CPU_ONLY void GenerateMotionVectors(MotionVectorsGenerationData& a_MotionVectorsData)
 {
-    const int numPixels = a_MotionVectorsData.m_ScreenResolution.x * a_MotionVectorsData.m_ScreenResolution.y;
-    const int blockSize = 256;
-    const int numBlocks = (numPixels + blockSize - 1) / blockSize;
+
+    const dim3 blockSize{ 16, 16 ,1 };
+
+    const unsigned blockSizeWidth =
+        static_cast<unsigned>(std::ceil(static_cast<float>(a_MotionVectorsData.m_RenderResolution.x) / static_cast<float>(blockSize.x)));
+    const unsigned blockSizeHeight =
+        static_cast<unsigned>(std::ceil(static_cast<float>(a_MotionVectorsData.m_RenderResolution.y) / static_cast<float>(blockSize.y)));
+
+    const dim3 numBlocks{ blockSizeWidth, blockSizeHeight, 1 };
+
+    const sutil::Matrix<4, 4> matrix = a_MotionVectorsData.m_ProjectionMatrix * a_MotionVectorsData.m_PrevViewMatrix;
+
+    sutil::Matrix<4, 4>* matrixDevPtr = { nullptr };
+    cudaMalloc(&matrixDevPtr, sizeof(matrix));
+    cudaMemcpy(matrixDevPtr, &matrix, sizeof(matrix), cudaMemcpyHostToDevice);
 
     GenerateMotionVector << <numBlocks, blockSize >> > (
         a_MotionVectorsData.m_MotionVectorBuffer,
-        a_MotionVectorsData.a_CurrentSurfaceData,
-        a_MotionVectorsData.m_ScreenResolution,
-        a_MotionVectorsData.m_ProjectionMatrix * a_MotionVectorsData.m_PrevViewMatrix);
+        a_MotionVectorsData.m_CurrentSurfaceData,
+        a_MotionVectorsData.m_RenderResolution,
+        matrixDevPtr);
+
+    cudaFree(matrixDevPtr);
 
     cudaDeviceSynchronize();
 }
 
 CPU_ONLY void ExtractSurfaceData(
-    unsigned a_NumIntersections, 
-    AtomicBuffer<IntersectionData>* a_IntersectionData, 
-    AtomicBuffer<IntersectionRayData>* a_Rays, 
-    SurfaceData* a_OutPut, 
-    SceneDataTableAccessor* a_SceneDataTable)
+    unsigned a_NumIntersections,
+    AtomicBuffer<IntersectionData>* a_IntersectionData,
+    AtomicBuffer<IntersectionRayData>* a_Rays,
+    SurfaceData* a_OutPut,
+    cudaSurfaceObject_t a_DepthOutPut,
+    uint2 a_Resolution,
+    SceneDataTableAccessor* a_SceneDataTable,
+    float2 a_MinMaxDepth,
+    unsigned int a_CurrentDepth)
 {
     const int blockSize = 256;
     const int numBlocks = (a_NumIntersections + blockSize - 1) / blockSize;
 
-    ExtractSurfaceDataGpu<<<numBlocks, blockSize>>>(a_NumIntersections, a_IntersectionData, a_Rays, a_OutPut, a_SceneDataTable);
+    ExtractSurfaceDataGpu << <numBlocks, blockSize >> > (a_NumIntersections, a_IntersectionData, a_Rays, a_OutPut, a_Resolution, a_SceneDataTable);
+
+    cudaDeviceSynchronize();
+    if (a_CurrentDepth == 0)
+    {
+
+        const dim3 blockSize2d{ 16, 16 ,1 };
+        const unsigned blockSizeWidth =
+            static_cast<unsigned>(std::ceil(static_cast<float>(a_Resolution.x) / static_cast<float>(blockSize2d.x)));
+        const unsigned blockSizeHeight =
+            static_cast<unsigned>(std::ceil(static_cast<float>(a_Resolution.y) / static_cast<float>(blockSize2d.y)));
+
+        const dim3 numBlocks2d{ blockSizeWidth, blockSizeHeight, 1 };
+
+        ExtractDepthDataGpu << <numBlocks2d, blockSize2d >> > (a_OutPut, a_DepthOutPut, a_Resolution, a_MinMaxDepth);
+    }
+
 }
 
 CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
 {
+
+    const dim3 blockSize{ 16, 16 ,1 };
+
+    const unsigned blockSizeWidth =
+        static_cast<unsigned>(std::ceil(static_cast<float>(a_ShadingParams.m_ResolutionAndDepth.x) / static_cast<float>(blockSize.x)));
+    const unsigned blockSizeHeight =
+        static_cast<unsigned>(std::ceil(static_cast<float>(a_ShadingParams.m_ResolutionAndDepth.y) / static_cast<float>(blockSize.y)));
+
+    const dim3 numBlocks{ blockSizeWidth, blockSizeHeight, 1 };
 
     auto seed = WangHash(a_ShadingParams.m_Seed);
     //TODO
@@ -80,108 +105,105 @@ CPU_ONLY void Shade(const ShadingLaunchParameters& a_ShadingParams)
      * - Access to intersection data, as well as the ray resulting in this shading for chained BRDF scaling.
      */
 
-    /*cudaDeviceSynchronize();
-       CHECKLASTCUDAERROR;*/
+     /*cudaDeviceSynchronize();
+        CHECKLASTCUDAERROR;*/
 
-    //Generate shadow rays for specular highlights.
-    /*ShadeSpecular<<<numBlocks, blockSize >>>();*/
+        //Generate shadow rays for specular highlights.
+        /*ShadeSpecular<<<numBlocks, blockSize >>>();*/
 
-    /*cudaDeviceSynchronize();
-      CHECKLASTCUDAERROR;*/
+        /*cudaDeviceSynchronize();
+          CHECKLASTCUDAERROR;*/
 
-    //Ensure that ReSTIR is loaded so that the CDF can be extracted.
+          //Ensure that ReSTIR is loaded so that the CDF can be extracted.
     assert(a_ShadingParams.m_ReSTIR != nullptr);
 
-    //TODO remove
-    static bool useRestir = true;
-
     /*
-     * Run ReSTIR at the first depth.
+     * First depth is somewhat of a special case.
      */
-    if(a_ShadingParams.m_CurrentDepth == 0 && useRestir)
+    if (a_ShadingParams.m_CurrentDepth == 0)
     {
+        /*
+         * First visualize all lights directly hit by the camera rays.
+         */
+        ResolveDirectLightHits << <numBlocks, blockSize >> > (
+            a_ShadingParams.m_CurrentSurfaceData,
+            uint2{ a_ShadingParams.m_ResolutionAndDepth.x, a_ShadingParams.m_ResolutionAndDepth.y },
+            a_ShadingParams.m_OutputChannels[static_cast<unsigned>(LightChannel::DIRECT)]
+            );
+
+        /*
+         * Run ReSTIR to find the best direct light candidates.
+         */
         a_ShadingParams.m_ReSTIR->Run(
             a_ShadingParams.m_CurrentSurfaceData,
             a_ShadingParams.m_TemporalSurfaceData,
-            a_ShadingParams.m_TriangleLights,
-            a_ShadingParams.m_NumLights,
-            a_ShadingParams.m_CameraDirection,
-            seed,
-            a_ShadingParams.m_OptixSceneHandle,
-            a_ShadingParams.m_ShadowRays,
-            a_ShadingParams.m_OptixSystem,
             a_ShadingParams.m_MotionVectorBuffer,
-            false
-        );
+            a_ShadingParams.m_OptixWrapper,
+            a_ShadingParams.m_OptixSceneHandle,
+            a_ShadingParams.m_Seed,
+            a_ShadingParams.m_LightDataBuffer,
+            a_ShadingParams.m_OutputChannels,
+            *a_ShadingParams.m_FrameStats,
+            true);
     }
     else
     {
-        //Generate the CDF if ReSTIR is disabled.
-        if(a_ShadingParams.m_CurrentDepth == 0 && !useRestir)
-        {
-            a_ShadingParams.m_ReSTIR->BuildCDF(a_ShadingParams.m_TriangleLights, a_ShadingParams.m_NumLights);
-        }
+        //This was from when ReSTIR was optional. Now it always runs so honestly no need to check.
+        ////Generate the CDF if ReSTIR is disabled.
+        //if(a_ShadingParams.m_CurrentDepth == 0 && !useRestir)
+        //{
+        //    a_ShadingParams.m_ReSTIR->BuildCDF(a_ShadingParams.m_TriangleLights);
+        //}
 
-        const int numPixels = a_ShadingParams.m_ResolutionAndDepth.x * a_ShadingParams.m_ResolutionAndDepth.y;
-        const int blockSize = 512;
-        const int numBlocks = (numPixels + blockSize - 1) / blockSize;
-        CDF* cdfPtr = a_ShadingParams.m_ReSTIR->GetCdfGpuPointer();
+        CDF* CDFPtr = a_ShadingParams.m_ReSTIR->GetCdfGpuPointer();
 
         //Generate shadow rays for direct lights.
 
         ShadeDirect << <numBlocks, blockSize >> > (
             a_ShadingParams.m_ResolutionAndDepth,
-            a_ShadingParams.m_TemporalSurfaceData,
             a_ShadingParams.m_CurrentSurfaceData,
-            a_ShadingParams.m_ShadowRays,
-            a_ShadingParams.m_TriangleLights,
-            seed,
-            a_ShadingParams.m_CurrentDepth,
-            cdfPtr);
+            a_ShadingParams.m_CurrentVolumetricData,
+            a_ShadingParams.m_LightDataBuffer->GetDevicePtr<AtomicBuffer<TriangleLight>>(),
+            a_ShadingParams.m_Seed,
+            CDFPtr,
+            a_ShadingParams.m_SolidShadowRayBuffer,
+            a_ShadingParams.m_VolumetricShadowRayBuffer,
+            a_ShadingParams.m_OutputChannels[static_cast<unsigned>(LightChannel::VOLUMETRIC)]);
     }
+
+    cudaDeviceSynchronize();
+    CHECKLASTCUDAERROR;
 
     //Update the seed.
     seed = WangHash(a_ShadingParams.m_Seed);
 
     //Generate secondary rays only when there's a wave after this.
-    if(a_ShadingParams.m_CurrentDepth < a_ShadingParams.m_ResolutionAndDepth.z - 1)
+    if (a_ShadingParams.m_CurrentDepth < a_ShadingParams.m_ResolutionAndDepth.z - 1)
     {
-        const int blockSize = 512;
-        const int numBlocks = (a_ShadingParams.m_NumIntersections + blockSize - 1) / blockSize;
 
         ShadeIndirect << <numBlocks, blockSize >> > (
             a_ShadingParams.m_ResolutionAndDepth,
-            a_ShadingParams.m_CameraPosition,
             a_ShadingParams.m_CurrentSurfaceData,
-            a_ShadingParams.m_IntersectionData,
             a_ShadingParams.m_RayBuffer,
-            a_ShadingParams.m_NumIntersections,
-            a_ShadingParams.m_CurrentDepth,
             seed);
 
-        cudaDeviceSynchronize();
     }
 
-    //const int blockSize = 512;
-    //const int numBlocks = (a_ShadingParams.m_NumIntersections + blockSize - 1) / blockSize;
-    //DEBUGShadePrimIntersections<<<numBlocks, blockSize>>>(
-    //    a_ShadingParams.m_ResolutionAndDepth,
-    //    a_ShadingParams.m_CurrentSurfaceData,
-    //    a_ShadingParams.m_Output);
+    cudaDeviceSynchronize();
 }
 
 CPU_ONLY void PostProcess(const PostProcessLaunchParameters& a_PostProcessParams)
 {
-    //TODO
-    /*
-     * Not needed now. Can be implemented later.
-     * For now just merge the final light contributions to get the final pixel color.
-     */
 
     //The amount of pixels and threads/blocks needed to apply effects.
-    const int numPixels = a_PostProcessParams.m_RenderResolution.x * a_PostProcessParams.m_RenderResolution.y;
-    const int blockSize = 256;
-    const int numBlocks = (numPixels + blockSize - 1) / blockSize;
+    const dim3 blockSize{ 32, 32 ,1 };
+
+    const unsigned blockSizeWidth =
+        static_cast<unsigned>(std::ceil(static_cast<float>(a_PostProcessParams.m_RenderResolution.x) / static_cast<float>(blockSize.x)));
+    const unsigned blockSizeHeight =
+        static_cast<unsigned>(std::ceil(static_cast<float>(a_PostProcessParams.m_RenderResolution.y) / static_cast<float>(blockSize.y)));
+
+    const dim3 numBlocks{ blockSizeWidth, blockSizeHeight, 1 };
 
     //TODO before merging.
     //Denoise<<<numBlocks, blockSize >>>();
@@ -191,8 +213,8 @@ CPU_ONLY void PostProcess(const PostProcessLaunchParameters& a_PostProcessParams
 
     MergeOutputChannels << <numBlocks, blockSize >> > (
         a_PostProcessParams.m_RenderResolution,
-        a_PostProcessParams.m_WavefrontOutput,
-        a_PostProcessParams.m_ProcessedOutput,
+        a_PostProcessParams.m_PixelBufferMultiChannel,
+        a_PostProcessParams.m_PixelBufferSingleChannel,
         a_PostProcessParams.m_BlendOutput,
         a_PostProcessParams.m_BlendCount
         );
@@ -204,9 +226,12 @@ CPU_ONLY void PostProcess(const PostProcessLaunchParameters& a_PostProcessParams
     //TODO copy merged results into image output after having run DLSS.
     DLSS << <numBlocks, blockSize >> > ();
 
-    const int numPixelsUpscaled = a_PostProcessParams.m_OutputResolution.x * a_PostProcessParams.m_OutputResolution.y;
-    const int blockSizeUpscaled = 256;
-    const int numBlocksUpscaled = (numPixelsUpscaled + blockSizeUpscaled - 1) / blockSizeUpscaled;
+    const unsigned blockSizeWidthUpscaled =
+        static_cast<unsigned>(std::ceil(static_cast<float>(a_PostProcessParams.m_OutputResolution.x) / static_cast<float>(blockSize.x)));
+    const unsigned blockSizeHeightUpscaled =
+        static_cast<unsigned>(std::ceil(static_cast<float>(a_PostProcessParams.m_OutputResolution.y) / static_cast<float>(blockSize.y)));
+
+    const dim3 numBlocksUpscaled{ blockSizeWidthUpscaled, blockSizeHeightUpscaled, 1 };
 
     /*cudaDeviceSynchronize();
     CHECKLASTCUDAERROR;*/
@@ -218,9 +243,97 @@ CPU_ONLY void PostProcess(const PostProcessLaunchParameters& a_PostProcessParams
     CHECKLASTCUDAERROR;*/
 
     //TODO This is temporary till the post-processing is  in place. Let the last stage copy it directly to the output buffer.
-    WriteToOutput << <numBlocksUpscaled, blockSizeUpscaled >> > (
+    WriteToOutput << <numBlocksUpscaled, blockSize >> > (
         a_PostProcessParams.m_OutputResolution,
-        a_PostProcessParams.m_ProcessedOutput,
+        a_PostProcessParams.m_PixelBufferSingleChannel,
         a_PostProcessParams.m_FinalOutput
+        );
+}
+
+CPU_ONLY void MergeOutput(const PostProcessLaunchParameters& a_PostProcessParams)
+{
+    //The amount of pixels and threads/blocks needed to apply effects.
+    const dim3 blockSize{ 32, 32 ,1 };
+
+    const unsigned blockSizeWidth =
+        static_cast<unsigned>(std::ceil(static_cast<float>(a_PostProcessParams.m_RenderResolution.x) / static_cast<float>(blockSize.x)));
+    const unsigned blockSizeHeight =
+        static_cast<unsigned>(std::ceil(static_cast<float>(a_PostProcessParams.m_RenderResolution.y) / static_cast<float>(blockSize.y)));
+
+    const dim3 numBlocks{ blockSizeWidth, blockSizeHeight, 1 };
+
+    MergeOutputChannels << <numBlocks, blockSize >> > (
+        a_PostProcessParams.m_RenderResolution,
+        a_PostProcessParams.m_PixelBufferMultiChannel,
+        a_PostProcessParams.m_PixelBufferSingleChannel,
+        a_PostProcessParams.m_BlendOutput,
+        a_PostProcessParams.m_BlendCount
+        );
+}
+
+CPU_ONLY void WriteToOutput(const WriteOutputParams& a_WriteOutputParams)
+{
+    //The amount of pixels and threads/blocks needed to apply effects.
+    const dim3 blockSize{ 32, 32 ,1 };
+
+    const unsigned blockSizeWidthUpscaled =
+        static_cast<unsigned>(std::ceil(static_cast<float>(a_WriteOutputParams.m_OutputResolution.x) / static_cast<float>(blockSize.x)));
+    const unsigned blockSizeHeightUpscaled =
+        static_cast<unsigned>(std::ceil(static_cast<float>(a_WriteOutputParams.m_OutputResolution.y) / static_cast<float>(blockSize.y)));
+
+    const dim3 numBlocksUpscaled{ blockSizeWidthUpscaled, blockSizeHeightUpscaled, 1 };
+
+    //TODO This is temporary till the post-processing is  in place. Let the last stage copy it directly to the output buffer.
+    WriteToOutput << <numBlocksUpscaled, blockSize >> > (
+        a_WriteOutputParams.m_OutputResolution,
+        a_WriteOutputParams.m_PixelBufferSingleChannel,
+        a_WriteOutputParams.m_FinalOutput
+        );
+}
+
+CPU_ONLY void PrepareOptixDenoising(WaveFront::OptixDenoiserLaunchParameters& a_LaunchParams)
+{
+    //The amount of pixels and threads/blocks needed to apply effects.
+    const dim3 blockSize{ 32, 32 ,1 };
+
+    const unsigned blockSizeWidth =
+        static_cast<unsigned>(std::ceil(static_cast<float>(a_LaunchParams.m_RenderResolution.x) / static_cast<float>(blockSize.x)));
+    const unsigned blockSizeHeight =
+        static_cast<unsigned>(std::ceil(static_cast<float>(a_LaunchParams.m_RenderResolution.y) / static_cast<float>(blockSize.y)));
+
+    const dim3 numBlocks{ blockSizeWidth, blockSizeHeight, 1 };
+
+    PrepareOptixDenoisingGPU << <numBlocks, blockSize >> > (
+        a_LaunchParams.m_RenderResolution,
+        a_LaunchParams.m_CurrentSurfaceData,
+        a_LaunchParams.m_PixelBufferSingleChannel,
+        a_LaunchParams.m_IntermediaryInput,
+        a_LaunchParams.m_AlbedoInput,
+        a_LaunchParams.m_NormalInput,
+        a_LaunchParams.m_FlowInput,
+        a_LaunchParams.m_IntermediaryOutput
+        );
+}
+
+CPU_ONLY void FinishOptixDenoising(WaveFront::OptixDenoiserLaunchParameters& a_LaunchParams)
+{
+    //The amount of pixels and threads/blocks needed to apply effects.
+    const dim3 blockSize{ 32, 32 ,1 };
+
+    const unsigned blockSizeWidth =
+        static_cast<unsigned>(std::ceil(static_cast<float>(a_LaunchParams.m_RenderResolution.x) / static_cast<float>(blockSize.x)));
+    const unsigned blockSizeHeight =
+        static_cast<unsigned>(std::ceil(static_cast<float>(a_LaunchParams.m_RenderResolution.y) / static_cast<float>(blockSize.y)));
+
+    const dim3 numBlocks{ blockSizeWidth, blockSizeHeight, 1 };
+
+    FinishOptixDenoisingGPU << <numBlocks, blockSize >> > (
+        a_LaunchParams.m_RenderResolution,
+        a_LaunchParams.m_PixelBufferSingleChannel,
+        a_LaunchParams.m_IntermediaryInput,
+        a_LaunchParams.m_IntermediaryOutput,
+        a_LaunchParams.m_BlendOutput,
+        a_LaunchParams.m_UseBlendOutput,
+        a_LaunchParams.m_BlendCount
         );
 }

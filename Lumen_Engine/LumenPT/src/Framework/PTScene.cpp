@@ -6,6 +6,8 @@
 #include "PTVolume.h"
 #include "PTVolumeInstance.h"
 #include "RendererDefinition.h"
+#include "SceneDataTable.h"
+#include "../Shaders/CppCommon/WaveFrontDataStructs/WavefrontTraceMasks.h"
 
 PTScene::PTScene(LumenRenderer::SceneData& a_SceneData, PTServiceLocator& a_ServiceLocator)
     : m_Services(a_ServiceLocator)
@@ -18,6 +20,13 @@ PTScene::PTScene(LumenRenderer::SceneData& a_SceneData, PTServiceLocator& a_Serv
         ptMesh->SetSceneRef(this);
         m_MeshInstances.push_back(std::move(ptMesh));
     }
+
+    m_SceneDataTable = std::make_unique<SceneDataTable>();
+}
+
+PTScene::~PTScene()
+{
+    m_SceneDataTable.reset();
 }
 
 Lumen::MeshInstance* PTScene::AddMesh()
@@ -36,7 +45,7 @@ Lumen::VolumeInstance* PTScene::AddVolume()
     // Create the new mesh of the path tracer volume instance type
     auto ptVolInst = std::make_unique<PTVolumeInstance>(m_Services);
     // Set the scene reference for the new instance
-    ptVolInst->m_SceneRef = this;
+    ptVolInst->SetSceneRef(this);
     // Add the instance to the list of all instances and return a raw pointer to it
     m_VolumeInstances.push_back(std::move(ptVolInst));
     return m_VolumeInstances.back().get();
@@ -68,22 +77,20 @@ void PTScene::UpdateSceneAccelerationStructure()
     // Go through all mesh instances, and verify that the meshes used by them are still correct
     for (auto& meshInstance : m_MeshInstances)
     {
-        if (meshInstance->GetMesh())
-        {
-            // VerifyStructCorrectness returns false if the acceleration structure was rebuilt.            
-            sbtMatchStructs &= static_cast<PTMesh*>(meshInstance->GetMesh().get())->VerifyStructCorrectness();
-        }
+        // VerifyAccelerationStructure returns false if the acceleration structure was rebuilt.            
+        sbtMatchStructs &= static_cast<PTMeshInstance*>(meshInstance.get())->VerifyAccelerationStructure();        
     }
 
-    // If there has been a mismatch between the SBT and the acceleration structs, some of the structs have been rebuilt and thus have new handles
+    // If there has been a mismatch between the SDT and the acceleration structs, some of the structs have been rebuilt and thus have new handles
     // which invalidates them in the scene struct
     // This is most likely to happen if resources were freed from the GPU, which would trigger a scene data table rebuild.
     // This rebuild is unlikely to mark the scene acceleration struct as dirty, but verifying that the mesh acceleration structures are still correct
     // will pick up on that
     if (m_AccelerationStructureDirty || !sbtMatchStructs)
     {
+		uint32_t instanceID = 0;
         // Create a list of all acceleration structure instances that need to be in the scene acceleration structure
-        std::vector<OptixInstance> instances;
+		std::vector<OptixInstance> instances;
 
         // First go through the static geometry structures
         for (auto& meshInstance : m_MeshInstances)
@@ -91,15 +98,14 @@ void PTScene::UpdateSceneAccelerationStructure()
             if (!meshInstance->GetMesh())
                 continue;
             auto& ptmi = static_cast<PTMeshInstance&>(*meshInstance);
-            auto ptMesh = static_cast<PTMesh*>(meshInstance->GetMesh().get());
 
             auto& inst = instances.emplace_back();
             // Record the acceleration structure of the mesh into the OptixInstance
-            inst.traversableHandle = ptMesh->m_AccelerationStructure->m_TraversableHandle;
-            inst.sbtOffset = 0; // Optix states that if the AS instance is an IAS, the sbt offset must be 0
-            inst.visibilityMask = 0x80; // 128
-            // The instance ID of this struct is irrelevant, as the intersections will see the ID of the lowest level AS
-            inst.instanceId = 0; 
+            inst.traversableHandle = ptmi.GetAccelerationStructureHandle();
+            inst.sbtOffset = 0;	// Optix states that if the AS instance is an IAS, the sbt offset must be 0
+            inst.visibilityMask = WaveFront::TraceMaskType::SOLIDS;	// 1
+			// The instance ID of this struct is irrelevant, as the intersections will see the ID of the lowest level AS
+            inst.instanceId = instanceID++;
             inst.flags = OPTIX_INSTANCE_FLAG_NONE;
 
             // Get the transformation matrix from the transform of the instance
@@ -121,11 +127,10 @@ void PTScene::UpdateSceneAccelerationStructure()
             auto& inst = instances.emplace_back();
             // Record the acceleration structure of the volume into the OptixInstance
             inst.traversableHandle = ptVolume->m_AccelerationStructure->m_TraversableHandle;
-            // TODO: This needs to be changed to represent the index of the volumetrics shaders in the shader binding table
-            inst.sbtOffset = ptVolume->m_RecordHandle.m_TableIndex; 
-            inst.visibilityMask = 0x40; // 64
-            // For volumetrics, the instance ID is important because it determine which volumetric data will be displayed
-            inst.instanceId = ptVolume->m_SceneEntry.m_TableIndex;
+			// TODO: This needs to be changed to represent the index of the volumetrics shaders in the shader binding table
+			inst.sbtOffset = 1;
+            inst.visibilityMask = WaveFront::TraceMaskType::VOLUMES;
+            inst.instanceId = ptvi.m_SceneDataTableEntry.m_TableIndex;
             inst.flags = OPTIX_INSTANCE_FLAG_NONE;
 
             // Get the transformation matrix from the transform of the instance
@@ -147,5 +152,20 @@ void PTScene::UpdateSceneAccelerationStructure()
         m_AccelerationStructureDirty = false;
     }
 
+}
+
+SceneDataTableAccessor* PTScene::GetSceneDataTableAccessor()
+{
+    UpdateSceneDataTable();
+
+    return m_SceneDataTable->GetDevicePointer();
+}
+
+void PTScene::UpdateSceneDataTable()
+{
+    for (auto& meshInstance : m_MeshInstances)
+    {
+        static_cast<PTMeshInstance*>(meshInstance.get())->UpdateRaytracingData();
+    }
 }
 

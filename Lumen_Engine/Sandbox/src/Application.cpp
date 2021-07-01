@@ -11,6 +11,11 @@
 #include "GLFW/include/GLFW/glfw3.h"
 #include "Lumen/ModelLoading/SceneManager.h"
 
+#include "AppConfiguration.h"
+#include "Framework/CudaUtilities.h"
+
+#include <chrono>
+
 #ifdef WAVEFRONT
 #include "../../LumenPT/src/Framework/WaveFrontRenderer.h"
 #else
@@ -70,91 +75,86 @@ public:
 	{
 		glfwMakeContextCurrent(reinterpret_cast<GLFWwindow*>(GetWindow().GetNativeWindow()));
 		//PushOverlay(new Lumen::ImGuiLayer());
-		
 
-		OutputLayer* m_ContextLayer = new OutputLayer;
-		PushLayer(m_ContextLayer);
+		const std::filesystem::path configFilePath = std::filesystem::current_path() += "/Config.json";
+
+		AppConfiguration& config = AppConfiguration::GetInstance();
+		config.Load(configFilePath, true, true);
+
+		std::shared_ptr<LumenRenderer> renderer = nullptr;
+
+#ifdef WAVEFRONT
+
+		renderer = std::make_shared<WaveFront::WaveFrontRenderer>();
+		WaveFront::WaveFrontSettings settings{};
+
+		settings.m_ShadersFilePathSolids = config.GetDirectoryShaders().string() +  config.GetFileShaderSolids().string();
+		settings.m_ShadersFilePathVolumetrics = config.GetDirectoryShaders().string() + config.GetFileShaderVolumetrics().string();
+
+		settings.depth = 5;
+		settings.renderResolution = uint2{ 1280, 720 };
+		//settings.outputResolution = { 2560, 1440 };
+		settings.outputResolution = uint2{ 1280, 720 };
+		settings.blendOutput = false;	//When true will blend output instead of overwriting it (high res image over time if static scene).
+
+		std::static_pointer_cast<WaveFront::WaveFrontRenderer>(renderer)->Init(settings);
+
+		CHECKLASTCUDAERROR;
+		renderer->CreateDefaultResources();
 
 
-		//temporary stuff to avoid absolute paths to gltf cube
-		std::filesystem::path p = std::filesystem::current_path();
+#else
 
-		while (p.has_parent_path())
+		OptiXRenderer::InitializationData initData;
+		initData.m_AssetDirectory = config.GetDirectoryAssets();
+		initData.m_ShaderDirectory = config.GetDirectoryShaders();
+
+		initData.m_MaxDepth = 5;
+		initData.m_RaysPerPixel = 1;
+		initData.m_ShadowRaysPerPixel = 1;
+
+		initData.m_RenderResolution = { 800, 600 };
+		initData.m_OutputResolution = { 800, 600 };
+
+		renderer = std::make_unique<OptiXRenderer>(initData);
+#endif
+
+		OutputLayer* contextLayer = new OutputLayer;
+		contextLayer->SetPipeline(renderer);
+		PushLayer(contextLayer);
+
+		if (config.HasDefaultModel())
 		{
-			bool found = false;
-			for (auto child : std::filesystem::directory_iterator(p))
-			{
-				if (child.is_directory() && child.path().filename() == "Sandbox")
-				{
-					found = true;
-					p = child.path().parent_path();
-				}
-			}
 
-			if (found) break;
+			const std::filesystem::path& modelDirectory = config.GetDirectoryModels();
+			const std::filesystem::path& defaultModel = config.GetDefaultModel();
+			
 
-			p = p.parent_path();
-		}
-		std::filesystem::current_path(p);
-		std::string p_string{ p.string() };
-		std::replace(p_string.begin(), p_string.end(), '\\', '/');
-		const std::string meshPath = p_string.append("/Sandbox/assets/models/");
+			LMN_TRACE(modelDirectory.string() + defaultModel.string());
 
-		//const std::string meshPath = p_string.append("/Sandbox/assets/models/Sponza/");
-		//Base path for meshes.
+			m_SceneManager->SetPipeline(*contextLayer->GetPipeline());
 
-		//Mesh name
-		const std::string meshName = "Lantern.gltf";
+			auto begin = std::chrono::high_resolution_clock::now();
 
-		//p_string.append("/Sandbox/assets/models/Sponza/Sponza.gltf");
-		LMN_TRACE(p_string);
+			auto res = m_SceneManager->LoadGLTF(defaultModel.string(), modelDirectory.string());
 
-	    m_SceneManager->SetPipeline(*m_ContextLayer->GetPipeline());
-		auto res = m_SceneManager->LoadGLTF(meshName, meshPath);
+			auto end = std::chrono::high_resolution_clock::now();
 
-		auto lumenPT = m_ContextLayer->GetPipeline();
+			auto milli = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count();
 
-		LumenRenderer::SceneData scData = {};
-		
-		lumenPT->m_Scene = lumenPT->CreateScene(scData);
-		
-		//Loop over the nodes in the scene, and add their meshes if they have one.
-		for(auto& node: res->m_NodePool)
-		{
-			auto meshId = node->m_MeshID;
-			if(meshId >= 0)
-			{
-				auto mesh = lumenPT->m_Scene->AddMesh();
-				mesh->SetMesh(res->m_MeshPool[meshId]);
-				mesh->m_Transform.CopyTransform(*node->m_LocalTransform);
-			}
+			printf("\n\nTime elapsed to load model: %lli milliseconds\n\n", milli);
+
+			auto lumenPT = contextLayer->GetPipeline();
+
+			lumenPT->m_Scene = res->m_Scenes[0];
+			lumenPT->m_Scene->m_Camera->SetPosition(glm::vec3{ -150.f, 300.f, 150.f });
+			lumenPT->m_Scene->m_Camera->SetRotation(glm::quatLookAtRH(glm::normalize(glm::vec3{ -1.f, 0.5f, 1.f }), glm::vec3{ 0.f, 1.f, 0.f }));
+
 		}
 
-		lumenPT->m_Scene = lumenPT->CreateScene(scData);
-		auto mesh = lumenPT->m_Scene->AddMesh();
-		mesh->SetMesh(res->m_MeshPool[0]);
+		//renderer->InitNGX();
 
-		mesh->m_Transform.SetPosition(glm::vec3(0.f, 0.f, 15.0f));
-		mesh->m_Transform.SetScale(glm::vec3(1.0f));
-
-		//for (size_t i = 0; i < 10; i++)
-		//{
-		//	//load lantern yay
-		//}
-		
-		//meshLight->m_Transform.SetPosition(glm::vec3(0.f, 0.f, 15.0f));
-		//meshLight->m_Transform.SetScale(glm::vec3(1.0f));
-
-		std::string vndbFilePath = { p.string() };
-		//vndbFilePath.append("/Sandbox/assets/volume/Sphere.vndb");
-		vndbFilePath.append("/Sandbox/assets/volume/bunny.vdb");
-		auto volumeRes = m_SceneManager->m_VolumeManager.LoadVDB(vndbFilePath);
-
-		auto volume = lumenPT->m_Scene->AddVolume();
-		volume->SetVolume(volumeRes->m_Volume);
-
-
-		m_ContextLayer->GetPipeline()->StartRendering();
+		contextLayer->GetPipeline()->StartRendering();
 
 	}
 
