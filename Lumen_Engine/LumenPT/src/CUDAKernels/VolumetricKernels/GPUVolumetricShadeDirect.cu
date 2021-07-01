@@ -25,7 +25,7 @@ GPU_ONLY void VolumetricShadeDirect(
 
 		//Volume ray marching settings (these need to be moved elsewhere or replaced with more sensible parameters)
 		const int MAX_STEPS = 5;
-		const float DENSITY_PER_METER = 0.0005f;
+		const float DENSITY_PER_METER = intersection.m_Density;
 		const float VOLUME_COLOR_R = 1.0f;
 		const float VOLUME_COLOR_G = 1.0f;
 		const float VOLUME_COLOR_B = 1.0f;
@@ -34,7 +34,7 @@ GPU_ONLY void VolumetricShadeDirect(
 		float distance = intersection.m_ExitIntersectionT - intersection.m_EntryIntersectionT;
 		float accumulatedDensity = 0.0f;
 		//Calculate appropriate step size
-		float stepSize = distance / MAX_STEPS;
+		float stepSize = distance / (float)MAX_STEPS;
 		float3 prevSamplePosition = intersection.m_PositionEntry;
 		float offset = RandomFloat(a_Seed) * stepSize;	//This is used to offset each ray into the screen by a small amount, sampling different parts of the volume
 
@@ -42,7 +42,6 @@ GPU_ONLY void VolumetricShadeDirect(
 		{
 			float sampleT = (float)i * stepSize + offset;
 			float3 samplePosition = intersection.m_PositionEntry + intersection.m_IncomingRayDirection * sampleT;
-			//TODO: first sample is wasted like this, will be fixed if offset is implemented
 			float distanceSincePrevSample = length(samplePosition - prevSamplePosition);
 			prevSamplePosition = samplePosition;
 
@@ -96,17 +95,8 @@ GPU_ONLY void VolumetricShadeDirect(
 
 			a_ShadowRays->Add(&shadowRay);
 
-			//------------END-------------
-
 			accumulatedDensity += sampledDensity;
 		}
-		//surf2DLayeredwrite<float4>(
-		//	make_float4(r, g, b, 1.f),
-		//	a_Output,
-		//	a_PixelIndex.m_X * sizeof(float4),
-		//	a_PixelIndex.m_Y,
-		//	static_cast<unsigned>(LightChannel::VOLUMETRIC),
-		//	cudaBoundaryModeTrap);
 	}
     return;
 }
