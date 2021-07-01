@@ -1,10 +1,10 @@
-﻿#include "GPUShadingKernels.cuh"
+#include "GPUShadingKernels.cuh"
 #include "../../Shaders/CppCommon/Half4.h"
 
 #include <device_launch_parameters.h>
 
 CPU_ON_GPU void ExtractDepthDataGpu(
-    const SurfaceData* a_SurfaceData, 
+    const SurfaceData* a_SurfaceData,
     cudaSurfaceObject_t a_DepthOutPut,
     uint2 a_Resolution,
     float2 a_MinMaxDistance)
@@ -17,11 +17,11 @@ CPU_ON_GPU void ExtractDepthDataGpu(
 
     //Check if a_OutPut->m_IntersectionT > a_DepthOutPut->depthValueAtPixelIndex to avoid writing to it if the T < value already there
     //if T > valueAtPixel ? overwrite : keep valueAtPixel
-    
+
     if (pixelX < a_Resolution.x && pixelY < a_Resolution.y)
     {
         float t = a_SurfaceData[pixelDataIndex].m_IntersectionT;
-        
+
         //float1 t = make_float1(a_SurfaceData[pixelDataIndex].m_IntersectionT);
 
         if (a_SurfaceData[pixelDataIndex].m_IntersectionT < 0.f)  //below 0 == no intersection
@@ -42,7 +42,7 @@ CPU_ON_GPU void ExtractDepthDataGpu(
             //    pixelX * sizeof(ushort4),
             //    pixelY,
             //    cudaBoundaryModeTrap);
-            return; 
+            return;
         }
 
         t = (t - fminf(a_MinMaxDistance.x, t)) / (fmaxf(a_MinMaxDistance.y, t) - fminf(a_MinMaxDistance.x, t));

@@ -40,6 +40,13 @@ CPU_ON_GPU void ExtractDepthDataGpu(
     uint2 a_Resolution,
     float2 a_MinMaxDistance);
 
+CPU_ON_GPU void ExtractNRD_DLSSdataGpu(
+    const SurfaceData* a_SurfaceData,
+    cudaSurfaceObject_t a_DepthOutPut,
+    cudaSurfaceObject_t a_NormalRoughnessOutput,
+    uint2 a_Resolution,
+    float2 a_MinMaxDistance);
+
 //Called during shading
 
 /*
@@ -134,10 +141,14 @@ CPU_ON_GPU void PrepareOptixDenoisingGPU(
     float3* a_IntermediaryInput,
     float3* a_AlbedoInput,
     float3* a_NormalInput,
+    float2* a_FlowInput,
     float3* a_IntermediaryOutput);
 
 CPU_ON_GPU void FinishOptixDenoisingGPU(
     const uint2 a_RenderResolution,
     const cudaSurfaceObject_t a_PixelBufferSingleChannel,
     float3* a_IntermediaryInput,
-    float3* a_IntermediaryOutput);
+    float3* a_IntermediaryOutput,
+    float3* a_BlendOutput,
+    bool a_UseBlendOutput,
+    unsigned int a_BlendCount);

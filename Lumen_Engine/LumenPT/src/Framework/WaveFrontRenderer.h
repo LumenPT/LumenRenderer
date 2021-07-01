@@ -106,6 +106,24 @@ namespace WaveFront
          * When true, output is blended and not overwritten.
          */
         bool GetBlendMode() const override;
+
+
+        struct DenoiserSettings
+        {
+            DenoiserSettings()
+                : m_UseOptix(false)
+                , m_UseNRD(false)
+                , m_OptixAlbedo(true)
+                , m_OptixNormal(true)
+                , m_OptixTemporal(false)
+            {}
+            bool m_UseOptix;
+            bool m_UseNRD;
+
+            bool m_OptixAlbedo;
+            bool m_OptixNormal;
+            bool m_OptixTemporal;
+        } m_DenoiserSettings;
     	
     private:
 
@@ -153,6 +171,8 @@ namespace WaveFront
 
         //Buffer used to combine light channels after denoising.
         std::unique_ptr<InteropGPUTexture> m_PixelBufferCombined;
+        
+        std::unique_ptr<InteropGPUTexture> m_PixelBufferUpscaled;
 
         std::unique_ptr<InteropGPUTexture> m_DepthBuffer;
         
@@ -160,6 +180,9 @@ namespace WaveFront
 
         //Buffer containing motion vectors
         std::unique_ptr<InteropGPUTexture> m_MotionVectorBuffer;
+
+        //Buffer containing Normal(world-space,XYZ) and Roughness.
+        std::unique_ptr<InteropGPUTexture> m_NormalRoughnessBuffer;
         
         Microsoft::WRL::ComPtr<ID3D11Texture2D> m_D3D11JitterBuffer;
 
@@ -172,6 +195,8 @@ namespace WaveFront
         Microsoft::WRL::ComPtr<ID3D11Texture2D> m_D3D11DepthBuffer;
 
         Microsoft::WRL::ComPtr<ID3D11Texture2D> m_D3D11MotionVectorBuffer;
+
+        Microsoft::WRL::ComPtr<ID3D11Texture2D> m_D3D11NormalRoughnessBuffer;
 
         Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView> m_D3D11PixelBufferCombinedUAV;
         Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView> m_D3D11PixelBufferUpscaledUAV;
@@ -198,6 +223,13 @@ namespace WaveFront
 
         //Variables and settings.
     private:
+
+        inline void ResizeInteropTexture(
+            const std::unique_ptr<InteropGPUTexture>& a_InteropTexture,
+            Microsoft::WRL::ComPtr<ID3D11Texture2D>& a_TextureResource,
+            const uint3& a_NewSize) const;
+
+
         WaveFrontSettings m_Settings; // Settings to use while rendering
         WaveFrontSettings m_IntermediateSettings; // Settings used to make changes from other threads without affecting the rendering process
         std::mutex m_SettingsUpdateMutex;
