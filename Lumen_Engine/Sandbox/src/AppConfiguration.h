@@ -26,6 +26,9 @@ public:
     const std::filesystem::path& GetFileShaderSolids() const;
     const std::filesystem::path& GetFileShaderVolumetrics() const;
 
+    const std::filesystem::path& GetDefaultModel() const;
+    const bool HasDefaultModel() const;
+
 private:
 
     static bool VerifyComplete(nlohmann::json a_ConfigFile);
@@ -38,6 +41,7 @@ private:
 
     std::filesystem::path m_ShadersSolids;
     std::filesystem::path m_ShadersVolumetrics;
+    std::filesystem::path m_DefaultModel;
 
     bool m_Loaded;
 

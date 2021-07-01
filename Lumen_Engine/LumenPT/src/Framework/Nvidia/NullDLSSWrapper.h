@@ -8,8 +8,10 @@ public:
 
 	NullDLSSWrapper() {}
 	~NullDLSSWrapper() {}
+	
+	bool InitializeNGX(DLSSWrapperInitParams a_InitParams) override { return false; };
+	bool InitializeDLSS(std::shared_ptr<DLSSWrapperInitParams> a_InitParams) override { return false; };
 
-	bool Initialize(DLSSWrapperInitParams a_InitParams) override { return false; };
 	virtual bool EvaluateDLSS(
 		Microsoft::WRL::ComPtr<ID3D11Resource> a_Outputbuffer = nullptr,
 		Microsoft::WRL::ComPtr<ID3D11Resource> a_Inputbuffer = nullptr,
@@ -21,7 +23,8 @@ public:
 	};
 
 	std::shared_ptr<DLSSWrapperInitParams> GetDLSSParams() { return m_Params == nullptr ? std::make_shared<DLSSWrapperInitParams>() : m_Params; };
-	std::shared_ptr<DLSSRecommendedSettings> GetRecommendedSettings() override { return m_OptimalSettings == nullptr ? std::make_shared<DLSSRecommendedSettings>() : m_OptimalSettings; };
+	std::shared_ptr<DLSSRecommendedSettings> GetRecommendedSettings(Uint2_c a_SelectedResolution, DLSSMode a_DLSSQualityVal) override { return m_OptimalSettings; };
+
 protected:
 
 };

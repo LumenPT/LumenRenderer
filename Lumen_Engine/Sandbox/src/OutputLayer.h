@@ -71,6 +71,7 @@ private:
     float m_CameraMouseSensitivity;
     float m_CameraMovementSpeed;
     float m_Gamma = 2.2f;
+    float m_MinMaxRenderDistance[2] = { 0.1f, 1000.f };
 
     std::unique_ptr<class ModelLoaderWidget> m_ModelLoaderWidget;
     std::unique_ptr<Lumen::SceneGraph> m_SceneGraph;
@@ -101,7 +102,8 @@ private:
         bool m_PixelDebugger = false;
         bool m_CameraSettings = false;
         bool m_DebugViewport = false;
-        bool m_Profiler = true;
+        bool m_Profiler = false;
+        bool m_GeneralSettings = true;
     } m_EnabledTools;
 
     struct CmpNoChange
@@ -127,7 +129,7 @@ private:
     };
 
     int m_Dlss_SelectedMode = 2;    // 2 translates to "BALANCED" dlss mode 
-    bool m_BlendMode = false;
+    bool m_BlendMode = true;
 
     std::vector<std::unique_ptr<FrameSnapshot>> m_FrameSnapshots;
     int m_CurrentSnapShotIndex;

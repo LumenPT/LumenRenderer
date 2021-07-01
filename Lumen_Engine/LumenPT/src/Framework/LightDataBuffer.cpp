@@ -62,7 +62,7 @@ unsigned int LightDataBuffer::BuildLightDataBuffer(
             {
                 const PTPrimitive* ptPrim = reinterpret_cast<PTPrimitive*>(prim.get());
 
-                if (ptPrim->m_ContainEmissive)
+                if (ptPrim->m_ContainEmissive || ptMeshInstance->GetEmissionMode() == Lumen::EmissionMode::OVERRIDE)
                 {
 
                     //Find the primitive instance in the data table.
