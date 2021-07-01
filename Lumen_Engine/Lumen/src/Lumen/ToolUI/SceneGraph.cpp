@@ -29,6 +29,9 @@ void Lumen::SceneGraph::Display(ILumenScene& a_Scene)
     if (ImGui::Button("Instance View"))
         m_DisplayNodes = false;
 
+    if (ImGui::Button("Add Volume"))
+        a_Scene.AddVolume();
+
     if (m_DisplayNodes)
     {
         NodeSelection(a_Scene);
@@ -38,6 +41,28 @@ void Lumen::SceneGraph::Display(ILumenScene& a_Scene)
         InstanceSelection(a_Scene);
     }
 
+    if (m_SelectedMeshInstance || m_SelectedVolumeInstance)
+    {
+        if (ImGui::Button("Remove"))
+        {
+            if (m_SelectedMeshInstance)
+            {
+                a_Scene.m_MeshInstances.erase(std::find_if(a_Scene.m_MeshInstances.begin(), a_Scene.m_MeshInstances.end(),
+                    [this](std::unique_ptr<MeshInstance>& a_Ptr) {
+                        return m_SelectedMeshInstance == a_Ptr.get();
+                    }));
+                m_SelectedMeshInstance = nullptr;
+            }
+            else
+            {
+                a_Scene.m_VolumeInstances.erase(std::find_if(a_Scene.m_VolumeInstances.begin(), a_Scene.m_VolumeInstances.end(),
+                    [this](std::unique_ptr<VolumeInstance>& a_Ptr) {
+                        return m_SelectedVolumeInstance == a_Ptr.get();
+                    }));
+                m_SelectedVolumeInstance = nullptr;
+            }
+        }
+    }
     if (m_SelectedMeshInstance != nullptr)
     {
         if (ImGui::CollapsingHeader("Transformation"))
