@@ -138,6 +138,7 @@ CPU_ON_GPU void PrepareOptixDenoisingGPU(
     const uint2 a_RenderResolution,
     const SurfaceData* a_CurrentSurfaceData,
     const cudaSurfaceObject_t a_PixelBufferSingleChannel,
+    const cudaSurfaceObject_t a_MotionVectorBuffer,
     float3* a_IntermediaryInput,
     float3* a_AlbedoInput,
     float3* a_NormalInput,

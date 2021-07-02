@@ -1,6 +1,7 @@
 #include "GPUShadingKernels.cuh"
 #include <device_launch_parameters.h>
 #include "../../Shaders/CppCommon/Half4.h"
+#include "../../Shaders/CppCommon/Half2.h"
 #include "../../../vendor/Include/Cuda/cuda/helpers.h"
 
 #include <cassert>
@@ -14,6 +15,7 @@ CPU_ON_GPU void PrepareOptixDenoisingGPU(
     const uint2 a_RenderResolution,
     const SurfaceData* a_CurrentSurfaceData,
     const cudaSurfaceObject_t a_PixelBufferSingleChannel,
+    const cudaSurfaceObject_t a_MotionVectorBuffer,
     float3* a_IntermediaryInput,
     float3* a_AlbedoInput,
     float3* a_NormalInput,
@@ -45,7 +47,22 @@ CPU_ON_GPU void PrepareOptixDenoisingGPU(
         float4 albedo = a_CurrentSurfaceData[pixelDataIndex].m_MaterialData.m_Color;
         a_AlbedoInput[pixelDataIndex] = make_float3(albedo.x, albedo.y, albedo.z);
         a_NormalInput[pixelDataIndex] = a_CurrentSurfaceData[pixelDataIndex].m_Normal;
-        a_FlowInput[pixelDataIndex] = make_float2(0.f, 0.f);
+
+        half2Ushort2 motionVector{ __float22half2_rn({0.f, 0.f}) };
+
+        surf2Dread<ushort2>(
+            &motionVector.m_Ushort2,
+            a_PixelBufferSingleChannel,
+            pixelX * sizeof(ushort4),
+            pixelY,
+            cudaBoundaryModeTrap);
+
+        float2 motionVectorFloat = motionVector.AsFloat2();
+
+        motionVectorFloat.x *= static_cast<float>(a_RenderResolution.x);
+        motionVectorFloat.y *= static_cast<float>(a_RenderResolution.y);
+
+        a_FlowInput[pixelDataIndex] = motionVectorFloat;
     }
 }
 
