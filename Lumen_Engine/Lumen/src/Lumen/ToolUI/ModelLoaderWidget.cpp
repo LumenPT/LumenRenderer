@@ -21,7 +21,7 @@ ModelLoaderWidget::ModelLoaderWidget(Lumen::SceneManager& a_SceneManager, std::s
     , m_State(State::Directory)
     , m_LoadingFinished(true)
 {
-	LoadIcons();
+	//LoadIcons();
 	// Initialze the selected path to the working directory for the application
 	m_SelectedPath = fs::current_path();
 }
@@ -74,9 +74,9 @@ void ModelLoaderWidget::LoadIcons()
 
 	fs::current_path(p);
 
-	m_Icons[FileType::Directory] = MakeGLTexture("Sandbox/assets/toolAssets/folder.png");
+	/*m_Icons[FileType::Directory] = MakeGLTexture("Sandbox/assets/toolAssets/folder.png");
 	m_Icons[FileType::GLTF] = MakeGLTexture("Sandbox/assets/toolAssets/file.png");
-	m_Icons[FileType::VDB] = MakeGLTexture("Sandbox/assets/toolAssets/file.png");
+	m_Icons[FileType::VDB] = MakeGLTexture("Sandbox/assets/toolAssets/file.png");*/
 }
 
 GLuint ModelLoaderWidget::MakeGLTexture(std::string a_FilePath)
@@ -149,7 +149,7 @@ void ModelLoaderWidget::LoadModel()
 		m_LoadingThread = std::thread([this]() {
 			m_LoadingFinished = false;
 			// Choose how to open the file based on its extension
-			if (m_PathToOpen.extension() == ".gltf")
+			if (m_PathToOpen.extension() == ".gltf" || m_PathToOpen.extension() == ".glb")
 			{
 				
 				m_LoadedResource = m_SceneManager.LoadGLTF(m_PathToOpen.filename().string(), m_PathToOpen.parent_path().string() + "\\");

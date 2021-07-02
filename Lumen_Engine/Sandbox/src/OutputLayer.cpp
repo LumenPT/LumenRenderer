@@ -237,7 +237,7 @@ void OutputLayer::OnImGuiRender()
 	    ImGuiCameraSettings();        
     }
 
-	if (!m_Renderer->m_Scene->m_VolumeInstances.empty())
+	/*if (!m_Renderer->m_Scene->m_VolumeInstances.empty())
 	{
 		auto& tarTransform = m_Renderer->m_Scene->m_VolumeInstances[0]->m_Transform;
 
@@ -267,7 +267,7 @@ void OutputLayer::OnImGuiRender()
 			tarTransform.Rotate(deltaQuat);
 		}
 		ImGui::End();
-	}
+	}*/
 
     // ##ToolBookmark
 	// Example of creating a window with an image from a CudaGLTexture object

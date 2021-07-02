@@ -29,11 +29,6 @@ namespace Lumen {
     class WindowsWindow;
 }
 
-namespace LumenPTConsts
-{
-	const static std::string ShaderPath = "whatever";
-}
-
 class ExampleLayer : public Lumen::Layer
 {
 public:

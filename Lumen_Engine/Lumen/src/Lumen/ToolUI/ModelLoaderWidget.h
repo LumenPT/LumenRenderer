@@ -88,7 +88,7 @@ private:
     std::thread m_LoadingThread;
     bool m_LoadingFinished;
 
-    std::map<FileType, GLuint> m_Icons;
+    //std::map<FileType, GLuint> m_Icons;
 
 
 
