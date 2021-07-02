@@ -28,6 +28,7 @@ namespace Lumen
         void NodeSelection(Lumen::ILumenScene& a_Scene);
         void InstanceSelection(Lumen::ILumenScene& a_Scene);
 
+        // Function called recursively to display nodes via Dear ImGui
         void DisplayNode(Lumen::ILumenScene::Node& a_Node, std::map<std::string, uint32_t>& a_NameMap, uint16_t a_Depth = 0);
 
         LumenRenderer* m_RendererRef;
