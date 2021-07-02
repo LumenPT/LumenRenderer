@@ -21,6 +21,7 @@ Lumen::SceneGraph::SceneGraph()
 void Lumen::SceneGraph::Display(ILumenScene& a_Scene)
 {
 
+
     ImGui::Begin("Scene Graph");
 
     if (ImGui::Button("Node View"))

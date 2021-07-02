@@ -27,6 +27,7 @@ Lumen::Transform::Transform(const glm::mat4& a_TransformationMatrix)
     , m_Parent(nullptr)
     , m_ID(m_IdCount++)
 {
+
     Decompose();
 }
 

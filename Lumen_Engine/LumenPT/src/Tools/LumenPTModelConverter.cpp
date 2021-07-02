@@ -953,6 +953,7 @@ LumenPTModelConverter::HeaderScene LumenPTModelConverter::MakeScene(const fx::gl
 void LumenPTModelConverter::LoadNode(const fx::gltf::Document& a_FxDoc, uint32_t a_NodeId, HeaderScene& a_Scene,
                                      LumenPTModelConverter::HeaderNode* a_ParentNode)
 {
+
 	const auto& node = a_FxDoc.nodes[a_NodeId];
 	HeaderNode* hNode;
     if (!a_ParentNode)

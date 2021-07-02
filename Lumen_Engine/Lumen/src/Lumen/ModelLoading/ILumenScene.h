@@ -21,6 +21,7 @@ namespace Lumen
                 , m_ScenePtr(nullptr)
             {}
 
+
             Node* AddChild();
 
             void AddChild(std::unique_ptr<Lumen::ILumenScene::Node>& a_Node);

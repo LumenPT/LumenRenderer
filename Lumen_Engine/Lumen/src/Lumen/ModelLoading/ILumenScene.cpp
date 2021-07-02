@@ -10,6 +10,7 @@ Lumen::ILumenScene::Node* Lumen::ILumenScene::Node::AddChild()
 
 void Lumen::ILumenScene::Node::AddChild(std::unique_ptr<Lumen::ILumenScene::Node>& a_Node)
 {
+
     if (a_Node->m_Parent)
         a_Node->m_Parent->RemoveChild(a_Node);
 

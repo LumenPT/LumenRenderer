@@ -139,6 +139,7 @@ void PTScene::UpdateSceneAccelerationStructure()
             auto transformMat = glm::transpose(ptvi.m_Transform.GetWorldTransformationMatrix());
             // Copy the transformation matrix into the OptixInstance struct
             memcpy(inst.transform, &transformMat, sizeof(inst.transform));
+
         }
 
         // We rebuild the acceleration structure from scratch because it is cheap to do so,

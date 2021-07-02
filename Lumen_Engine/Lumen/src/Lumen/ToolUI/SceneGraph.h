@@ -16,6 +16,7 @@ namespace Lumen
     {
     public:
 
+
         SceneGraph();
     	
         void SetRendererRef(LumenRenderer& a_Renderer) { m_RendererRef = &a_Renderer; }

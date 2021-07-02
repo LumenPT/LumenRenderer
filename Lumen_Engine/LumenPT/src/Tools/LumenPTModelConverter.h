@@ -227,6 +227,7 @@ private:
         std::vector<uint8_t>* m_Tangent;
     };
 
+
     static std::vector<char> InterleaveVertexBuffers(InterleaveInput& a_Input);
 
     static HeaderScene MakeScene(const fx::gltf::Document& a_FxDoc, const fx::gltf::Scene& a_Scene);
