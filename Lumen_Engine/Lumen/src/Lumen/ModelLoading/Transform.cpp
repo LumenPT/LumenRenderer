@@ -17,6 +17,7 @@ Lumen::Transform::Transform(const glm::mat4& a_TransformationMatrix)
     : m_TransformationMatrix(a_TransformationMatrix)
     , m_MatrixDirty(false)
 {
+
     Decompose();
 }
 

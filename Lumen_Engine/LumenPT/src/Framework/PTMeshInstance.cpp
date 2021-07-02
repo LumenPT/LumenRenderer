@@ -122,6 +122,7 @@ void PTMeshInstance::SetAdditionalColor(glm::vec4 a_AdditionalColor)
 
 bool PTMeshInstance::UpdateRaytracingData()
 {
+
     if (!m_SceneDataDirty || !m_MeshRef || !m_SceneRef)
         return false; //not updated.
 

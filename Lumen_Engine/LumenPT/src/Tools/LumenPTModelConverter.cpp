@@ -912,6 +912,7 @@ LumenPTModelConverter::HeaderScene LumenPTModelConverter::MakeScene(const fx::gl
 void LumenPTModelConverter::LoadNode(const fx::gltf::Document& a_FxDoc, uint32_t a_NodeId, HeaderScene& a_Scene,
     glm::mat4 a_ParentTransform)
 {
+
 	const auto& node = a_FxDoc.nodes[a_NodeId];
 
 	auto localTransform = LoadNodeTransform(node);

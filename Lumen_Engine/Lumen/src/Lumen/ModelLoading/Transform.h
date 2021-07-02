@@ -38,6 +38,8 @@ namespace Lumen // BYOUTIFUL KARTOSHKA
 
     class Transform
     {
+
+        friend Transform;
     public:
         Transform();
         ~Transform();
