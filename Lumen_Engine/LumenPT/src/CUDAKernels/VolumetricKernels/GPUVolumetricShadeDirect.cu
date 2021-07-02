@@ -1,6 +1,7 @@
 #include "GPUVolumetricShadingKernels.cuh"
 #include <device_launch_parameters.h>
 #include <sutil/vec_math.h>
+#include "../../Shaders/CppCommon/Half4.h"
 
 using namespace WaveFront;
 
@@ -10,7 +11,7 @@ GPU_ONLY void VolumetricShadeDirect(
     const WaveFront::VolumetricData* a_VolumetricDataBuffer,
     WaveFront::AtomicBuffer<WaveFront::ShadowRayData>* const a_ShadowRays,
 	const AtomicBuffer<TriangleLight>* const a_Lights,
-	unsigned int a_Seed,
+	unsigned int& a_Seed,
     const CDF* const a_CDF,
 	cudaSurfaceObject_t a_Output)
 {
@@ -21,8 +22,6 @@ GPU_ONLY void VolumetricShadeDirect(
 
 	if (intersection.m_ExitIntersectionT > intersection.m_EntryIntersectionT)
 	{
-
-
 		//Volume ray marching settings (these need to be moved elsewhere or replaced with more sensible parameters)
 		const int MAX_STEPS = 5;
 		const float DENSITY_PER_METER = intersection.m_Density;
@@ -34,7 +33,7 @@ GPU_ONLY void VolumetricShadeDirect(
 		float distance = intersection.m_ExitIntersectionT - intersection.m_EntryIntersectionT;
 		float accumulatedDensity = 0.0f;
 		//Calculate appropriate step size
-		float stepSize = distance / (float)MAX_STEPS;
+		float stepSize = distance / MAX_STEPS;
 		float3 prevSamplePosition = intersection.m_PositionEntry;
 		float offset = RandomFloat(a_Seed) * stepSize;	//This is used to offset each ray into the screen by a small amount, sampling different parts of the volume
 
@@ -66,37 +65,37 @@ GPU_ONLY void VolumetricShadeDirect(
 			//Normalize
 			pixelToLightDir /= lDistance;
 			
-			//Light normal at sample point dotted with light direction. Invert light dir for this (light to pixel instead of pixel to light)
-			//const float cosIn = fmax(dot(pixelToLightDir, surfaceData.m_Normal), 0.f);
-			const float cosOut = fmax(0.f, dot(light.normal, -pixelToLightDir));
-			
-			//Geometry term G(x).
-			const float solidAngle = (cosOut * light.area) / (lDistance * lDistance);
-			
-			//BSDF is equal to material color for now.
 			float sampledDensity = DENSITY_PER_METER * distanceSincePrevSample;
-			const auto bssdf = make_float3(sampledDensity, sampledDensity, sampledDensity) * 0.01f;
-			
-			//The unshadowed contribution (contributed if no obstruction is between the light and surface) takes the BRDF,
-			//geometry factor and solid angle into account. Also the light radiance.
-			//The only thing missing from this is the scaling with the rest of the scene based on the reservoir PDF.
-			auto unshadowedPathContribution = bssdf * solidAngle * light.radiance;
-			
-			//Scale by the PDF of this light to compensate for all other lights not being picked.
-			unshadowedPathContribution *= (1.f / pdf); 
+
+			auto volumeColor = make_float3(VOLUME_COLOR_R, VOLUME_COLOR_G, VOLUME_COLOR_B) * 0.01f;
 
 			ShadowRayData shadowRay(
 				a_PixelIndex,
 				samplePosition,
 				pixelToLightDir,
 				lDistance - 0.2f,
-				unshadowedPathContribution,
+				volumeColor,
 				LightChannel::VOLUMETRIC);
 
 			a_ShadowRays->Add(&shadowRay);
 
 			accumulatedDensity += sampledDensity;
 		}
+		//printf("Density: %d", accumulatedDensity);
+		half4Ushort4 color{ make_float4(0.f, 0.f, 0.f, accumulatedDensity) };
+		surf2Dwrite<ushort4>(
+			color.m_Ushort4,
+			a_Output,
+			a_PixelIndex.m_X * sizeof(ushort4),
+			a_PixelIndex.m_Y,
+			cudaBoundaryModeTrap);
+		//surf2DLayeredwrite<float4>(
+		//	make_float4(0.f, 0.f, 0.f, accumulatedDensity),
+		//	a_Output,
+		//	a_PixelIndex.m_X * sizeof(float4),
+		//	a_PixelIndex.m_Y,
+		//	static_cast<unsigned>(LightChannel::VOLUMETRIC),
+		//	cudaBoundaryModeTrap);
 	}
     return;
 }

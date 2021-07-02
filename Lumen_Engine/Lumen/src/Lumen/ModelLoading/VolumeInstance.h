@@ -21,7 +21,7 @@ namespace Lumen
 
         Transform m_Transform;
         std::string m_Name;
-		float m_Density = 0.1f;	//Default value
+		float m_Density = 0.001f;	//Default value
     protected:
         std::shared_ptr<Lumen::ILumenVolume> m_VolumeRef;
     };
