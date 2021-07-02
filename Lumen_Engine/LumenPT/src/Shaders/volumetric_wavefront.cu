@@ -41,6 +41,7 @@ __global__ void __closesthit__Volumetric()
 		intersection->m_EntryT = uint_as_float(optixGetAttribute_0());
 		intersection->m_ExitT = uint_as_float(optixGetAttribute_1());
 		intersection->m_VolumeGrid = pGrid;
+		intersection->m_Density = volume->m_Density;
 	}
 
     return;

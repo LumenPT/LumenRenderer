@@ -25,6 +25,7 @@ namespace WaveFront
 
 		const nanovdb::FloatGrid* m_VolumeGrid;
 
+		float m_Density;
     };
 
 }

@@ -10726,8 +10726,9 @@ bool ImGui::BeginDragDropTarget()
     ImGuiWindow* window = g.CurrentWindow;
     if (!(window->DC.LastItemStatusFlags & ImGuiItemStatusFlags_HoveredRect))
         return false;
-    /*if (g.HoveredWindowUnderMovingWindow == NULL || window->RootWindow != g.HoveredWindowUnderMovingWindow->RootWindow)
-        return false;*/
+    ImGuiWindow* hovered_window = g.HoveredWindowUnderMovingWindow;
+    if (hovered_window == NULL || window->RootWindowDockTree != hovered_window->RootWindowDockTree)
+        return false;
 
     const ImRect& display_rect = (window->DC.LastItemStatusFlags & ImGuiItemStatusFlags_HasDisplayRect) ? window->DC.LastItemDisplayRect : window->DC.LastItemRect;
     ImGuiID id = window->DC.LastItemId;
