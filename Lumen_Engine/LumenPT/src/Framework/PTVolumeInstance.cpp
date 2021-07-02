@@ -18,6 +18,7 @@ PTVolumeInstance::PTVolumeInstance(const Lumen::VolumeInstance& a_Instance, PTSe
     m_Transform = a_Instance.m_Transform;
     m_Transform.AddDependent(*this);
     m_VolumeRef = a_Instance.GetVolume();
+	m_Density = a_Instance.m_Density;
 }
 
 void PTVolumeInstance::DependencyCallback()
@@ -49,4 +50,5 @@ void PTVolumeInstance::UpdateRaytracingData()
 	auto& entryData = m_SceneDataTableEntry.GetData();
 	auto* ptVolume = reinterpret_cast<PTVolume*>(m_VolumeRef.get());
 	entryData.m_Grid = ptVolume->GetHandle()->grid<float>();
+	entryData.m_Density = m_Density;
 }

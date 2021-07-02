@@ -122,6 +122,7 @@ void PTMeshInstance::SetAdditionalColor(glm::vec4 a_AdditionalColor)
 
 bool PTMeshInstance::UpdateRaytracingData()
 {
+
     if (!m_SceneDataDirty || !m_MeshRef || !m_SceneRef)
         return false; //not updated.
 
@@ -143,7 +144,7 @@ bool PTMeshInstance::UpdateRaytracingData()
         // Any instance specific data would go here
         auto& entryData = entry->GetData();
 
-        auto glmTransform = m_Transform.GetTransformationMatrix();
+        auto glmTransform = m_Transform.GetWorldTransformationMatrix();
         glmTransform = glm::transpose((glmTransform));
 
         entryData.m_Primitive = ptPrim->m_DevicePrimitive;

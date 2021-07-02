@@ -73,6 +73,7 @@ private:
     FileType m_LoadedFileType;
     // The loaded GLTF resource.
     Lumen::SceneManager::GLTFResource* m_LoadedResource;
+    Lumen::VolumeResource* m_LoadedVolume;
     // The transform that should be used when adding a mesh to the existing render scene
     Lumen::Transform m_TransformToApply;
     bool m_ResetTransformOnMeshAdded;
@@ -88,7 +89,7 @@ private:
     std::thread m_LoadingThread;
     bool m_LoadingFinished;
 
-    std::map<FileType, GLuint> m_Icons;
+    //std::map<FileType, GLuint> m_Icons;
 
 
 

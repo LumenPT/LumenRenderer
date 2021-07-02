@@ -61,8 +61,6 @@ CPU_ON_GPU void ShadeDirect(
 
     if(pixelX < a_ResolutionAndDepth.x && pixelY < a_ResolutionAndDepth.y)
     {
-
-        //TODO: return some form of light transform factor after resolving the distances in the volume.
         VolumetricShadeDirect(
             { pixelX, pixelY }, 
             a_ResolutionAndDepth, 

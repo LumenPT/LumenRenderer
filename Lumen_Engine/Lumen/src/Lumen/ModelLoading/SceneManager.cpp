@@ -239,7 +239,7 @@ void Lumen::SceneManager::LoadNodes(fx::gltf::Document& a_Doc, GLTFResource& a_R
 		t.SetRotation(rotation);
 		t.SetScale(scale);
 
-		transform = t.GetTransformationMatrix();
+		transform = t.GetWorldTransformationMatrix();
 	}
 
 	const glm::mat4 chainedTransform = a_TransformMat * transform;
