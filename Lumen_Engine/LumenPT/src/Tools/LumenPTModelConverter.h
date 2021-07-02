@@ -4,6 +4,7 @@
 
 //#include "../vendor/fx/gltf.h"
 
+#include "ILumenScene.h"
 #include "Lumen/ModelLoading/SceneManager.h"
 
 class LumenPTModelConverter
@@ -84,23 +85,23 @@ private:
     struct HeaderMaterial
     {
         HeaderMaterial()
-            : m_Color{0.f, 0.f, 0.f, 0.f}, m_Emission{0.f, 0.f, 0.f}, m_DiffuseTextureId(-1)
-              , m_NormalMapId(-1)
-              , m_EmissiveTextureId(-1)
-              , m_TransmissionTextureId(-1), m_ClearCoatTextureId(-1), m_ClearCoatRoughnessTextureId(-1),
-              m_TintTextureId(-1), m_TransmissionFactor(0),
-              m_ClearCoatFactor(0),
-              m_ClearCoatRoughnessFactor(0),
-              m_IndexOfRefraction(0),
-              m_SpecularFactor(0),
-              m_SpecularTintFactor(0),
-              m_SubSurfaceFactor(0),
-              m_Luminance(0), m_Anisotropic(0),
-              m_SheenFactor(0),
-              m_SheenTintFactor(0), m_MetallicFactor(1.f), m_RoughnessFactor(1.f),
-              m_TintFactor{0.f, 0.f, 0.f},
-              m_Transmittance{0.f, 0.f, 0.f},
-              m_MetallicRoughnessTextureId(-1)
+            : m_Color{ 0.f, 0.f, 0.f, 0.f }, m_Emission{ 0.f, 0.f, 0.f }, m_DiffuseTextureId(-1)
+            , m_NormalMapId(-1)
+            , m_EmissiveTextureId(-1)
+            , m_TransmissionTextureId(-1), m_ClearCoatTextureId(-1), m_ClearCoatRoughnessTextureId(-1),
+            m_TintTextureId(-1), m_TransmissionFactor(0),
+            m_ClearCoatFactor(0),
+            m_ClearCoatRoughnessFactor(0),
+            m_IndexOfRefraction(0),
+            m_SpecularFactor(0),
+            m_SpecularTintFactor(0),
+            m_SubSurfaceFactor(0),
+            m_Luminance(0), m_Anisotropic(0),
+            m_SheenFactor(0),
+            m_SheenTintFactor(0), m_MetallicFactor(1.f), m_RoughnessFactor(1.f),
+            m_TintFactor{ 0.f, 0.f, 0.f },
+            m_Transmittance{ 0.f, 0.f, 0.f },
+            m_MetallicRoughnessTextureId(-1)
         {
         }
 
@@ -160,22 +161,35 @@ private:
         struct
         {
             int32_t m_MeshId;
-            float m_Transform[16];
             uint32_t m_NameLength;
         } m_Header;
         std::string m_Name;
+    };
+
+    struct HeaderNode
+    {
+        struct
+        {
+            uint32_t m_NameLength;
+            uint32_t m_NumChildren;
+            float m_Transform[16];
+            int32_t m_MeshId;
+        } m_Header;
+
+        std::string m_Name;
+        std::vector<HeaderNode> m_ChildNodes;
     };
 
     struct HeaderScene
     {
         struct
         {
-            uint32_t m_NumMeshes;
+            uint32_t m_NumRootNodes;
             uint32_t m_NameLength;
         } m_Header;
 
         std::string m_Name;
-        std::vector<HeaderMeshInstance> m_Meshes;
+        std::vector<HeaderNode> m_RootNodes;
     };
 
     struct FileContent
@@ -196,6 +210,7 @@ private:
 
     static FileContent GenerateContent(const fx::gltf::Document& a_FxDoc, const std::string& a_SourcePath);
     static Header GenerateHeader(const FileContent& a_Content);
+    static void AddNodeToHeader(const HeaderNode& a_Node, Header& a_Header);
     static void OutputToFile(const Header& a_Header, const Blob& a_Binary, const std::string& a_DestPath);
 
     static HeaderTexture TextureToBlob(const fx::gltf::Document& a_FxDoc, uint32_t a_ImageId, Blob& a_Blob, const std::string& a_SourcePath);
@@ -212,16 +227,21 @@ private:
         std::vector<uint8_t>* m_Tangent;
     };
 
+
     static std::vector<char> InterleaveVertexBuffers(InterleaveInput& a_Input);
 
     static HeaderScene MakeScene(const fx::gltf::Document& a_FxDoc, const fx::gltf::Scene& a_Scene);
-    static void LoadNode(const fx::gltf::Document& a_FxDoc, uint32_t a_NodeId, HeaderScene& a_Scene, glm::mat4 a_ParentTransform = glm::identity<glm::mat4>());
+    static void LoadNode(const fx::gltf::Document& a_FxDoc, uint32_t a_NodeId, HeaderScene& a_Scene, HeaderNode* a_ParentNode = nullptr);
+    static std::unique_ptr<Lumen::ILumenScene::Node> LoadNode(std::ifstream& a_FileStream,
+        Lumen::SceneManager::GLTFResource& a_Resource,
+        Lumen::ILumenScene& a_Scene, Lumen::
+        ILumenScene::Node* a_ParentNode);
     static Lumen::Transform LoadNodeTransform(const fx::gltf::Node& a_Node);
 
     template<typename T>
     static T JsonGetOrDefault(const nlohmann::json& a_Json, const std::string& a_Key, const T& a_DefaultValue)
     {
-        if(a_Json.contains(a_Key))
+        if (a_Json.contains(a_Key))
         {
             return a_Json[a_Key];
         }
@@ -240,4 +260,3 @@ private:
     std::shared_ptr<Lumen::ILumenTexture> m_DefaultEmissiveTexture;
 
 };
-

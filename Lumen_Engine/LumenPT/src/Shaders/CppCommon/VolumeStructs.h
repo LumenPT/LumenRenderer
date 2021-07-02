@@ -6,4 +6,5 @@
 struct DeviceVolume
 {
     const nanovdb::FloatGrid* m_Grid;
+	float m_Density;
 };
