@@ -25,7 +25,6 @@ void Lumen::ILumenScene::Node::RemoveChild(std::unique_ptr<Lumen::ILumenScene::N
         m_ChildNodes.erase(fIter);
     }
     m_Transform.RemoveChild(a_Node->m_Transform);
-
     a_Node->m_Parent = nullptr;
     a_Node->m_Transform.SetParent(nullptr);*/
 }

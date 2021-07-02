@@ -10,8 +10,10 @@
 #include <string>
 
 Lumen::SceneGraph::SceneGraph()
-	: m_SelectedMeshInstance(nullptr)
-	, m_SelectedVolumeInstance(nullptr)
+    : m_SelectedMeshInstance(nullptr)
+    , m_SelectedVolumeInstance(nullptr)
+    , m_SelectedNode(nullptr)
+    , m_DisplayNodes(true)
 {
     m_SearchString.resize(128, 0);
 }
@@ -21,7 +23,6 @@ void Lumen::SceneGraph::Display(ILumenScene& a_Scene)
 
 
     ImGui::Begin("Scene Graph");
-    ImGui::InputText("Search", m_SearchString.data(), m_SearchString.size());
 
     if (ImGui::Button("Node View"))
         m_DisplayNodes = true;
@@ -34,42 +35,11 @@ void Lumen::SceneGraph::Display(ILumenScene& a_Scene)
 
     if (m_DisplayNodes)
     {
-        std::map<std::string, uint32_t> names;
-    	
-        for (auto& meshInstance : a_Scene.m_MeshInstances)
-        {
-            auto instanceName = "[M] " + meshInstance->m_Name;
-            if (names[meshInstance->m_Name] == 0)
-                names[meshInstance->m_Name]++;
-            else
-                instanceName += std::to_string(names[meshInstance->m_Name]);
-
-            if (trimmed.empty() || instanceName.find(trimmed) != std::string::npos)
-                if (ImGui::Selectable(instanceName.c_str(), m_SelectedMeshInstance == meshInstance.get()))
-                {
-                    m_SelectedMeshInstance = meshInstance.get();
-                    m_SelectedVolumeInstance = nullptr;
-                }
-        }
-
-        for (auto& volumeInstance : a_Scene.m_VolumeInstances)
-        {
-            auto instanceName = "[V] " + volumeInstance->m_Name;
-            if (names[volumeInstance->m_Name] = 0)
-                names[volumeInstance->m_Name]++;
-            else
-                instanceName += std::to_string(names[volumeInstance->m_Name]);
-
-            if (trimmed.empty() || instanceName.find(trimmed) != std::string::npos)
-                if (ImGui::Selectable(instanceName.c_str(), m_SelectedVolumeInstance == volumeInstance.get()))
-                {
-                    m_SelectedVolumeInstance = volumeInstance.get();
-                    m_SelectedMeshInstance = nullptr;
-
-                }
-        }
-    	
-        ImGui::ListBoxFooter();
+        NodeSelection(a_Scene);
+    }
+    else
+    {
+        InstanceSelection(a_Scene);
     }
 
     if (m_SelectedMeshInstance || m_SelectedVolumeInstance)
@@ -99,7 +69,7 @@ void Lumen::SceneGraph::Display(ILumenScene& a_Scene)
         if (ImGui::CollapsingHeader("Transformation"))
         {
             auto& transform = m_SelectedMeshInstance->m_Transform;
-            TransformEditor(transform);            
+            TransformEditor(transform);
         }
 
         if (ImGui::CollapsingHeader("Emissive Properties"))
@@ -123,8 +93,8 @@ void Lumen::SceneGraph::Display(ILumenScene& a_Scene)
                 newEmissiveness.m_EmissionMode != emissiveness.m_EmissionMode ||
                 newEmissiveness.m_OverrideRadiance != emissiveness.m_OverrideRadiance)
             {
-                m_SelectedMeshInstance->SetEmissiveness(newEmissiveness);            
-            }            
+                m_SelectedMeshInstance->SetEmissiveness(newEmissiveness);
+            }
         }
 
         if (ImGui::CollapsingHeader("Material Properties"))
@@ -286,12 +256,13 @@ void Lumen::SceneGraph::Display(ILumenScene& a_Scene)
     }
     else if (m_SelectedVolumeInstance != nullptr)
     {
-	    if (ImGui::CollapsingHeader("Transformation"))
+        if (ImGui::CollapsingHeader("Transformation"))
         {
             auto& transform = m_SelectedVolumeInstance->m_Transform;
-            TransformEditor(transform);            
+            TransformEditor(transform);
         }
     }
+
     ImGui::End();
 }
 
@@ -302,6 +273,7 @@ void Lumen::SceneGraph::TransformEditor(Transform& a_Transform)
     r = a_Transform.GetRotationEuler();
     s = a_Transform.GetScale();
 
+    ImGui::Text("Transform ID %llu", a_Transform.m_ID);
     ImGui::DragFloat3("Position", &t[0]);
     ImGui::DragFloat3("Rotation", &r[0]);
     ImGui::DragFloat3("Scale", &s[0]);
@@ -320,6 +292,12 @@ void Lumen::SceneGraph::TransformEditor(Transform& a_Transform)
     }
 }
 
+struct DragDrop
+{
+    Lumen::ILumenScene::Node* m_Source;
+    Lumen::ILumenScene::Node* m_Dest;
+    Lumen::ILumenScene::Node* m_Target;
+};
 
 void Lumen::SceneGraph::NodeSelection(Lumen::ILumenScene& a_Scene)
 {
@@ -422,7 +400,7 @@ void Lumen::SceneGraph::DisplayNode(Lumen::ILumenScene::Node& a_Node, std::map<s
         else
             ImGui::PushStyleColor(ImGuiCol_Header, ImGui::GetColorU32(ImGuiCol_ChildBg));
         if (ImGui::CollapsingHeader(name.c_str(), flags))
-            collapsed = false;        
+            collapsed = false;
     }
     else
     {
@@ -469,7 +447,7 @@ void Lumen::SceneGraph::DisplayNode(Lumen::ILumenScene::Node& a_Node, std::map<s
         //target_flags |= ImGuiDragDropFlags_AcceptBeforeDelivery;    // Don't wait until the delivery (release mouse button on a target) to do something
         //target_flags |= ImGuiDragDropFlags_AcceptNoDrawDefaultRect; // Don't display the yellow rectangle
         auto payload = ImGui::AcceptDragDropPayload("Node_DND", target_flags);
-        
+
         if (payload)
         {
             auto data = reinterpret_cast<const DragDrop*>(payload->Data);
@@ -506,10 +484,8 @@ void Lumen::SceneGraph::DisplayNode(Lumen::ILumenScene::Node& a_Node, std::map<s
             dd.m_Dest->m_Transform.AddChild(dd.m_Target->m_Transform);
             dd.m_Target->m_Parent = dd.m_Dest;
 
-            printf("Parent node changed\n");            
+            printf("Parent node changed\n");
         }
-
-        // TODO: Brokie
     }
 
     if (!a_Node.m_ChildNodes.empty() && ImGui::IsItemClicked())

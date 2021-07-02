@@ -3,19 +3,29 @@
 
 #include <glm/gtx/matrix_decompose.inl>
 
+uint64_t Lumen::Transform::m_IdCount = 0;
+
 Lumen::Transform::Transform()
     : m_Position(0.0f)
     , m_Rotation(1.0f, 0.0f, 0.0f, 0.0f)
     , m_Scale(1.0f)
-    , m_MatrixDirty(true)
-    , m_TransformationMatrix(1.0f)
+    , m_WorldMatrixDirty(true)
+    , m_WorldMatrix(1.0f)
+    , m_LocalMatrixDirty(true)
+    , m_LocalMatrix(0.0f)
+    , m_Parent(nullptr)
+    , m_ID(m_IdCount++)
 {
 
 }
 
 Lumen::Transform::Transform(const glm::mat4& a_TransformationMatrix)
-    : m_TransformationMatrix(a_TransformationMatrix)
-    , m_MatrixDirty(false)
+    : m_LocalMatrix(a_TransformationMatrix)
+    , m_LocalMatrixDirty(false)
+    , m_WorldMatrix(a_TransformationMatrix)
+    , m_WorldMatrixDirty(false)
+    , m_Parent(nullptr)
+    , m_ID(m_IdCount++)
 {
 
     Decompose();
@@ -23,31 +33,52 @@ Lumen::Transform::Transform(const glm::mat4& a_TransformationMatrix)
 
 Lumen::Transform::~Transform()
 {
+    if (m_Parent)
+        m_Parent->RemoveChild(*this);
+    for (auto& child : m_Children)
+    {
+        child->SetParentInternal(nullptr);
+    }
 }
 
 Lumen::Transform::Transform(const Transform& a_Other)
 {
-    a_Other.UpdateMatrix();
+    a_Other.UpdateWorldMatrix();
     m_Position = a_Other.m_Position;
     m_Rotation = a_Other.m_Rotation;
     m_Scale = a_Other.m_Scale;
-    m_TransformationMatrix = a_Other.m_TransformationMatrix;
+    m_WorldMatrix = a_Other.m_WorldMatrix;
+    m_LocalMatrixDirty = a_Other.m_LocalMatrixDirty;
+    m_WorldMatrixDirty = a_Other.m_WorldMatrixDirty;
+    m_Parent = a_Other.GetParent();
+    if (m_Parent)
+        m_Parent->AddChildInternal(*this);
 }
 
 Lumen::Transform& Lumen::Transform::operator=(const Transform& a_Other)
 {
-    a_Other.UpdateMatrix();
+    a_Other.UpdateWorldMatrix();
     m_Position = a_Other.m_Position;
     m_Rotation = a_Other.m_Rotation;
     m_Scale = a_Other.m_Scale;
-    m_TransformationMatrix = a_Other.m_TransformationMatrix;
+    m_LocalMatrix = a_Other.m_LocalMatrix;
+    m_WorldMatrixDirty = a_Other.m_WorldMatrixDirty;
+    m_ID = m_IdCount++;
+
+    m_Parent = a_Other.m_Parent;
+    if (m_Parent)
+    {
+        m_Parent->AddChildInternal(*this);
+    }
 
     return *this;
 }
 
 Lumen::Transform& Lumen::Transform::operator=(const glm::mat4& a_TransformationMatrix)
 {
-    m_TransformationMatrix = a_TransformationMatrix;
+    m_ID = m_IdCount++;
+    m_Parent = nullptr;
+    m_LocalMatrix = a_TransformationMatrix;
     Decompose();
     return *this;
 }
@@ -55,13 +86,13 @@ Lumen::Transform& Lumen::Transform::operator=(const glm::mat4& a_TransformationM
 void Lumen::Transform::SetPosition(const glm::vec3& a_NewPosition)
 {
     m_Position = a_NewPosition;
-    MakeDirty();
+    MakeLocalDirty();
 }
 
 void Lumen::Transform::SetRotation(const glm::quat& a_Quaternion)
 {
     m_Rotation = a_Quaternion;
-    MakeDirty();
+    MakeLocalDirty();
 }
 
 void Lumen::Transform::SetRotation(const glm::vec3& a_EulerDegrees)
@@ -77,7 +108,7 @@ void Lumen::Transform::SetRotation(const glm::vec3& a_Pivot, float a_Degrees)
 void Lumen::Transform::SetScale(const glm::vec3& a_Scale)
 {
     m_Scale = a_Scale;
-    MakeDirty();
+    MakeLocalDirty();
 }
 
 void Lumen::Transform::Move(const glm::vec3& a_Movement)
@@ -139,45 +170,140 @@ const glm::vec3& Lumen::Transform::GetScale() const
     return m_Scale;
 }
 
-glm::mat4 Lumen::Transform::GetTransformationMatrix() const
+glm::mat4 Lumen::Transform::GetWorldTransformationMatrix() const
 {
-    UpdateMatrix();
-    return m_TransformationMatrix;
+    UpdateWorldMatrix();
+    return m_WorldMatrix;
+}
+
+glm::mat4 Lumen::Transform::GetLocalTransformationMatrix() const
+{
+    UpdateLocalMatrix();
+    return m_LocalMatrix;
 }
 
 Lumen::Transform::operator glm::mat<4, 4, float, glm::defaultp>() const
 {
-    return GetTransformationMatrix();
+    return GetWorldTransformationMatrix();
 }
 
 Lumen::Transform& Lumen::Transform::operator*=(const Lumen::Transform& a_Other)
 {
-    m_TransformationMatrix *= a_Other.GetTransformationMatrix();
+    m_WorldMatrix *= a_Other.GetWorldTransformationMatrix();
     Decompose();
 
     return *this;
 }
 
-void Lumen::Transform::MakeDirty()
+void Lumen::Transform::SetParent(Transform* a_ParentTransform)
 {
-    UpdateDependents();
-    m_MatrixDirty = true;
+    SetParentInternal(a_ParentTransform);
+    m_Parent->AddChildInternal(*this);
+    MakeWorldDirty();
 }
 
-void Lumen::Transform::UpdateMatrix() const
+void Lumen::Transform::AddChild(Transform& a_ChildTransform)
 {
-    if (!m_MatrixDirty)
+    AddChildInternal(a_ChildTransform);
+    a_ChildTransform.SetParentInternal(this);
+}
+
+void Lumen::Transform::RemoveChild(Transform& a_ChildTransform)
+{
+    RemoveChildInternal(a_ChildTransform);
+    a_ChildTransform.SetParentInternal(nullptr);
+
+    //TODO: Do we WANT to keep the child in its current world transform?
+
+}
+
+void Lumen::Transform::SetParentInternal(Transform* a_ParentTransform)
+{
+    auto prevParent = m_Parent;
+    m_Parent = a_ParentTransform;
+    if (prevParent)
+        prevParent->RemoveChildInternal(*this);
+    MakeWorldDirty();
+}
+
+void Lumen::Transform::AddChildInternal(Transform& a_ChildTransform)
+{
+    m_Children.push_back(&a_ChildTransform);
+}
+
+void Lumen::Transform::RemoveChildInternal(Transform& a_ChildTransform)
+{
+    auto fIter = std::find(m_Children.begin(), m_Children.end(), &a_ChildTransform);
+    if (fIter != m_Children.end())
+        m_Children.erase(fIter);
+}
+
+
+void Lumen::Transform::MakeWorldDirty()
+{
+    UpdateDependents();
+    m_WorldMatrixDirty = true;
+
+    for (auto& child : m_Children)
+    {
+        child->MakeWorldDirty();
+    }
+}
+
+void Lumen::Transform::MakeLocalDirty()
+{
+    UpdateDependents();
+    m_LocalMatrixDirty = true;
+    m_WorldMatrixDirty = true; // If the local transform was changed, then the world transform was also invalidated
+
+    for (auto& child : m_Children)
+    {
+        child->MakeWorldDirty();
+    }
+}
+
+void Lumen::Transform::UpdateLocalMatrix() const
+{
+    if (!m_LocalMatrixDirty)
         return;
 
-    m_TransformationMatrix = glm::mat4(1.0f);
+    // Build the local transformation matrix
+    m_LocalMatrix = glm::mat4(1.0f);
 
     glm::mat4 rotation = glm::mat4_cast(m_Rotation);
 
-    m_TransformationMatrix = glm::translate(m_TransformationMatrix, m_Position);
-    m_TransformationMatrix = m_TransformationMatrix * rotation;
-    m_TransformationMatrix = glm::scale(m_TransformationMatrix, m_Scale);
+    m_LocalMatrix = glm::translate(m_LocalMatrix, m_Position);
+    m_LocalMatrix = m_LocalMatrix * rotation;
+    m_LocalMatrix = glm::scale(m_LocalMatrix, m_Scale);
 
-    m_MatrixDirty = false;
+    m_LocalMatrixDirty = false;
+}
+
+void Lumen::Transform::UpdateWorldMatrix() const
+{
+    // If world matrix is still valid, there is nothing necessary to do
+    if (!m_WorldMatrixDirty)
+        return;
+
+    // Try updating the local matrix
+    UpdateLocalMatrix();
+
+    if (m_Parent != nullptr)
+    {
+        // Get the transformation of the parents transform
+        // This will go recursively, rebuilding world transforms until it reaches a parent transform which doesn't need to be rebuilt
+        auto parentWorld = m_Parent->GetWorldTransformationMatrix();
+
+        // TODO: Is this the correct order? Run it and find out!
+        //m_WorldMatrix = m_LocalMatrix * parentWorld;
+        m_WorldMatrix = parentWorld * m_LocalMatrix;
+    }
+    else
+        m_WorldMatrix = m_LocalMatrix;
+
+    // The world matrix was rebuilt, so it's no longer dirty
+    // If it was invalidated by the local matrix, that flag was lowered in UpdateLocalMatrix()
+    m_WorldMatrixDirty = false;
 
 }
 
@@ -187,7 +313,7 @@ void Lumen::Transform::Decompose()
     glm::vec3 skew;
     glm::vec4 perspective;
 
-    glm::decompose(m_TransformationMatrix, m_Scale, m_Rotation, m_Position, skew, perspective);
+    glm::decompose(m_LocalMatrix, m_Scale, m_Rotation, m_Position, skew, perspective);
 }
 
 void Lumen::Transform::UpdateDependents()
@@ -200,7 +326,7 @@ void Lumen::Transform::UpdateDependents()
 
 Lumen::Transform Lumen::operator*(const Lumen::Transform& a_Left, const Lumen::Transform& a_Right)
 {
-    auto mat = a_Left.GetTransformationMatrix() * a_Right.GetTransformationMatrix();
+    auto mat = a_Left.GetWorldTransformationMatrix() * a_Right.GetWorldTransformationMatrix();
     Transform t(mat);
 
     return t;

@@ -144,7 +144,7 @@ bool PTMeshInstance::UpdateRaytracingData()
         // Any instance specific data would go here
         auto& entryData = entry->GetData();
 
-        auto glmTransform = m_Transform.GetTransformationMatrix();
+        auto glmTransform = m_Transform.GetWorldTransformationMatrix();
         glmTransform = glm::transpose((glmTransform));
 
         entryData.m_Primitive = ptPrim->m_DevicePrimitive;

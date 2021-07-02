@@ -1,4 +1,7 @@
 #pragma once
+#include <map>
+
+#include "Lumen/ModelLoading/ILumenScene.h"
 
 class LumenRenderer;
 
@@ -15,7 +18,7 @@ namespace Lumen
 
 
         SceneGraph();
-    	
+
         void SetRendererRef(LumenRenderer& a_Renderer) { m_RendererRef = &a_Renderer; }
 
         void Display(ILumenScene& a_Scene);
@@ -31,9 +34,15 @@ namespace Lumen
 
         LumenRenderer* m_RendererRef;
 
+        bool m_DisplayNodes;
+
         MeshInstance* m_SelectedMeshInstance;
         VolumeInstance* m_SelectedVolumeInstance;
+        Lumen::ILumenScene::Node* m_SelectedNode;
         std::string m_SearchString;
+
+
+        const glm::uvec2 m_GraphSize = glm::uvec2(300, 350);
     };
 
 }

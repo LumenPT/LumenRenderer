@@ -44,20 +44,21 @@ Lumen::SceneManager::GLTFResource LumenPTModelConverter::ConvertGLTF(std::string
 		fxDoc = LoadFromText(p, readQuotas);
 	else if (sp.extension() == ".glb")
 		fxDoc = LoadFromBinary(p, readQuotas);
-	
+
 	printf("[File Conversion] Done loading file from GLTF.\n");
 
 	auto content = GenerateContent(fxDoc, p);
 
 	printf("[File Conversion] Done generating content.\n");
-	
+
 	auto header = GenerateHeader(content);
 
 	printf("[File Conversion] Done generating header.\n");
 
 	volatile auto dbgfc = &content;
 
-	std::string destPath = std::filesystem::path(p).replace_extension(ms_ExtensionName).string();
+	p.erase(p.begin() + p.find('.'), p.end());
+	std::string destPath = p.append(ms_ExtensionName);
 
 	OutputToFile(header, content.m_Blob, destPath);
 
@@ -79,7 +80,7 @@ Lumen::SceneManager::GLTFResource LumenPTModelConverter::LoadFile(std::string a_
 	{
 		// If yes, start decoding the data in it
 
-	    // Get the full size of the file
+		// Get the full size of the file
 		ifs.seekg(0, ifs.end);
 		uint64_t fileSize = ifs.tellg();
 		ifs.seekg(0, ifs.beg);
@@ -118,14 +119,14 @@ Lumen::SceneManager::GLTFResource LumenPTModelConverter::LoadFile(std::string a_
 			std::vector<uint8_t> arr(x * y);
 			memcpy(arr.data(), texData, x * y);
 
-            if (ht.m_TextureType == TextureType::EMetalRoughness)
-            {
+			if (ht.m_TextureType == TextureType::EMetalRoughness)
+			{
 				for (int index = 0; index < x * y; ++index)
 				{
 					uchar4* data = reinterpret_cast<uchar4*>(&texData[index * 4]);
 					data->y = std::max(data->y, static_cast<unsigned char>(1));	//Minimal value for roughness is 1/255 (as a char).
 				}
-            }
+			}
 
 			bool normalize = ht.m_TextureType == TextureType::EDiffuse || ht.m_TextureType == TextureType::EEmissive;
 
@@ -140,7 +141,7 @@ Lumen::SceneManager::GLTFResource LumenPTModelConverter::LoadFile(std::string a_
 			HeaderMaterial hm;
 			ifs.read(reinterpret_cast<char*>(&hm), sizeof(hm));
 
-			
+
 
 			LumenRenderer::MaterialData matData;
 			matData.m_DiffuseColor.x = hm.m_Color[0];
@@ -165,10 +166,10 @@ Lumen::SceneManager::GLTFResource LumenPTModelConverter::LoadFile(std::string a_
 			if (hm.m_MetallicRoughnessTextureId != -1)
 				matData.m_MetallicRoughnessTexture = textures[hm.m_MetallicRoughnessTextureId];
 			else
-			    matData.m_MetallicRoughnessTexture = m_DefaultMetalRoughnessTexture;
+				matData.m_MetallicRoughnessTexture = m_DefaultMetalRoughnessTexture;
 
-            if (hm.m_EmissiveTextureId != -1)
-			    matData.m_EmissiveTexture = textures[hm.m_EmissiveTextureId];
+			if (hm.m_EmissiveTextureId != -1)
+				matData.m_EmissiveTexture = textures[hm.m_EmissiveTextureId];
 			else
 				matData.m_EmissiveTexture = m_DefaultEmissiveTexture;
 
@@ -258,23 +259,10 @@ Lumen::SceneManager::GLTFResource LumenPTModelConverter::LoadFile(std::string a_
 
 			uint32_t unnamedCounter = 0;
 
-			for (size_t j = 0; j < sceneHeader.m_NumMeshes; j++)
+			for (size_t j = 0; j < sceneHeader.m_NumRootNodes; j++)
 			{
-				
-				decltype(HeaderMeshInstance::m_Header) instanceHeader;
-				ifs.read(reinterpret_cast<char*>(&instanceHeader), sizeof(instanceHeader));
-				
-				auto m = scene->AddMesh();
-				m->SetMesh(res.m_MeshPool[instanceHeader.m_MeshId]);
-				m->m_Transform = glm::make_mat4(instanceHeader.m_Transform);
-				m->m_Name.resize(instanceHeader.m_NameLength);
-				ifs.read(m->m_Name.data(), m->m_Name.size());
-
-                if (m->m_Name.empty())
-                {
-					m->m_Name = std::string("Mesh ") + std::to_string(unnamedCounter++);
-                }
-
+				scene->m_RootNodes.push_back(LoadNode(ifs, res, *scene, nullptr));
+				scene->m_RootNodes.back()->m_ScenePtr = scene.get();
 			}
 		}
 	}
@@ -283,6 +271,50 @@ Lumen::SceneManager::GLTFResource LumenPTModelConverter::LoadFile(std::string a_
 
 	return res;
 }
+
+std::unique_ptr<Lumen::ILumenScene::Node> LumenPTModelConverter::LoadNode(
+	std::ifstream& a_FileStream, Lumen::SceneManager::GLTFResource& a_Resource, Lumen::ILumenScene& a_Scene,
+	Lumen::ILumenScene::Node* a_ParentNode)
+{
+	decltype(HeaderNode::m_Header) header;
+	a_FileStream.read(reinterpret_cast<char*>(&header), sizeof(header));
+	std::string name;
+	name.resize(header.m_NameLength);
+
+	a_FileStream.read(name.data(), name.size());
+
+	auto node = std::make_unique<Lumen::ILumenScene::Node>();
+	node->m_Name = name;
+	node->m_Transform = glm::make_mat4<float>(header.m_Transform);
+
+	if (header.m_MeshId != -1)
+	{
+		auto m = a_Scene.AddMesh();
+		m->m_Name = name;
+		m->SetMesh(a_Resource.m_MeshPool[header.m_MeshId]);
+		m->m_Transform = node->m_Transform;
+
+		node->m_MeshInstancePtr = m;
+
+		if (a_ParentNode != nullptr)
+			a_ParentNode->m_Transform.AddChild(m->m_Transform);
+	}
+	else if (a_ParentNode != nullptr)
+	{
+		a_ParentNode->m_Transform.AddChild(node->m_Transform);
+	}
+
+	for (size_t i = 0; i < header.m_NumChildren; i++)
+	{
+		node->m_ChildNodes.push_back(LoadNode(a_FileStream, a_Resource, a_Scene, node.get()));
+		node->m_ChildNodes.back()->m_Parent = node.get();
+	}
+
+
+
+	return node;
+}
+
 
 void LumenPTModelConverter::SetRendererRef(LumenRenderer& a_Renderer)
 {
@@ -304,16 +336,16 @@ void LumenPTModelConverter::SetRendererRef(LumenRenderer& a_Renderer)
 LumenPTModelConverter::FileContent LumenPTModelConverter::GenerateContent(const fx::gltf::Document& a_FxDoc, const std::string& a_SourcePath)
 {
 	FileContent fc;
-	
-    for (uint32_t i = 0; i < a_FxDoc.images.size(); i++)
-    {
+
+	for (uint32_t i = 0; i < a_FxDoc.images.size(); i++)
+	{
 		fc.m_Textures.push_back(TextureToBlob(a_FxDoc, i, fc.m_Blob, a_SourcePath));
-		printf("[File Conversion] Extracted image %i of %i.\n", i , static_cast<int>(a_FxDoc.images.size()) - 1);
-    }
+		printf("[File Conversion] Extracted image %i of %i.\n", i, static_cast<int>(a_FxDoc.images.size()) - 1);
+	}
 
 	int index = 0;
-    for (auto& material : a_FxDoc.materials)
-    {
+	for (auto& material : a_FxDoc.materials)
+	{
 		auto& m = fc.m_Materials.emplace_back();
 
 		m.m_Color[0] = material.pbrMetallicRoughness.baseColorFactor[0];
@@ -326,12 +358,12 @@ LumenPTModelConverter::FileContent LumenPTModelConverter::GenerateContent(const 
 		m.m_Emission[2] = material.emissiveFactor[2];
 
 		m.m_DiffuseTextureId = material.pbrMetallicRoughness.baseColorTexture.index;
-        if (m.m_DiffuseTextureId != -1)
-        {
+		if (m.m_DiffuseTextureId != -1)
+		{
 			m.m_DiffuseTextureId = a_FxDoc.textures[m.m_DiffuseTextureId].source;
-		    fc.m_Textures[m.m_DiffuseTextureId].m_TextureType = TextureType::EDiffuse;
-        }
-    	
+			fc.m_Textures[m.m_DiffuseTextureId].m_TextureType = TextureType::EDiffuse;
+		}
+
 		assert(m.m_DiffuseTextureId < static_cast<int>(a_FxDoc.textures.size()));
 
 		m.m_NormalMapId = material.normalTexture.index;
@@ -377,19 +409,19 @@ LumenPTModelConverter::FileContent LumenPTModelConverter::GenerateContent(const 
 		m.m_Anisotropic = 0.f;
 
 		nlohmann::json extensions;
-		if(material.extensionsAndExtras.contains("extensions"))
+		if (material.extensionsAndExtras.contains("extensions"))
 		{
 			extensions = material.extensionsAndExtras["extensions"];
 		}
-    	
-        //Transmission
+
+		//Transmission
 		constexpr auto transmissionExtension = "KHR_materials_transmission";
-		if(extensions.contains(transmissionExtension))
+		if (extensions.contains(transmissionExtension))
 		{
 			auto json = extensions[transmissionExtension];
 			const float transmissionFactor = JsonGetOrDefault<float>(json, "transmissionFactor", 0.f);
 			m.m_TransmissionFactor = transmissionFactor;
-			
+
 			const uint32_t transmissionTextureId = JsonGetOrDefault<uint32_t>(json, "transmissionTexture", -1);
 			m.m_TransmissionTextureId = transmissionTextureId;
 
@@ -428,13 +460,13 @@ LumenPTModelConverter::FileContent LumenPTModelConverter::GenerateContent(const 
 		if (extensions.contains(iorExtension))
 		{
 			auto json = extensions[iorExtension];
-			const float ior = JsonGetOrDefault<float>(json, "ior", 1.5f);
+			const float ior = JsonGetOrDefault<float>(json, "ior", 1.f);
 			m.m_IndexOfRefraction = ior;
 		}
 		//Not specified, default values.
 		else
 		{
-			m.m_IndexOfRefraction = 1.5f;
+			m.m_IndexOfRefraction = 1.f;
 		}
 
 		//Clearcoat
@@ -459,7 +491,7 @@ LumenPTModelConverter::FileContent LumenPTModelConverter::GenerateContent(const 
 				m.m_ClearCoatTextureId = a_FxDoc.textures[m.m_ClearCoatTextureId].source;
 				fc.m_Textures[m.m_ClearCoatTextureId].m_TextureType = TextureType::EClearCoat;
 			}
-			
+
 			m.m_ClearCoatRoughnessFactor = JsonGetOrDefault<float>(json, "clearcoatRoughnessFactor", 0.f);
 			m.m_ClearCoatFactor = JsonGetOrDefault<float>(json, "clearcoatFactor", 0.f);
 
@@ -502,26 +534,26 @@ LumenPTModelConverter::FileContent LumenPTModelConverter::GenerateContent(const 
 	}
 
 	index = 0;
-	
-    for (auto& mesh : a_FxDoc.meshes)
-    {
+
+	for (auto& mesh : a_FxDoc.meshes)
+	{
 		auto& m = fc.m_Meshes.emplace_back();
-        for (auto& primitive : mesh.primitives)
-        {
+		for (auto& primitive : mesh.primitives)
+		{
 			m.m_Primitives.push_back(PrimitiveToBlob(a_FxDoc, primitive, fc.m_Blob));
-        }
+		}
 		m.m_Header.m_NumPrimitives = m.m_Primitives.size();
 		printf("[File Conversion] Done generating mesh %i of %i.\n", index, static_cast<int>(a_FxDoc.meshes.size()) - 1);
 		++index;
-    }
+	}
 
 	index = 0;
-    for (auto& fxScene : a_FxDoc.scenes)
-    {
+	for (auto& fxScene : a_FxDoc.scenes)
+	{
 		fc.m_Scenes.push_back(MakeScene(a_FxDoc, fxScene));
 		printf("[File Conversion] Done extracting scene %i of %i.\n", index, static_cast<int>(a_FxDoc.scenes.size()) - 1);
 		++index;
-    }
+	}
 
 	fc.m_Blob.Trim();
 
@@ -544,28 +576,37 @@ LumenPTModelConverter::Header LumenPTModelConverter::GenerateHeader(const FileCo
 
 	h.m_Binary.Write(reinterpret_cast<char*>(&numMesh), sizeof(numMesh));
 	for (auto mesh : a_Content.m_Meshes)
-    {
+	{
 		h.m_Binary.Write(&mesh.m_Header, sizeof(mesh.m_Header));
 		h.m_Binary.Write(mesh.m_Primitives.data(), mesh.m_Primitives.size() * sizeof(HeaderPrimitive));
-    }
+	}
 
 
 	h.m_Binary.Write(reinterpret_cast<char*>(&numScenes), sizeof(numScenes));
-    for (auto headerScene : a_Content.m_Scenes)
-    {
+	for (auto headerScene : a_Content.m_Scenes)
+	{
 		h.m_Binary.Write(&headerScene.m_Header, sizeof(headerScene.m_Header));
 		h.m_Binary.Write(headerScene.m_Name.data(), headerScene.m_Name.size());
-        for (auto& mesh : headerScene.m_Meshes)
-        {
-			h.m_Binary.Write(&mesh.m_Header, sizeof(mesh.m_Header));
-			h.m_Binary.Write(mesh.m_Name.data(), mesh.m_Name.size());
-		    //h.m_Binary.Write(headerScene.m_Meshes.data(), headerScene.m_Meshes.size() * sizeof(HeaderMeshInstance));            
-        }
-    }
+		for (auto& node : headerScene.m_RootNodes)
+		{
+			AddNodeToHeader(node, h);
+			//h.m_Binary.Write(headerScene.m_Meshes.data(), headerScene.m_Meshes.size() * sizeof(HeaderMeshInstance));            
+		}
+	}
 
 	h.m_Binary.Trim();
 	h.m_Size = h.m_Binary.m_Size;
 	return h;
+}
+
+void LumenPTModelConverter::AddNodeToHeader(const HeaderNode& a_Node, Header& a_Header)
+{
+	a_Header.m_Binary.Write(&a_Node.m_Header, sizeof(a_Node.m_Header));
+	a_Header.m_Binary.Write(a_Node.m_Name.data(), a_Node.m_Name.size());
+	for (auto& childNode : a_Node.m_ChildNodes)
+	{
+		AddNodeToHeader(childNode, a_Header);
+	}
 }
 
 void LumenPTModelConverter::OutputToFile(const Header& a_Header, const Blob& a_Binary, const std::string& a_DestPath)
@@ -582,7 +623,7 @@ void LumenPTModelConverter::OutputToFile(const Header& a_Header, const Blob& a_B
 LumenPTModelConverter::HeaderTexture LumenPTModelConverter::TextureToBlob(const fx::gltf::Document& a_FxDoc, uint32_t a_ImageId, Blob& a_Blob, const std::string& a_SourcePath)
 {
 	HeaderTexture ht;
-    auto image = a_FxDoc.images[a_ImageId];
+	auto image = a_FxDoc.images[a_ImageId];
 
 	if (!image.IsEmbeddedResource() && !image.uri.empty())
 	{
@@ -600,14 +641,14 @@ LumenPTModelConverter::HeaderTexture LumenPTModelConverter::TextureToBlob(const 
 	}
 	else
 	{
-        if (image.IsEmbeddedResource())
-        {
+		if (image.IsEmbeddedResource())
+		{
 			std::vector<uint8_t> v;
 			image.MaterializeData(v);
 
 			ht.m_Offset = a_Blob.Write(v.data(), v.size());
 			ht.m_Size = v.size();
-        }
+		}
 		else
 		{
 			fx::gltf::BufferView const& bufferView = a_FxDoc.bufferViews[image.bufferView];
@@ -621,7 +662,7 @@ LumenPTModelConverter::HeaderTexture LumenPTModelConverter::TextureToBlob(const 
 }
 
 LumenPTModelConverter::HeaderPrimitive LumenPTModelConverter::PrimitiveToBlob(const fx::gltf::Document& a_FxDoc,
-    const fx::gltf::Primitive& a_FxPrimitive, Blob& a_Blob)
+	const fx::gltf::Primitive& a_FxPrimitive, Blob& a_Blob)
 {
 	// Extract the binary data of the primitive
 	std::vector<uint8_t> posBinary, texBinary, norBinary, tanBinary;
@@ -662,10 +703,10 @@ LumenPTModelConverter::HeaderPrimitive LumenPTModelConverter::PrimitiveToBlob(co
 	auto indexSize = GetComponentSize(indexBufferAcc); // indices are are always a single component
 	assert(indexSize <= 4);
 
-    if(tanBinary.empty())
-    {
+	if (tanBinary.empty())
+	{
 		tanBinary = GenerateTangentBinary(posBinary, norBinary, texBinary, indexBin, indexSize);
-    }
+	}
 
 
 	InterleaveInput interleave;
@@ -691,7 +732,7 @@ LumenPTModelConverter::HeaderPrimitive LumenPTModelConverter::PrimitiveToBlob(co
 }
 
 std::vector<uint8_t> LumenPTModelConverter::GenerateTangentBinary(std::vector<uint8_t>& a_PosBinary, std::vector<uint8_t>& a_NormalBinary,
-    std::vector<uint8_t>& a_TexBinary, std::vector<uint8_t>& a_IndexBinary, uint32_t a_IndexSize)
+	std::vector<uint8_t>& a_TexBinary, std::vector<uint8_t>& a_IndexBinary, uint32_t a_IndexSize)
 {
 	VectorView<glm::vec3, uint8_t> posView(a_PosBinary);
 	VectorView<glm::vec2, uint8_t> texView(a_TexBinary);
@@ -700,7 +741,7 @@ std::vector<uint8_t> LumenPTModelConverter::GenerateTangentBinary(std::vector<ui
 	VectorView<uint16_t, uint8_t> indexView16(a_IndexBinary);
 	const auto numIndices = a_IndexBinary.size() / a_IndexSize;
 	std::vector<uint8_t> tanBinary;
-    tanBinary.resize(numIndices * sizeof(glm::vec4));
+	tanBinary.resize(numIndices * sizeof(glm::vec4));
 
 	VectorView<glm::vec4, uint8_t> tangentView(tanBinary);
 
@@ -782,21 +823,21 @@ std::vector<uint8_t> LumenPTModelConverter::GenerateTangentBinary(std::vector<ui
 		glm::vec2 deltaUV1 = *uv1 - *uv0;
 		glm::vec2 deltaUV2 = *uv2 - *uv0;
 
-        ////If the cross is 0, it means the texture coords span an infinitely flat line. Set to default to avoid pain.
-        const float cross = deltaUV1.x * deltaUV2.y - deltaUV1.y * deltaUV2.x;
-        if (cross == 0)
-        {
-        	uv0 = &defaultUv[0];
-        	uv1 = &defaultUv[1];
-        	uv2 = &defaultUv[2];
-        	deltaUV1 = *uv1 - *uv0;
-        	deltaUV2 = *uv2 - *uv0;
-        }
+		////If the cross is 0, it means the texture coords span an infinitely flat line. Set to default to avoid pain.
+		const float cross = deltaUV1.x * deltaUV2.y - deltaUV1.y * deltaUV2.x;
+		if (cross == 0)
+		{
+			uv0 = &defaultUv[0];
+			uv1 = &defaultUv[1];
+			uv2 = &defaultUv[2];
+			deltaUV1 = *uv1 - *uv0;
+			deltaUV2 = *uv2 - *uv0;
+		}
 
 		//Generate the tangent vector.
-        glm::vec3 t = (deltaUV2.t * deltaPos1 - deltaUV1.t * deltaPos2) / (deltaUV1.s * deltaUV2.t - deltaUV2.s * deltaUV1.t);
+		glm::vec3 t = (deltaUV2.t * deltaPos1 - deltaUV1.t * deltaPos2) / (deltaUV1.s * deltaUV2.t - deltaUV2.s * deltaUV1.t);
 
-		for(int i = 0; i < 3; ++i)
+		for (int i = 0; i < 3; ++i)
 		{
 			//Take the tangent, and make it perpendicular to the normal.
 			glm::vec3 tangent = t;
@@ -853,7 +894,7 @@ std::vector<uint8_t> LumenPTModelConverter::GenerateTangentBinary(std::vector<ui
 		//tangentView[index2] = tanVec4;
 		//tangentView[index3] = tanVec4;
 	}
-	
+
 
 	return tanBinary;
 }
@@ -871,8 +912,8 @@ std::vector<char> LumenPTModelConverter::InterleaveVertexBuffers(InterleaveInput
 	for (size_t i = 0; i < posView.Size(); i++)
 	{
 		interleavedView[i].m_Position = make_float3(posView[i].x, posView[i].y, posView[i].z);
-        if (!a_Input.m_Tex->empty())
-		    interleavedView[i].m_UVCoord = make_float2(texView[i].x, texView[i].y);
+		if (!a_Input.m_Tex->empty())
+			interleavedView[i].m_UVCoord = make_float2(texView[i].x, texView[i].y);
 		if (!a_Input.m_Normal->empty())
 			interleavedView[i].m_Normal = make_float3(normalView[i].x, normalView[i].y, normalView[i].z);
 		if (!a_Input.m_Tangent->empty())
@@ -890,62 +931,72 @@ LumenPTModelConverter::HeaderScene LumenPTModelConverter::MakeScene(const fx::gl
 {
 	HeaderScene hscene;
 
-	
+
 	int index = 0;
-    for (auto rootNode : a_Scene.nodes)
-    {
+	for (auto rootNode : a_Scene.nodes)
+	{
 		printf("[File Conversion] Now loading root node %i of %i.\n", index, static_cast<int>(a_Scene.nodes.size()) - 1);
-    	
+
 		LoadNode(a_FxDoc, rootNode, hscene);
 
 		printf("[File Conversion] Done loading root node %i of %i.\n", index, static_cast<int>(a_Scene.nodes.size()) - 1);
 		++index;
-    }
+	}
 
 	hscene.m_Name = a_Scene.name;
-	hscene.m_Header.m_NumMeshes = hscene.m_Meshes.size();
+	hscene.m_Header.m_NumRootNodes = hscene.m_RootNodes.size();
 	hscene.m_Header.m_NameLength = hscene.m_Name.size();
 
 	return hscene;
 }
 
 void LumenPTModelConverter::LoadNode(const fx::gltf::Document& a_FxDoc, uint32_t a_NodeId, HeaderScene& a_Scene,
-    glm::mat4 a_ParentTransform)
+	LumenPTModelConverter::HeaderNode* a_ParentNode)
 {
 
 	const auto& node = a_FxDoc.nodes[a_NodeId];
+	HeaderNode* hNode;
+	if (!a_ParentNode)
+	{
+		hNode = &a_Scene.m_RootNodes.emplace_back();
+	}
+	else
+	{
+		hNode = &a_ParentNode->m_ChildNodes.emplace_back();
+	}
 
 	auto localTransform = LoadNodeTransform(node);
-	auto worldTransform = a_ParentTransform * localTransform;
 
-	auto mat = worldTransform.GetTransformationMatrix();
-
-    if (node.mesh != -1)
-    {
-		auto& m = a_Scene.m_Meshes.emplace_back();
-		m.m_Header.m_MeshId = node.mesh;
-
-		memcpy(m.m_Header.m_Transform, &mat[0], sizeof(glm::mat4));
-		m.m_Name = node.name;
-		m.m_Header.m_NameLength = node.name.size();
-    }
+	hNode->m_Name = node.name;
+	hNode->m_Header.m_MeshId = node.mesh;
 
 	int index = 0;
-
-    for (auto& ch : node.children)
-    {
+	for (auto& ch : node.children)
+	{
 		printf("[File Conversion] Now loading child node %i of %i.\n", index, static_cast<int>(node.children.size()) - 1);
-		LoadNode(a_FxDoc, ch, a_Scene, worldTransform);
+		LoadNode(a_FxDoc, ch, a_Scene, hNode);
 		++index;
-    }
+	}
+
+	auto mat = localTransform.GetLocalTransformationMatrix();
+
+	memcpy(&hNode->m_Header.m_Transform[0], &mat[0], sizeof(float) * 16);
+
+	hNode->m_Header.m_NumChildren = hNode->m_ChildNodes.size();
+	hNode->m_Header.m_NameLength = hNode->m_Name.size();
+
+	//  for (auto& ch : node.children)
+	//  {
+		  //LoadNode(a_FxDoc, ch, a_Scene, worldTransform);
+	//  }
 }
 
 Lumen::Transform LumenPTModelConverter::LoadNodeTransform(const fx::gltf::Node& a_Node)
 {
-    Lumen::Transform transform = glm::make_mat4(&a_Node.matrix[0]);
+	Lumen::Transform transform = glm::make_mat4(&a_Node.matrix[0]);
 
-    if (transform.GetTransformationMatrix() == glm::identity<glm::mat4>())
-    {
+	if (transform.GetWorldTransformationMatrix() == glm::identity<glm::mat4>())
+	{
 		auto translation = glm::vec3(
 			a_Node.translation[0],
 			a_Node.translation[1],
@@ -967,7 +1018,7 @@ Lumen::Transform LumenPTModelConverter::LoadNodeTransform(const fx::gltf::Node& 
 		transform.SetPosition(translation);
 		transform.SetRotation(rotation);
 		transform.SetScale(scale);
-    }
+	}
 
 	return transform;
 }
