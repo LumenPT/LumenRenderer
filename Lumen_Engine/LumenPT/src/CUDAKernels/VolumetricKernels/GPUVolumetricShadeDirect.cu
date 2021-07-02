@@ -24,7 +24,7 @@ GPU_ONLY void VolumetricShadeDirect(
 	{
 		//Volume ray marching settings (these need to be moved elsewhere or replaced with more sensible parameters)
 		const int MAX_STEPS = 5;
-		const float DENSITY_PER_METER = intersection.m_Density;
+		const float DENSITY_PER_CENTIMETER = intersection.m_Density;
 		const float VOLUME_COLOR_R = 1.0f;
 		const float VOLUME_COLOR_G = 1.0f;
 		const float VOLUME_COLOR_B = 1.0f;
@@ -65,7 +65,7 @@ GPU_ONLY void VolumetricShadeDirect(
 			//Normalize
 			pixelToLightDir /= lDistance;
 			
-			float sampledDensity = DENSITY_PER_METER * distanceSincePrevSample;
+			float sampledDensity = DENSITY_PER_CENTIMETER * distanceSincePrevSample;
 
 			auto volumeColor = make_float3(VOLUME_COLOR_R, VOLUME_COLOR_G, VOLUME_COLOR_B) * 0.01f;
 
