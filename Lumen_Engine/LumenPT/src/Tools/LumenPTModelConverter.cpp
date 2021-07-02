@@ -57,8 +57,8 @@ Lumen::SceneManager::GLTFResource LumenPTModelConverter::ConvertGLTF(std::string
 
 	volatile auto dbgfc = &content;
 
-	p.erase(p.begin() + p.find('.'), p.end());
-	std::string destPath = p.append(ms_ExtensionName);
+	
+	std::string destPath = std::filesystem::path(p).replace_extension(ms_ExtensionName).string();
 
 	OutputToFile(header, content.m_Blob, destPath);
 
