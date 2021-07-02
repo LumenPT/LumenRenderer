@@ -924,6 +924,7 @@ namespace WaveFront
                     m_OptixDenoiser->AlbedoInput.GetDevicePtr<float3>(),
                     m_OptixDenoiser->NormalInput.GetDevicePtr<float3>(),
                     m_OptixDenoiser->FlowInput.GetDevicePtr<float2>(),
+                    m_MotionVectorBuffer->GetSurfaceObject(),
                     m_OptixDenoiser->GetColorOutput().GetDevicePtr<float3>()
                 );
                 OptixDenoiserInitParams optixDenoiserInitParams;

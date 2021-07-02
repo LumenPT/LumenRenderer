@@ -184,6 +184,7 @@ namespace WaveFront
             float3* a_AlbedoInput,
             float3* a_NormalInput,
             float2* a_FlowInput,
+            cudaSurfaceObject_t a_MotionVectorBuffer,
             float3* a_IntermediaryOutput
         )
             :
@@ -194,6 +195,7 @@ namespace WaveFront
             m_AlbedoInput(a_AlbedoInput),
             m_NormalInput(a_NormalInput),
             m_FlowInput(a_FlowInput),
+            m_MotionVectorBuffer(a_MotionVectorBuffer),
             m_IntermediaryOutput(a_IntermediaryOutput)
         {}
 
@@ -206,6 +208,7 @@ namespace WaveFront
         float3* m_AlbedoInput;
         float3* m_NormalInput;
         float2* m_FlowInput;
+        cudaSurfaceObject_t m_MotionVectorBuffer;
         float3* m_IntermediaryOutput;
         float3* m_BlendOutput;
         bool m_UseBlendOutput;
