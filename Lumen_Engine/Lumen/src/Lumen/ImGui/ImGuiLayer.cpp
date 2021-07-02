@@ -103,7 +103,7 @@ namespace Lumen
 	void ImGuiLayer::OnImGuiRender()
 	{
 		static bool show = true;
-		ImGui::ShowDemoWindow(&show);
-		ImPlot::ShowDemoWindow();
+		//ImGui::ShowDemoWindow(&show);
+		//ImPlot::ShowDemoWindow();
 	}
 }
