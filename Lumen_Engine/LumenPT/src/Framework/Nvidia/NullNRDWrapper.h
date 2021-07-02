@@ -9,9 +9,9 @@ public:
 	NullNRDWrapper() {}
 	~NullNRDWrapper() {}
 
-	void Initialize(NRDWrapperInitParams a_InitParams) override {}
+	void Initialize(NRDWrapperInitParams& a_InitParams) override {}
 
-	void Denoise(DenoiseParams a_DenoiseParams) override {}
+	void Denoise(NRDWrapperEvaluateParams& a_DenoiseParams) override {}
 
 protected:
 

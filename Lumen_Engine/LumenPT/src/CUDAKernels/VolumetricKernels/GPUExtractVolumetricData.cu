@@ -35,6 +35,7 @@ CPU_ON_GPU void ExtractVolumetricDataGpu(
 		output.m_EntryIntersectionT = currIntersection.m_EntryT;
 		output.m_ExitIntersectionT = currIntersection.m_ExitT;
 		output.m_VolumeGrid = currIntersection.m_VolumeGrid;
+		output.m_Density = currIntersection.m_Density;
     }
 
 }

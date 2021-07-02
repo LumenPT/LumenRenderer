@@ -236,13 +236,13 @@ set(LUMENPT_LIBS
 if(${USE_NVIDIA_DENOISER})
 	list(APPEND LUMENPT_LIBS 
 	
-	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/_NRD_SDK/Lib/Release/NRD.lib"
-	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/_NRI_SDK/Lib/Release/NRI.lib"
-	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/_NRI_SDK/Lib/Release/NRI_Creation.lib"
-	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/_NRI_SDK/Lib/Release/NRI_Validation.lib"
-	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/_NRI_SDK/Lib/Release/NRI_D3D11.lib"
-	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/_NRI_SDK/Lib/Release/NRI_D3D12.lib"
-	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/_NRI_SDK/Lib/Release/NRI_VK.lib"
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/_NRD_SDK/Lib/Debug/NRD.lib"
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/_NRI_SDK/Lib/Debug/NRI.lib"
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/_NRI_SDK/Lib/Debug/NRI_Creation.lib"
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/_NRI_SDK/Lib/Debug/NRI_Validation.lib"
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/_NRI_SDK/Lib/Debug/NRI_D3D11.lib"
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/_NRI_SDK/Lib/Debug/NRI_D3D12.lib"
+	"${CMAKE_CURRENT_SOURCE_DIR}/vendor/RayTracingDenoiser/_NRI_SDK/Lib/Debug/NRI_VK.lib"
 
 	#NRD NRI NRI_D3D12 NRI_Validation
 	)
@@ -252,6 +252,7 @@ if(${USE_NVIDIA_DLSS})
 	file(GLOB_RECURSE DLSS_LIBS 
 
 	#${CMAKE_CURRENT_SOURCE_DIR}/vendor/DLSS_Private/Lib/x64/*_d_dbg.lib #TODO: use release version in release mode
+	#${CMAKE_CURRENT_SOURCE_DIR}/vendor/DLSS_Private/Lib/x64/nvsdk_ngx_d_dbg.lib #TODO: use release version in release mode
 	${CMAKE_CURRENT_SOURCE_DIR}/vendor/DLSS_Private/Lib/x64/*_d.lib #TODO: use release version in release mode
 	)
 

@@ -149,13 +149,20 @@ void ModelLoaderWidget::LoadModel()
 		m_LoadingThread = std::thread([this]() {
 			m_LoadingFinished = false;
 			// Choose how to open the file based on its extension
-			if (m_PathToOpen.extension() == ".gltf" || m_PathToOpen.extension() == ".glb")
+			if (m_PathToOpen.extension() == ".gltf" || m_PathToOpen.extension() == ".glb" || m_PathToOpen.extension() == ".ollad")
 			{
 				
 				m_LoadedResource = m_SceneManager.LoadGLTF(m_PathToOpen.filename().string(), m_PathToOpen.parent_path().string() + "\\");
 				m_State = State::ModelLoaded;
 				m_AdditionalMessage = "";
 				m_LoadedFileType = FileType::GLTF;
+			}
+			else if (m_PathToOpen.extension() == ".vdb")
+			{
+				//m_LoadedVolume = m_SceneManager.m_VolumeManager.LoadVDB(m_PathToOpen.string());
+				m_State = State::Directory;
+				m_AdditionalMessage = "";
+				m_LoadedFileType = FileType::VDB;
 			}
 			else
 			{
@@ -189,7 +196,7 @@ void ModelLoaderWidget::ModelSelection()
 
 void ModelLoaderWidget::ModelSelectionGLTF()
 {
-	ImGui::Text("Loaded file is .gltf.\nYou can replace the current scene with one from the file,\nor extract individual meshes from the file into the scene");
+	ImGui::Text("Loaded file is originally a .gltf.\nYou can replace the current scene with one from the file,\nor extract individual meshes from the file into the scene");
 
 	// If the file has any scenes specified, display them as possible scene options
 	if (!m_LoadedResource->m_Scenes.empty() && ImGui::ListBoxHeader("Loaded scenes"))
@@ -277,7 +284,6 @@ void ModelLoaderWidget::ModelSelectionGLTF()
 	}
 
 }
-
 
 void ModelLoaderWidget::TransformSpecifier(Lumen::Transform& a_Transform, bool& a_ResetAfterApplied)
 {
@@ -400,6 +406,31 @@ void ModelLoaderWidget::DirectoryNagivation()
 		}
 
 		ImGui::ListBoxFooter();
+	}
+
+    if (m_LoadedFileType == FileType::VDB)
+    {
+		{
+			ImGui::Text("The file you are trying to open contains volumetrics.\nWould you like to load it and add it to the scene?");
+			TransformSpecifier(m_TransformToApply, m_ResetTransformOnMeshAdded);
+			ImGui::InputText("Instance Name", m_NameToGiveToInstance.data(), m_NameToGiveToInstance.size());
+			if (ImGui::Button("Add to scene"))
+			{
+				auto res = m_SceneManager.m_VolumeManager.LoadVDB(m_PathToOpen.string());
+				auto v = m_SceneRef->AddVolume();
+
+				v->m_Name = m_NameToGiveToInstance;
+				v->SetVolume(res->m_Volume);
+				v->m_Transform = m_TransformToApply;
+				if (m_ResetTransformOnMeshAdded)
+				{
+					m_TransformToApply = Lumen::Transform();
+				}
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Cancel"))
+				m_LoadedFileType = FileType::Directory;
+		}
 	}
 }
 

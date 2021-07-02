@@ -67,5 +67,8 @@ namespace WaveFront
 
 		//Pointer to intersected volume as represented by a nanovdb grid of float type
 		const nanovdb::FloatGrid* m_VolumeGrid;
+
+		//Density of the volume
+		float m_Density;
 	};
 }

@@ -15,6 +15,7 @@ class AccelerationStructure;
 class PTMeshInstance : public Lumen::MeshInstance
 {
 public:
+
     // Default constructor creates an instance without a mesh attached to it
     // In this case the instance is not rendered because there is no geometry associated with it
     PTMeshInstance(PTServiceLocator& a_ServiceLocator);

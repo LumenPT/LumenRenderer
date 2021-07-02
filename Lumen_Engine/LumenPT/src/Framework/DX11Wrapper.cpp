@@ -9,9 +9,9 @@ namespace WaveFront
     void DX11Wrapper::Init()
     {
         UINT deviceFlags = 0;
-    #if _DEBUG
+
         deviceFlags = D3D11_CREATE_DEVICE_DEBUG;
-    #endif
+
         D3D_FEATURE_LEVEL featureLevels[] =
         {
             D3D_FEATURE_LEVEL_11_1,
@@ -35,12 +35,14 @@ namespace WaveFront
 
     }
 
-    Microsoft::WRL::ComPtr<ID3D11Texture2D> DX11Wrapper::CreateTexture2D(const uint3& a_ResDepth, DXGI_FORMAT a_Format, UINT a_BindFlag)
+    Microsoft::WRL::ComPtr<ID3D11Texture2D> DX11Wrapper::CreateTexture2D(const uint3& a_ResDepth, DXGI_FORMAT a_Format, UINT a_BindFlag, UINT a_Usage)
     {
         
         DXGI_SAMPLE_DESC textureSampleDesc{};
         textureSampleDesc.Count = 1;
         textureSampleDesc.Quality = 0;
+
+        D3D11_USAGE usage = a_Usage == 0 ? D3D11_USAGE_DEFAULT : D3D11_USAGE_STAGING;
 
         D3D11_TEXTURE2D_DESC desc{};
         desc.Width = a_ResDepth.x;
@@ -49,7 +51,8 @@ namespace WaveFront
         desc.ArraySize = a_ResDepth.z;
         desc.Format = a_Format;
         desc.SampleDesc = textureSampleDesc;
-        desc.Usage = D3D11_USAGE_DEFAULT;
+        //desc.Usage = D3D11_USAGE_DEFAULT;
+        desc.Usage = usage;
         desc.BindFlags = a_BindFlag;
         desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ | D3D11_CPU_ACCESS_WRITE;
         desc.MiscFlags = 0;

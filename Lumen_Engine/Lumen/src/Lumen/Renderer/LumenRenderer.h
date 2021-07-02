@@ -205,7 +205,7 @@ public:
 	//Debug GLuint texture accessible by application
 	GLuint m_DebugTexture;
 
-	unsigned int m_DlssMode = 2; //corresponds to dlssmodes enum in DLSS init params
+	unsigned int m_DlssMode = 1; //corresponds to dlssmodes enum in DLSS init params
 protected:
 
 	FrameStats m_LastFrameStats;

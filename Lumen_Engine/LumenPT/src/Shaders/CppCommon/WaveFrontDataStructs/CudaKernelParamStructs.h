@@ -120,6 +120,25 @@ namespace WaveFront
         FrameStats* m_FrameStats;
     };
 
+    struct WriteOutputParams {
+        CPU_ONLY WriteOutputParams(
+            const uint2& a_OutputResolution,
+            const cudaSurfaceObject_t a_PixelBufferSingleChannel,
+            uchar4* const a_FinalOutput)
+            :
+            m_OutputResolution(a_OutputResolution),
+            m_PixelBufferSingleChannel(a_PixelBufferSingleChannel),
+            m_FinalOutput(a_FinalOutput)
+        {}
+
+        CPU_ONLY ~WriteOutputParams() = default;
+
+        const uint2& m_OutputResolution;
+        const cudaSurfaceObject_t m_PixelBufferSingleChannel;
+        uchar4* const m_FinalOutput;
+    };
+
+
     struct PostProcessLaunchParameters
     {
 
@@ -149,8 +168,8 @@ namespace WaveFront
         const std::array<cudaSurfaceObject_t, static_cast<unsigned>(LightChannel::NUM_CHANNELS)> m_PixelBufferMultiChannel;
         const cudaSurfaceObject_t m_PixelBufferSingleChannel;
         uchar4* const m_FinalOutput;
-        const bool m_BlendOutput;
-        const unsigned m_BlendCount;
+        bool m_BlendOutput;
+        unsigned m_BlendCount;
     };
 
 
@@ -164,6 +183,7 @@ namespace WaveFront
             float3* a_IntermediaryInput,
             float3* a_AlbedoInput,
             float3* a_NormalInput,
+            float2* a_FlowInput,
             float3* a_IntermediaryOutput
         )
             :
@@ -173,6 +193,7 @@ namespace WaveFront
             m_IntermediaryInput(a_IntermediaryInput),
             m_AlbedoInput(a_AlbedoInput),
             m_NormalInput(a_NormalInput),
+            m_FlowInput(a_FlowInput),
             m_IntermediaryOutput(a_IntermediaryOutput)
         {}
 
@@ -184,6 +205,10 @@ namespace WaveFront
         float3* m_IntermediaryInput;
         float3* m_AlbedoInput;
         float3* m_NormalInput;
+        float2* m_FlowInput;
         float3* m_IntermediaryOutput;
+        float3* m_BlendOutput;
+        bool m_UseBlendOutput;
+        unsigned int m_BlendCount;
     };
 }
