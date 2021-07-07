@@ -18,7 +18,7 @@ PTVolumeInstance::PTVolumeInstance(const Lumen::VolumeInstance& a_Instance, PTSe
     m_Transform = a_Instance.m_Transform;
     m_Transform.AddDependent(*this);
     m_VolumeRef = a_Instance.GetVolume();
-	m_Density = a_Instance.m_Density;
+	m_Density = a_Instance.GetDensity();
 }
 
 void PTVolumeInstance::DependencyCallback()
@@ -42,10 +42,18 @@ void PTVolumeInstance::SetVolume(std::shared_ptr<Lumen::ILumenVolume> a_Mesh)
 	UpdateRaytracingData();
 }
 
+void PTVolumeInstance::SetDensity(float a_Density)
+{
+    VolumeInstance::SetDensity(a_Density);
+    UpdateRaytracingData();
+}
+
 void PTVolumeInstance::UpdateRaytracingData()
 {
 	if (!m_VolumeRef || !m_SceneRef)
 		return;
+
+    printf("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
 
 	auto& entryData = m_SceneDataTableEntry.GetData();
 	auto* ptVolume = reinterpret_cast<PTVolume*>(m_VolumeRef.get());

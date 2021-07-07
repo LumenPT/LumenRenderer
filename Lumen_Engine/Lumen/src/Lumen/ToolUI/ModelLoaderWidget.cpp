@@ -16,14 +16,15 @@
 namespace fs = std::filesystem;
 
 ModelLoaderWidget::ModelLoaderWidget(Lumen::SceneManager& a_SceneManager, std::shared_ptr<Lumen::ILumenScene>& a_SceneRef)
-    : m_SceneManager(a_SceneManager)
-    , m_SceneRef(a_SceneRef)
-    , m_State(State::Directory)
-    , m_LoadingFinished(true)
+	: m_SceneManager(a_SceneManager)
+	, m_SceneRef(a_SceneRef)
+	, m_State(State::Directory)
+	, m_LoadingFinished(true)
 {
 	//LoadIcons();
 	// Initialze the selected path to the working directory for the application
 	m_SelectedPath = fs::current_path();
+	m_NameToGiveToInstance.resize(256);
 }
 
 ModelLoaderWidget::~ModelLoaderWidget()

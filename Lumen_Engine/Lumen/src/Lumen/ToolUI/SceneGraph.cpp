@@ -261,6 +261,14 @@ void Lumen::SceneGraph::Display(ILumenScene& a_Scene)
             auto& transform = m_SelectedVolumeInstance->m_Transform;
             TransformEditor(transform);
         }
+        ImGui::Separator();
+        auto density = m_SelectedVolumeInstance->GetDensity();
+        auto newDensity = density;
+        ImGui::DragFloat("Volume Density", &newDensity, 0.005f, 0.0f, 1.0f);
+        if (newDensity != density)
+        {
+            m_SelectedVolumeInstance->SetDensity(newDensity);
+        }
     }
 
     ImGui::End();

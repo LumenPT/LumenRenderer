@@ -20,7 +20,7 @@ public:
     void SetSceneRef(PTScene* a_SceneRef);
 
     void SetVolume(std::shared_ptr<Lumen::ILumenVolume> a_Mesh) override;
-
+    void SetDensity(float a_Density) override;
     PTScene* m_SceneRef;
     PTServiceLocator& m_Services;
 
