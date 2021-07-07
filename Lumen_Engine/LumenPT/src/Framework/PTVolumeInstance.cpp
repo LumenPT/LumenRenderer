@@ -53,8 +53,6 @@ void PTVolumeInstance::UpdateRaytracingData()
 	if (!m_VolumeRef || !m_SceneRef)
 		return;
 
-    printf("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
-
 	auto& entryData = m_SceneDataTableEntry.GetData();
 	auto* ptVolume = reinterpret_cast<PTVolume*>(m_VolumeRef.get());
 	entryData.m_Grid = ptVolume->GetHandle()->grid<float>();

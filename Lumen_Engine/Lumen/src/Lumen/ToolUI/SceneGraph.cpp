@@ -30,9 +30,6 @@ void Lumen::SceneGraph::Display(ILumenScene& a_Scene)
     if (ImGui::Button("Instance View"))
         m_DisplayNodes = false;
 
-    if (ImGui::Button("Add Volume"))
-        a_Scene.AddVolume();
-
     if (m_DisplayNodes)
     {
         NodeSelection(a_Scene);
